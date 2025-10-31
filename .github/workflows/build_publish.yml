@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   Build:
+    environment: ENCODED_KEYSTORE
     strategy:
       fail-fast: false
       matrix:
