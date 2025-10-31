@@ -71,6 +71,14 @@ jobs:
       - name: Setup Android keystore
         if: matrix.target == 'Android'
         run: |
+          if [ -z "${{ secrets.ENCODED_KEYSTORE }}" ]; then
+            echo 'Missing secret: ENCODED_KEYSTORE'
+            exit 1
+          fi
+          if [ -z "${{ secrets.KEY_PROPERTIES }}" ]; then
+            echo 'Missing secret: KEY_PROPERTIES'
+            exit 1
+          fi
           echo "${{ secrets.ENCODED_KEYSTORE }}" | base64 -di > android/app/upload-keystore.jks
           echo "${{ secrets.KEY_PROPERTIES }}" > android/key.properties
           ls -l android/app/upload-keystore.jks
