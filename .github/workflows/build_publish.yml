@@ -73,6 +73,12 @@ jobs:
         run: |
           echo "${{ secrets.ENCODED_KEYSTORE }}" | base64 -di > android/app/upload-keystore.jks
           echo "${{ secrets.KEY_PROPERTIES }}" > android/key.properties
+          ls -l android/app/upload-keystore.jks
+          ls -l android/key.properties
+          if [ ! -s android/key.properties ]; then
+            echo 'key.properties is empty or missing'
+            exit 1
+          fi
       # Setup Flutter
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
