@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          xmlns:tools="http://schemas.android.com/tools" package="top.jtmonster.jhentai">
+          xmlns:tools="http://schemas.android.com/tools" package="com.gallery.reader">
     <application
-            android:label="JHenTai"
+            android:label="Gallery Reader"
             android:name="${applicationName}"
             android:requestLegacyExternalStorage="true"
             android:icon="@mipmap/launcher_icon">

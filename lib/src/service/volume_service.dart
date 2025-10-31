@@ -24,7 +24,7 @@ class VolumeService extends GetxService with JHLifeCircleBeanErrorCatch implemen
     if (!GetPlatform.isAndroid) {
       return;
     }
-    methodChannel = const MethodChannel('top.jtmonster.jhentai.volume.event.intercept');
+    methodChannel = const MethodChannel('com.gallery.reader.volume.event.intercept');
   }
 
   @override
