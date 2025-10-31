@@ -73,14 +73,6 @@ jobs:
         run: |
           echo "${{ secrets.ENCODED_KEYSTORE }}" | base64 -di > android/app/upload-keystore.jks
           echo "${{ secrets.KEY_PROPERTIES }}" > android/key.properties
-      # Add JHenTai api serret
-      - name: Setup JHenTai API Secret
-        run: |
-          cat > lib/src/config/jh_api_secret_config.dart << 'EOL'
-          class JHApiSecretConfig {
-            static const secret = '';
-          }
-          EOL
       # Setup Flutter
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
