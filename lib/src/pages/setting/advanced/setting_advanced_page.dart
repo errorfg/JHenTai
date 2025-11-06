@@ -12,7 +12,9 @@ import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/model/config.dart';
 import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/service/cloud_service.dart';
+import 'package:jhentai/src/service/webdav_sync_service.dart';
 import 'package:jhentai/src/setting/advanced_setting.dart';
+import 'package:jhentai/src/setting/webdav_setting.dart';
 import 'package:jhentai/src/service/path_service.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
@@ -45,12 +47,34 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
   LoadingState _exportDataLoadingState = LoadingState.idle;
   LoadingState _importDataLoadingState = LoadingState.idle;
 
+  LoadingState _testConnectionLoadingState = LoadingState.idle;
+  LoadingState _syncLoadingState = LoadingState.idle;
+
+  final TextEditingController _serverUrlController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _remotePathController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
 
     _loadingLogSize();
     _getImagesCacheSize();
+
+    _serverUrlController.text = webDavSetting.serverUrl.value;
+    _usernameController.text = webDavSetting.username.value;
+    _passwordController.text = webDavSetting.password.value;
+    _remotePathController.text = webDavSetting.remotePath.value;
+  }
+
+  @override
+  void dispose() {
+    _serverUrlController.dispose();
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _remotePathController.dispose();
+    super.dispose();
   }
 
   @override
@@ -74,6 +98,8 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
             _buildInNoImageMode(),
             _buildImportData(context),
             _buildExportData(context),
+            const Divider(),
+            _buildWebDavSyncSection(context),
           ],
         ).withListTileTheme(context),
       ),
@@ -468,5 +494,242 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
       setStateSafely(() => _exportDataLoadingState = LoadingState.error);
       file.delete().ignore();
     }
+  }
+
+  Widget _buildWebDavSyncSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Text(
+            'webdavSync'.tr,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+        _buildEnableWebDav(),
+        if (webDavSetting.enableWebDav.isTrue) ...[
+          _buildWebDavServerUrl(),
+          _buildWebDavUsername(),
+          _buildWebDavPassword(),
+          _buildWebDavRemotePath(),
+          _buildTestConnection(),
+          _buildAutoSync(),
+          _buildManualSync(context),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildEnableWebDav() {
+    return ListTile(
+      title: Text('enableWebDav'.tr),
+      subtitle: Text('enableWebDavHint'.tr),
+      trailing: Switch(
+        value: webDavSetting.enableWebDav.value,
+        onChanged: webDavSetting.saveEnableWebDav,
+      ),
+    );
+  }
+
+  Widget _buildWebDavServerUrl() {
+    return ListTile(
+      title: Text('webdavServerUrl'.tr),
+      subtitle: TextField(
+        controller: _serverUrlController,
+        decoration: InputDecoration(
+          hintText: 'https://dav.jianguoyun.com/dav/',
+          border: InputBorder.none,
+        ),
+        onChanged: (value) => webDavSetting.saveServerUrl(value),
+      ),
+    );
+  }
+
+  Widget _buildWebDavUsername() {
+    return ListTile(
+      title: Text('webdavUsername'.tr),
+      subtitle: TextField(
+        controller: _usernameController,
+        decoration: InputDecoration(
+          hintText: 'username@example.com',
+          border: InputBorder.none,
+        ),
+        onChanged: (value) => webDavSetting.saveUsername(value),
+      ),
+    );
+  }
+
+  Widget _buildWebDavPassword() {
+    return ListTile(
+      title: Text('webdavPassword'.tr),
+      subtitle: TextField(
+        controller: _passwordController,
+        obscureText: true,
+        decoration: InputDecoration(
+          hintText: '••••••••',
+          border: InputBorder.none,
+        ),
+        onChanged: (value) => webDavSetting.savePassword(value),
+      ),
+    );
+  }
+
+  Widget _buildWebDavRemotePath() {
+    return ListTile(
+      title: Text('webdavRemotePath'.tr),
+      subtitle: TextField(
+        controller: _remotePathController,
+        decoration: InputDecoration(
+          hintText: '/JHenTaiConfig',
+          border: InputBorder.none,
+        ),
+        onChanged: (value) => webDavSetting.saveRemotePath(value),
+      ),
+    );
+  }
+
+  Widget _buildTestConnection() {
+    return ListTile(
+      title: Text('testConnection'.tr),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          LoadingStateIndicator(
+            loadingState: _testConnectionLoadingState,
+            idleWidgetBuilder: () => const Icon(Icons.keyboard_arrow_right),
+            successWidgetSameWithIdle: false,
+            successWidgetBuilder: () => const Icon(Icons.check, color: Colors.green),
+            useCupertinoIndicator: true,
+            errorWidgetSameWithIdle: false,
+            errorWidgetBuilder: () => const Icon(Icons.error, color: Colors.red),
+          ).marginOnly(right: 8)
+        ],
+      ),
+      onTap: _testWebDavConnection,
+    );
+  }
+
+  Widget _buildAutoSync() {
+    return ListTile(
+      title: Text('autoSync'.tr),
+      subtitle: Text('autoSyncHint'.tr),
+      trailing: Switch(
+        value: webDavSetting.autoSync.value,
+        onChanged: webDavSetting.saveAutoSync,
+      ),
+    );
+  }
+
+  Widget _buildManualSync(BuildContext context) {
+    return ListTile(
+      title: Text('manualSync'.tr),
+      subtitle: Text('manualSyncHint'.tr),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          LoadingStateIndicator(
+            loadingState: _syncLoadingState,
+            idleWidgetBuilder: () => const Icon(Icons.keyboard_arrow_right),
+            successWidgetSameWithIdle: false,
+            successWidgetBuilder: () => const Icon(Icons.check, color: Colors.green),
+            useCupertinoIndicator: true,
+            errorWidgetSameWithIdle: false,
+            errorWidgetBuilder: () => const Icon(Icons.error, color: Colors.red),
+          ).marginOnly(right: 8)
+        ],
+      ),
+      onTap: () => _performManualSync(context),
+    );
+  }
+
+  Future<void> _testWebDavConnection() async {
+    if (_testConnectionLoadingState == LoadingState.loading) {
+      return;
+    }
+
+    setStateSafely(() => _testConnectionLoadingState = LoadingState.loading);
+
+    try {
+      bool success = await webDavSyncService.testConnection();
+      if (success) {
+        toast('connectionSuccess'.tr, isCenter: false);
+        setStateSafely(() => _testConnectionLoadingState = LoadingState.success);
+      } else {
+        toast('connectionFailed'.tr, isCenter: false);
+        setStateSafely(() => _testConnectionLoadingState = LoadingState.error);
+      }
+    } catch (e) {
+      log.error('Test WebDAV connection failed', e);
+      toast('connectionFailed'.tr + ': ${e.toString()}', isCenter: false);
+      setStateSafely(() => _testConnectionLoadingState = LoadingState.error);
+    }
+
+    // Reset state after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        setStateSafely(() => _testConnectionLoadingState = LoadingState.idle);
+      }
+    });
+  }
+
+  Future<void> _performManualSync(BuildContext context) async {
+    // First, show dialog to select config types
+    List<CloudConfigTypeEnum>? selectedTypes = await showDialog(
+      context: context,
+      builder: (_) => EHConfigTypeSelectDialog(title: 'selectSyncItems'.tr),
+    );
+
+    if (selectedTypes?.isEmpty ?? true) {
+      return;
+    }
+
+    if (_syncLoadingState == LoadingState.loading) {
+      return;
+    }
+
+    setStateSafely(() => _syncLoadingState = LoadingState.loading);
+
+    try {
+      SyncResult result = await webDavSyncService.manualSync(selectedTypes!);
+
+      if (result.success) {
+        String message = '';
+        switch (result.direction) {
+          case SyncDirection.upload:
+            message = 'syncUploadSuccess'.tr;
+            break;
+          case SyncDirection.download:
+            message = 'syncDownloadSuccess'.tr;
+            break;
+          case SyncDirection.bidirectional:
+            message = 'syncMergeSuccess'.tr;
+            break;
+          case SyncDirection.none:
+            message = 'alreadySynced'.tr;
+            break;
+        }
+        toast(message, isCenter: false);
+        setStateSafely(() => _syncLoadingState = LoadingState.success);
+      } else {
+        toast('syncFailed'.tr + ': ${result.message}', isCenter: false);
+        setStateSafely(() => _syncLoadingState = LoadingState.error);
+      }
+    } catch (e) {
+      log.error('Manual sync failed', e);
+      toast('syncFailed'.tr + ': ${e.toString()}', isCenter: false);
+      setStateSafely(() => _syncLoadingState = LoadingState.error);
+    }
+
+    // Reset state after 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        setStateSafely(() => _syncLoadingState = LoadingState.idle);
+      }
+    });
   }
 }

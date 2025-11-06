@@ -428,6 +428,28 @@ class zh_CN {
       'importData': '导入数据',
       'importDataHint': '在导入成功后应用会自动关闭以应用最新配置',
 
+      /// webdav sync
+      'webdavSync': 'WebDAV 同步',
+      'enableWebDav': '启用 WebDAV 同步',
+      'enableWebDavHint': '使用 WebDAV 云端同步配置文件',
+      'webdavServerUrl': 'WebDAV 服务器地址',
+      'webdavUsername': '用户名',
+      'webdavPassword': '密码',
+      'webdavRemotePath': '远程路径',
+      'testConnection': '测试连接',
+      'connectionSuccess': '连接成功',
+      'connectionFailed': '连接失败',
+      'autoSync': '自动同步',
+      'autoSyncHint': '应用启动时自动同步配置',
+      'manualSync': '手动同步',
+      'manualSyncHint': '根据时间戳自动判断上传或下载',
+      'selectSyncItems': '选择同步项',
+      'syncUploadSuccess': '上传同步成功',
+      'syncDownloadSuccess': '下载同步成功',
+      'syncMergeSuccess': '增量同步成功',
+      'syncFailed': '同步失败',
+      'alreadySynced': '已是最新，无需同步',
+
       /// host mapping page
       'hostDataSource': '默认情况下不用改动。\n数据来源: https://dns.google/',
 
