@@ -706,6 +706,9 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
           case SyncDirection.download:
             message = 'syncDownloadSuccess'.tr;
             break;
+          case SyncDirection.bidirectional:
+            message = 'syncMergeSuccess'.tr;
+            break;
           case SyncDirection.none:
             message = 'alreadySynced'.tr;
             break;

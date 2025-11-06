@@ -446,6 +446,7 @@ class en_US {
       'selectSyncItems': 'Select Sync Items',
       'syncUploadSuccess': 'Upload Sync Successful',
       'syncDownloadSuccess': 'Download Sync Successful',
+      'syncMergeSuccess': 'Incremental Sync Successful',
       'syncFailed': 'Sync Failed',
       'alreadySynced': 'Already up to date, no sync needed',
 

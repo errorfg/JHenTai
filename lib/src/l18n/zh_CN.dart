@@ -446,6 +446,7 @@ class zh_CN {
       'selectSyncItems': '选择同步项',
       'syncUploadSuccess': '上传同步成功',
       'syncDownloadSuccess': '下载同步成功',
+      'syncMergeSuccess': '增量同步成功',
       'syncFailed': '同步失败',
       'alreadySynced': '已是最新，无需同步',
 
