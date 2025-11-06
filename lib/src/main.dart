@@ -27,6 +27,7 @@ import 'package:jhentai/src/service/super_resolution_service.dart';
 import 'package:jhentai/src/service/tag_search_order_service.dart';
 import 'package:jhentai/src/service/tag_translation_service.dart';
 import 'package:jhentai/src/service/volume_service.dart';
+import 'package:jhentai/src/service/webdav_sync_service.dart';
 import 'package:jhentai/src/service/windows_service.dart';
 import 'package:jhentai/src/setting/advanced_setting.dart';
 import 'package:jhentai/src/setting/archive_bot_setting.dart';
@@ -42,6 +43,7 @@ import 'package:jhentai/src/setting/read_setting.dart';
 import 'package:jhentai/src/setting/site_setting.dart';
 import 'package:jhentai/src/setting/super_resolution_setting.dart';
 import 'package:jhentai/src/setting/user_setting.dart';
+import 'package:jhentai/src/setting/webdav_setting.dart';
 import 'package:jhentai/src/widget/app_manager.dart';
 import 'exception/upload_exception.dart';
 import 'package:jhentai/src/l18n/locale_text.dart';
@@ -79,6 +81,7 @@ List<JHLifeCircleBean> lifeCircleBeans = [
   tagTranslationService,
   tagSearchOrderOptimizationService,
   volumeService,
+  webDavSyncService,
   windowService,
   advancedSetting,
   downloadSetting,
@@ -96,6 +99,7 @@ List<JHLifeCircleBean> lifeCircleBeans = [
   styleSetting,
   superResolutionSetting,
   userSetting,
+  webDavSetting,
   builtInBlockedUserService,
 ];
 

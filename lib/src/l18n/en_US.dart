@@ -428,6 +428,25 @@ class en_US {
       'importData': 'Import Data',
       'importDataHint': 'App will shutdown automatically after importing to apply the latest configuration',
 
+      /// webdav sync
+      'webdavSync': 'WebDAV Sync',
+      'enableWebDav': 'Enable WebDAV Sync',
+      'enableWebDavHint': 'Sync configuration files using WebDAV cloud storage',
+      'webdavServerUrl': 'WebDAV Server URL',
+      'webdavUsername': 'Username',
+      'webdavPassword': 'Password',
+      'webdavRemotePath': 'Remote Path',
+      'testConnection': 'Test Connection',
+      'connectionSuccess': 'Connection Successful',
+      'connectionFailed': 'Connection Failed',
+      'manualSync': 'Manual Sync',
+      'manualSyncHint': 'Automatically determine upload or download based on timestamps',
+      'selectSyncItems': 'Select Sync Items',
+      'syncUploadSuccess': 'Upload Sync Successful',
+      'syncDownloadSuccess': 'Download Sync Successful',
+      'syncFailed': 'Sync Failed',
+      'alreadySynced': 'Already up to date, no sync needed',
+
       /// host mapping page
       'hostDataSource': 'No need to change by default.\nData source: https://dns.google/',
 
