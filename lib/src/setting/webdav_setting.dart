@@ -9,7 +9,7 @@ import '../service/jh_service.dart';
 WebDavSetting webDavSetting = WebDavSetting();
 
 class WebDavSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBean {
-  RxString serverUrl = ''.obs;
+  RxString serverUrl = 'https://dav.jianguoyun.com/dav/'.obs;
   RxString username = ''.obs;
   RxString password = ''.obs;
   RxString remotePath = '/JHenTaiConfig'.obs;
