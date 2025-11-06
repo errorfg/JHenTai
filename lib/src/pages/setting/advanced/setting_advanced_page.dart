@@ -518,6 +518,7 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
           _buildWebDavPassword(),
           _buildWebDavRemotePath(),
           _buildTestConnection(),
+          _buildAutoSync(),
           _buildManualSync(context),
         ],
       ],
@@ -610,6 +611,17 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
         ],
       ),
       onTap: _testWebDavConnection,
+    );
+  }
+
+  Widget _buildAutoSync() {
+    return ListTile(
+      title: Text('autoSync'.tr),
+      subtitle: Text('autoSyncHint'.tr),
+      trailing: Switch(
+        value: webDavSetting.autoSync.value,
+        onChanged: webDavSetting.saveAutoSync,
+      ),
     );
   }
 

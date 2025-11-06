@@ -439,6 +439,8 @@ class en_US {
       'testConnection': 'Test Connection',
       'connectionSuccess': 'Connection Successful',
       'connectionFailed': 'Connection Failed',
+      'autoSync': 'Auto Sync',
+      'autoSyncHint': 'Automatically sync configuration on app startup',
       'manualSync': 'Manual Sync',
       'manualSyncHint': 'Automatically determine upload or download based on timestamps',
       'selectSyncItems': 'Select Sync Items',

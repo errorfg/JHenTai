@@ -439,6 +439,8 @@ class zh_CN {
       'testConnection': '测试连接',
       'connectionSuccess': '连接成功',
       'connectionFailed': '连接失败',
+      'autoSync': '自动同步',
+      'autoSyncHint': '应用启动时自动同步配置',
       'manualSync': '手动同步',
       'manualSyncHint': '根据时间戳自动判断上传或下载',
       'selectSyncItems': '选择同步项',

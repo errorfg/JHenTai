@@ -29,7 +29,33 @@ class WebDavSyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleB
   Future<void> doInitBean() async {}
 
   @override
-  Future<void> doAfterBeanReady() async {}
+  Future<void> doAfterBeanReady() async {
+    // Auto sync on app startup if enabled
+    if (webDavSetting.enableWebDav.value && webDavSetting.autoSync.value) {
+      _performAutoSyncOnStartup();
+    }
+  }
+
+  /// Perform auto sync on app startup (non-blocking, background)
+  void _performAutoSyncOnStartup() async {
+    try {
+      log.info('Auto sync on startup: checking...');
+
+      // Sync all config types by default
+      List<CloudConfigTypeEnum> allTypes = CloudConfigTypeEnum.values;
+
+      SyncResult result = await manualSync(allTypes);
+
+      if (result.success) {
+        log.info('Auto sync completed: ${result.direction.name}');
+      } else {
+        log.warning('Auto sync failed: ${result.message}');
+      }
+    } catch (e) {
+      log.error('Auto sync on startup failed', e);
+      // Don't throw, just log the error to avoid affecting app startup
+    }
+  }
 
   /// Initialize WebDAV client with current settings
   webdav.Client _initClient() {
