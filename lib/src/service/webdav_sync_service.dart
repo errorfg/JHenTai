@@ -70,7 +70,7 @@ class WebDavSyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleB
 
   /// Get local temporary file path
   Future<String> _getLocalTempFilePath() async {
-    String tempDir = pathService.getTempDir();
+    String tempDir = pathService.tempDir.path;
     String fileName = '${CloudConfigService.configFileName}-temp.json';
     return path.join(tempDir, fileName);
   }
@@ -189,7 +189,7 @@ class WebDavSyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleB
 
   /// Get local metadata file path
   Future<String> _getLocalMetadataPath() async {
-    String tempDir = pathService.getTempDir();
+    String tempDir = pathService.tempDir.path;
     String fileName = '${CloudConfigService.configFileName}-metadata.json';
     return path.join(tempDir, fileName);
   }
@@ -292,7 +292,7 @@ class WebDavSyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleB
       }
 
       String fileName = '${CloudConfigService.configFileName}-${DateFormat('yyyyMMddHHmmss').format(DateTime.now())}.json';
-      String filePath = path.join(pathService.getTempDir(), fileName);
+      String filePath = path.join(pathService.tempDir.path, fileName);
 
       File file = File(filePath);
       await file.writeAsString(await isolateService.jsonEncodeAsync(exportConfigs));
