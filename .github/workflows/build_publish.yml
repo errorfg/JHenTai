@@ -280,9 +280,12 @@ jobs:
       - name: Get changelog content
         id: get_changelog
         run: |
-          # Read changelog and preserve newlines for JSON
-          CHANGELOG=$(cat changelog/${{ github.ref_name }}.md | jq -Rs .)
-          echo "changelog=$CHANGELOG" >> $GITHUB_OUTPUT
+          # Read changelog and preserve newlines using heredoc
+          {
+            echo 'changelog<<EOF'
+            cat changelog/${{ github.ref_name }}.md
+            echo EOF
+          } >> $GITHUB_OUTPUT
 
       # Extract build version from tag
       - name: Get build version
@@ -296,12 +299,8 @@ jobs:
         run: |
           VERSION="${{ needs.Build.outputs.version }}"
           DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          
-          # Get changelog as raw string (remove quotes added by jq -Rs)
           CHANGELOG="${{ steps.get_changelog.outputs.changelog }}"
-          CHANGELOG="${CHANGELOG%\"}"
-          CHANGELOG="${CHANGELOG#\"}"
-          
+
           # Create new version entry
           jq --arg version "$VERSION" \
              --arg build "${{ steps.get_build_version.outputs.build_version }}" \
