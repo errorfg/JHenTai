@@ -1,6 +1,7 @@
 import 'package:jhentai/src/mixin/scroll_to_top_state_mixin.dart';
 import 'package:jhentai/src/model/gallery.dart';
 import 'package:jhentai/src/model/gallery_detail.dart';
+import 'package:jhentai/src/model/gallery_tag.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/widget/loading_state_indicator.dart';
 
@@ -29,6 +30,10 @@ class DetailsPageState with Scroll2TopStateMixin {
   LoadingState loadingThumbnailsState = LoadingState.idle;
   LoadingState favoriteState = LoadingState.idle;
   LoadingState ratingState = LoadingState.idle;
+
+  /// Tag selection mode
+  bool isTagSelectionMode = false;
+  List<GalleryTag> selectedTags = [];
 
   String? errorMessage;
 }

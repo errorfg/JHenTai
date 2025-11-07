@@ -1205,6 +1205,43 @@ class DetailsPageLogic extends GetxController with LoginRequiredMixin, Scroll2To
     }
   }
 
+  void toggleTagSelectionMode() {
+    state.isTagSelectionMode = !state.isTagSelectionMode;
+    if (!state.isTagSelectionMode) {
+      state.selectedTags.clear();
+    }
+    updateSafely([detailsId]);
+  }
+
+  void toggleTagSelection(GalleryTag tag) {
+    int existingIndex = state.selectedTags.indexWhere(
+      (t) => t.tagData.namespace == tag.tagData.namespace && t.tagData.key == tag.tagData.key,
+    );
+
+    if (existingIndex != -1) {
+      state.selectedTags.removeAt(existingIndex);
+    } else {
+      state.selectedTags.add(tag);
+    }
+    updateSafely([detailsId]);
+  }
+
+  void searchWithSelectedTags() {
+    if (state.selectedTags.isEmpty) {
+      return;
+    }
+
+    SearchConfig searchConfig = SearchConfig();
+    searchConfig.tags = state.selectedTags.map((t) => t.tagData).toList();
+
+    newSearch(rewriteSearchConfig: searchConfig, forceNewRoute: true);
+
+    // Exit selection mode after search
+    state.isTagSelectionMode = false;
+    state.selectedTags.clear();
+    updateSafely([detailsId]);
+  }
+
   void removeCache() {
     ehRequest.removeCacheByGalleryUrlAndPage(state.galleryUrl.url, 0);
   }
