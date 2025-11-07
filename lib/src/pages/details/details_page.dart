@@ -1233,24 +1233,54 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
           }
 
           return Column(
-            children: state.galleryDetails!.tags.entries
-                .map(
-                  (entry) => Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildCategoryTag(entry.key),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Wrap(
-                          spacing: 5,
-                          runSpacing: 5,
-                          children: _buildSubTags(entry.value),
-                        ),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Multi-select button and search button
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton.icon(
+                    onPressed: logic.toggleTagSelectionMode,
+                    icon: Icon(
+                      state.isTagSelectionMode ? Icons.close : Icons.checklist,
+                      size: 18,
+                    ),
+                    label: Text(
+                      state.isTagSelectionMode ? 'cancelMultiSelect'.tr : 'multiSelectTags'.tr,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+                  if (state.isTagSelectionMode && state.selectedTags.isNotEmpty)
+                    ElevatedButton.icon(
+                      onPressed: logic.searchWithSelectedTags,
+                      icon: const Icon(Icons.search, size: 18),
+                      label: Text(
+                        '${'searchSelectedTags'.tr} (${state.selectedTags.length})',
+                        style: const TextStyle(fontSize: 14),
                       ),
-                    ],
-                  ).marginOnly(top: 10),
-                )
-                .toList(),
+                    ),
+                ],
+              ),
+              // Tags list
+              ...state.galleryDetails!.tags.entries
+                  .map(
+                    (entry) => Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildCategoryTag(entry.key),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Wrap(
+                            spacing: 5,
+                            runSpacing: 5,
+                            children: _buildSubTags(entry.value),
+                          ),
+                        ),
+                      ],
+                    ).marginOnly(top: 10),
+                  )
+                  .toList(),
+            ],
           ).fadeIn().marginSymmetric(horizontal: UIConfig.detailPagePadding);
         },
       ),
@@ -1271,17 +1301,46 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
   }
 
   List<Widget> _buildSubTags(List<GalleryTag> tags) {
-    return tags
-        .map(
-          (tag) => EHTag(
-            tag: tag,
-            onTap: (tag) => newSearch(keyword: '${tag.tagData.namespace}:"${tag.tagData.key}\$"', forceNewRoute: true),
-            onSecondaryTap: logic.showTagDialog,
-            onLongPress: logic.showTagDialog,
-            showTagStatus: preferenceSetting.showGalleryTagVoteStatus.isTrue,
-          ),
-        )
-        .toList();
+    return tags.map((tag) {
+      bool isSelected = state.isTagSelectionMode &&
+          state.selectedTags.any((t) => t.tagData.namespace == tag.tagData.namespace && t.tagData.key == tag.tagData.key);
+
+      Widget tagWidget = EHTag(
+        tag: tag,
+        onTap: state.isTagSelectionMode
+            ? (tag) => logic.toggleTagSelection(tag)
+            : (tag) => newSearch(keyword: '${tag.tagData.namespace}:"${tag.tagData.key}\$"', forceNewRoute: true),
+        onSecondaryTap: logic.showTagDialog,
+        onLongPress: logic.showTagDialog,
+        showTagStatus: preferenceSetting.showGalleryTagVoteStatus.isTrue,
+      );
+
+      if (isSelected) {
+        return Stack(
+          children: [
+            tagWidget,
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check,
+                  size: 12,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        );
+      }
+
+      return tagWidget;
+    }).toList();
   }
 
   Widget buildComments() {
