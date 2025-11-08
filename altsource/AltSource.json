@@ -60,12 +60,12 @@
       },
       "versions": [
         {
-          "version": "8.0.12+304",
-          "buildVersion": "304",
-          "date": "2025-11-07T08:23:40Z",
-          "localizedDescription": "- 新增画廊详情页多标签选择功能\n  - 支持通过按钮启用多选模式\n  - 可以选择多个标签进行组合搜索（AND 逻辑）\n  - 选中的标签会显示绿色勾选标记\n  - 提供取消多选和搜索所选标签的功能\n- 修复 release workflow 脚本语法错误\n\n--------------------\n\n- Add multi-tag selection feature for gallery details page\n  - Support enabling multi-select mode via button\n  - Select multiple tags for combined search (AND logic)\n  - Selected tags show green checkmark indicator\n  - Provide cancel multi-select and search selected tags functionality\n- Fix release workflow script syntax error",
-          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.12+304/JHenTai_8.0.12+304.ipa",
-          "size": 15753485
+          "version": "8.0.13+305",
+          "buildVersion": "305",
+          "date": "2025-11-08T20:08:38Z",
+          "localizedDescription": "- 新增 S3 兼容云同步功能\n  - 支持 S3 和 WebDAV 两种云存储协议\n  - 统一的同步服务架构\n  - 支持多种配置类型同步：阅读进度、快速搜索、屏蔽规则、搜索历史、浏览历史\n  - 基于时间戳的版本控制\n  - 自动清理旧版本历史\n- 改进同步合并逻辑\n  - 从实际数据中提取最新时间戳，提高时间比较准确性\n  - 简化搜索历史合并策略：新覆盖旧\n  - 添加数据大小比较作为时间戳不可用时的回退方案\n  - 修复多个可能导致数据丢失的关键 bug\n- 新增应用恢复前台时自动同步功能\n  - 当应用从后台恢复到前台时自动触发同步\n  - 复用现有自动同步开关\n  - 添加 30 秒防抖机制防止频繁同步\n\n--------------------\n\n- Add S3-compatible cloud sync feature\n  - Support both S3 and WebDAV cloud storage protocols\n  - Unified sync service architecture\n  - Support syncing multiple config types: read progress, quick search, block rules, search history, browsing history\n  - Timestamp-based version control\n  - Automatic cleanup of old version history\n- Improve sync merge logic\n  - Extract latest timestamp from actual data for better accuracy\n  - Simplify search history merge strategy: newer overwrites older\n  - Add data size comparison as fallback when timestamp unavailable\n  - Fix multiple critical bugs that could cause data loss\n- Add auto sync on app resume\n  - Automatically trigger sync when app returns to foreground\n  - Reuse existing auto sync toggle\n  - Add 30-second debounce to prevent frequent syncs",
+          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.13+305/JHenTai_8.0.13+305.ipa",
+          "size": 15837969
         }
       ]
     }
