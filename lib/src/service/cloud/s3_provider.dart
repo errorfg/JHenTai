@@ -13,7 +13,6 @@ class S3Provider implements CloudProvider {
   final String _endpoint;
   final String _bucketName;
   final String _baseKey; // Object key prefix (e.g., "jhentai-sync/")
-  final bool _enabled;
 
   S3Provider({
     required String endpoint,
@@ -22,12 +21,10 @@ class S3Provider implements CloudProvider {
     required String bucketName,
     required String region,
     String baseKey = '',
-    bool enabled = false,
     bool useSSL = true,
   })  : _endpoint = endpoint,
         _bucketName = bucketName,
         _baseKey = baseKey.isEmpty ? '' : (baseKey.endsWith('/') ? baseKey : '$baseKey/'),
-        _enabled = enabled,
         _client = Minio(
           endPoint: endpoint,
           accessKey: accessKey,
@@ -38,9 +35,6 @@ class S3Provider implements CloudProvider {
 
   @override
   String get name => 's3';
-
-  @override
-  bool get isEnabled => _enabled;
 
   @override
   Future<CloudFile> upload(String data, {bool saveHistory = false}) async {
@@ -169,8 +163,14 @@ class S3Provider implements CloudProvider {
         size: stat.size ?? 0,
         etag: stat.etag,
       );
-    } catch (e) {
-      log.error('Failed to get file metadata from S3', e);
+    } on MinioError catch (_) {
+      // File doesn't exist (NoSuchKey) or other S3 errors
+      // Don't access exception properties to avoid triggering null check issues in minio-dart
+      // Most common case: file doesn't exist (first sync)
+      return null;
+    } catch (_) {
+      // Catch any other unexpected errors
+      // Don't log exception to avoid potential null check issues
       return null;
     }
   }

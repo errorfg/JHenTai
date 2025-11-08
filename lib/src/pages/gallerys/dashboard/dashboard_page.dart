@@ -58,19 +58,15 @@ class DashboardPage extends BasePage {
   }
 
   void _handleTitleTap() async {
-    if (!syncSetting.autoSync.value) {
-      return; // Only sync when autoSync is enabled
+    // Check if sync is enabled
+    if (!syncSetting.enableSync.value) {
+      return; // Sync is disabled
     }
 
-    // Get enabled provider
+    // Get current provider
     String provider = syncSetting.currentProvider.value;
-    bool providerEnabled = provider == 's3' ? syncSetting.enableS3.value : syncSetting.enableWebDav.value;
 
-    if (!providerEnabled) {
-      return; // Provider not enabled, skip sync
-    }
-
-    log.info('Syncing on home title tap...');
+    log.info('Syncing on home title tap with provider: $provider');
 
     try {
       var result = await syncService.sync(

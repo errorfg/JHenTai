@@ -105,20 +105,35 @@ class _CloudSyncSettingsPageState extends State<CloudSyncSettingsPage> {
         () => ListView(
           padding: const EdgeInsets.only(top: 16),
           children: [
-            _buildProviderSelector(context),
-            _buildAutoSyncSwitch(context),
-            const Divider(height: 32),
-            if (syncSetting.currentProvider.value == 's3') ..._buildS3Settings(context),
-            if (syncSetting.currentProvider.value == 'webdav') ..._buildWebDavSettings(context),
-            const Divider(height: 32),
-            ..._buildHistorySettings(context),
-            const Divider(height: 32),
-            _buildTestConnectionButton(context),
-            _buildSyncButton(context),
-            if (syncSetting.enableHistory.value) _buildViewHistoryButton(context),
+            _buildEnableSyncSwitch(context),
+            if (syncSetting.enableSync.value) ...[
+              const Divider(height: 32),
+              _buildProviderSelector(context),
+              _buildAutoSyncSwitch(context),
+              const Divider(height: 32),
+              if (syncSetting.currentProvider.value == 's3') ..._buildS3Settings(context),
+              if (syncSetting.currentProvider.value == 'webdav') ..._buildWebDavSettings(context),
+              const Divider(height: 32),
+              ..._buildHistorySettings(context),
+              const Divider(height: 32),
+              _buildTestConnectionButton(context),
+              _buildSyncButton(context),
+              if (syncSetting.enableHistory.value) _buildViewHistoryButton(context),
+            ],
           ],
         ).withListTileTheme(context),
       ),
+    );
+  }
+
+  Widget _buildEnableSyncSwitch(BuildContext context) {
+    return SwitchListTile(
+      title: Text('enableSync'.tr),
+      subtitle: Text('enableSyncHint'.tr),
+      value: syncSetting.enableSync.value,
+      onChanged: (value) async {
+        await syncSetting.saveEnableSync(value);
+      },
     );
   }
 
@@ -160,14 +175,6 @@ class _CloudSyncSettingsPageState extends State<CloudSyncSettingsPage> {
     return [
       ListTile(
         title: Text('s3Config'.tr, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-      ),
-      SwitchListTile(
-        title: Text('enableS3'.tr),
-        subtitle: Text('enableS3Hint'.tr),
-        value: syncSetting.enableS3.value,
-        onChanged: (value) async {
-          await syncSetting.saveEnableS3(value);
-        },
       ),
       _buildTextFieldTile(
         context: context,
@@ -228,14 +235,6 @@ class _CloudSyncSettingsPageState extends State<CloudSyncSettingsPage> {
     return [
       ListTile(
         title: Text('webdavConfig'.tr, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-      ),
-      SwitchListTile(
-        title: Text('enableWebDAV'.tr),
-        subtitle: Text('enableWebDAVHint'.tr),
-        value: syncSetting.enableWebDav.value,
-        onChanged: (value) async {
-          await syncSetting.saveEnableWebDav(value);
-        },
       ),
       _buildTextFieldTile(
         context: context,

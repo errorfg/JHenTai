@@ -4,9 +4,6 @@ abstract class CloudProvider {
   /// 提供商名称 (例如: 's3', 'webdav')
   String get name;
 
-  /// 是否已启用
-  bool get isEnabled;
-
   /// 上传配置文件
   ///
   /// [data]: JSON 字符串格式的配置数据

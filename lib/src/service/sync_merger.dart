@@ -34,6 +34,9 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     List<CloudConfig> mergedConfigs = [];
     Map<CloudConfigTypeEnum, MergeStatistics> statistics = {};
 
+    // Extract latest local timestamp from configs with item timestamps
+    DateTime? latestLocalTime = await _getLatestLocalTimestamp(localConfigs);
+
     for (var type in selectedTypes) {
       try {
         // Get local config for this type
@@ -51,21 +54,25 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         }
 
         if (localConfig == null) {
-          // Only remote exists, use it (will be imported by caller)
-          log.info('Only remote config exists for $type, will use it');
+          // Only remote exists, import it
+          log.info('Only remote config exists for $type, importing');
+          await cloudConfigService.importConfig(remoteConfig!);
           merged = remoteConfig;
           stats = MergeStatistics(0, 1, 1, 1, 0);
         } else if (remoteConfig == null) {
-          // Only local exists, use it
-          log.info('Only local config exists for $type, will use it');
+          // Only local exists, use it (no need to import)
+          log.info('Only local config exists for $type, will upload');
           merged = localConfig;
           stats = MergeStatistics(1, 0, 1, 0, 0);
         } else {
-          // Both exist, merge them (will be imported by caller)
+          // Both exist, merge them
           log.info('Merging configs for $type');
-          var result = await mergeConfigType(type, localConfig, remoteConfig, remoteFileTime);
+          var result = await mergeConfigType(type, localConfig, remoteConfig, remoteFileTime, latestLocalTime);
           merged = result.config;
           stats = result.statistics;
+
+          // Import merged config to local
+          await cloudConfigService.importConfig(merged);
         }
 
         if (merged != null) {
@@ -80,22 +87,71 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     return MergeResult(mergedConfigs, statistics);
   }
 
+  /// 从本地配置中提取最新的时间戳
+  /// 优先使用 readIndexRecord 或 history 的 item timestamp
+  Future<DateTime?> _getLatestLocalTimestamp(List<CloudConfig> localConfigs) async {
+    DateTime? latestTime;
+
+    // Check readIndexRecord
+    CloudConfig? readIndexRecord = localConfigs.where((c) => c.type == CloudConfigTypeEnum.readIndexRecord).firstOrNull;
+    if (readIndexRecord != null) {
+      try {
+        List list = await isolateService.jsonDecodeAsync(readIndexRecord.config);
+        for (var item in list) {
+          if (item['utime'] != null) {
+            DateTime time = DateTime.parse(item['utime']);
+            if (latestTime == null || time.isAfter(latestTime)) {
+              latestTime = time;
+            }
+          }
+        }
+      } catch (e) {
+        log.warning('Failed to parse readIndexRecord timestamps', e);
+      }
+    }
+
+    // Check history
+    CloudConfig? history = localConfigs.where((c) => c.type == CloudConfigTypeEnum.history).firstOrNull;
+    if (history != null) {
+      try {
+        List list = await isolateService.jsonDecodeAsync(history.config);
+        for (var item in list) {
+          if (item['lastReadTime'] != null) {
+            DateTime time = DateTime.parse(item['lastReadTime']);
+            if (latestTime == null || time.isAfter(latestTime)) {
+              latestTime = time;
+            }
+          }
+        }
+      } catch (e) {
+        log.warning('Failed to parse history timestamps', e);
+      }
+    }
+
+    if (latestTime != null) {
+      log.info('📅 Latest local timestamp: $latestTime');
+    }
+
+    return latestTime;
+  }
+
   /// 合并单个配置类型
   Future<MergeConfigResult> mergeConfigType(
     CloudConfigTypeEnum type,
     CloudConfig local,
     CloudConfig remote,
     DateTime remoteFileTime,
+    DateTime? latestLocalTime,
   ) async {
     switch (type) {
       case CloudConfigTypeEnum.readIndexRecord:
         return await _mergeReadIndexRecord(local, remote);
       case CloudConfigTypeEnum.quickSearch:
-        return await _mergeQuickSearch(local, remote, remoteFileTime);
+        return await _mergeQuickSearch(local, remote, remoteFileTime, latestLocalTime);
       case CloudConfigTypeEnum.blockRules:
-        return await _mergeBlockRules(local, remote, remoteFileTime);
+        return await _mergeBlockRules(local, remote, remoteFileTime, latestLocalTime);
       case CloudConfigTypeEnum.searchHistory:
-        return await _mergeSearchHistory(local, remote, remoteFileTime);
+        return await _mergeSearchHistory(local, remote, remoteFileTime, latestLocalTime);
       case CloudConfigTypeEnum.history:
         return await _mergeHistory(local, remote);
     }
@@ -115,6 +171,22 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     }
     for (var item in remoteList) {
       remoteMap[item['subConfigKey']] = item;
+    }
+
+    // Debug: Print recent 10 records
+    log.info('📚 ReadIndexRecord Merge Details:');
+    log.info('  Local total: ${localMap.length}, Remote total: ${remoteMap.length}');
+
+    var localRecent = localList.take(10).toList();
+    log.info('  Local recent 10 records:');
+    for (var item in localRecent) {
+      log.info('    gid=${item['subConfigKey']}, page=${item['value']}, utime=${item['utime']}');
+    }
+
+    var remoteRecent = remoteList.take(10).toList();
+    log.info('  Remote recent 10 records:');
+    for (var item in remoteRecent) {
+      log.info('    gid=${item['subConfigKey']}, page=${item['value']}, utime=${item['utime']}');
     }
 
     Map<String, dynamic> merged = {};
@@ -141,6 +213,14 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
 
     String mergedJson = await isolateService.jsonEncodeAsync(merged.values.toList());
 
+    // Debug: Print merged result
+    List mergedList = await isolateService.jsonDecodeAsync(mergedJson);
+    var mergedRecent = mergedList.take(10).toList();
+    log.info('  Merged recent 10 records:');
+    for (var item in mergedRecent) {
+      log.info('    gid=${item['subConfigKey']}, page=${item['value']}, utime=${item['utime']}');
+    }
+
     CloudConfig mergedConfig = CloudConfig(
       id: CloudConfigService.localConfigId,
       shareCode: CloudConfigService.localConfigCode,
@@ -163,12 +243,15 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   }
 
   /// Merge quickSearch (with file timestamp)
-  Future<MergeConfigResult> _mergeQuickSearch(CloudConfig local, CloudConfig remote, DateTime remoteFileTime) async {
+  Future<MergeConfigResult> _mergeQuickSearch(CloudConfig local, CloudConfig remote, DateTime remoteFileTime, DateTime? latestLocalTime) async {
     Map localMap = await isolateService.jsonDecodeAsync(local.config);
     Map remoteMap = await isolateService.jsonDecodeAsync(remote.config);
 
     Map<String, dynamic> merged = {};
-    bool remoteIsNewer = remoteFileTime.isAfter(local.ctime);
+    // Use latestLocalTime if available, otherwise fallback to comparing data size
+    bool remoteIsNewer = latestLocalTime != null
+        ? remoteFileTime.isAfter(latestLocalTime)
+        : remoteMap.length > localMap.length;
     int conflicts = 0;
 
     // Add all local items
@@ -212,12 +295,15 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   }
 
   /// Merge blockRules (with file timestamp)
-  Future<MergeConfigResult> _mergeBlockRules(CloudConfig local, CloudConfig remote, DateTime remoteFileTime) async {
+  Future<MergeConfigResult> _mergeBlockRules(CloudConfig local, CloudConfig remote, DateTime remoteFileTime, DateTime? latestLocalTime) async {
     List localList = await isolateService.jsonDecodeAsync(local.config);
     List remoteList = await isolateService.jsonDecodeAsync(remote.config);
 
     Map<String, dynamic> merged = {};
-    bool remoteIsNewer = remoteFileTime.isAfter(local.ctime);
+    // Use latestLocalTime if available, otherwise fallback to comparing data size
+    bool remoteIsNewer = latestLocalTime != null
+        ? remoteFileTime.isAfter(latestLocalTime)
+        : remoteList.length > localList.length;
     int conflicts = 0;
 
     // Helper to generate unique ID for block rule
@@ -269,53 +355,30 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   }
 
   /// Merge searchHistory (with file timestamp)
-  Future<MergeConfigResult> _mergeSearchHistory(CloudConfig local, CloudConfig remote, DateTime remoteFileTime) async {
+  /// Strategy: Newer overwrites older based on file timestamp
+  Future<MergeConfigResult> _mergeSearchHistory(CloudConfig local, CloudConfig remote, DateTime remoteFileTime, DateTime? latestLocalTime) async {
     List localList = await isolateService.jsonDecodeAsync(local.config);
     List remoteList = await isolateService.jsonDecodeAsync(remote.config);
 
-    Map<String, dynamic> merged = {};
-    bool remoteIsNewer = remoteFileTime.isAfter(local.ctime);
-    int conflicts = 0;
+    log.info('🔍 SearchHistory Merge Debug:');
+    log.info('  Local list length: ${localList.length}');
+    log.info('  Remote list length: ${remoteList.length}');
+    log.info('  Latest local timestamp: $latestLocalTime');
+    log.info('  Remote file time: $remoteFileTime');
 
-    // Add all local items
-    for (var item in localList) {
-      if (item is Map) {
-        merged[item['rawKeyword']] = item;
-      } else if (item is String) {
-        // Old format: direct string
-        merged[item] = {'rawKeyword': item};
-      }
-    }
+    // Use latestLocalTime if available, otherwise fallback to comparing data size
+    bool remoteIsNewer = latestLocalTime != null
+        ? remoteFileTime.isAfter(latestLocalTime)
+        : remoteList.length > localList.length;
 
-    // Merge remote items
-    for (var item in remoteList) {
-      String key;
-      dynamic value;
+    // Use newer list to overwrite older list
+    List finalList = remoteIsNewer ? remoteList : localList;
+    int addedFromRemote = remoteIsNewer ? remoteList.length : 0;
+    int conflicts = remoteIsNewer ? localList.length : 0;
 
-      if (item is Map) {
-        key = item['rawKeyword'];
-        value = item;
-      } else if (item is String) {
-        // Old format: direct string
-        key = item;
-        value = {'rawKeyword': item};
-      } else {
-        continue; // Skip invalid items
-      }
+    log.info('  Using ${remoteIsNewer ? "remote" : "local"} list (newer)');
 
-      if (!merged.containsKey(key)) {
-        // Remote only
-        merged[key] = value;
-      } else {
-        // Conflict: use file timestamp
-        if (remoteIsNewer) {
-          merged[key] = value;
-          conflicts++;
-        }
-      }
-    }
-
-    String mergedJson = await isolateService.jsonEncodeAsync(merged.values.toList());
+    String mergedJson = await isolateService.jsonEncodeAsync(finalList);
 
     CloudConfig mergedConfig = CloudConfig(
       id: CloudConfigService.localConfigId,
@@ -330,8 +393,8 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     MergeStatistics stats = MergeStatistics(
       localList.length,
       remoteList.length,
-      merged.length,
-      merged.length - localList.length,
+      finalList.length,
+      addedFromRemote,
       conflicts,
     );
 

@@ -15,13 +15,13 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
   /// 当前使用的同步提供商 ('s3' 或 'webdav')
   RxString currentProvider = 's3'.obs; // 默认使用 S3 (Cloudflare R2)
 
-  /// 是否启用自动同步
+  /// 是否启用同步功能（整体开关）
+  RxBool enableSync = false.obs;
+
+  /// 是否在应用启动时自动同步
   RxBool autoSync = false.obs;
 
   // ==================== S3 设置 ====================
-
-  /// 是否启用 S3 同步
-  RxBool enableS3 = false.obs;
 
   /// S3 Endpoint (例如: <account-id>.r2.cloudflarestorage.com)
   RxString s3Endpoint = ''.obs;
@@ -45,9 +45,6 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
   RxBool s3UseSSL = true.obs;
 
   // ==================== WebDAV 设置 ====================
-
-  /// 是否启用 WebDAV 同步
-  RxBool enableWebDav = false.obs;
 
   /// WebDAV 服务器地址
   RxString webdavServerUrl = 'https://dav.jianguoyun.com/dav/'.obs;
@@ -81,10 +78,10 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
 
     // 通用设置
     currentProvider.value = map['currentProvider'] ?? currentProvider.value;
+    enableSync.value = map['enableSync'] ?? enableSync.value;
     autoSync.value = map['autoSync'] ?? autoSync.value;
 
     // S3 设置
-    enableS3.value = map['enableS3'] ?? enableS3.value;
     s3Endpoint.value = map['s3Endpoint'] ?? s3Endpoint.value;
     s3AccessKey.value = map['s3AccessKey'] ?? s3AccessKey.value;
     s3SecretKey.value = map['s3SecretKey'] ?? s3SecretKey.value;
@@ -94,7 +91,6 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
     s3UseSSL.value = map['s3UseSSL'] ?? s3UseSSL.value;
 
     // WebDAV 设置
-    enableWebDav.value = map['enableWebDav'] ?? enableWebDav.value;
     webdavServerUrl.value = map['webdavServerUrl'] ?? webdavServerUrl.value;
     webdavUsername.value = map['webdavUsername'] ?? webdavUsername.value;
     webdavPassword.value = map['webdavPassword'] ?? webdavPassword.value;
@@ -111,10 +107,10 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
     return jsonEncode({
       // 通用设置
       'currentProvider': currentProvider.value,
+      'enableSync': enableSync.value,
       'autoSync': autoSync.value,
 
       // S3 设置
-      'enableS3': enableS3.value,
       's3Endpoint': s3Endpoint.value,
       's3AccessKey': s3AccessKey.value,
       's3SecretKey': s3SecretKey.value,
@@ -124,7 +120,6 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
       's3UseSSL': s3UseSSL.value,
 
       // WebDAV 设置
-      'enableWebDav': enableWebDav.value,
       'webdavServerUrl': webdavServerUrl.value,
       'webdavUsername': webdavUsername.value,
       'webdavPassword': webdavPassword.value,
@@ -151,6 +146,12 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
     await saveBeanConfig();
   }
 
+  Future<void> saveEnableSync(bool enabled) async {
+    log.debug('saveEnableSync: $enabled');
+    enableSync.value = enabled;
+    await saveBeanConfig();
+  }
+
   Future<void> saveAutoSync(bool enabled) async {
     log.debug('saveAutoSync: $enabled');
     autoSync.value = enabled;
@@ -158,12 +159,6 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
   }
 
   // ==================== S3 设置保存方法 ====================
-
-  Future<void> saveEnableS3(bool enabled) async {
-    log.debug('saveEnableS3: $enabled');
-    enableS3.value = enabled;
-    await saveBeanConfig();
-  }
 
   Future<void> saveS3Endpoint(String endpoint) async {
     log.debug('saveS3Endpoint: $endpoint');
@@ -208,12 +203,6 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
   }
 
   // ==================== WebDAV 设置保存方法 ====================
-
-  Future<void> saveEnableWebDav(bool enabled) async {
-    log.debug('saveEnableWebDav: $enabled');
-    enableWebDav.value = enabled;
-    await saveBeanConfig();
-  }
 
   Future<void> saveWebdavServerUrl(String serverUrl) async {
     log.debug('saveWebdavServerUrl: $serverUrl');

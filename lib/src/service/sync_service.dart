@@ -30,7 +30,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   @override
   Future<void> doAfterBeanReady() async {
     // Auto sync on app startup if enabled
-    if (syncSetting.autoSync.value) {
+    if (syncSetting.enableSync.value && syncSetting.autoSync.value) {
       _performAutoSyncOnStartup();
     }
   }
@@ -61,8 +61,6 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       log.info('Auto sync on startup: checking...');
       log.info('Auto sync enabled: ${syncSetting.autoSync.value}');
       log.info('Current provider: ${syncSetting.currentProvider.value}');
-      log.info('S3 enabled: ${syncSetting.enableS3.value}');
-      log.info('WebDAV enabled: ${syncSetting.enableWebDav.value}');
       log.info('========================================');
 
       // Sync all config types by default
@@ -103,7 +101,6 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           bucketName: syncSetting.s3BucketName.value,
           region: syncSetting.s3Region.value,
           baseKey: syncSetting.s3BaseKey.value,
-          enabled: syncSetting.enableS3.value,
           useSSL: syncSetting.s3UseSSL.value,
         );
       } else if (provider == 'webdav') {
@@ -112,21 +109,11 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           username: syncSetting.webdavUsername.value,
           password: syncSetting.webdavPassword.value,
           remotePath: syncSetting.webdavRemotePath.value,
-          enabled: syncSetting.enableWebDav.value,
         );
       } else {
         return SyncResult(
           success: false,
           message: 'Unknown provider: $provider',
-          statistics: {},
-        );
-      }
-
-      if (!cloudProvider.isEnabled) {
-        log.warning('❌ Provider ${cloudProvider.name} is not enabled. Please enable it in settings.');
-        return SyncResult(
-          success: false,
-          message: 'Provider ${cloudProvider.name} is not enabled',
           statistics: {},
         );
       }
@@ -150,23 +137,36 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       // 2. Download remote config
       List<CloudConfig> remoteConfigs = [];
       CloudFile? remoteFile = await cloudProvider.getFileMetadata();
-      if (remoteFile != null) {
-        try {
-          String data = await cloudProvider.download();
-          List list = await isolateService.jsonDecodeAsync(data);
-          remoteConfigs = list.map((e) => CloudConfig.fromJson(e)).toList();
-          log.info('Downloaded ${remoteConfigs.length} remote configs');
-          for (var config in remoteConfigs) {
-            log.info('  Remote ${config.type.name}: ${config.config.length} bytes');
-          }
-        } catch (e) {
+
+      // Try to download even if metadata fetch failed
+      try {
+        String data = await cloudProvider.download();
+        List list = await isolateService.jsonDecodeAsync(data);
+        remoteConfigs = list.map((e) => CloudConfig.fromJson(e)).toList();
+        log.info('Downloaded ${remoteConfigs.length} remote configs');
+        for (var config in remoteConfigs) {
+          log.info('  Remote ${config.type.name}: ${config.config.length} bytes');
+        }
+
+        // If download succeeded but metadata failed, create a placeholder
+        if (remoteFile == null && remoteConfigs.isNotEmpty) {
+          log.warning('Metadata fetch failed but download succeeded, using current time as fallback');
+          remoteFile = CloudFile(
+            version: 'latest',
+            modifiedTime: DateTime.now(),
+            size: data.length,
+            etag: null,
+          );
+        }
+      } catch (e) {
+        if (remoteConfigs.isEmpty) {
+          log.info('No remote config found (first sync), will upload local configs');
+        } else {
           log.warning('Failed to download remote config, will upload local', e);
         }
-      } else {
-        log.info('No remote config found (first sync), will upload local configs');
       }
 
-      // 3. Merge configs
+      // 3. Merge configs (merger handles import internally)
       var mergeResult = await syncMerger.merge(
         localConfigs,
         remoteConfigs,
@@ -174,14 +174,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         types,
       );
 
-      // 4. Import merged result to local
-      log.info('Importing ${mergeResult.merged.length} merged configs to local');
-      for (var config in mergeResult.merged) {
-        await cloudConfigService.importConfig(config);
-        log.info('  Imported ${config.type.name}');
-      }
-
-      // 5. Upload merged result
+      // 4. Upload merged result
       // saveHistory is determined by user settings (default: false)
       bool saveHistory = syncSetting.enableHistory.value;
       String encodedData = await isolateService.jsonEncodeAsync(mergeResult.merged);
@@ -193,7 +186,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       );
       log.info('Upload complete');
 
-      // 6. If history is enabled and auto cleanup is on, clean up old versions
+      // 5. If history is enabled and auto cleanup is on, clean up old versions
       if (saveHistory && syncSetting.autoCleanHistory.value) {
         await _cleanupOldVersions(cloudProvider);
       }
@@ -230,7 +223,6 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           bucketName: syncSetting.s3BucketName.value,
           region: syncSetting.s3Region.value,
           baseKey: syncSetting.s3BaseKey.value,
-          enabled: syncSetting.enableS3.value,
           useSSL: syncSetting.s3UseSSL.value,
         );
       } else if (provider == 'webdav') {
@@ -239,7 +231,6 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           username: syncSetting.webdavUsername.value,
           password: syncSetting.webdavPassword.value,
           remotePath: syncSetting.webdavRemotePath.value,
-          enabled: syncSetting.enableWebDav.value,
         );
       } else {
         log.warning('Unknown provider: $provider');
@@ -275,7 +266,6 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           bucketName: syncSetting.s3BucketName.value,
           region: syncSetting.s3Region.value,
           baseKey: syncSetting.s3BaseKey.value,
-          enabled: syncSetting.enableS3.value,
           useSSL: syncSetting.s3UseSSL.value,
         );
       } else if (provider == 'webdav') {
@@ -284,7 +274,6 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           username: syncSetting.webdavUsername.value,
           password: syncSetting.webdavPassword.value,
           remotePath: syncSetting.webdavRemotePath.value,
-          enabled: syncSetting.enableWebDav.value,
         );
       } else {
         return RestoreResult(
@@ -338,7 +327,6 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           bucketName: syncSetting.s3BucketName.value,
           region: syncSetting.s3Region.value,
           baseKey: syncSetting.s3BaseKey.value,
-          enabled: syncSetting.enableS3.value,
           useSSL: syncSetting.s3UseSSL.value,
         );
       } else if (provider == 'webdav') {
@@ -347,7 +335,6 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           username: syncSetting.webdavUsername.value,
           password: syncSetting.webdavPassword.value,
           remotePath: syncSetting.webdavRemotePath.value,
-          enabled: syncSetting.enableWebDav.value,
         );
       } else {
         log.warning('Unknown provider: $provider');
@@ -379,7 +366,6 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           bucketName: syncSetting.s3BucketName.value,
           region: syncSetting.s3Region.value,
           baseKey: syncSetting.s3BaseKey.value,
-          enabled: syncSetting.enableS3.value,
           useSSL: syncSetting.s3UseSSL.value,
         );
       } else if (provider == 'webdav') {
@@ -388,7 +374,6 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           username: syncSetting.webdavUsername.value,
           password: syncSetting.webdavPassword.value,
           remotePath: syncSetting.webdavRemotePath.value,
-          enabled: syncSetting.enableWebDav.value,
         );
       } else {
         log.warning('Unknown provider: $provider');
@@ -434,7 +419,6 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           bucketName: syncSetting.s3BucketName.value,
           region: syncSetting.s3Region.value,
           baseKey: syncSetting.s3BaseKey.value,
-          enabled: true, // Always test connection regardless of enabled state
           useSSL: syncSetting.s3UseSSL.value,
         );
       } else if (providerName == 'webdav') {
@@ -450,7 +434,6 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           username: syncSetting.webdavUsername.value,
           password: syncSetting.webdavPassword.value,
           remotePath: syncSetting.webdavRemotePath.value,
-          enabled: true, // Always test connection regardless of enabled state
         );
       } else {
         log.warning('Unknown provider: $providerName');

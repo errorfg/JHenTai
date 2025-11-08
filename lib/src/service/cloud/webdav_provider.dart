@@ -13,21 +13,16 @@ class WebDavProvider implements CloudProvider {
   final String username;
   final String password;
   final String remotePath;
-  final bool _enabled;
 
   WebDavProvider({
     required this.serverUrl,
     required this.username,
     required this.password,
     required this.remotePath,
-    bool enabled = false,
-  }) : _enabled = enabled;
+  });
 
   @override
   String get name => 'webdav';
-
-  @override
-  bool get isEnabled => _enabled;
 
   /// Initialize WebDAV client
   webdav.Client _initClient() {

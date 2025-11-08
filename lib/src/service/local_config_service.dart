@@ -61,7 +61,7 @@ class LocalConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
                 configKey: i.configKey.value,
                 subConfigKey: i.subConfigKey.value,
                 value: i.value.value,
-                utime: DateTime.now().toString(),
+                utime: i.utime.value,
               ))
           .toList(),
       mode: InsertMode.insertOrReplace,
