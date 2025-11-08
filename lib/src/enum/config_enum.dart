@@ -22,6 +22,7 @@ enum ConfigEnum {
   userSetting('userSetting'),
   archiveBotSetting('archiveBotSetting'),
   webdavSetting('webdavSetting'),
+  syncSetting('syncSetting'),
   downloadSearchPageType('downloadSearchPageType'),
   windowFullScreen('windowFullScreen'),
   windowMaximize('windowMaximize'),

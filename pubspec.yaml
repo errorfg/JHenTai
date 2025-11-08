@@ -123,6 +123,7 @@ dependencies:
   xml: 6.5.0
   telegram: 0.0.9
   webdav_client: ^1.2.2
+  minio: ^3.5.8
 
 dependency_overrides:
   test_api: 0.6.0

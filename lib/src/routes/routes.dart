@@ -20,7 +20,9 @@ import 'package:jhentai/src/pages/setting/account/cookie/cookie_page.dart';
 import 'package:jhentai/src/pages/setting/account/login/login_page.dart';
 import 'package:jhentai/src/pages/setting/advanced/setting_advanced_page.dart';
 import 'package:jhentai/src/pages/setting/cloud/config_sync/config_sync_page.dart';
+import 'package:jhentai/src/pages/setting/cloud/cloud_sync_settings/cloud_sync_settings_page.dart';
 import 'package:jhentai/src/pages/setting/cloud/setting_cloud_page.dart';
+import 'package:jhentai/src/pages/setting/cloud/sync_history/sync_history_page.dart';
 import 'package:jhentai/src/pages/setting/download/extra_gallery_scan_path/extra_gallery_scan_path_page.dart';
 import 'package:jhentai/src/pages/setting/download/setting_download_page.dart';
 import 'package:jhentai/src/pages/setting/eh/profile/setting_eh_profile_page.dart';
@@ -127,6 +129,8 @@ class Routes {
   static const String log = "/setting_advanced/logList/log";
 
   static const String configSync = "/setting_cloud/configSync";
+  static const String cloudSyncSettings = "/setting_cloud/cloudSyncSettings";
+  static const String syncHistory = "/setting_cloud/syncHistory";
 
   static final Transition defaultTransition = preferenceSetting.enableSwipeBackGesture.isTrue ? Transition.cupertino : Transition.fadeIn;
 
@@ -327,6 +331,17 @@ class Routes {
       name: configSync,
       page: () => const ConfigSyncPage().withEscOrFifthButton2BackRightRoute(),
       transition: defaultTransition,
+    ),
+    EHPage(
+      name: cloudSyncSettings,
+      page: () => const CloudSyncSettingsPage().withEscOrFifthButton2BackRightRoute(),
+      transition: defaultTransition,
+    ),
+    EHPage(
+      name: syncHistory,
+      page: () => const SyncHistoryPage().withEscOrFifthButton2BackRightRoute(),
+      transition: defaultTransition,
+      offAllBefore: false,
     ),
     EHPage(
       name: settingSecurity,
