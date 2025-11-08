@@ -36,12 +36,13 @@ class CloudConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
   Future<void> doAfterBeanReady() async {}
 
   Future<void> importConfig(CloudConfig config) async {
-    log.info('importConfig: ${config.type}');
+    log.info('📥 Importing config: ${config.type.name}');
 
     switch (config.type) {
       case CloudConfigTypeEnum.readIndexRecord:
         List list = await isolateService.jsonDecodeAsync(config.config);
         List<LocalConfig> readIndexRecords = list.map((e) => LocalConfig.fromJson(e)).toList();
+        log.info('  Writing ${readIndexRecords.length} read index records to database');
         await localConfigService.batchWrite(readIndexRecords
             .map((e) => LocalConfigCompanion(
                   configKey: Value(e.configKey.key),
@@ -50,35 +51,47 @@ class CloudConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
                   utime: Value(e.utime),
                 ))
             .toList());
+        log.info('  ✅ Read index records imported');
         break;
       case CloudConfigTypeEnum.quickSearch:
         await localConfigService.write(configKey: ConfigEnum.quickSearch, value: config.config);
+        log.info('  Refreshing quick search service');
         await quickSearchService.refreshBean();
+        log.info('  ✅ Quick search imported and refreshed');
         break;
       case CloudConfigTypeEnum.searchHistory:
+        List historyList = await isolateService.jsonDecodeAsync(config.config);
+        log.info('  Writing ${historyList.length} search history items');
         await localConfigService.write(configKey: ConfigEnum.searchHistory, value: config.config);
         await searchHistoryService.refreshBean();
+        log.info('  ✅ Search history imported and refreshed');
         break;
       case CloudConfigTypeEnum.blockRules:
         List list = await isolateService.jsonDecodeAsync(config.config);
         List<LocalBlockRule> blockRules = list.map((e) => LocalBlockRule.fromJson(e)).toList();
+        log.info('  Processing ${blockRules.length} block rules');
 
         for (LocalBlockRule blockRule in blockRules) {
           blockRule.id = null;
         }
-        
-        blockRules.groupListsBy((element) => element.groupId!).forEach((groupId, rules) async {
-          bool exists = await localBlockRuleService.existsGroup(groupId);
+
+        int imported = 0;
+        for (var group in blockRules.groupListsBy((element) => element.groupId!).entries) {
+          bool exists = await localBlockRuleService.existsGroup(group.key);
           if (!exists) {
-            await localBlockRuleService.replaceBlockRulesByGroup(groupId, rules);
+            await localBlockRuleService.replaceBlockRulesByGroup(group.key, group.value);
+            imported += group.value.length;
           }
-        });
+        }
+        log.info('  ✅ Imported $imported new block rules (${blockRules.length - imported} groups already exist)');
 
         break;
       case CloudConfigTypeEnum.history:
         List list = await isolateService.jsonDecodeAsync(config.config);
         List<GalleryHistoryV2Data> histories = list.map((e) => GalleryHistoryV2Data.fromJson(e)).toList();
+        log.info('  Writing ${histories.length} gallery history records');
         await historyService.batchRecord(histories);
+        log.info('  ✅ Gallery history imported');
         break;
     }
   }
@@ -89,8 +102,10 @@ class CloudConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
       case CloudConfigTypeEnum.readIndexRecord:
         List<LocalConfig> readIndexRecords = await localConfigService.readWithAllSubKeys(configKey: ConfigEnum.readIndexRecord);
         if (readIndexRecords.isEmpty) {
+          log.debug('  No local ${type.name} data found');
           return null;
         }
+        log.debug('  Found ${readIndexRecords.length} local read index records');
         configValue = await isolateService.jsonEncodeAsync(readIndexRecords);
         break;
       case CloudConfigTypeEnum.quickSearch:

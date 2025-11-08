@@ -1,17 +1,24 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
+import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/pages/base/base_page.dart';
 import 'package:jhentai/src/pages/gallerys/dashboard/dashboard_page_state.dart';
 import 'package:jhentai/src/routes/routes.dart';
+import 'package:jhentai/src/service/log.dart';
+import 'package:jhentai/src/service/sync_service.dart';
+import 'package:jhentai/src/setting/sync_setting.dart';
 import 'package:jhentai/src/utils/route_util.dart';
+import 'package:jhentai/src/utils/toast_util.dart';
 import 'package:jhentai/src/widget/eh_wheel_speed_controller.dart';
 import 'package:jhentai/src/widget/eh_dashboard_card.dart';
 import 'package:jhentai/src/widget/loading_state_indicator.dart';
 
 import '../../../config/ui_config.dart';
 import '../../layout/mobile_v2/mobile_layout_page_v2_state.dart';
+import '../../layout/mobile_v2/notification/tap_menu_button_notification.dart';
 import '../../layout/mobile_v2/notification/tap_tab_bat_button_notification.dart';
 import 'dashboard_page_logic.dart';
 
@@ -33,6 +40,54 @@ class DashboardPage extends BasePage {
 
   @override
   DashboardPageState get state => Get.find<DashboardPageLogic>().state;
+
+  @override
+  AppBar? buildAppBar(BuildContext context) {
+    return AppBar(
+      leading: IconButton(
+        icon: const Icon(FontAwesomeIcons.bars, size: 20),
+        onPressed: () => TapMenuButtonNotification().dispatch(context),
+      ),
+      title: GestureDetector(
+        onTap: _handleTitleTap,
+        child: Text(name),
+      ),
+      centerTitle: true,
+      actions: buildAppBarActions(),
+    );
+  }
+
+  void _handleTitleTap() async {
+    if (!syncSetting.autoSync.value) {
+      return; // Only sync when autoSync is enabled
+    }
+
+    // Get enabled provider
+    String provider = syncSetting.currentProvider.value;
+    bool providerEnabled = provider == 's3' ? syncSetting.enableS3.value : syncSetting.enableWebDav.value;
+
+    if (!providerEnabled) {
+      return; // Provider not enabled, skip sync
+    }
+
+    log.info('Syncing on home title tap...');
+
+    try {
+      var result = await syncService.sync(
+        types: CloudConfigTypeEnum.values,
+        providerName: provider,
+      );
+
+      if (result.success) {
+        log.info('Sync successful: ${result.message}');
+        toast('syncSuccess'.tr, isShort: false);
+      } else {
+        log.warning('Sync failed: ${result.message}');
+      }
+    } catch (e) {
+      log.error('Sync error on title tap', e);
+    }
+  }
 
   @override
   List<Widget> buildAppBarActions() {
