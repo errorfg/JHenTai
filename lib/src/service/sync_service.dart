@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/model/config.dart';
 import 'package:jhentai/src/service/cloud/cloud_provider.dart';
@@ -7,6 +8,7 @@ import 'package:jhentai/src/service/cloud_service.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/sync_merger.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
+import 'package:jhentai/src/widget/app_manager.dart';
 
 import 'jh_service.dart';
 import 'log.dart';
@@ -17,6 +19,8 @@ SyncService syncService = SyncService();
 /// 负责协调 CloudProvider 和 SyncMerger，提供统一的同步接口
 class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   final Map<String, CloudProvider> _providers = {};
+  DateTime? _lastSyncTime;
+  static const _minSyncInterval = Duration(seconds: 30);
 
   @override
   List<JHLifeCircleBean> get initDependencies => [log, syncSetting, syncMerger, cloudConfigService, isolateService];
@@ -29,6 +33,9 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
 
   @override
   Future<void> doAfterBeanReady() async {
+    // Register app lifecycle callback to listen for app resumed events
+    AppManager.registerDidChangeAppLifecycleStateCallback(_onAppLifecycleStateChanged);
+
     // Auto sync on app startup if enabled
     if (syncSetting.enableSync.value && syncSetting.autoSync.value) {
       _performAutoSyncOnStartup();
@@ -78,6 +85,52 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     } catch (e) {
       log.error('💥 Auto sync on startup failed', e);
       // Don't throw, just log the error to avoid affecting app startup
+    }
+  }
+
+  /// Handle app lifecycle state changes
+  void _onAppLifecycleStateChanged(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _performAutoSyncOnResume();
+    }
+  }
+
+  /// Perform auto sync when app resumes from background
+  void _performAutoSyncOnResume() async {
+    // Check if sync is enabled
+    if (!syncSetting.enableSync.value || !syncSetting.autoSync.value) {
+      log.debug('Auto sync on resume: disabled');
+      return;
+    }
+
+    // Prevent frequent syncs: require at least 30 seconds since last sync
+    if (_lastSyncTime != null && DateTime.now().difference(_lastSyncTime!) < _minSyncInterval) {
+      log.debug('Auto sync on resume: skipped (too soon since last sync)');
+      return;
+    }
+
+    try {
+      log.info('========================================');
+      log.info('Auto sync on app resumed: starting...');
+      log.info('Current provider: ${syncSetting.currentProvider.value}');
+      log.info('========================================');
+
+      // Update last sync time
+      _lastSyncTime = DateTime.now();
+
+      // Sync all config types
+      List<CloudConfigTypeEnum> allTypes = CloudConfigTypeEnum.values;
+      SyncResult result = await sync(types: allTypes);
+
+      if (result.success) {
+        log.info('✅ Auto sync on resume completed successfully');
+        log.info('Statistics: ${result.statistics}');
+      } else {
+        log.warning('❌ Auto sync on resume failed: ${result.message}');
+      }
+    } catch (e) {
+      log.error('💥 Auto sync on resume failed', e);
+      // Don't throw, just log the error
     }
   }
 

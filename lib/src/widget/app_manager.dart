@@ -41,6 +41,14 @@ class AppManager extends StatefulWidget {
     _didChangePlatformBrightnessCallbacks.remove(callback);
   }
 
+  static void registerDidChangeAppLifecycleStateCallback(DidChangeAppLifecycleStateCallback callback) {
+    _didChangeAppLifecycleStateCallbacks.add(callback);
+  }
+
+  static void unRegisterDidChangeAppLifecycleStateCallback(DidChangeAppLifecycleStateCallback callback) {
+    _didChangeAppLifecycleStateCallbacks.remove(callback);
+  }
+
   static void registerDidHaveMemoryPressureCallback(DidHaveMemoryPressureCallback callback) {
     _didHaveMemoryPressureCallbacks.add(callback);
   }
