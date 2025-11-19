@@ -31,6 +31,7 @@ class RanklistPage extends BasePage {
       centerTitle: true,
       leading: showMenuButton ? super.buildAppBarMenuButton(context) : null,
       actions: [
+        IconButton(icon: const Icon(Icons.filter_alt_outlined, size: 28), onPressed: logic.handleTapFilterButton),
         ...super.buildAppBarActions(),
         PopupMenuButton(
           tooltip: '',
