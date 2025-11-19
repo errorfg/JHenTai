@@ -6,5 +6,5 @@ class PopularPageLogic extends BasePageLogic {
   final PopularPageState state = PopularPageState();
 
   @override
-  bool get useSearchConfig => false;
+  bool get useSearchConfig => true;
 }
