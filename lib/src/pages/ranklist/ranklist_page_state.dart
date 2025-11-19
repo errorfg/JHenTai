@@ -1,3 +1,4 @@
+import '../../model/search_config.dart';
 import '../../routes/routes.dart';
 import '../base/old_base_page_state.dart';
 
@@ -13,4 +14,7 @@ class RanklistPageState extends OldBasePageState {
   String get route => Routes.ranklist;
 
   RanklistType ranklistType = RanklistType.day;
+
+  @override
+  SearchConfig searchConfig = SearchConfig(searchType: SearchType.gallery);
 }
