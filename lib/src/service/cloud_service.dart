@@ -7,6 +7,7 @@ import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
 import 'package:jhentai/src/service/search_history_service.dart';
+import 'package:jhentai/src/setting/sync_setting.dart';
 
 import '../database/database.dart';
 import 'history_service.dart';
@@ -23,6 +24,7 @@ class CloudConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
     CloudConfigTypeEnum.searchHistory: '1.0.0',
     CloudConfigTypeEnum.blockRules: '1.0.0',
     CloudConfigTypeEnum.history: '1.0.0',
+    CloudConfigTypeEnum.syncSetting: '1.0.0',
   };
 
   static const int localConfigId = -1;
@@ -93,6 +95,11 @@ class CloudConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
         await historyService.batchRecord(histories);
         log.info('  ✅ Gallery history imported');
         break;
+      case CloudConfigTypeEnum.syncSetting:
+        await localConfigService.write(configKey: ConfigEnum.syncSetting, value: config.config);
+        await syncSetting.refreshBean();
+        log.info('  ✅ Sync setting imported and refreshed');
+        break;
     }
   }
 
@@ -129,6 +136,13 @@ class CloudConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
       case CloudConfigTypeEnum.history:
         List<GalleryHistoryV2Data> histories = await historyService.getLatest10000RawHistory();
         configValue = await isolateService.jsonEncodeAsync(histories);
+        break;
+      case CloudConfigTypeEnum.syncSetting:
+        String? syncConfig = await localConfigService.read(configKey: ConfigEnum.syncSetting);
+        if (syncConfig == null) {
+          return null;
+        }
+        configValue = syncConfig;
         break;
     }
 

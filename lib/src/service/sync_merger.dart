@@ -154,7 +154,17 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         return await _mergeSearchHistory(local, remote, remoteFileTime, latestLocalTime);
       case CloudConfigTypeEnum.history:
         return await _mergeHistory(local, remote);
+      case CloudConfigTypeEnum.syncSetting:
+        return await _mergeSyncSetting(local, remote, remoteFileTime, latestLocalTime);
     }
+  }
+
+  Future<MergeConfigResult> _mergeSyncSetting(CloudConfig local, CloudConfig remote, DateTime remoteFileTime, DateTime? latestLocalTime) async {
+    bool useRemote = latestLocalTime != null ? remoteFileTime.isAfter(latestLocalTime) : remote.ctime.isAfter(local.ctime);
+    CloudConfig mergedConfig = useRemote ? remote : local;
+    MergeStatistics stats = MergeStatistics(1, 1, 1, useRemote ? 1 : 0, useRemote ? 1 : 0);
+
+    return MergeConfigResult(mergedConfig, stats);
   }
 
   /// Merge readIndexRecord (with item timestamp)

@@ -4,6 +4,7 @@ enum CloudConfigTypeEnum {
   blockRules(3, 'blockRules'),
   searchHistory(4, 'searchHistory'),
   history(5, 'galleryHistory'),
+  syncSetting(6, 'syncSetting'),
   ;
 
   final int code;
@@ -24,6 +25,8 @@ enum CloudConfigTypeEnum {
         return CloudConfigTypeEnum.searchHistory;
       case 5:
         return CloudConfigTypeEnum.history;
+      case 6:
+        return CloudConfigTypeEnum.syncSetting;
       default:
         throw Exception('Unknown CloudConfigTypeEnum code: $code');
     }
