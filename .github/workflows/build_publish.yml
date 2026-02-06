@@ -7,6 +7,9 @@ on:
       - 'master'
     tags:
       - v*
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
   workflow_dispatch:  # 允许手动触发
 
 # If previous workflow is still running, we push again, we will cancel the previous workflow
@@ -16,6 +19,7 @@ concurrency:
 
 jobs:
   Build:
+    if: ${{ github.event_name != 'push' || !contains(join(github.event.commits.*.message, ' '), '[skip-build]') }}
     environment: ENCODED_KEYSTORE
     strategy:
       fail-fast: false
@@ -327,4 +331,3 @@ jobs:
           git add altsource/AltSource.json
           git commit -m "Update AltSource.json for version ${{ needs.Build.outputs.version }}"
           git push origin HEAD:master
-

@@ -6,9 +6,15 @@ on:
       - 'master'
     tags-ignore:
       - v*
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
   pull_request:
     branches:
       - 'master'
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
   workflow_dispatch:
 
 concurrency:
@@ -17,6 +23,7 @@ concurrency:
 
 jobs:
   AndroidRelease:
+    if: ${{ (github.event_name != 'push' || !contains(join(github.event.commits.*.message, ' '), '[skip-build]')) && (github.event_name != 'pull_request' || (!contains(github.event.pull_request.title, '[skip-build]') && !contains(github.event.pull_request.body || '', '[skip-build]'))) }}
     name: Android Release
     runs-on: ubuntu-latest
     env:
