@@ -9,13 +9,16 @@ import 'jh_service.dart';
 
 SearchHistoryService searchHistoryService = SearchHistoryService();
 
-class SearchHistoryService with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBean {
+class SearchHistoryService
+    with JHLifeCircleBeanWithConfigStorage
+    implements JHLifeCircleBean {
   List<SearchHistory> histories = [];
 
   static const _maxLength = 50;
 
   @override
-  List<JHLifeCircleBean> get initDependencies => super.initDependencies..add(tagTranslationService);
+  List<JHLifeCircleBean> get initDependencies =>
+      super.initDependencies..add(tagTranslationService);
 
   @override
   ConfigEnum get configEnum => ConfigEnum.searchHistory;
@@ -23,14 +26,32 @@ class SearchHistoryService with JHLifeCircleBeanWithConfigStorage implements JHL
   @override
   Future<void> applyBeanConfig(String configString) async {
     List searchHistories = jsonDecode(configString);
+    histories.clear();
 
-    for (String searchHistory in searchHistories) {
+    for (dynamic item in searchHistories) {
+      String? searchHistory;
+      if (item is String) {
+        searchHistory = item;
+      } else if (item is Map && item['rawKeyword'] is String) {
+        searchHistory = item['rawKeyword'] as String;
+      }
+
+      if (searchHistory == null || searchHistory.trim().isEmpty) {
+        continue;
+      }
+
       histories.add(
         SearchHistory(
           rawKeyword: searchHistory,
-          translatedKeyword: tagTranslationService.isReady ? await translateSearchHistory(searchHistory) : null,
+          translatedKeyword: tagTranslationService.isReady
+              ? await translateSearchHistory(searchHistory)
+              : null,
         ),
       );
+
+      if (histories.length >= _maxLength) {
+        break;
+      }
     }
   }
 
@@ -51,7 +72,9 @@ class SearchHistoryService with JHLifeCircleBeanWithConfigStorage implements JHL
       0,
       SearchHistory(
         rawKeyword: searchHistory,
-        translatedKeyword: tagTranslationService.isReady ? await translateSearchHistory(searchHistory) : null,
+        translatedKeyword: tagTranslationService.isReady
+            ? await translateSearchHistory(searchHistory)
+            : null,
       ),
     );
 
@@ -75,7 +98,8 @@ class SearchHistoryService with JHLifeCircleBeanWithConfigStorage implements JHL
 
   /// find each pair and then translate, remains the parts which can't be translated
   Future<String> translateSearchHistory(String searchHistory) async {
-    List<RegExpMatch> matches = RegExp(r'(\w+):"([^"]+)\$"').allMatches(searchHistory).toList();
+    List<RegExpMatch> matches =
+        RegExp(r'(\w+):"([^"]+)\$"').allMatches(searchHistory).toList();
     if (matches.isEmpty) {
       return searchHistory;
     }
@@ -98,10 +122,12 @@ class SearchHistoryService with JHLifeCircleBeanWithConfigStorage implements JHL
       if (index == matches[matchIndex].start) {
         String namespace = matches[matchIndex].group(1)!;
         String key = matches[matchIndex].group(2)!;
-        TagData? tagData = await tagTranslationService.getTagTranslation(namespace, key);
+        TagData? tagData =
+            await tagTranslationService.getTagTranslation(namespace, key);
 
         if (tagData == null) {
-          result += searchHistory.substring(matches[matchIndex].start, matches[matchIndex].end);
+          result += searchHistory.substring(
+              matches[matchIndex].start, matches[matchIndex].end);
         } else {
           result += '｢${tagData.translatedNamespace}:${tagData.tagName}｣';
         }

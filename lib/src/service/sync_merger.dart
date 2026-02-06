@@ -11,6 +11,8 @@ SyncMerger syncMerger = SyncMerger();
 /// 同步合并服务（独立于传输层）
 /// 负责处理本地和远程配置的增量合并逻辑
 class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
+  static const int _maxSearchHistoryLength = 50;
+
   @override
   List<JHLifeCircleBean> get initDependencies => [log];
 
@@ -40,13 +42,15 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     for (var type in selectedTypes) {
       try {
         // Get local config for this type
-        CloudConfig? localConfig = localConfigs.where((c) => c.type == type).firstOrNull;
+        CloudConfig? localConfig =
+            localConfigs.where((c) => c.type == type).firstOrNull;
 
         // Get remote config for this type
-        CloudConfig? remoteConfig = remoteConfigs.where((c) => c.type == type).firstOrNull;
+        CloudConfig? remoteConfig =
+            remoteConfigs.where((c) => c.type == type).firstOrNull;
 
-        CloudConfig? merged;
-        MergeStatistics stats;
+        late CloudConfig merged;
+        late MergeStatistics stats;
 
         if (localConfig == null && remoteConfig == null) {
           log.debug('No config for type: $type');
@@ -67,7 +71,8 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         } else {
           // Both exist, merge them
           log.info('Merging configs for $type');
-          var result = await mergeConfigType(type, localConfig, remoteConfig, remoteFileTime, latestLocalTime);
+          var result = await mergeConfigType(
+              type, localConfig, remoteConfig, remoteFileTime, latestLocalTime);
           merged = result.config;
           stats = result.statistics;
 
@@ -75,10 +80,8 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           await cloudConfigService.importConfig(merged);
         }
 
-        if (merged != null) {
-          mergedConfigs.add(merged);
-          statistics[type] = stats;
-        }
+        mergedConfigs.add(merged);
+        statistics[type] = stats;
       } catch (e) {
         log.error('Failed to merge config type: $type', e);
       }
@@ -89,14 +92,18 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
 
   /// 从本地配置中提取最新的时间戳
   /// 优先使用 readIndexRecord 或 history 的 item timestamp
-  Future<DateTime?> _getLatestLocalTimestamp(List<CloudConfig> localConfigs) async {
+  Future<DateTime?> _getLatestLocalTimestamp(
+      List<CloudConfig> localConfigs) async {
     DateTime? latestTime;
 
     // Check readIndexRecord
-    CloudConfig? readIndexRecord = localConfigs.where((c) => c.type == CloudConfigTypeEnum.readIndexRecord).firstOrNull;
+    CloudConfig? readIndexRecord = localConfigs
+        .where((c) => c.type == CloudConfigTypeEnum.readIndexRecord)
+        .firstOrNull;
     if (readIndexRecord != null) {
       try {
-        List list = await isolateService.jsonDecodeAsync(readIndexRecord.config);
+        List list =
+            await isolateService.jsonDecodeAsync(readIndexRecord.config);
         for (var item in list) {
           if (item['utime'] != null) {
             DateTime time = DateTime.parse(item['utime']);
@@ -111,7 +118,9 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     }
 
     // Check history
-    CloudConfig? history = localConfigs.where((c) => c.type == CloudConfigTypeEnum.history).firstOrNull;
+    CloudConfig? history = localConfigs
+        .where((c) => c.type == CloudConfigTypeEnum.history)
+        .firstOrNull;
     if (history != null) {
       try {
         List list = await isolateService.jsonDecodeAsync(history.config);
@@ -147,28 +156,40 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       case CloudConfigTypeEnum.readIndexRecord:
         return await _mergeReadIndexRecord(local, remote);
       case CloudConfigTypeEnum.quickSearch:
-        return await _mergeQuickSearch(local, remote, remoteFileTime, latestLocalTime);
+        return await _mergeQuickSearch(
+            local, remote, remoteFileTime, latestLocalTime);
       case CloudConfigTypeEnum.blockRules:
-        return await _mergeBlockRules(local, remote, remoteFileTime, latestLocalTime);
+        return await _mergeBlockRules(
+            local, remote, remoteFileTime, latestLocalTime);
       case CloudConfigTypeEnum.searchHistory:
-        return await _mergeSearchHistory(local, remote, remoteFileTime, latestLocalTime);
+        return await _mergeSearchHistory(
+            local, remote, remoteFileTime, latestLocalTime);
       case CloudConfigTypeEnum.history:
         return await _mergeHistory(local, remote);
       case CloudConfigTypeEnum.syncSetting:
-        return await _mergeSyncSetting(local, remote, remoteFileTime, latestLocalTime);
+        return await _mergeSyncSetting(
+            local, remote, remoteFileTime, latestLocalTime);
     }
   }
 
-  Future<MergeConfigResult> _mergeSyncSetting(CloudConfig local, CloudConfig remote, DateTime remoteFileTime, DateTime? latestLocalTime) async {
-    bool useRemote = latestLocalTime != null ? remoteFileTime.isAfter(latestLocalTime) : remote.ctime.isAfter(local.ctime);
+  Future<MergeConfigResult> _mergeSyncSetting(
+      CloudConfig local,
+      CloudConfig remote,
+      DateTime remoteFileTime,
+      DateTime? latestLocalTime) async {
+    bool useRemote = latestLocalTime != null
+        ? remoteFileTime.isAfter(latestLocalTime)
+        : remote.ctime.isAfter(local.ctime);
     CloudConfig mergedConfig = useRemote ? remote : local;
-    MergeStatistics stats = MergeStatistics(1, 1, 1, useRemote ? 1 : 0, useRemote ? 1 : 0);
+    MergeStatistics stats =
+        MergeStatistics(1, 1, 1, useRemote ? 1 : 0, useRemote ? 1 : 0);
 
     return MergeConfigResult(mergedConfig, stats);
   }
 
   /// Merge readIndexRecord (with item timestamp)
-  Future<MergeConfigResult> _mergeReadIndexRecord(CloudConfig local, CloudConfig remote) async {
+  Future<MergeConfigResult> _mergeReadIndexRecord(
+      CloudConfig local, CloudConfig remote) async {
     List localList = await isolateService.jsonDecodeAsync(local.config);
     List remoteList = await isolateService.jsonDecodeAsync(remote.config);
 
@@ -185,18 +206,21 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
 
     // Debug: Print recent 10 records
     log.info('📚 ReadIndexRecord Merge Details:');
-    log.info('  Local total: ${localMap.length}, Remote total: ${remoteMap.length}');
+    log.info(
+        '  Local total: ${localMap.length}, Remote total: ${remoteMap.length}');
 
     var localRecent = localList.take(10).toList();
     log.info('  Local recent 10 records:');
     for (var item in localRecent) {
-      log.info('    gid=${item['subConfigKey']}, page=${item['value']}, utime=${item['utime']}');
+      log.info(
+          '    gid=${item['subConfigKey']}, page=${item['value']}, utime=${item['utime']}');
     }
 
     var remoteRecent = remoteList.take(10).toList();
     log.info('  Remote recent 10 records:');
     for (var item in remoteRecent) {
-      log.info('    gid=${item['subConfigKey']}, page=${item['value']}, utime=${item['utime']}');
+      log.info(
+          '    gid=${item['subConfigKey']}, page=${item['value']}, utime=${item['utime']}');
     }
 
     Map<String, dynamic> merged = {};
@@ -221,14 +245,16 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       }
     }
 
-    String mergedJson = await isolateService.jsonEncodeAsync(merged.values.toList());
+    String mergedJson =
+        await isolateService.jsonEncodeAsync(merged.values.toList());
 
     // Debug: Print merged result
     List mergedList = await isolateService.jsonDecodeAsync(mergedJson);
     var mergedRecent = mergedList.take(10).toList();
     log.info('  Merged recent 10 records:');
     for (var item in mergedRecent) {
-      log.info('    gid=${item['subConfigKey']}, page=${item['value']}, utime=${item['utime']}');
+      log.info(
+          '    gid=${item['subConfigKey']}, page=${item['value']}, utime=${item['utime']}');
     }
 
     CloudConfig mergedConfig = CloudConfig(
@@ -236,7 +262,8 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       shareCode: CloudConfigService.localConfigCode,
       identificationCode: CloudConfigService.localConfigCode,
       type: CloudConfigTypeEnum.readIndexRecord,
-      version: CloudConfigService.configTypeVersionMap[CloudConfigTypeEnum.readIndexRecord]!,
+      version: CloudConfigService
+          .configTypeVersionMap[CloudConfigTypeEnum.readIndexRecord]!,
       config: mergedJson,
       ctime: DateTime.now(),
     );
@@ -253,7 +280,11 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   }
 
   /// Merge quickSearch (with file timestamp)
-  Future<MergeConfigResult> _mergeQuickSearch(CloudConfig local, CloudConfig remote, DateTime remoteFileTime, DateTime? latestLocalTime) async {
+  Future<MergeConfigResult> _mergeQuickSearch(
+      CloudConfig local,
+      CloudConfig remote,
+      DateTime remoteFileTime,
+      DateTime? latestLocalTime) async {
     Map localMap = await isolateService.jsonDecodeAsync(local.config);
     Map remoteMap = await isolateService.jsonDecodeAsync(remote.config);
 
@@ -288,7 +319,8 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       shareCode: CloudConfigService.localConfigCode,
       identificationCode: CloudConfigService.localConfigCode,
       type: CloudConfigTypeEnum.quickSearch,
-      version: CloudConfigService.configTypeVersionMap[CloudConfigTypeEnum.quickSearch]!,
+      version: CloudConfigService
+          .configTypeVersionMap[CloudConfigTypeEnum.quickSearch]!,
       config: mergedJson,
       ctime: DateTime.now(),
     );
@@ -305,7 +337,11 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   }
 
   /// Merge blockRules (with file timestamp)
-  Future<MergeConfigResult> _mergeBlockRules(CloudConfig local, CloudConfig remote, DateTime remoteFileTime, DateTime? latestLocalTime) async {
+  Future<MergeConfigResult> _mergeBlockRules(
+      CloudConfig local,
+      CloudConfig remote,
+      DateTime remoteFileTime,
+      DateTime? latestLocalTime) async {
     List localList = await isolateService.jsonDecodeAsync(local.config);
     List remoteList = await isolateService.jsonDecodeAsync(remote.config);
 
@@ -341,14 +377,16 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       }
     }
 
-    String mergedJson = await isolateService.jsonEncodeAsync(merged.values.toList());
+    String mergedJson =
+        await isolateService.jsonEncodeAsync(merged.values.toList());
 
     CloudConfig mergedConfig = CloudConfig(
       id: CloudConfigService.localConfigId,
       shareCode: CloudConfigService.localConfigCode,
       identificationCode: CloudConfigService.localConfigCode,
       type: CloudConfigTypeEnum.blockRules,
-      version: CloudConfigService.configTypeVersionMap[CloudConfigTypeEnum.blockRules]!,
+      version: CloudConfigService
+          .configTypeVersionMap[CloudConfigTypeEnum.blockRules]!,
       config: mergedJson,
       ctime: DateTime.now(),
     );
@@ -365,8 +403,11 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   }
 
   /// Merge searchHistory (with file timestamp)
-  /// Strategy: Newer overwrites older based on file timestamp
-  Future<MergeConfigResult> _mergeSearchHistory(CloudConfig local, CloudConfig remote, DateTime remoteFileTime, DateTime? latestLocalTime) async {
+  Future<MergeConfigResult> _mergeSearchHistory(
+      CloudConfig local,
+      CloudConfig remote,
+      DateTime remoteFileTime,
+      DateTime? latestLocalTime) async {
     List localList = await isolateService.jsonDecodeAsync(local.config);
     List remoteList = await isolateService.jsonDecodeAsync(remote.config);
 
@@ -376,43 +417,103 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     log.info('  Latest local timestamp: $latestLocalTime');
     log.info('  Remote file time: $remoteFileTime');
 
-    // Use latestLocalTime if available, otherwise fallback to comparing data size
-    bool remoteIsNewer = latestLocalTime != null
-        ? remoteFileTime.isAfter(latestLocalTime)
-        : remoteList.length > localList.length;
+    List<String> normalize(List rawList) {
+      List<String> result = [];
+      for (dynamic item in rawList) {
+        String? keyword;
+        if (item is String) {
+          keyword = item;
+        } else if (item is Map && item['rawKeyword'] is String) {
+          keyword = item['rawKeyword'] as String;
+        }
 
-    // Use newer list to overwrite older list
-    List finalList = remoteIsNewer ? remoteList : localList;
-    int addedFromRemote = remoteIsNewer ? remoteList.length : 0;
-    int conflicts = remoteIsNewer ? localList.length : 0;
+        if (keyword == null) {
+          continue;
+        }
 
-    log.info('  Using ${remoteIsNewer ? "remote" : "local"} list (newer)');
+        String normalized = keyword.trim();
+        if (normalized.isEmpty) {
+          continue;
+        }
 
-    String mergedJson = await isolateService.jsonEncodeAsync(finalList);
+        result.add(normalized);
+      }
+      return result;
+    }
+
+    List<String> localKeywords = normalize(localList);
+    List<String> remoteKeywords = normalize(remoteList);
+
+    List<String> mergedKeywords = [];
+    Set<String> seen = {};
+    Set<String> localSet = localKeywords.toSet();
+    Set<String> conflictKeywords = {};
+
+    int maxLength = localKeywords.length > remoteKeywords.length
+        ? localKeywords.length
+        : remoteKeywords.length;
+    int addedFromRemote = 0;
+
+    for (int i = 0; i < maxLength; i++) {
+      if (i < localKeywords.length) {
+        String keyword = localKeywords[i];
+        if (seen.add(keyword)) {
+          mergedKeywords.add(keyword);
+        }
+      }
+
+      if (mergedKeywords.length >= _maxSearchHistoryLength) {
+        break;
+      }
+
+      if (i < remoteKeywords.length) {
+        String keyword = remoteKeywords[i];
+        if (seen.add(keyword)) {
+          mergedKeywords.add(keyword);
+          if (!localSet.contains(keyword)) {
+            addedFromRemote++;
+          }
+        } else if (localSet.contains(keyword)) {
+          conflictKeywords.add(keyword);
+        }
+      }
+
+      if (mergedKeywords.length >= _maxSearchHistoryLength) {
+        break;
+      }
+    }
+
+    log.info('  Normalized local entries: ${localKeywords.length}');
+    log.info('  Normalized remote entries: ${remoteKeywords.length}');
+    log.info('  Merged entries: ${mergedKeywords.length}');
+
+    String mergedJson = await isolateService.jsonEncodeAsync(mergedKeywords);
 
     CloudConfig mergedConfig = CloudConfig(
       id: CloudConfigService.localConfigId,
       shareCode: CloudConfigService.localConfigCode,
       identificationCode: CloudConfigService.localConfigCode,
       type: CloudConfigTypeEnum.searchHistory,
-      version: CloudConfigService.configTypeVersionMap[CloudConfigTypeEnum.searchHistory]!,
+      version: CloudConfigService
+          .configTypeVersionMap[CloudConfigTypeEnum.searchHistory]!,
       config: mergedJson,
       ctime: DateTime.now(),
     );
 
     MergeStatistics stats = MergeStatistics(
-      localList.length,
-      remoteList.length,
-      finalList.length,
+      localKeywords.length,
+      remoteKeywords.length,
+      mergedKeywords.length,
       addedFromRemote,
-      conflicts,
+      conflictKeywords.length,
     );
 
     return MergeConfigResult(mergedConfig, stats);
   }
 
   /// Merge history (with item timestamp)
-  Future<MergeConfigResult> _mergeHistory(CloudConfig local, CloudConfig remote) async {
+  Future<MergeConfigResult> _mergeHistory(
+      CloudConfig local, CloudConfig remote) async {
     List localList = await isolateService.jsonDecodeAsync(local.config);
     List remoteList = await isolateService.jsonDecodeAsync(remote.config);
 
@@ -441,14 +542,16 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       }
     }
 
-    String mergedJson = await isolateService.jsonEncodeAsync(merged.values.toList());
+    String mergedJson =
+        await isolateService.jsonEncodeAsync(merged.values.toList());
 
     CloudConfig mergedConfig = CloudConfig(
       id: CloudConfigService.localConfigId,
       shareCode: CloudConfigService.localConfigCode,
       identificationCode: CloudConfigService.localConfigCode,
       type: CloudConfigTypeEnum.history,
-      version: CloudConfigService.configTypeVersionMap[CloudConfigTypeEnum.history]!,
+      version:
+          CloudConfigService.configTypeVersionMap[CloudConfigTypeEnum.history]!,
       config: mergedJson,
       ctime: DateTime.now(),
     );

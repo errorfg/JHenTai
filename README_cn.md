@@ -8,8 +8,8 @@
 
 # JHenTai
 
-[English](https://github.com/jiangtian616/JHenTai/blob/master/README.md) | 简体中文
-| [한국어](https://github.com/jiangtian616/JHenTai/blob/master/README_kr.md)
+[English](./README.md) | 简体中文
+| [한국어](./README_kr.md)
 
 [常见问题，提问前必看](https://github.com/jiangtian616/JHenTai/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98)
 
