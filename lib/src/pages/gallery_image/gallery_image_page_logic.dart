@@ -11,9 +11,6 @@ import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/pages/details/details_page_logic.dart';
 import 'package:jhentai/src/pages/gallery_image/gallery_image_page_state.dart';
 import 'package:jhentai/src/routes/routes.dart';
-import 'package:jhentai/src/service/gallery_download_service.dart';
-import 'package:jhentai/src/service/storage_service.dart';
-import 'package:jhentai/src/service/super_resolution_service.dart';
 import 'package:jhentai/src/service/tag_translation_service.dart';
 import 'package:jhentai/src/utils/eh_spider_parser.dart';
 import 'package:jhentai/src/utils/route_util.dart';
@@ -94,10 +91,12 @@ class GalleryImagePageLogic extends GetxController {
 
     ({GalleryDetail galleryDetails, String apikey}) detailsPageInfo;
     try {
-      detailsPageInfo = await _getDetailsWithRedirectAndFallback(galleryUrl: galleryUrl);
+      detailsPageInfo =
+          await _getDetailsWithRedirectAndFallback(galleryUrl: galleryUrl);
       galleryUrl = detailsPageInfo.galleryDetails.galleryUrl;
     } on DioException catch (e) {
-      log.error('Get gallery detail failed in image page', e.errorMsg, e.stackTrace);
+      log.error(
+          'Get gallery detail failed in image page', e.errorMsg, e.stackTrace);
       snack('getGalleryDetailFailed'.tr, e.errorMsg ?? '', isShort: true);
       state.loadingState = LoadingState.error;
       updateSafely();
@@ -116,9 +115,10 @@ class GalleryImagePageLogic extends GetxController {
       return;
     }
 
-    await tagTranslationService.translateTagsIfNeeded(detailsPageInfo.galleryDetails.tags);
+    await tagTranslationService
+        .translateTagsIfNeeded(detailsPageInfo.galleryDetails.tags);
 
-    _addColor2WatchedTags(detailsPageInfo.galleryDetails!.tags);
+    _addColor2WatchedTags(detailsPageInfo.galleryDetails.tags);
 
     if (isClosed) {
       return;
@@ -135,7 +135,18 @@ class GalleryImagePageLogic extends GetxController {
     );
   }
 
-  Future<({GalleryDetail galleryDetails, String apikey})> _getDetailsWithRedirectAndFallback({required GalleryUrl galleryUrl, bool useCache = true}) async {
+  Future<({GalleryDetail galleryDetails, String apikey})>
+      _getDetailsWithRedirectAndFallback(
+          {required GalleryUrl galleryUrl, bool useCache = true}) async {
+    if (galleryUrl.isNH) {
+      return ehRequest
+          .requestDetailPage<({GalleryDetail galleryDetails, String apikey})>(
+        galleryUrl: galleryUrl.url,
+        parser: EHSpiderParser.detailPage2GalleryAndDetailAndApikey,
+        useCacheIfAvailable: useCache,
+      );
+    }
+
     final GalleryUrl? firstLink;
     final GalleryUrl secondLink;
 
@@ -152,7 +163,9 @@ class GalleryImagePageLogic extends GetxController {
     } else {
       /// fallback to EX site only if user has logged in
       firstLink = userSetting.hasLoggedIn() ? galleryUrl : null;
-      secondLink = userSetting.hasLoggedIn() ? galleryUrl.copyWith(isEH: false) : galleryUrl;
+      secondLink = userSetting.hasLoggedIn()
+          ? galleryUrl.copyWith(isEH: false)
+          : galleryUrl;
     }
 
     /// if we can't find gallery via firstLink, try second link
@@ -160,28 +173,38 @@ class GalleryImagePageLogic extends GetxController {
     if (firstLink != null) {
       log.trace('Try to find gallery via firstLink: $firstLink');
       try {
-        ({GalleryDetail galleryDetails, String apikey}) detailPageInfo = await ehRequest.requestDetailPage<({GalleryDetail galleryDetails, String apikey})>(
+        ({
+          GalleryDetail galleryDetails,
+          String apikey
+        }) detailPageInfo = await ehRequest
+            .requestDetailPage<({GalleryDetail galleryDetails, String apikey})>(
           galleryUrl: firstLink.url,
           parser: EHSpiderParser.detailPage2GalleryAndDetailAndApikey,
           useCacheIfAvailable: useCache,
         );
         return detailPageInfo;
       } on EHSiteException catch (e) {
-        log.trace('Can\'t find gallery, firstLink: $firstLink, reason: ${e.message}');
+        log.trace(
+            'Can\'t find gallery, firstLink: $firstLink, reason: ${e.message}');
         firstException = e;
       }
     }
 
     try {
       log.trace('Try to find gallery via secondLink: $secondLink');
-      ({GalleryDetail galleryDetails, String apikey}) detailPageInfo = await ehRequest.requestDetailPage<({GalleryDetail galleryDetails, String apikey})>(
+      ({
+        GalleryDetail galleryDetails,
+        String apikey
+      }) detailPageInfo = await ehRequest
+          .requestDetailPage<({GalleryDetail galleryDetails, String apikey})>(
         galleryUrl: secondLink.url,
         parser: EHSpiderParser.detailPage2GalleryAndDetailAndApikey,
         useCacheIfAvailable: useCache,
       );
       return detailPageInfo;
     } on EHSiteException catch (e) {
-      log.trace('Can\'t find gallery, secondLink: $secondLink, reason: ${e.message}');
+      log.trace(
+          'Can\'t find gallery, secondLink: $secondLink, reason: ${e.message}');
       throw firstException ?? e;
     }
   }
@@ -193,16 +216,20 @@ class GalleryImagePageLogic extends GetxController {
           continue;
         }
 
-        ({Color? tagSetBackGroundColor, WatchedTag tag})? tagInfo = myTagsSetting.getOnlineTagSetByTagData(tag.tagData);
+        ({Color? tagSetBackGroundColor, WatchedTag tag})? tagInfo =
+            myTagsSetting.getOnlineTagSetByTagData(tag.tagData);
         if (tagInfo == null) {
           continue;
         }
 
-        Color? backGroundColor = tagInfo.tag.backgroundColor ?? tagInfo.tagSetBackGroundColor;
-        tag.backgroundColor = backGroundColor ?? UIConfig.ehWatchedTagDefaultBackGroundColor;
+        Color? backGroundColor =
+            tagInfo.tag.backgroundColor ?? tagInfo.tagSetBackGroundColor;
+        tag.backgroundColor =
+            backGroundColor ?? UIConfig.ehWatchedTagDefaultBackGroundColor;
         tag.color = backGroundColor == null
             ? const Color(0xFFF1F1F1)
-            : ThemeData.estimateBrightnessForColor(backGroundColor) == Brightness.light
+            : ThemeData.estimateBrightnessForColor(backGroundColor) ==
+                    Brightness.light
                 ? const Color.fromRGBO(9, 9, 9, 1)
                 : const Color(0xFFF1F1F1);
       }

@@ -9,12 +9,19 @@ import '../service/jh_service.dart';
 
 EHSetting ehSetting = EHSetting();
 
-class EHSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBean {
+class EHSetting
+    with JHLifeCircleBeanWithConfigStorage
+    implements JHLifeCircleBean {
   RxString site = 'EH'.obs;
   RxBool redirect2Eh = true.obs;
 
+  bool get isEHSite => site.value == 'EH';
+  bool get isEXSite => site.value == 'EX';
+  bool get isNHSite => site.value == 'NH';
+
   @override
-  List<JHLifeCircleBean> get initDependencies => super.initDependencies..add(userSetting);
+  List<JHLifeCircleBean> get initDependencies =>
+      super.initDependencies..add(userSetting);
 
   @override
   ConfigEnum get configEnum => ConfigEnum.EHSetting;
@@ -23,7 +30,11 @@ class EHSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBe
   void applyBeanConfig(String configString) {
     Map map = jsonDecode(configString);
 
-    site.value = map['site'];
+    String siteValue = map['site'] ?? 'EH';
+    if (siteValue != 'EH' && siteValue != 'EX' && siteValue != 'NH') {
+      siteValue = 'EH';
+    }
+    site.value = siteValue;
     redirect2Eh.value = map['redirect2Eh'] ?? redirect2Eh.value;
   }
 
