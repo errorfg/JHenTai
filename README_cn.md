@@ -19,6 +19,29 @@ E-hentai 的一个多端app，现支持Android、iOS、Windows、MacOS和Linux�
 
 仍在发展阶段，十分欢迎提交各种bug反馈或Feature Request。
 
+## Fork版本新增功能
+
+以下内容基于 `upstream/master` 与本 fork `origin/master` 的提交差异整理：
+
+- 鸿蒙兼容 / 应用标识调整：
+  - 针对 HarmonyOS 风险弹窗场景做过包名/标识相关调整。
+- 云同步增强：
+  - 增加 WebDAV 配置同步。
+  - 增加 S3 兼容同步。
+  - 增量同步与智能合并策略优化。
+  - 支持启动自动同步、应用恢复/展示时自动同步。
+  - 支持导出同步设置。
+- 画廊与检索体验：
+  - 详情页支持多 Tag 选择搜索。
+  - Popular / Ranklist 页支持客户端过滤。
+  - 增加 `nhentai` 备选链路（搜索/详情/图片页）。
+  - 搜索页新增 `NH` 切换按钮（`nh:` 关键词模式）。
+  - `nhentai` 详情页新增 `EH` 按钮，可提取标题并回搜 E-Hentai。
+- CI 流程（fork 自定义）：
+  - 分支检查聚焦 Android release APK artifact 产出。
+  - 仅文档改动默认跳过编译。
+  - 支持通过 `[skip-build]` 关键词主动跳过编译任务。
+
 ## 下载&安装
 
 [<img src="https://raw.githubusercontent.com/jiangtian616/JHenTai/master/badges/download_from_github.png" 

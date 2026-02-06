@@ -18,6 +18,29 @@ A manga app for E-Hentai, supporting Android & iOS & Windows & MacOS & Linux.
 
 Still in development stage, welcome to submit issues or feature requests.
 
+## Fork Highlights
+
+Compared with `upstream/master`, this fork currently contains additional commits in these areas:
+
+- HarmonyOS compatibility / app identity adjustments:
+  - package/app identity related changes to reduce HarmonyOS risk-popup friction.
+- Cloud sync enhancements:
+  - WebDAV config sync.
+  - S3-compatible sync provider.
+  - incremental/smart merge improvements.
+  - auto sync on startup and app resumed/shown.
+  - sync setting export support.
+- Gallery and search UX:
+  - multi-tag selection in detail page.
+  - client-side filters for Popular and Ranklist pages.
+  - `nhentai` fallback search/detail/image flow support.
+  - dedicated `NH` keyword-mode toggle in search page.
+  - dedicated `EH` action on `nhentai` details to extract title and search on E-Hentai.
+- CI/workflow updates in this fork:
+  - branch check focused on Android release APK artifact.
+  - docs-only changes skip build.
+  - `[skip-build]` keyword support for skipping build jobs.
+
 ## Download & Install
 
 [<img src="https://raw.githubusercontent.com/jiangtian616/JHenTai/master/badges/download_from_github.png" 
