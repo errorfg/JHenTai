@@ -863,14 +863,26 @@ class DetailsPageLogic extends GetxController
   }
 
   void searchSimilar() {
-    if (mainTitleText.isEmpty) {
+    String? keyword = _buildTitleSearchKeyword();
+    if (keyword == null) {
       return;
     }
 
-    String keyword =
-        'title:"${(mainTitleText).replaceAll(RegExp(r'\[.*?\]|\(.*?\)|{.*?}'), '').trim()}"';
     if (state.galleryUrl.isNH) {
       keyword = 'nh:$keyword';
+    }
+
+    newSearch(keyword: keyword, forceNewRoute: true);
+  }
+
+  void searchInEhByNhTitle() {
+    if (!state.galleryUrl.isNH) {
+      return;
+    }
+
+    String? keyword = _buildTitleSearchKeyword();
+    if (keyword == null) {
+      return;
     }
 
     newSearch(keyword: keyword, forceNewRoute: true);
@@ -1428,5 +1440,29 @@ class DetailsPageLogic extends GetxController
 
   void removeCache() {
     ehRequest.removeCacheByGalleryUrlAndPage(state.galleryUrl.url, 0);
+  }
+
+  String? _buildTitleSearchKeyword() {
+    String source = mainTitleText.trim();
+    if (source.isEmpty) {
+      return null;
+    }
+
+    String normalized = source
+        .replaceAll(RegExp(r'\[.*?\]|\(.*?\)|{.*?}'), ' ')
+        .replaceAll('"', ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    if (normalized.isEmpty) {
+      normalized =
+          source.replaceAll('"', ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+    }
+
+    if (normalized.isEmpty) {
+      return null;
+    }
+
+    return 'title:"$normalized"';
   }
 }

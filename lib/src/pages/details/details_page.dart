@@ -972,6 +972,10 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
               _buildSimilarButton(context),
             ];
 
+            if (state.galleryUrl.isNH) {
+              actions.add(_buildSearchInEHButton(context));
+            }
+
             if (!state.galleryUrl.isNH) {
               actions.addAll([
                 _buildFavoriteButton(context),
@@ -1327,6 +1331,36 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
             ),
           ),
           onPressed: disabled ? null : logic.searchSimilar,
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchInEHButton(BuildContext context) {
+    return GetBuilder<DetailsPageLogic>(
+      id: DetailsPageLogic.detailsId,
+      global: false,
+      init: logic,
+      builder: (_) {
+        bool disabled = logic.mainTitleText.trim().isEmpty;
+
+        return IconTextButton(
+          width: UIConfig.detailsPageActionExtent,
+          icon: Icon(Icons.travel_explore,
+              color: disabled
+                  ? UIConfig.detailsPageActionDisabledIconColor(context)
+                  : UIConfig.detailsPageActionIconColor(context)),
+          text: Text(
+            'EH',
+            style: TextStyle(
+              fontSize: UIConfig.detailsPageActionTextSize,
+              color: disabled
+                  ? UIConfig.detailsPageActionDisabledIconColor(context)
+                  : UIConfig.detailsPageActionTextColor(context),
+              height: 1,
+            ),
+          ),
+          onPressed: disabled ? null : logic.searchInEhByNhTitle,
         );
       },
     );
