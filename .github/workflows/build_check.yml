@@ -23,7 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: Android Debug
+          - target: Android Release
             os: ubuntu-latest
           - target: Linux Debug
             os: ubuntu-22.04
@@ -41,7 +41,7 @@ jobs:
           cache: true
 
       - name: Setup JDK 17 (Android)
-        if: matrix.target == 'Android Debug'
+        if: matrix.target == 'Android Release'
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
@@ -57,16 +57,37 @@ jobs:
       - name: Flutter Pub Get
         run: flutter pub get
 
-      - name: Build Android Debug APK
-        if: matrix.target == 'Android Debug'
-        run: flutter build apk -t lib/src/main.dart --debug
+      - name: Setup Temporary Android Keystore
+        if: matrix.target == 'Android Release'
+        run: |
+          keytool -genkeypair \
+            -v \
+            -storetype PKCS12 \
+            -keystore android/app/ci-upload-keystore.jks \
+            -alias ci \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=CI,O=JHenTai,C=US"
+          cat > android/key.properties <<'EOF'
+          storePassword=android
+          keyPassword=android
+          keyAlias=ci
+          storeFile=ci-upload-keystore.jks
+          EOF
 
-      - name: Upload Android Debug APK
-        if: matrix.target == 'Android Debug'
+      - name: Build Android Release APK
+        if: matrix.target == 'Android Release'
+        run: flutter build apk -t lib/src/main.dart --release
+
+      - name: Upload Android Release APK
+        if: matrix.target == 'Android Release'
         uses: actions/upload-artifact@v4
         with:
-          name: android-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          name: android-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
 
       - name: Build Linux Debug
