@@ -16,17 +16,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  Compile:
-    name: ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: Android Release
-            os: ubuntu-latest
-          - target: Linux Debug
-            os: ubuntu-22.04
+  AndroidRelease:
+    name: Android Release
+    runs-on: ubuntu-latest
     env:
       FLUTTER_VERSION: 3.24.4
     steps:
@@ -41,24 +33,16 @@ jobs:
           cache: true
 
       - name: Setup JDK 17 (Android)
-        if: matrix.target == 'Android Release'
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
           cache: gradle
 
-      - name: Install Linux dependencies
-        if: matrix.target == 'Linux Debug'
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ninja-build libfuse2 webkit2gtk-4.1
-
       - name: Flutter Pub Get
         run: flutter pub get
 
       - name: Setup Temporary Android Keystore
-        if: matrix.target == 'Android Release'
         run: |
           keytool -genkeypair \
             -v \
@@ -79,17 +63,11 @@ jobs:
           EOF
 
       - name: Build Android Release APK
-        if: matrix.target == 'Android Release'
         run: flutter build apk -t lib/src/main.dart --release
 
       - name: Upload Android Release APK
-        if: matrix.target == 'Android Release'
         uses: actions/upload-artifact@v4
         with:
           name: android-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
-
-      - name: Build Linux Debug
-        if: matrix.target == 'Linux Debug'
-        run: flutter build linux -t lib/src/main.dart --debug
