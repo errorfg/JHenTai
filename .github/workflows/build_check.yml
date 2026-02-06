@@ -1,0 +1,73 @@
+name: Build Check
+
+on:
+  push:
+    branches-ignore:
+      - 'master'
+    tags-ignore:
+      - v*
+  pull_request:
+    branches:
+      - 'master'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  AndroidRelease:
+    name: Android Release
+    runs-on: ubuntu-latest
+    env:
+      FLUTTER_VERSION: 3.24.4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'master'
+          cache: true
+
+      - name: Setup JDK 17 (Android)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: gradle
+
+      - name: Flutter Pub Get
+        run: flutter pub get
+
+      - name: Setup Temporary Android Keystore
+        run: |
+          keytool -genkeypair \
+            -v \
+            -storetype PKCS12 \
+            -keystore android/app/ci-upload-keystore.jks \
+            -alias ci \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=CI,O=JHenTai,C=US"
+          cat > android/key.properties <<'EOF'
+          storePassword=android
+          keyPassword=android
+          keyAlias=ci
+          storeFile=ci-upload-keystore.jks
+          EOF
+
+      - name: Build Android Release APK
+        run: flutter build apk -t lib/src/main.dart --release
+
+      - name: Upload Android Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
