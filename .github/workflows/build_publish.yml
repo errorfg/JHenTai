@@ -278,17 +278,6 @@ jobs:
           IPA_SIZE=$(stat -c %s /tmp/artifacts/release-iOS/*.ipa)
           echo "ipa_size=$IPA_SIZE" >> $GITHUB_OUTPUT
 
-      # Get changelog content
-      - name: Get changelog content
-        id: get_changelog
-        run: |
-          # Read changelog and preserve newlines using heredoc
-          {
-            echo 'changelog<<EOF'
-            cat changelog/${{ github.ref_name }}.md
-            echo EOF
-          } >> $GITHUB_OUTPUT
-
       # Extract build version from tag
       - name: Get build version
         id: get_build_version
@@ -303,12 +292,16 @@ jobs:
           # Remove build number part (content after +)
           VERSION="${FULL_VERSION%%+*}"
           DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          CHANGELOG="${{ steps.get_changelog.outputs.changelog }}"
+          CHANGELOG_FILE="changelog/${{ github.ref_name }}.md"
+          if [ ! -f "$CHANGELOG_FILE" ]; then
+            echo "Missing changelog file: $CHANGELOG_FILE"
+            exit 1
+          fi
           # Create new version entry
           jq --arg version "$VERSION" \
              --arg build "${{ steps.get_build_version.outputs.build_version }}" \
              --arg date "$DATE" \
-             --arg desc "$CHANGELOG" \
+             --rawfile desc "$CHANGELOG_FILE" \
              --arg url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/JHenTai_${FULL_VERSION}.ipa" \
              --arg size "${{ steps.get_ipa_size.outputs.ipa_size }}" \
              '.apps[0].versions[0] = {
@@ -327,5 +320,9 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add altsource/AltSource.json
+          if git diff --cached --quiet; then
+            echo "No AltSource.json changes to commit"
+            exit 0
+          fi
           git commit -m "Update AltSource.json for version ${{ needs.Build.outputs.version }}"
           git push origin HEAD:master
