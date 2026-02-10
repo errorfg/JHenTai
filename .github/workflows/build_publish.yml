@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   Build:
-    if: ${{ github.event_name != 'push' || !contains(join(github.event.commits.*.message, ' '), '[skip-build]') }}
+    if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip-build]') }}
     environment: ENCODED_KEYSTORE
     strategy:
       fail-fast: false
