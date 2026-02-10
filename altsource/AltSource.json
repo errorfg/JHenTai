@@ -61,11 +61,11 @@
       "versions": [
         {
           "version": "8.0.15",
-          "buildVersion": "311",
-          "date": "2026-02-07T08:04:22Z",
-          "localizedDescription": "- Auto-generated release notes\n- Tag: v8.0.15+311\n- Commit: da5c792aab44e123cd209e651ab56e86ff69f77b\n",
-          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.15+311/JHenTai_8.0.15+310.ipa",
-          "size": 15850530
+          "buildVersion": "312",
+          "date": "2026-02-10T14:50:47Z",
+          "localizedDescription": "- Merge upstream cookie login feature with webview-assisted login and iOS fixes\n- Add auto sync trigger on new history record (every 5 new records)\n- Fix CI: detect tag at publish time instead of triggering on tag push\n",
+          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.15+312/JHenTai_8.0.15+312.ipa",
+          "size": 15896996
         }
       ]
     }
