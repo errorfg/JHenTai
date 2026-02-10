@@ -20,10 +20,14 @@ SyncService syncService = SyncService();
 class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   final Map<String, CloudProvider> _providers = {};
   DateTime? _lastSyncTime;
+  int _lastHistoryAutoSyncCount = 0;
+  bool _historyAutoSyncInProgress = false;
   static const _minSyncInterval = Duration(seconds: 30);
+  static const int _historyAutoSyncStep = 5;
 
   @override
-  List<JHLifeCircleBean> get initDependencies => [log, syncSetting, syncMerger, cloudConfigService, isolateService];
+  List<JHLifeCircleBean> get initDependencies =>
+      [log, syncSetting, syncMerger, cloudConfigService, isolateService];
 
   @override
   Future<void> doInitBean() async {
@@ -34,7 +38,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   @override
   Future<void> doAfterBeanReady() async {
     // Register app lifecycle callback to listen for app resumed events
-    AppManager.registerDidChangeAppLifecycleStateCallback(_onAppLifecycleStateChanged);
+    AppManager.registerDidChangeAppLifecycleStateCallback(
+        _onAppLifecycleStateChanged);
 
     // Auto sync on app startup if enabled
     if (syncSetting.enableSync.value && syncSetting.autoSync.value) {
@@ -53,12 +58,6 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   void reinitProviders() {
     _providers.clear();
     _initProviders();
-  }
-
-  /// Get current active provider
-  CloudProvider? _getCurrentProvider() {
-    String providerName = syncSetting.currentProvider.value;
-    return _providers[providerName];
   }
 
   /// Perform auto sync on app startup (non-blocking, background)
@@ -104,7 +103,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     }
 
     // Prevent frequent syncs: require at least 30 seconds since last sync
-    if (_lastSyncTime != null && DateTime.now().difference(_lastSyncTime!) < _minSyncInterval) {
+    if (_lastSyncTime != null &&
+        DateTime.now().difference(_lastSyncTime!) < _minSyncInterval) {
       log.debug('Auto sync on resume: skipped (too soon since last sync)');
       return;
     }
@@ -131,6 +131,53 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     } catch (e) {
       log.error('💥 Auto sync on resume failed', e);
       // Don't throw, just log the error
+    }
+  }
+
+  /// Trigger auto sync when history count reaches the configured step milestone.
+  /// Only syncs gallery history to reduce overhead.
+  void triggerAutoSyncByHistoryCount(int totalHistoryCount) async {
+    if (totalHistoryCount <= 0 ||
+        totalHistoryCount % _historyAutoSyncStep != 0) {
+      return;
+    }
+
+    if (_lastHistoryAutoSyncCount >= totalHistoryCount) {
+      return;
+    }
+
+    if (!syncSetting.enableSync.value || !syncSetting.autoSync.value) {
+      log.debug('Auto sync by history count skipped: sync disabled');
+      return;
+    }
+
+    if (_historyAutoSyncInProgress) {
+      log.debug('Auto sync by history count skipped: sync already in progress');
+      return;
+    }
+
+    _historyAutoSyncInProgress = true;
+    _lastHistoryAutoSyncCount = totalHistoryCount;
+    _lastSyncTime = DateTime.now();
+
+    try {
+      log.info('========================================');
+      log.info('Auto sync by history count: $totalHistoryCount');
+      log.info('Current provider: ${syncSetting.currentProvider.value}');
+      log.info('========================================');
+
+      SyncResult result =
+          await sync(types: const [CloudConfigTypeEnum.history]);
+
+      if (result.success) {
+        log.info('✅ Auto sync by history count completed successfully');
+      } else {
+        log.warning('❌ Auto sync by history count failed: ${result.message}');
+      }
+    } catch (e) {
+      log.error('💥 Auto sync by history count failed', e);
+    } finally {
+      _historyAutoSyncInProgress = false;
     }
   }
 
@@ -198,12 +245,14 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         remoteConfigs = list.map((e) => CloudConfig.fromJson(e)).toList();
         log.info('Downloaded ${remoteConfigs.length} remote configs');
         for (var config in remoteConfigs) {
-          log.info('  Remote ${config.type.name}: ${config.config.length} bytes');
+          log.info(
+              '  Remote ${config.type.name}: ${config.config.length} bytes');
         }
 
         // If download succeeded but metadata failed, create a placeholder
         if (remoteFile == null && remoteConfigs.isNotEmpty) {
-          log.warning('Metadata fetch failed but download succeeded, using current time as fallback');
+          log.warning(
+              'Metadata fetch failed but download succeeded, using current time as fallback');
           remoteFile = CloudFile(
             version: 'latest',
             modifiedTime: DateTime.now(),
@@ -213,7 +262,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         }
       } catch (e) {
         if (remoteConfigs.isEmpty) {
-          log.info('No remote config found (first sync), will upload local configs');
+          log.info(
+              'No remote config found (first sync), will upload local configs');
         } else {
           log.warning('Failed to download remote config, will upload local', e);
         }
@@ -230,8 +280,10 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       // 4. Upload merged result
       // saveHistory is determined by user settings (default: false)
       bool saveHistory = syncSetting.enableHistory.value;
-      String encodedData = await isolateService.jsonEncodeAsync(mergeResult.merged);
-      log.info('Uploading ${mergeResult.merged.length} configs to remote (${encodedData.length} bytes)');
+      String encodedData =
+          await isolateService.jsonEncodeAsync(mergeResult.merged);
+      log.info(
+          'Uploading ${mergeResult.merged.length} configs to remote (${encodedData.length} bytes)');
 
       await cloudProvider.upload(
         encodedData,
@@ -340,7 +392,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       // 1. Download specified history version
       String data = await cloudProvider.downloadVersion(version);
       List configs = await isolateService.jsonDecodeAsync(data);
-      List<CloudConfig> cloudConfigs = configs.map((e) => CloudConfig.fromJson(e)).toList();
+      List<CloudConfig> cloudConfigs =
+          configs.map((e) => CloudConfig.fromJson(e)).toList();
 
       // 2. Import to local (replace current config)
       for (var config in cloudConfigs) {
@@ -349,7 +402,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
 
       // 3. (Optional) Sync to cloud, making the restored version the new latest
       if (syncToCloud) {
-        await cloudProvider.upload(data, saveHistory: syncSetting.enableHistory.value);
+        await cloudProvider.upload(data,
+            saveHistory: syncSetting.enableHistory.value);
       }
 
       log.info('Restored from version: $version');
@@ -464,7 +518,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           return false;
         }
 
-        log.info('Creating S3 provider with endpoint: ${syncSetting.s3Endpoint.value}, bucket: ${syncSetting.s3BucketName.value}');
+        log.info(
+            'Creating S3 provider with endpoint: ${syncSetting.s3Endpoint.value}, bucket: ${syncSetting.s3BucketName.value}');
         cloudProvider = S3Provider(
           endpoint: syncSetting.s3Endpoint.value,
           accessKey: syncSetting.s3AccessKey.value,
@@ -481,7 +536,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           return false;
         }
 
-        log.info('Creating WebDAV provider with server: ${syncSetting.webdavServerUrl.value}');
+        log.info(
+            'Creating WebDAV provider with server: ${syncSetting.webdavServerUrl.value}');
         cloudProvider = WebDavProvider(
           serverUrl: syncSetting.webdavServerUrl.value,
           username: syncSetting.webdavUsername.value,
@@ -505,7 +561,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   /// Cleanup old versions exceeding the limit
   Future<void> _cleanupOldVersions(CloudProvider provider) async {
     // Check if auto cleanup is enabled
-    if (!syncSetting.enableHistory.value || !syncSetting.autoCleanHistory.value) {
+    if (!syncSetting.enableHistory.value ||
+        !syncSetting.autoCleanHistory.value) {
       return;
     }
 
@@ -514,7 +571,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       List<CloudFile> versions = await provider.listVersions();
       int maxVersions = syncSetting.maxHistoryVersions.value;
 
-      log.info('Found ${versions.length} history versions, max allowed: $maxVersions');
+      log.info(
+          'Found ${versions.length} history versions, max allowed: $maxVersions');
 
       if (versions.length > maxVersions) {
         // Sort by version (timestamp) in descending order (newest first)

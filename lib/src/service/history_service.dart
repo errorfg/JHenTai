@@ -6,10 +6,13 @@ import 'package:jhentai/src/extension/list_extension.dart';
 import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'jh_service.dart';
 import 'log.dart';
+import 'sync_service.dart';
 
 HistoryService historyService = HistoryService();
 
-class HistoryService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
+class HistoryService
+    with JHLifeCircleBeanErrorCatch
+    implements JHLifeCircleBean {
   static const String historyUpdateId = 'historyUpdateId';
 
   static const int pageSize = 100;
@@ -26,18 +29,28 @@ class HistoryService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean
   }
 
   Future<List<GalleryHistoryModel>> getByPageIndex(int pageIndex) async {
-    List<GalleryHistoryV2Data> historys = await GalleryHistoryDao.selectByPageIndex(pageIndex, pageSize);
-    return historys.map<GalleryHistoryModel>((h) => GalleryHistoryModel.fromJson(jsonDecode(h.jsonBody))).toList();
+    List<GalleryHistoryV2Data> historys =
+        await GalleryHistoryDao.selectByPageIndex(pageIndex, pageSize);
+    return historys
+        .map<GalleryHistoryModel>(
+            (h) => GalleryHistoryModel.fromJson(jsonDecode(h.jsonBody)))
+        .toList();
   }
 
   Future<List<GalleryHistoryV2Data>> getLatest10000RawHistory() async {
-    return appDb.managers.galleryHistoryV2.orderBy((o) => o.lastReadTime.desc() & o.gid.desc()).limit(10000).get();
+    return appDb.managers.galleryHistoryV2
+        .orderBy((o) => o.lastReadTime.desc() & o.gid.desc())
+        .limit(10000)
+        .get();
   }
 
   Future<void> record(GalleryHistoryModel gallery) async {
     log.trace('Record history: ${gallery.galleryUrl.gid}');
 
     try {
+      bool isNewHistory =
+          !await GalleryHistoryDao.existsHistory(gallery.galleryUrl.gid);
+
       await GalleryHistoryDao.replaceHistory(
         GalleryHistoryV2Data(
           gid: gallery.galleryUrl.gid,
@@ -45,6 +58,11 @@ class HistoryService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean
           lastReadTime: DateTime.now().toString(),
         ),
       );
+
+      if (isNewHistory) {
+        int totalCount = await GalleryHistoryDao.selectTotalCount();
+        syncService.triggerAutoSyncByHistoryCount(totalCount);
+      }
     } on Exception catch (e) {
       log.error('Record history failed!', e);
     }
