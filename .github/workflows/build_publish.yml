@@ -1,14 +1,13 @@
 name: Build & Release
 
-# Trigger only on release tags (or manual dispatch) to avoid duplicate builds
 on:
   push:
-    tags:
-      - v*
+    branches:
+      - master
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 # If previous workflow is still running, we push again, we will cancel the previous workflow
 concurrency:
@@ -245,25 +244,45 @@ jobs:
           path: ${{ matrix.artifact_path }}
           if-no-files-found: error
   Publish:
-    if: startsWith(github.ref, 'refs/tags/')
     name: Publish
     needs: Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect release tag on this commit
+        id: rel
+        run: |
+          git fetch --tags --force
+          TAG=$(git tag --points-at "${GITHUB_SHA}" --list 'v*' | head -n 1)
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Detected tag: $TAG"
+
+      - name: Skip publish if no tag
+        if: steps.rel.outputs.tag == ''
+        run: echo "No v* tag points to this commit, skip publish."
+
       - name: Make tmp dir
+        if: steps.rel.outputs.tag != ''
         run: mkdir /tmp/artifacts
+
       - name: Download all Artifacts
+        if: steps.rel.outputs.tag != ''
         uses: actions/download-artifact@v4
         with:
           path: /tmp/artifacts
+
       - name: List all Artifacts
+        if: steps.rel.outputs.tag != ''
         run: ls -R /tmp/artifacts
 
       - name: Prepare release changelog file
+        if: steps.rel.outputs.tag != ''
         run: |
-          CHANGELOG_FILE="changelog/${{ github.ref_name }}.md"
+          CHANGELOG_FILE="changelog/${{ steps.rel.outputs.tag }}.md"
           if [ -f "$CHANGELOG_FILE" ]; then
             echo "Using existing changelog: $CHANGELOG_FILE"
             exit 0
@@ -273,53 +292,51 @@ jobs:
           mkdir -p changelog
           {
             echo "- Auto-generated release notes"
-            echo "- Tag: ${{ github.ref_name }}"
+            echo "- Tag: ${{ steps.rel.outputs.tag }}"
             echo "- Commit: ${{ github.sha }}"
           } > "$CHANGELOG_FILE"
 
-      # Upload release assets
       - name: Upload to release
+        if: steps.rel.outputs.tag != ''
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ github.ref_name }}
+          tag: ${{ steps.rel.outputs.tag }}
           allowUpdates: true
-          bodyFile: changelog/${{ github.ref_name }}.md
+          bodyFile: changelog/${{ steps.rel.outputs.tag }}.md
           artifacts: /tmp/artifacts/release-Android/*.apk,/tmp/artifacts/release-iOS/*.ipa,/tmp/artifacts/release-macOS/*.dmg,/tmp/artifacts/release-Windows/*.zip,/tmp/artifacts/release-Linux-x64-deb/*.deb,/tmp/artifacts/release-Linux-arm64-deb/*.deb
           artifactErrorsFailBuild: true
           replacesArtifacts: true
 
-      # Get IPA file size
       - name: Get IPA file size
+        if: steps.rel.outputs.tag != ''
         id: get_ipa_size
         run: |
           IPA_SIZE=$(stat -c %s /tmp/artifacts/release-iOS/*.ipa)
           echo "ipa_size=$IPA_SIZE" >> $GITHUB_OUTPUT
 
-      # Extract build version from tag
       - name: Get build version
+        if: steps.rel.outputs.tag != ''
         id: get_build_version
         run: |
-          BUILD_VERSION=$(echo "${{ github.ref_name }}" | grep -oE '\+[0-9]+' | tr -d '+')
+          BUILD_VERSION=$(echo "${{ steps.rel.outputs.tag }}" | grep -oE '\+[0-9]+' | tr -d '+')
           echo "build_version=$BUILD_VERSION" >> $GITHUB_OUTPUT
 
-      # Update AltSource.json
       - name: Update AltSource.json
+        if: steps.rel.outputs.tag != ''
         run: |
           FULL_VERSION="${{ needs.Build.outputs.version }}"
-          # Remove build number part (content after +)
           VERSION="${FULL_VERSION%%+*}"
           DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          CHANGELOG_FILE="changelog/${{ github.ref_name }}.md"
+          CHANGELOG_FILE="changelog/${{ steps.rel.outputs.tag }}.md"
           if [ ! -f "$CHANGELOG_FILE" ]; then
             echo "Missing changelog file: $CHANGELOG_FILE"
             exit 1
           fi
-          # Create new version entry
           jq --arg version "$VERSION" \
              --arg build "${{ steps.get_build_version.outputs.build_version }}" \
              --arg date "$DATE" \
              --rawfile desc "$CHANGELOG_FILE" \
-             --arg url "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/JHenTai_${FULL_VERSION}.ipa" \
+             --arg url "https://github.com/${{ github.repository }}/releases/download/${{ steps.rel.outputs.tag }}/JHenTai_${FULL_VERSION}.ipa" \
              --arg size "${{ steps.get_ipa_size.outputs.ipa_size }}" \
              '.apps[0].versions[0] = {
                 "version": $version,
@@ -331,8 +348,8 @@ jobs:
               }' altsource/AltSource.json > altsource/AltSource.json.tmp
           mv altsource/AltSource.json.tmp altsource/AltSource.json
 
-      # Commit and push updated AltSource.json
       - name: Commit changes
+        if: steps.rel.outputs.tag != ''
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
