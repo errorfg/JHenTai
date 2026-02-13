@@ -774,6 +774,7 @@ favnote：配對收藏備註
       'blockRules': '本機隱藏規則',
       'searchHistory': '搜尋紀錄',
       'galleryHistory': '畫廊瀏覽紀錄',
+      'nhentaiFavorite': 'nhentai 收藏',
 
       /// block rule page
       'configureBlockRuleFailed': '設定隱藏規則失敗',

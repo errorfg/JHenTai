@@ -22,6 +22,7 @@ import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/model/read_page_info.dart';
 import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/pages/download/download_base_page.dart';
+import 'package:jhentai/src/pages/favorite/favorite_page_logic.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/service/super_resolution_service.dart';
 import 'package:jhentai/src/setting/download_setting.dart';
@@ -60,6 +61,7 @@ import '../../model/tag_set.dart';
 import '../../service/history_service.dart';
 import '../../service/gallery_download_service.dart';
 import '../../service/local_block_rule_service.dart';
+import '../../service/nhentai_favorite_service.dart';
 import '../../setting/eh_setting.dart';
 import '../../setting/read_setting.dart';
 import '../../setting/site_setting.dart';
@@ -142,6 +144,8 @@ class DetailsPageLogic extends GetxController
     state.gallery = argument.gallery;
     state.galleryDetails = argument.detailsPageInfo?.galleryDetails;
     state.apikey = argument.detailsPageInfo?.apikey;
+
+    _syncNhFavoriteStatus();
   }
 
   @override
@@ -236,6 +240,8 @@ class DetailsPageLogic extends GetxController
     state.galleryDetails = detailPageInfo.galleryDetails;
     state.apikey = detailPageInfo.apikey;
     state.nextPageIndexToLoadThumbnails = 1;
+
+    _syncNhFavoriteStatus();
 
     await tagTranslationService
         .translateTagsIfNeeded(state.galleryDetails!.tags);
@@ -445,7 +451,7 @@ class DetailsPageLogic extends GetxController
 
   Future<void> handleTapFavorite({required bool useDefault}) async {
     if (state.galleryUrl.isNH) {
-      return;
+      return _handleTapNhentaiFavorite(useDefault: useDefault);
     }
 
     if (!checkLogin()) {
@@ -625,6 +631,135 @@ class DetailsPageLogic extends GetxController
           : 'favoriteGallerySuccess'.tr,
       isCenter: false,
     );
+  }
+
+  Future<void> _handleTapNhentaiFavorite({required bool useDefault}) async {
+    if (state.favoriteState == LoadingState.loading) {
+      return;
+    }
+
+    Gallery? gallerySnapshot = _getNhFavoriteGallerySnapshot();
+    if (gallerySnapshot == null) {
+      return;
+    }
+
+    int? currentFavIndex =
+        nhentaiFavoriteService.getFavoriteCategoryIndex(state.galleryUrl.gid);
+    ({bool isDelete, int favIndex, String note, bool remember}) operation;
+
+    if (useDefault && userSetting.defaultFavoriteIndex.value != null) {
+      operation = (
+        isDelete: currentFavIndex == userSetting.defaultFavoriteIndex.value,
+        favIndex: userSetting.defaultFavoriteIndex.value!,
+        note: '',
+        remember: false,
+      );
+    } else {
+      ({bool isDelete, int favIndex, String note, bool remember})? result =
+          await Get.dialog(
+        EHFavoriteDialog(
+          selectedIndex: currentFavIndex,
+          needInitNote: false,
+        ),
+      );
+      if (result == null) {
+        return;
+      }
+      operation = result;
+    }
+
+    if (operation.remember == true) {
+      userSetting.saveDefaultFavoriteIndex(operation.favIndex);
+    }
+
+    state.favoriteState = LoadingState.loading;
+    updateSafely([favoriteId]);
+
+    try {
+      if (operation.isDelete) {
+        await nhentaiFavoriteService.removeFavorite(state.galleryUrl.gid);
+        _applyNhFavoriteStatus(favoriteCategoryIndex: null);
+      } else {
+        await nhentaiFavoriteService.addFavorite(
+          gallerySnapshot,
+          favoriteCategoryIndex: operation.favIndex,
+        );
+        _applyNhFavoriteStatus(favoriteCategoryIndex: operation.favIndex);
+      }
+    } catch (e, s) {
+      log.error(
+        operation.isDelete
+            ? 'removeFavoriteFailed'.tr
+            : 'favoriteGalleryFailed'.tr,
+        e,
+        s,
+      );
+      snack(
+        operation.isDelete
+            ? 'removeFavoriteFailed'.tr
+            : 'favoriteGalleryFailed'.tr,
+        e.toString(),
+        isShort: true,
+      );
+      state.favoriteState = LoadingState.error;
+      updateSafely([favoriteId]);
+      return;
+    }
+
+    if (Get.isRegistered<FavoritePageLogic>()) {
+      await Get.find<FavoritePageLogic>().reloadNhentaiFavoriteGallerys();
+    }
+
+    state.favoriteState = LoadingState.idle;
+    updateSafely([favoriteId]);
+
+    updateGlobalGalleryStatus();
+
+    toast(
+      operation.isDelete
+          ? 'removeFavoriteSuccess'.tr
+          : 'favoriteGallerySuccess'.tr,
+      isCenter: false,
+    );
+  }
+
+  Gallery? _getNhFavoriteGallerySnapshot() {
+    if (state.gallery != null) {
+      return state.gallery;
+    }
+
+    if (state.galleryDetails != null) {
+      return state.galleryDetails!.toGallery();
+    }
+
+    return null;
+  }
+
+  void _syncNhFavoriteStatus() {
+    if (!state.galleryUrl.isNH) {
+      return;
+    }
+
+    _applyNhFavoriteStatus(
+      favoriteCategoryIndex:
+          nhentaiFavoriteService.getFavoriteCategoryIndex(state.galleryUrl.gid),
+    );
+  }
+
+  void _applyNhFavoriteStatus({required int? favoriteCategoryIndex}) {
+    String? favoriteTagName;
+    if (favoriteCategoryIndex != null &&
+        favoriteCategoryIndex >= 0 &&
+        favoriteCategoryIndex < favoriteSetting.favoriteTagNames.length) {
+      favoriteTagName = favoriteSetting.favoriteTagNames[favoriteCategoryIndex];
+    }
+
+    state.gallery
+      ?..favoriteTagIndex = favoriteCategoryIndex
+      ..favoriteTagName = favoriteTagName;
+    state.galleryDetails
+      ?..favoriteTagIndex = favoriteCategoryIndex
+      ..favoriteTagName = favoriteTagName;
   }
 
   Future<void> handleTapRating() async {

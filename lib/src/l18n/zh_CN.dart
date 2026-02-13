@@ -899,6 +899,7 @@ favnote：匹配收藏备注
       'blockRules': '本地屏蔽规则',
       'searchHistory': '搜索历史',
       'galleryHistory': '画廊浏览历史',
+      'nhentaiFavorite': 'nhentai 收藏',
 
       /// block rule page
       'configureBlockRuleFailed': '设置屏蔽规则失败',

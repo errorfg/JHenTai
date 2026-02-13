@@ -779,6 +779,7 @@ class ru_RU {
       'blockRules': 'Правила блокировки',
       'searchHistory': 'История поиска',
       'galleryHistory': 'История галерей',
+      'nhentaiFavorite': 'Избранное nhentai',
 
       /// block rule page / Страница правил блокировки
       'configureBlockRuleFailed': 'Не удалось настроить правило блокировки',
