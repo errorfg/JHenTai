@@ -169,6 +169,8 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       case CloudConfigTypeEnum.syncSetting:
         return await _mergeSyncSetting(
             local, remote, remoteFileTime, latestLocalTime);
+      case CloudConfigTypeEnum.nhentaiFavorite:
+        return await _mergeNhentaiFavorite(local, remote);
     }
   }
 
@@ -565,6 +567,107 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     );
 
     return MergeConfigResult(mergedConfig, stats);
+  }
+
+  /// Merge nhentai favorites (with item timestamp)
+  Future<MergeConfigResult> _mergeNhentaiFavorite(
+      CloudConfig local, CloudConfig remote) async {
+    List localList = await isolateService.jsonDecodeAsync(local.config);
+    List remoteList = await isolateService.jsonDecodeAsync(remote.config);
+
+    Map<String, dynamic> merged = {};
+    int conflicts = 0;
+
+    for (dynamic item in localList) {
+      String? gid = _extractNhFavoriteGid(item);
+      if (gid == null) {
+        continue;
+      }
+      merged[gid] = item;
+    }
+
+    for (dynamic item in remoteList) {
+      String? gid = _extractNhFavoriteGid(item);
+      if (gid == null) {
+        continue;
+      }
+
+      if (!merged.containsKey(gid)) {
+        merged[gid] = item;
+        continue;
+      }
+
+      DateTime localTime = _extractNhFavoriteTime(merged[gid]);
+      DateTime remoteTime = _extractNhFavoriteTime(item);
+      if (remoteTime.isAfter(localTime)) {
+        merged[gid] = item;
+        conflicts++;
+      }
+    }
+
+    String mergedJson =
+        await isolateService.jsonEncodeAsync(merged.values.toList());
+
+    CloudConfig mergedConfig = CloudConfig(
+      id: CloudConfigService.localConfigId,
+      shareCode: CloudConfigService.localConfigCode,
+      identificationCode: CloudConfigService.localConfigCode,
+      type: CloudConfigTypeEnum.nhentaiFavorite,
+      version: CloudConfigService
+          .configTypeVersionMap[CloudConfigTypeEnum.nhentaiFavorite]!,
+      config: mergedJson,
+      ctime: DateTime.now(),
+    );
+
+    MergeStatistics stats = MergeStatistics(
+      localList.length,
+      remoteList.length,
+      merged.length,
+      merged.length - localList.length,
+      conflicts,
+    );
+
+    return MergeConfigResult(mergedConfig, stats);
+  }
+
+  String? _extractNhFavoriteGid(dynamic item) {
+    if (item is! Map) {
+      return null;
+    }
+
+    dynamic gallery = item['gallery'];
+    if (gallery is! Map) {
+      return null;
+    }
+
+    dynamic gid = gallery['gid'];
+    if (gid == null) {
+      return null;
+    }
+
+    return gid.toString();
+  }
+
+  DateTime _extractNhFavoriteTime(dynamic item) {
+    if (item is! Map) {
+      return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+    }
+
+    DateTime? time = DateTime.tryParse(item['favoritedTime']?.toString() ?? '');
+    if (time != null) {
+      return time.toUtc();
+    }
+
+    dynamic gallery = item['gallery'];
+    if (gallery is Map) {
+      DateTime? publishTime =
+          DateTime.tryParse(gallery['publishTime']?.toString() ?? '');
+      if (publishTime != null) {
+        return publishTime.toUtc();
+      }
+    }
+
+    return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
   }
 }
 

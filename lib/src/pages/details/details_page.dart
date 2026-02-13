@@ -970,6 +970,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
               _buildReadButton(context),
               _buildDownloadButton(context),
               _buildSimilarButton(context),
+              _buildFavoriteButton(context),
             ];
 
             if (state.galleryUrl.isNH) {
@@ -978,7 +979,6 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
 
             if (!state.galleryUrl.isNH) {
               actions.addAll([
-                _buildFavoriteButton(context),
                 _buildRatingButton(context),
                 _buildArchiveButton(context),
                 _buildHHButton(context),

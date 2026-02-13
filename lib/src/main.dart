@@ -22,6 +22,7 @@ import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
 import 'package:jhentai/src/service/schedule_service.dart';
 import 'package:jhentai/src/service/search_history_service.dart';
+import 'package:jhentai/src/service/nhentai_favorite_service.dart';
 import 'package:jhentai/src/service/storage_service.dart';
 import 'package:jhentai/src/service/super_resolution_service.dart';
 import 'package:jhentai/src/service/tag_search_order_service.dart';
@@ -77,6 +78,7 @@ List<JHLifeCircleBean> lifeCircleBeans = [
   quickSearchService,
   scheduleService,
   searchHistoryService,
+  nhentaiFavoriteService,
   storageService,
   superResolutionService,
   tagTranslationService,
@@ -134,8 +136,10 @@ class MyApp extends StatelessWidget {
     return GetMaterialApp(
       title: 'JHenTai',
       themeMode: styleSetting.themeMode.value,
-      theme: ThemeConfig.theme(styleSetting.lightThemeColor.value, Brightness.light),
-      darkTheme: ThemeConfig.theme(styleSetting.darkThemeColor.value, Brightness.dark),
+      theme: ThemeConfig.theme(
+          styleSetting.lightThemeColor.value, Brightness.light),
+      darkTheme:
+          ThemeConfig.theme(styleSetting.darkThemeColor.value, Brightness.dark),
 
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -154,7 +158,10 @@ class MyApp extends StatelessWidget {
       translations: LocaleText(),
 
       getPages: Routes.pages,
-      initialRoute: securitySetting.enablePasswordAuth.isTrue || securitySetting.enableBiometricAuth.isTrue ? Routes.lock : Routes.home,
+      initialRoute: securitySetting.enablePasswordAuth.isTrue ||
+              securitySetting.enableBiometricAuth.isTrue
+          ? Routes.lock
+          : Routes.home,
       navigatorObservers: [GetXRouterObserver()],
       builder: (context, child) => AppManager(child: child!),
 

@@ -22,34 +22,52 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  AndroidRelease:
+  BuildAllTargets:
     if: ${{ (github.event_name != 'push' || !contains(join(github.event.commits.*.message, ' '), '[skip-build]')) && (github.event_name != 'pull_request' || (!contains(github.event.pull_request.title, '[skip-build]') && !contains(github.event.pull_request.body || '', '[skip-build]'))) }}
-    name: Android Release
-    runs-on: ubuntu-latest
+    name: Build ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: Android
+            os: ubuntu-latest
+            artifact_name: check-Android
+            artifact_path: build/app/outputs/apk/release/*.apk
+          - target: Windows
+            os: windows-latest
+            artifact_name: check-Windows
+            artifact_path: build/windows/*.zip
+          - target: Linux-x64-deb
+            os: ubuntu-22.04
+            artifact_name: check-Linux-x64-deb
+            artifact_path: build/linux/*.deb
+          - target: Linux-arm64-deb
+            os: ubuntu-22.04-arm
+            artifact_name: check-Linux-arm64-deb
+            artifact_path: build/linux/*.deb
+          - target: iOS
+            os: macos-latest
+            cache_pod_key: ios-pods-check
+            cache_pod_path: ios/Pods
+            cache_pod_restore_keys_hash_file: ios/Podfile.lock
+            artifact_name: check-iOS
+            artifact_path: build/**/*.ipa
+          - target: macOS
+            os: macos-latest
+            cache_pod_key: macos-pods-check
+            cache_pod_path: macos/Pods
+            cache_pod_restore_keys_hash_file: macos/Podfile.lock
+            artifact_name: check-macOS
+            artifact_path: /Users/runner/work/JHenTai/JHenTai/*.dmg
+    runs-on: ${{ matrix.os }}
     env:
       FLUTTER_VERSION: 3.24.4
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: 'master'
-          cache: true
-
-      - name: Setup JDK 17 (Android)
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-          cache: gradle
-
-      - name: Flutter Pub Get
-        run: flutter pub get
-
       - name: Setup Temporary Android Keystore
+        if: matrix.target == 'Android'
         run: |
           keytool -genkeypair \
             -v \
@@ -69,12 +87,123 @@ jobs:
           storeFile=ci-upload-keystore.jks
           EOF
 
-      - name: Build Android Release APK
-        run: flutter build apk -t lib/src/main.dart --release
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'master'
+          cache: true
 
-      - name: Upload Android Release APK
+      - name: Output Flutter Version
+        run: flutter --version
+
+      - name: Cache Pod
+        if: matrix.cache_pod_key != null
+        uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-${{ matrix.cache_pod_key }}-${{ hashFiles(matrix.cache_pod_restore_keys_hash_file) }}
+          path: ${{ matrix.cache_pod_path }}
+          restore-keys: ${{ runner.os }}-${{ matrix.cache_pod_key }}-
+
+      - name: Setup JDK 17 (Android)
+        if: matrix.target == 'Android'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: gradle
+
+      - name: Build Xcode
+        if: matrix.os == 'macos-latest'
+        run: xcodebuild -resolvePackageDependencies -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release
+
+      - name: Flutter Pub Get
+        run: |
+          git config --global core.longpaths true
+          flutter pub get
+
+      - name: Get App Version
+        id: get_version
+        shell: bash
+        run: |
+          echo "version=$(head -n 5 pubspec.yaml | tail -n 1 | cut -d ' ' -f 2)" >> "$GITHUB_OUTPUT"
+          echo "arch=$(echo "$RUNNER_ARCH" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Build Android
+        if: matrix.target == 'Android'
+        run: |
+          flutter build apk -t lib/src/main.dart --release --split-per-abi
+          cd build/app/outputs/apk/release
+          mv app-arm64-v8a-release.apk JHenTai-${{ steps.get_version.outputs.version }}-arm64-v8a.apk
+          mv app-armeabi-v7a-release.apk JHenTai-${{ steps.get_version.outputs.version }}-armeabi-v7a.apk
+          mv app-x86_64-release.apk JHenTai-${{ steps.get_version.outputs.version }}-x64.apk
+
+      - name: Build iOS
+        if: matrix.target == 'iOS'
+        run: |
+          flutter precache --ios
+          cd ios
+          pod update
+          cd ..
+          flutter build ios -t lib/src/main.dart --release --no-codesign
+          sh thin-payload.sh build/ios/iphoneos/*.app
+          cd build
+          mkdir -p Payload
+          mv ios/iphoneos/*.app Payload
+          zip -9 JHenTai_${{ steps.get_version.outputs.version }}.ipa -r Payload
+
+      - name: Build macOS
+        if: matrix.target == 'macOS'
+        run: |
+          flutter precache --macos
+          cd macos
+          pod update
+          cd ..
+          sh dmg.sh
+
+      - name: Build Windows
+        if: matrix.target == 'Windows'
+        run: |
+          flutter build windows -t lib/src/main.dart --release
+          $DestDir = "build\windows\JHenTai_${{ steps.get_version.outputs.version }}"
+          $SrcDir = "build\windows\x64\runner\Release"
+          New-Item -Path $DestDir -ItemType Directory
+          Copy-Item $SrcDir\* -Recurse $DestDir
+          Copy-Item -Filter *.dll -Path windows\* -Destination $DestDir -Force
+          Compress-Archive $DestDir build\windows\JHenTai_${{ steps.get_version.outputs.version }}_Windows.zip
+
+      - name: Build Linux Deb
+        if: matrix.target == 'Linux-x64-deb' || matrix.target == 'Linux-arm64-deb'
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build libfuse2 webkit2gtk-4.1
+
+          flutter build linux --release -t lib/src/main.dart
+
+          mkdir -p build/linux/JHenTai-${{ steps.get_version.outputs.version }}-Linux-${{ steps.get_version.outputs.arch }}
+          cd build/linux/JHenTai-${{ steps.get_version.outputs.version }}-Linux-${{ steps.get_version.outputs.arch }}
+          mkdir -p opt/jhentai
+          mkdir -p usr/share/applications
+          mkdir -p usr/share/icons/hicolor/512x512/apps
+          cp -r ../${{ steps.get_version.outputs.arch }}/release/bundle/* opt/jhentai
+          cp -r ../../../linux/assets/DEBIAN .
+          chmod 0755 DEBIAN/postinst
+          chmod 0755 DEBIAN/postrm
+
+          cp ../../../linux/assets/top.jtmonster.jhentai.desktop usr/share/applications
+          cp ../../../assets/icon/JHenTai_512.png usr/share/icons/hicolor/512x512/apps/top.jtmonster.jhentai.png
+
+          sed -i "/^Version: /s/Version: .*/Version: ${{ steps.get_version.outputs.version }}/" DEBIAN/control
+          if [ "${{ steps.get_version.outputs.arch }}" = "arm64" ]; then
+              sed -i "/^Architecture: /s/Architecture: .*/Architecture: arm64/" DEBIAN/control
+          fi
+
+          cd ..
+          dpkg-deb --build --root-owner-group JHenTai-${{ steps.get_version.outputs.version }}-Linux-${{ steps.get_version.outputs.arch }}
+
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: android-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
           if-no-files-found: error

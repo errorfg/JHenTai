@@ -38,6 +38,7 @@ enum ConfigEnum {
   quickSearch('quickSearch'),
   oldGalleryHistory('history'),
   searchHistory('searchHistory'),
+  nhentaiFavorite('nhentaiFavorite'),
   myTagsSetting('MyTagsSetting'),
   builtInBlockedUser('builtInBlockedUser'),
 
@@ -49,7 +50,8 @@ enum ConfigEnum {
   tagTranslationServiceLoadingState('TagTranslationServiceLoadingState'),
   tagTranslationServiceTimestamp('TagTranslationServiceTimestamp'),
   tagSearchOrderOptimizationServiceVersion('TagTranslationServiceVersion'),
-  tagSearchOrderOptimizationServiceLoadingState('TagSearchOrderOptimizationServiceLoadingState'),
+  tagSearchOrderOptimizationServiceLoadingState(
+      'TagSearchOrderOptimizationServiceLoadingState'),
   displayBlockingRulesGroup('displayBlockingRulesGroup'),
 
   /// cache

@@ -894,6 +894,7 @@ class en_US {
       'blockRules': 'Block Rules',
       'searchHistory': 'Search History',
       'galleryHistory': 'Gallery History',
+      'nhentaiFavorite': 'nhentai Favorites',
 
       /// block rule page
       'configureBlockRuleFailed': 'Configure block rule failed',
