@@ -61,11 +61,11 @@
       "versions": [
         {
           "version": "8.0.15",
-          "buildVersion": "312",
-          "date": "2026-02-10T14:50:47Z",
-          "localizedDescription": "- Merge upstream cookie login feature with webview-assisted login and iOS fixes\n- Add auto sync trigger on new history record (every 5 new records)\n- Fix CI: detect tag at publish time instead of triggering on tag push\n",
-          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.15+312/JHenTai_8.0.15+312.ipa",
-          "size": 15896996
+          "buildVersion": "313",
+          "date": "2026-02-13T12:13:50Z",
+          "localizedDescription": "- Align nhentai favorites flow with EH favorites flow\n- Show favorite action for nhentai on the details page\n",
+          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.15+313/JHenTai_8.0.15+313.ipa",
+          "size": 15910061
         }
       ]
     }
