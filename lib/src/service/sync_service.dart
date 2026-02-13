@@ -187,8 +187,15 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   Future<SyncResult> sync({
     required List<CloudConfigTypeEnum> types,
     String? providerName,
+    void Function(double progress)? onProgress,
   }) async {
+    void reportProgress(double progress) {
+      onProgress?.call(progress.clamp(0, 1).toDouble());
+    }
+
     try {
+      reportProgress(0.03);
+
       // Create provider dynamically with latest settings
       String provider = providerName ?? syncSetting.currentProvider.value;
       CloudProvider cloudProvider;
@@ -219,10 +226,12 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       }
 
       log.info('🔄 Starting sync with provider: ${cloudProvider.name}');
+      reportProgress(0.08);
 
       // 1. Get local configs
       List<CloudConfig> localConfigs = [];
-      for (var type in types) {
+      for (int i = 0; i < types.length; i++) {
+        CloudConfigTypeEnum type = types[i];
         CloudConfig? config = await cloudConfigService.getLocalConfig(type);
         if (config != null) {
           localConfigs.add(config);
@@ -230,9 +239,14 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         } else {
           log.info('  Local ${type.name}: empty (skipped)');
         }
+
+        if (types.isNotEmpty) {
+          reportProgress(0.08 + ((i + 1) / types.length) * 0.27);
+        }
       }
 
       log.info('Total local configs: ${localConfigs.length}');
+      reportProgress(0.38);
 
       // 2. Download remote config
       List<CloudConfig> remoteConfigs = [];
@@ -268,6 +282,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           log.warning('Failed to download remote config, will upload local', e);
         }
       }
+      reportProgress(0.58);
 
       // 3. Merge configs (merger handles import internally)
       var mergeResult = await syncMerger.merge(
@@ -276,6 +291,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         remoteFile?.modifiedTime ?? DateTime.now(),
         types,
       );
+      reportProgress(0.74);
 
       // 4. Upload merged result
       // saveHistory is determined by user settings (default: false)
@@ -290,11 +306,13 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         saveHistory: saveHistory,
       );
       log.info('Upload complete');
+      reportProgress(0.92);
 
       // 5. If history is enabled and auto cleanup is on, clean up old versions
       if (saveHistory && syncSetting.autoCleanHistory.value) {
         await _cleanupOldVersions(cloudProvider);
       }
+      reportProgress(1);
 
       log.info('Sync completed successfully');
       return SyncResult(

@@ -2,16 +2,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
-import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/pages/base/base_page.dart';
 import 'package:jhentai/src/pages/gallerys/dashboard/dashboard_page_state.dart';
 import 'package:jhentai/src/routes/routes.dart';
-import 'package:jhentai/src/service/log.dart';
-import 'package:jhentai/src/service/sync_service.dart';
-import 'package:jhentai/src/setting/sync_setting.dart';
 import 'package:jhentai/src/utils/route_util.dart';
-import 'package:jhentai/src/utils/toast_util.dart';
 import 'package:jhentai/src/widget/eh_wheel_speed_controller.dart';
 import 'package:jhentai/src/widget/eh_dashboard_card.dart';
 import 'package:jhentai/src/widget/loading_state_indicator.dart';
@@ -36,7 +31,8 @@ class DashboardPage extends BasePage {
   String get name => 'home'.tr;
 
   @override
-  DashboardPageLogic get logic => Get.put<DashboardPageLogic>(DashboardPageLogic(), permanent: true);
+  DashboardPageLogic get logic =>
+      Get.put<DashboardPageLogic>(DashboardPageLogic(), permanent: true);
 
   @override
   DashboardPageState get state => Get.find<DashboardPageLogic>().state;
@@ -49,7 +45,7 @@ class DashboardPage extends BasePage {
         onPressed: () => TapMenuButtonNotification().dispatch(context),
       ),
       title: GestureDetector(
-        onTap: _handleTitleTap,
+        onTap: logic.handleTapHomeSync,
         child: Text(name),
       ),
       centerTitle: true,
@@ -57,32 +53,25 @@ class DashboardPage extends BasePage {
     );
   }
 
-  void _handleTitleTap() async {
-    // Check if sync is enabled
-    if (!syncSetting.enableSync.value) {
-      return; // Sync is disabled
-    }
+  Widget _buildSyncProgressBar() {
+    return GetBuilder<DashboardPageLogic>(
+      id: logic.syncProgressId,
+      global: false,
+      init: logic,
+      builder: (_) {
+        if (!state.syncInProgress) {
+          return const SizedBox(height: 2);
+        }
 
-    // Get current provider
-    String provider = syncSetting.currentProvider.value;
-
-    log.info('Syncing on home title tap with provider: $provider');
-
-    try {
-      var result = await syncService.sync(
-        types: CloudConfigTypeEnum.values,
-        providerName: provider,
-      );
-
-      if (result.success) {
-        log.info('Sync successful: ${result.message}');
-        toast('syncSuccess'.tr, isShort: false);
-      } else {
-        log.warning('Sync failed: ${result.message}');
-      }
-    } catch (e) {
-      log.error('Sync error on title tap', e);
-    }
+        return SizedBox(
+          height: 2,
+          child: LinearProgressIndicator(
+            minHeight: 2,
+            value: state.syncProgress.clamp(0.03, 1).toDouble(),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -94,7 +83,8 @@ class DashboardPage extends BasePage {
       ),
       IconButton(
         icon: const Icon(Icons.more_vert),
-        onPressed: MobileLayoutPageV2State.scaffoldKey.currentState?.openEndDrawer,
+        onPressed:
+            MobileLayoutPageV2State.scaffoldKey.currentState?.openEndDrawer,
       ),
     ];
   }
@@ -110,10 +100,12 @@ class DashboardPage extends BasePage {
           child: CustomScrollView(
             key: state.pageStorageKey,
             controller: state.scrollController,
-            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+            physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics()),
             scrollBehavior: UIConfig.scrollBehaviourWithScrollBarWithMouse,
             slivers: [
               buildPullDownIndicator(),
+              SliverToBoxAdapter(child: _buildSyncProgressBar()),
               _buildRanklistDesc(),
               _buildRanklist(),
               _buildPopularListDesc(),
@@ -158,7 +150,9 @@ class DashboardPage extends BasePage {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 10),
               itemCount: state.ranklistGallerys.length,
-              itemBuilder: (_, index) => EHDashboardCard(gallery: state.ranklistGallerys[index], badge: _getRanklistBadge(index)),
+              itemBuilder: (_, index) => EHDashboardCard(
+                  gallery: state.ranklistGallerys[index],
+                  badge: _getRanklistBadge(index)),
               separatorBuilder: (_, __) => const VerticalDivider(),
               cacheExtent: 2000,
             ).enableMouseDrag(withScrollBar: false).fadeIn(),
@@ -190,7 +184,8 @@ class DashboardPage extends BasePage {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 10),
               itemCount: state.popularGallerys.length,
-              itemBuilder: (_, index) => EHDashboardCard(gallery: state.popularGallerys[index]),
+              itemBuilder: (_, index) =>
+                  EHDashboardCard(gallery: state.popularGallerys[index]),
               separatorBuilder: (_, __) => const VerticalDivider(),
               cacheExtent: 2000,
             ).enableMouseDrag(withScrollBar: false).fadeIn(),
@@ -207,14 +202,23 @@ class DashboardPage extends BasePage {
         child: _GalleryListDesc(
           actions: [
             IconButton(
-              icon: Icon(Icons.settings, size: 22, color: UIConfig.dashboardPageGalleryDescButtonColor(context)),
+              icon: Icon(Icons.settings,
+                  size: 22,
+                  color: UIConfig.dashboardPageGalleryDescButtonColor(context)),
               onPressed: logic.handleTapFilterButton,
-              style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: const VisualDensity(vertical: -4)),
+              style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  visualDensity: const VisualDensity(vertical: -4)),
             ),
             IconButton(
-              icon: Icon(Icons.refresh, size: 25, color: UIConfig.dashboardPageGalleryDescButtonColor(context)),
+              icon: Icon(Icons.refresh,
+                  size: 25,
+                  color: UIConfig.dashboardPageGalleryDescButtonColor(context)),
               onPressed: logic.handleClearAndRefresh,
-              style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: const VisualDensity(vertical: -4, horizontal: -4)),
+              style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  visualDensity:
+                      const VisualDensity(vertical: -4, horizontal: -4)),
             ),
           ],
         ),
@@ -254,21 +258,31 @@ class _RankListDesc extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('🏆 ', style: TextStyle(fontSize: 16)),
-            Text('ranklistBoard'.tr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Text('ranklistBoard'.tr,
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           ],
         ),
         const Expanded(child: SizedBox()),
         TextButton(
-          style: TextButton.styleFrom(padding: const EdgeInsets.only(left: 12), visualDensity: const VisualDensity(vertical: -4)),
-          onPressed: () => const TapTabBarButtonNotification(Routes.ranklist).dispatch(context),
+          style: TextButton.styleFrom(
+              padding: const EdgeInsets.only(left: 12),
+              visualDensity: const VisualDensity(vertical: -4)),
+          onPressed: () => const TapTabBarButtonNotification(Routes.ranklist)
+              .dispatch(context),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 'seeAll'.tr,
-                style: TextStyle(color: UIConfig.dashboardPageSeeAllTextColor(context), fontSize: 12, fontWeight: FontWeight.w400, height: 1),
+                style: TextStyle(
+                    color: UIConfig.dashboardPageSeeAllTextColor(context),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    height: 1),
               ),
-              Icon(Icons.keyboard_arrow_right, color: UIConfig.dashboardPageArrowButtonColor(context)),
+              Icon(Icons.keyboard_arrow_right,
+                  color: UIConfig.dashboardPageArrowButtonColor(context)),
             ],
           ),
         )
@@ -288,21 +302,31 @@ class _PopularListDesc extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('🥵 ', style: TextStyle(fontSize: 16)),
-            Text('popular'.tr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Text('popular'.tr,
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           ],
         ),
         const Expanded(child: SizedBox()),
         TextButton(
-          style: TextButton.styleFrom(padding: const EdgeInsets.only(left: 12), visualDensity: const VisualDensity(vertical: -4)),
-          onPressed: () => const TapTabBarButtonNotification(Routes.popular).dispatch(context),
+          style: TextButton.styleFrom(
+              padding: const EdgeInsets.only(left: 12),
+              visualDensity: const VisualDensity(vertical: -4)),
+          onPressed: () => const TapTabBarButtonNotification(Routes.popular)
+              .dispatch(context),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 'seeAll'.tr,
-                style: TextStyle(color: UIConfig.dashboardPageSeeAllTextColor(context), fontSize: 12, fontWeight: FontWeight.w400, height: 1),
+                style: TextStyle(
+                    color: UIConfig.dashboardPageSeeAllTextColor(context),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    height: 1),
               ),
-              Icon(Icons.keyboard_arrow_right, color: UIConfig.dashboardPageArrowButtonColor(context)),
+              Icon(Icons.keyboard_arrow_right,
+                  color: UIConfig.dashboardPageArrowButtonColor(context)),
             ],
           ),
         )
@@ -324,7 +348,9 @@ class _GalleryListDesc extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('🎁 ', style: TextStyle(fontSize: 16)),
-            Text('newest'.tr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Text('newest'.tr,
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           ],
         ),
         const Expanded(child: SizedBox()),
