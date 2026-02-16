@@ -9,4 +9,6 @@ class FavoritePageState extends BasePageState {
 
   @override
   SearchConfig searchConfig = SearchConfig(searchType: SearchType.favorite);
+
+  bool showNhFavorites = false;
 }

@@ -1,14 +1,16 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_navigation/get_navigation.dart';
 import 'package:get/get_utils/get_utils.dart';
-import 'package:intl/intl.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
 import 'package:jhentai/src/model/gallery_page.dart';
 import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/widget/eh_favorite_sort_order_dialog.dart';
+
+import '../../utils/uuid_util.dart';
 
 import '../../enum/config_enum.dart';
 import '../../exception/eh_site_exception.dart';
@@ -24,8 +26,6 @@ import '../base/base_page_logic.dart';
 import 'favorite_page_state.dart';
 
 class FavoritePageLogic extends BasePageLogic {
-  static final DateFormat _minuteDateFormat = DateFormat('yyyy-MM-dd HH:mm');
-
   @override
   bool get useSearchConfig => true;
 
@@ -37,26 +37,29 @@ class FavoritePageLogic extends BasePageLogic {
 
   @override
   Future<void> handleRefresh({String? updateId}) async {
+    if (state.showNhFavorites) {
+      _loadNhFavorites();
+      return;
+    }
     await super.handleRefresh(updateId: updateId);
-    _mergeNhentaiFavoritesForDisplay();
   }
 
   @override
   Future<void> loadBefore() async {
+    if (state.showNhFavorites) return;
     await super.loadBefore();
-    _mergeNhentaiFavoritesForDisplay();
   }
 
   @override
   Future<void> loadMore({bool checkLoadingState = true}) async {
+    if (state.showNhFavorites) return;
     await super.loadMore(checkLoadingState: checkLoadingState);
-    _mergeNhentaiFavoritesForDisplay();
   }
 
   @override
   Future<void> jumpPage(DateTime dateTime) async {
+    if (state.showNhFavorites) return;
     await super.jumpPage(dateTime);
-    _mergeNhentaiFavoritesForDisplay();
   }
 
   Future<void> handleChangeSortOrder() async {
@@ -67,6 +70,12 @@ class FavoritePageLogic extends BasePageLogic {
     FavoriteSortOrder? result = await Get.dialog(
         EHFavoriteSortOrderDialog(init: state.favoriteSortOrder));
     if (result == null) {
+      return;
+    }
+
+    if (state.showNhFavorites) {
+      state.favoriteSortOrder = result;
+      _loadNhFavorites();
       return;
     }
 
@@ -118,111 +127,40 @@ class FavoritePageLogic extends BasePageLogic {
     return loadMore(checkLoadingState: false);
   }
 
-  Future<void> reloadNhentaiFavoriteGallerys() async {
-    _mergeNhentaiFavoritesForDisplay();
+  void handleToggleNhFavorites() {
+    state.showNhFavorites = !state.showNhFavorites;
+    if (state.showNhFavorites) {
+      _loadNhFavorites();
+    } else {
+      handleRefresh();
+    }
   }
 
-  void _mergeNhentaiFavoritesForDisplay() {
-    if (state.searchConfig.searchType != SearchType.favorite) {
-      return;
+  Future<void> reloadNhentaiFavoriteGallerys() async {
+    if (state.showNhFavorites) {
+      _loadNhFavorites();
     }
+  }
 
-    List<Gallery> ehFavorites =
-        state.gallerys.where((gallery) => !gallery.galleryUrl.isNH).toList();
+  void _loadNhFavorites() {
     List<Gallery> nhFavorites = nhentaiFavoriteService.getDisplayFavorites(
       sortOrder: state.favoriteSortOrder,
       searchConfig: state.searchConfig,
     );
 
-    state.gallerys = _insertNhFavoritesByTime(
-      ehFavorites: ehFavorites,
-      nhFavorites: nhFavorites,
-    );
+    state.gallerys = nhFavorites;
+    state.prevGid = null;
+    state.nextGid = null;
+    state.galleryCollectionKey = Key(newUUID());
 
-    _adjustLoadingStateAfterMerge();
-    updateSafely();
-  }
-
-  List<Gallery> _insertNhFavoritesByTime({
-    required List<Gallery> ehFavorites,
-    required List<Gallery> nhFavorites,
-  }) {
     if (nhFavorites.isEmpty) {
-      return ehFavorites;
-    }
-
-    List<Gallery> merged = List<Gallery>.from(ehFavorites);
-
-    for (Gallery nhGallery in nhFavorites) {
-      DateTime? nhTime = _parseGalleryTime(nhGallery.publishTime);
-      int insertIndex = merged.length;
-
-      for (int i = 0; i < merged.length; i++) {
-        DateTime? currentTime = _parseGalleryTime(merged[i].publishTime);
-        if (_shouldInsertBefore(
-          nhTime: nhTime,
-          currentTime: currentTime,
-        )) {
-          insertIndex = i;
-          break;
-        }
-      }
-
-      merged.insert(insertIndex, nhGallery);
-    }
-
-    return merged;
-  }
-
-  bool _shouldInsertBefore({
-    required DateTime? nhTime,
-    required DateTime? currentTime,
-  }) {
-    if (nhTime == null) {
-      return false;
-    }
-    if (currentTime == null) {
-      return true;
-    }
-    return nhTime.isAfter(currentTime);
-  }
-
-  DateTime? _parseGalleryTime(String time) {
-    String normalized = time.trim();
-    if (normalized.isEmpty) {
-      return null;
-    }
-
-    try {
-      return _minuteDateFormat.parseUtc(normalized);
-    } catch (_) {}
-
-    try {
-      return DateFormat('yyyy-MM-dd HH:mm:ss').parseUtc(normalized);
-    } catch (_) {}
-
-    return DateTime.tryParse(normalized)?.toUtc();
-  }
-
-  void _adjustLoadingStateAfterMerge() {
-    if (state.loadingState == LoadingState.loading ||
-        state.loadingState == LoadingState.error) {
-      return;
-    }
-
-    if (state.nextGid == null &&
-        state.prevGid == null &&
-        state.gallerys.isEmpty) {
       state.loadingState = LoadingState.noData;
-      return;
-    }
-
-    if (state.nextGid == null) {
+    } else {
       state.loadingState = LoadingState.noMore;
-      return;
     }
 
-    state.loadingState = LoadingState.idle;
+    jump2Top();
+    updateSafely();
   }
 
   @override

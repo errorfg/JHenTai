@@ -31,8 +31,26 @@ class FavoritePage extends BasePage {
   @override
   List<Widget> buildAppBarActions() {
     return [
-      if (state.gallerys.isNotEmpty) IconButton(icon: const Icon(FontAwesomeIcons.paperPlane, size: 20), onPressed: logic.handleTapJumpButton),
-      if (state.gallerys.isNotEmpty) IconButton(icon: const Icon(Icons.sort), onPressed: logic.handleChangeSortOrder),
+      if (state.gallerys.isNotEmpty && !state.showNhFavorites)
+        IconButton(icon: const Icon(FontAwesomeIcons.paperPlane, size: 20), onPressed: logic.handleTapJumpButton),
+      if (state.gallerys.isNotEmpty)
+        IconButton(icon: const Icon(Icons.sort), onPressed: logic.handleChangeSortOrder),
+      PopupMenuButton<bool>(
+        icon: const Icon(Icons.swap_horiz),
+        onSelected: (_) => logic.handleToggleNhFavorites(),
+        itemBuilder: (context) => [
+          PopupMenuItem(
+            value: false,
+            enabled: state.showNhFavorites,
+            child: Text('EH ${'favorite'.tr}'),
+          ),
+          PopupMenuItem(
+            value: true,
+            enabled: !state.showNhFavorites,
+            child: Text('nhentaiFavorite'.tr),
+          ),
+        ],
+      ),
       IconButton(icon: const Icon(Icons.filter_alt_outlined, size: 28), onPressed: logic.handleTapFilterButton),
     ];
   }
