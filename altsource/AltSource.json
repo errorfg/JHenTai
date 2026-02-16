@@ -62,10 +62,10 @@
         {
           "version": "8.0.16",
           "buildVersion": "315",
-          "date": "2026-02-17T00:00:00Z",
-          "localizedDescription": "- Add home sync progress indicator with desktop support\n- Separate EH and NH favorites display with menu switching\n- Parse favoritedTime from EH favorites page\n- Add mixed mode: interleave EH + NH favorites sorted by favorited/published time\n",
+          "date": "2026-02-16T18:00:22Z",
+          "localizedDescription": "- Add home sync progress indicator with desktop support\n- Separate EH and NH favorites display with menu switching\n- Parse favoritedTime from EH favorites page (Extended/Compact/Minimal layouts)\n- Add mixed mode: interleave EH + NH favorites sorted by favorited or published time\n",
           "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.16+315/JHenTai_8.0.16+315.ipa",
-          "size": 15910061
+          "size": 15919483
         },
         {
           "version": "8.0.15",
