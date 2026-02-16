@@ -29,6 +29,7 @@ class Gallery {
   String? uploader;
 
   String publishTime;
+  String? favoritedTime;
   bool isExpunged;
   LinkedHashMap<String, List<GalleryTag>> tags;
 
@@ -53,6 +54,7 @@ class Gallery {
     this.language,
     this.uploader,
     required this.publishTime,
+    this.favoritedTime,
     required this.isExpunged,
     required this.tags,
     this.blockedByLocalRules = false,
@@ -75,6 +77,7 @@ class Gallery {
       'language': language,
       'uploader': uploader,
       'publishTime': publishTime,
+      'favoritedTime': favoritedTime,
       'isExpunged': isExpunged,
       'tags': tags,
     };
@@ -94,6 +97,7 @@ class Gallery {
       language: map['language'],
       uploader: map['uploader'],
       publishTime: map['publishTime'],
+      favoritedTime: map['favoritedTime'],
       isExpunged: map['isExpunged'] ?? false,
       tags: LinkedHashMap.of(
         (map['tags'] as Map).map(
@@ -108,7 +112,7 @@ class Gallery {
 
   @override
   String toString() {
-    return 'Gallery{galleryUrl: $galleryUrl, title: $title, category: $category, cover: $cover, pageCount: $pageCount, rating: $rating, hasRated: $hasRated, favoriteTagIndex: $favoriteTagIndex, favoriteTagName: $favoriteTagName, language: $language, uploader: $uploader, publishTime: $publishTime, isExpunged: $isExpunged, tags: $tags, hasLocalFilteredTag: $blockedByLocalRules}';
+    return 'Gallery{galleryUrl: $galleryUrl, title: $title, category: $category, cover: $cover, pageCount: $pageCount, rating: $rating, hasRated: $hasRated, favoriteTagIndex: $favoriteTagIndex, favoriteTagName: $favoriteTagName, language: $language, uploader: $uploader, publishTime: $publishTime, favoritedTime: $favoritedTime, isExpunged: $isExpunged, tags: $tags, hasLocalFilteredTag: $blockedByLocalRules}';
   }
 
   Gallery copyWith({
@@ -124,6 +128,7 @@ class Gallery {
     String? language,
     String? uploader,
     String? publishTime,
+    String? favoritedTime,
     bool? isExpunged,
     LinkedHashMap<String, List<GalleryTag>>? tags,
     bool? blockedByLocalRules,
@@ -141,6 +146,7 @@ class Gallery {
       language: language ?? this.language,
       uploader: uploader ?? this.uploader,
       publishTime: publishTime ?? this.publishTime,
+      favoritedTime: favoritedTime ?? this.favoritedTime,
       isExpunged: isExpunged ?? this.isExpunged,
       tags: tags ?? this.tags,
       blockedByLocalRules: blockedByLocalRules ?? this.blockedByLocalRules,

@@ -900,6 +900,8 @@ favnote：匹配收藏备注
       'searchHistory': '搜索历史',
       'galleryHistory': '画廊浏览历史',
       'nhentaiFavorite': 'nhentai 收藏',
+      'mixNhFavorites': '混合显示 nhentai 收藏',
+      'mixedModeUnavailable': '混合模式不可用：当前布局不提供收藏时间',
 
       /// block rule page
       'configureBlockRuleFailed': '设置屏蔽规则失败',

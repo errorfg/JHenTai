@@ -769,6 +769,8 @@ class ko_KR {
       'searchHistory': 'Search History',
       'galleryHistory': 'Gallery History',
       'nhentaiFavorite': 'nhentai Favorites',
+      'mixNhFavorites': 'nhentai 즐겨찾기 혼합 표시',
+      'mixedModeUnavailable': '혼합 모드 사용 불가: 현재 레이아웃에서 즐겨찾기 시간을 제공하지 않습니다',
 
       /// block rule page
       'configureBlockRuleFailed': 'Configure block rule failed',

@@ -775,6 +775,8 @@ favnote：配對收藏備註
       'searchHistory': '搜尋紀錄',
       'galleryHistory': '畫廊瀏覽紀錄',
       'nhentaiFavorite': 'nhentai 收藏',
+      'mixNhFavorites': '混合顯示 nhentai 收藏',
+      'mixedModeUnavailable': '混合模式不可用：當前佈局不提供收藏時間',
 
       /// block rule page
       'configureBlockRuleFailed': '設定隱藏規則失敗',

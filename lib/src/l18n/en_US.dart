@@ -895,6 +895,8 @@ class en_US {
       'searchHistory': 'Search History',
       'galleryHistory': 'Gallery History',
       'nhentaiFavorite': 'nhentai Favorites',
+      'mixNhFavorites': 'Mix nhentai Favorites',
+      'mixedModeUnavailable': 'Mixed mode unavailable: current layout does not provide favorited time',
 
       /// block rule page
       'configureBlockRuleFailed': 'Configure block rule failed',

@@ -780,6 +780,8 @@ class ru_RU {
       'searchHistory': 'История поиска',
       'galleryHistory': 'История галерей',
       'nhentaiFavorite': 'Избранное nhentai',
+      'mixNhFavorites': 'Смешать избранное nhentai',
+      'mixedModeUnavailable': 'Смешанный режим недоступен: текущий макет не предоставляет время добавления в избранное',
 
       /// block rule page / Страница правил блокировки
       'configureBlockRuleFailed': 'Не удалось настроить правило блокировки',

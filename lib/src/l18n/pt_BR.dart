@@ -772,6 +772,8 @@ class pt_BR {
       'searchHistory': 'Search History',
       'galleryHistory': 'Gallery History',
       'nhentaiFavorite': 'nhentai Favorites',
+      'mixNhFavorites': 'Misturar Favoritos nhentai',
+      'mixedModeUnavailable': 'Modo misto indisponível: o layout atual não fornece o horário de favoritação',
 
       /// block rule page
       'configureBlockRuleFailed': 'Configure block rule failed',

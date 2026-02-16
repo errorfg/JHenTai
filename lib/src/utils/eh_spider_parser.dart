@@ -1033,6 +1033,7 @@ class EHSpiderParser {
       tags: LinkedHashMap<String, List<GalleryTag>>(),
       uploader: tr.querySelector('.gl5m.glhide > div > a')?.text,
       publishTime: tr.querySelector('.gl2m > div:nth-child(2)')?.text ?? '',
+      favoritedTime: _parseTableGalleryFavoritedTime(tr),
       isExpunged: tr.querySelector('.gl2m > div:nth-child(2) > s') != null,
     );
 
@@ -1057,6 +1058,7 @@ class EHSpiderParser {
       language: tags['language']?[0].tagData.key,
       uploader: tr.querySelector('.gl4c.glhide > div > a')?.text,
       publishTime: tr.querySelector('.gl2c > div:nth-child(2) > [id]')?.text ?? '',
+      favoritedTime: _parseTableGalleryFavoritedTime(tr),
       isExpunged: tr.querySelector('.gl2c > div:nth-child(2) > [id] > s') != null,
     );
 
@@ -1081,6 +1083,7 @@ class EHSpiderParser {
       language: tags['language']?[0].tagData.key,
       uploader: tr.querySelector('.gl3e > div > a')?.text,
       publishTime: tr.querySelector('.gl3e > div[id]')?.text ?? '',
+      favoritedTime: _parseExtendedGalleryFavoritedTime(tr),
       isExpunged: tr.querySelector('.gl3e > div[id] > s') != null,
     );
 
@@ -1377,6 +1380,31 @@ class EHSpiderParser {
     }
     final String color = RegExp(r'border-color:#(\w{3});').firstMatch(style)?.group(1) ?? '';
     return UIConfig.favoriteTagIndex[color]!;
+  }
+
+  /// Extended: <div><p>Favorited:</p><p>2026-02-16 15:52</p></div> inside .gl3e
+  static String? _parseExtendedGalleryFavoritedTime(Element tr) {
+    List<Element> divs = tr.querySelectorAll('.gl3e > div');
+    for (Element div in divs) {
+      List<Element> ps = div.querySelectorAll('p');
+      if (ps.length == 2 && ps[0].text.trim() == 'Favorited:') {
+        return ps[1].text.trim();
+      }
+    }
+    return null;
+  }
+
+  /// Compact/Minimal: <td class="glfc glfav"><p>DATE</p><p>TIME</p></td>
+  static String? _parseTableGalleryFavoritedTime(Element tr) {
+    Element? td = tr.querySelector('td.glfc.glfav');
+    if (td == null) {
+      return null;
+    }
+    List<Element> ps = td.querySelectorAll('p');
+    if (ps.length == 2) {
+      return '${ps[0].text.trim()} ${ps[1].text.trim()}';
+    }
+    return null;
   }
 
   static int? _parseFavoriteTagIndexByOffset(Document document) {

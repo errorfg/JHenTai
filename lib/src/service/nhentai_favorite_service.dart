@@ -115,6 +115,7 @@ class NHentaiFavoriteService
             favoriteTagIndex: entry.favoriteCategoryIndex,
             favoriteTagName: null,
             publishTime: _resolveDisplayTime(entry, sortOrder),
+            favoritedTime: _displayDateFormat.format(entry.favoritedTime.toUtc()),
           ),
         )
         .toList();

@@ -42,24 +42,36 @@ class FavoritePageLogic extends BasePageLogic {
       return;
     }
     await super.handleRefresh(updateId: updateId);
+    if (state.mixedMode) {
+      _mergeNhFavoritesForDisplay();
+    }
   }
 
   @override
   Future<void> loadBefore() async {
     if (state.showNhFavorites) return;
     await super.loadBefore();
+    if (state.mixedMode) {
+      _mergeNhFavoritesForDisplay();
+    }
   }
 
   @override
   Future<void> loadMore({bool checkLoadingState = true}) async {
     if (state.showNhFavorites) return;
     await super.loadMore(checkLoadingState: checkLoadingState);
+    if (state.mixedMode) {
+      _mergeNhFavoritesForDisplay();
+    }
   }
 
   @override
   Future<void> jumpPage(DateTime dateTime) async {
     if (state.showNhFavorites) return;
     await super.jumpPage(dateTime);
+    if (state.mixedMode) {
+      _mergeNhFavoritesForDisplay();
+    }
   }
 
   Future<void> handleChangeSortOrder() async {
@@ -67,14 +79,26 @@ class FavoritePageLogic extends BasePageLogic {
       return;
     }
 
-    FavoriteSortOrder? result = await Get.dialog(
-        EHFavoriteSortOrderDialog(init: state.favoriteSortOrder));
+    FavoriteSortOrderDialogResult? result = await Get.dialog(
+        EHFavoriteSortOrderDialog(
+      init: state.favoriteSortOrder,
+      initMixedMode: state.mixedMode,
+    ));
     if (result == null) {
       return;
     }
 
+    state.mixedMode = result.mixedMode;
+
     if (state.showNhFavorites) {
-      state.favoriteSortOrder = result;
+      if (state.mixedMode) {
+        // switching from NH-only to mixed mode: go back to EH view with mix
+        state.showNhFavorites = false;
+        state.favoriteSortOrder = result.sortOrder;
+        handleRefresh();
+        return;
+      }
+      state.favoriteSortOrder = result.sortOrder;
       _loadNhFavorites();
       return;
     }
@@ -97,7 +121,7 @@ class FavoritePageLogic extends BasePageLogic {
     updateSafely();
 
     try {
-      await ehRequest.requestChangeFavoriteSortOrder(result,
+      await ehRequest.requestChangeFavoriteSortOrder(result.sortOrder,
           parser: EHSpiderParser.galleryPage2GalleryPageInfo);
     } on DioException catch (e) {
       /// handle with domain fronting, manually load more
@@ -128,6 +152,10 @@ class FavoritePageLogic extends BasePageLogic {
   }
 
   void handleToggleNhFavorites() {
+    if (state.mixedMode) {
+      // in mixed mode, toggling switches back to separate mode
+      state.mixedMode = false;
+    }
     state.showNhFavorites = !state.showNhFavorites;
     if (state.showNhFavorites) {
       _loadNhFavorites();
@@ -139,6 +167,9 @@ class FavoritePageLogic extends BasePageLogic {
   Future<void> reloadNhentaiFavoriteGallerys() async {
     if (state.showNhFavorites) {
       _loadNhFavorites();
+    } else if (state.mixedMode) {
+      _mergeNhFavoritesForDisplay();
+      updateSafely();
     }
   }
 
@@ -161,6 +192,41 @@ class FavoritePageLogic extends BasePageLogic {
 
     jump2Top();
     updateSafely();
+  }
+
+  void _mergeNhFavoritesForDisplay() {
+    // Check if EH galleries have favoritedTime
+    bool ehHasFavoritedTime = state.gallerys.any((g) => g.favoritedTime != null);
+    if (state.gallerys.isNotEmpty && !ehHasFavoritedTime) {
+      state.mixedMode = false;
+      snack('mixedModeUnavailable'.tr, '');
+      updateSafely();
+      return;
+    }
+
+    List<Gallery> nhFavorites = nhentaiFavoriteService.getDisplayFavorites(
+      sortOrder: state.favoriteSortOrder,
+      searchConfig: state.searchConfig,
+    );
+
+    if (nhFavorites.isEmpty) {
+      return;
+    }
+
+    // Remove any previously merged NH galleries (identified by NH URL)
+    state.gallerys.removeWhere((g) => g.galleryUrl.isNH);
+
+    // Combine and sort descending by the time matching current sort order
+    bool sortByPublishTime = state.favoriteSortOrder == FavoriteSortOrder.publishedTime;
+    List<Gallery> combined = [...state.gallerys, ...nhFavorites];
+    combined.sort((a, b) {
+      String timeA = sortByPublishTime ? a.publishTime : (a.favoritedTime ?? '');
+      String timeB = sortByPublishTime ? b.publishTime : (b.favoritedTime ?? '');
+      return timeB.compareTo(timeA);
+    });
+
+    state.gallerys = combined;
+    state.galleryCollectionKey = Key(newUUID());
   }
 
   @override

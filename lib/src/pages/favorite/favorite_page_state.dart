@@ -11,4 +11,5 @@ class FavoritePageState extends BasePageState {
   SearchConfig searchConfig = SearchConfig(searchType: SearchType.favorite);
 
   bool showNhFavorites = false;
+  bool mixedMode = false;
 }
