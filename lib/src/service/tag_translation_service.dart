@@ -200,7 +200,15 @@ class TagTranslationService with JHLifeCircleBeanErrorCatch implements JHLifeCir
 
   Future<TagData?> getTagTranslation(String namespace, String key) async {
     List<TagData> list = await TagDao.selectTagByNamespaceAndKey(namespace, key);
-    return list.isNotEmpty ? list.first : null;
+    if (list.isNotEmpty) {
+      return list.first;
+    }
+    // Fallback: for non-standard namespaces (e.g. NH's 'tag'), search by key only
+    if (EHNamespace.findNameSpaceFromDescOrAbbr(namespace) == null) {
+      List<TagData> byKey = await TagDao.selectTagsByKey(key);
+      return byKey.isNotEmpty ? byKey.first : null;
+    }
+    return null;
   }
 
   Future<List<TagAutoCompletionMatch>> searchTags(String searchText, {int? limit}) async {

@@ -1016,6 +1016,10 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
       return false;
     }
 
+    if (searchConfig.isNhSearch) {
+      return true;
+    }
+
     if (searchConfig.searchType != SearchType.gallery) {
       return false;
     }

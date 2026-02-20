@@ -47,6 +47,8 @@ class SearchConfig {
   /// Favorite search
   int? searchFavoriteCategoryIndex;
 
+  bool isNhSearch;
+
   SearchConfig({
     this.searchType = SearchType.gallery,
     this.includeDoujinshi = true,
@@ -71,6 +73,7 @@ class SearchConfig {
     this.disableFilterForUploader = false,
     this.disableFilterForTags = false,
     this.searchFavoriteCategoryIndex,
+    this.isNhSearch = false,
   });
 
   SearchConfig.nonHOnly({
@@ -97,6 +100,7 @@ class SearchConfig {
     this.disableFilterForUploader = false,
     this.disableFilterForTags = false,
     this.searchFavoriteCategoryIndex,
+    this.isNhSearch = false,
   });
 
   void enableAllCategories() {
@@ -287,6 +291,7 @@ class SearchConfig {
       disableFilterForUploader: json["disableFilterForUploader"],
       disableFilterForTags: json["disableFilterForTags"],
       searchFavoriteCategoryIndex: json["searchFavoriteCategoryIndex"],
+      isNhSearch: json["isNhSearch"] ?? false,
     );
   }
 
@@ -315,6 +320,7 @@ class SearchConfig {
       "disableFilterForUploader": disableFilterForUploader,
       "disableFilterForTags": disableFilterForTags,
       "searchFavoriteCategoryIndex": searchFavoriteCategoryIndex,
+      "isNhSearch": isNhSearch,
     };
   }
 
@@ -341,6 +347,7 @@ class SearchConfig {
     bool? disableFilterForLanguage,
     bool? disableFilterForUploader,
     bool? disableFilterForTags,
+    bool? isNhSearch,
   }) {
     return SearchConfig(
       searchType: searchType ?? this.searchType,
@@ -366,11 +373,12 @@ class SearchConfig {
       disableFilterForUploader: disableFilterForUploader ?? this.disableFilterForUploader,
       disableFilterForTags: disableFilterForTags ?? this.disableFilterForTags,
       searchFavoriteCategoryIndex: searchFavoriteCategoryIndex ?? searchFavoriteCategoryIndex,
+      isNhSearch: isNhSearch ?? this.isNhSearch,
     );
   }
 
   @override
   String toString() {
-    return 'SearchConfig{searchType: $searchType, includeDoujinshi: $includeDoujinshi, includeManga: $includeManga, includeArtistCG: $includeArtistCG, includeGameCg: $includeGameCg, includeWestern: $includeWestern, includeNonH: $includeNonH, includeImageSet: $includeImageSet, includeCosplay: $includeCosplay, includeAsianPorn: $includeAsianPorn, includeMisc: $includeMisc, keyword: $keyword, tags: $tags, language: $language, onlySearchExpungedGalleries: $onlySearchExpungedGalleries, onlyShowGalleriesWithTorrents: $onlyShowGalleriesWithTorrents, pageAtLeast: $pageAtLeast, pageAtMost: $pageAtMost, minimumRating: $minimumRating, disableFilterForLanguage: $disableFilterForLanguage, disableFilterForUploader: $disableFilterForUploader, disableFilterForTags: $disableFilterForTags, searchFavoriteCategoryIndex: $searchFavoriteCategoryIndex}';
+    return 'SearchConfig{searchType: $searchType, includeDoujinshi: $includeDoujinshi, includeManga: $includeManga, includeArtistCG: $includeArtistCG, includeGameCg: $includeGameCg, includeWestern: $includeWestern, includeNonH: $includeNonH, includeImageSet: $includeImageSet, includeCosplay: $includeCosplay, includeAsianPorn: $includeAsianPorn, includeMisc: $includeMisc, keyword: $keyword, tags: $tags, language: $language, onlySearchExpungedGalleries: $onlySearchExpungedGalleries, onlyShowGalleriesWithTorrents: $onlyShowGalleriesWithTorrents, pageAtLeast: $pageAtLeast, pageAtMost: $pageAtMost, minimumRating: $minimumRating, disableFilterForLanguage: $disableFilterForLanguage, disableFilterForUploader: $disableFilterForUploader, disableFilterForTags: $disableFilterForTags, searchFavoriteCategoryIndex: $searchFavoriteCategoryIndex, isNhSearch: $isNhSearch}';
   }
 }

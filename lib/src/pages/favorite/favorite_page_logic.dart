@@ -18,6 +18,7 @@ import '../../model/gallery.dart';
 import '../../model/search_config.dart';
 import '../../service/local_config_service.dart';
 import '../../service/nhentai_favorite_service.dart';
+import '../../service/tag_translation_service.dart';
 import '../../utils/eh_spider_parser.dart';
 import '../../service/log.dart';
 import '../../utils/snack_util.dart';
@@ -173,11 +174,13 @@ class FavoritePageLogic extends BasePageLogic {
     }
   }
 
-  void _loadNhFavorites() {
+  Future<void> _loadNhFavorites() async {
     List<Gallery> nhFavorites = nhentaiFavoriteService.getDisplayFavorites(
       sortOrder: state.favoriteSortOrder,
       searchConfig: state.searchConfig,
     );
+
+    await Future.wait(nhFavorites.map((g) => tagTranslationService.translateTagsIfNeeded(g.tags)));
 
     state.gallerys = nhFavorites;
     state.prevGid = null;
@@ -194,7 +197,7 @@ class FavoritePageLogic extends BasePageLogic {
     updateSafely();
   }
 
-  void _mergeNhFavoritesForDisplay() {
+  Future<void> _mergeNhFavoritesForDisplay() async {
     // Check if EH galleries have favoritedTime
     bool ehHasFavoritedTime = state.gallerys.any((g) => g.favoritedTime != null);
     if (state.gallerys.isNotEmpty && !ehHasFavoritedTime) {
@@ -212,6 +215,8 @@ class FavoritePageLogic extends BasePageLogic {
     if (nhFavorites.isEmpty) {
       return;
     }
+
+    await Future.wait(nhFavorites.map((g) => tagTranslationService.translateTagsIfNeeded(g.tags)));
 
     // Remove any previously merged NH galleries (identified by NH URL)
     state.gallerys.removeWhere((g) => g.galleryUrl.isNH);

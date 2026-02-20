@@ -78,15 +78,18 @@ mixin SearchPageLogicMixin on BasePageLogic {
   Future<void> toggleNhSearchMode() async {
     await state.searchConfigInitCompleter.future;
 
-    String keyword = state.searchConfig.keyword ?? '';
-    String trimmed = keyword.trimLeft();
-    if (trimmed.toLowerCase().startsWith('nh:')) {
-      trimmed = trimmed.substring(3).trimLeft();
-      state.searchConfig.keyword = trimmed;
-    } else {
-      state.searchConfig.keyword = 'nh:$trimmed';
-    }
+    state.searchConfig.isNhSearch = !state.searchConfig.isNhSearch;
+    await onInputChanged(state.searchConfig.keyword ?? '');
+    updateSafely([searchFieldId]);
+  }
 
+  Future<void> setNhSearchMode(bool value) async {
+    await state.searchConfigInitCompleter.future;
+
+    if (state.searchConfig.isNhSearch == value) {
+      return;
+    }
+    state.searchConfig.isNhSearch = value;
     await onInputChanged(state.searchConfig.keyword ?? '');
     updateSafely([searchFieldId]);
   }
@@ -220,7 +223,7 @@ mixin SearchPageLogicMixin on BasePageLogic {
       return;
     }
 
-    if (keyword.trimLeft().toLowerCase().startsWith('nh:')) {
+    if (state.searchConfig.isNhSearch || keyword.trimLeft().toLowerCase().startsWith('nh:')) {
       state.suggestions = [];
       if (state.bodyType == SearchPageBodyType.suggestionAndHistory) {
         updateSafely([suggestionBodyId]);

@@ -14,6 +14,7 @@ import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/mixin/scroll_to_top_page_mixin.dart';
 import 'package:jhentai/src/model/gallery_image.dart';
 import 'package:jhentai/src/model/gallery_tag.dart';
+import 'package:jhentai/src/model/search_config.dart';
 import 'package:jhentai/src/pages/details/comment/eh_comment.dart';
 import 'package:jhentai/src/pages/download/download_base_page.dart';
 import 'package:jhentai/src/routes/routes.dart';
@@ -1536,8 +1537,10 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
         onTap: state.isTagSelectionMode
             ? (tag) => logic.toggleTagSelection(tag)
             : (tag) => newSearch(
-                  keyword:
-                      '${state.galleryUrl.isNH ? 'nh:' : ''}${tag.tagData.namespace}:"${tag.tagData.key}\$"',
+                  rewriteSearchConfig: SearchConfig(
+                    keyword: '${tag.tagData.namespace}:"${tag.tagData.key}\$"',
+                    isNhSearch: state.galleryUrl.isNH,
+                  ),
                   forceNewRoute: true,
                 ),
         onSecondaryTap: state.galleryUrl.isNH ? null : logic.showTagDialog,

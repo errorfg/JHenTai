@@ -1004,10 +1004,10 @@ class DetailsPageLogic extends GetxController
     }
 
     if (state.galleryUrl.isNH) {
-      keyword = 'nh:$keyword';
+      newSearch(rewriteSearchConfig: SearchConfig(keyword: keyword, isNhSearch: true), forceNewRoute: true);
+    } else {
+      newSearch(keyword: keyword, forceNewRoute: true);
     }
-
-    newSearch(keyword: keyword, forceNewRoute: true);
   }
 
   void searchInEhByNhTitle() {
@@ -1032,10 +1032,10 @@ class DetailsPageLogic extends GetxController
     String keyword =
         'uploader:"${state.galleryDetails?.uploader ?? state.gallery!.uploader}"';
     if (state.galleryUrl.isNH) {
-      keyword = 'nh:$keyword';
+      newSearch(rewriteSearchConfig: SearchConfig(keyword: keyword, isNhSearch: true), forceNewRoute: true);
+    } else {
+      newSearch(keyword: keyword, forceNewRoute: true);
     }
-
-    newSearch(keyword: keyword, forceNewRoute: true);
   }
 
   Future<void> handleTapTorrent() async {
@@ -1562,7 +1562,7 @@ class DetailsPageLogic extends GetxController
     SearchConfig searchConfig = SearchConfig();
     searchConfig.tags = state.selectedTags.map((t) => t.tagData).toList();
     if (state.galleryUrl.isNH) {
-      searchConfig.keyword = 'nh:';
+      searchConfig.isNhSearch = true;
     }
 
     newSearch(rewriteSearchConfig: searchConfig, forceNewRoute: true);
