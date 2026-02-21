@@ -15,6 +15,7 @@ import 'history_service.dart';
 import 'jh_service.dart';
 import 'local_block_rule_service.dart';
 import 'log.dart';
+import 'read_progress_service.dart';
 
 CloudConfigService cloudConfigService = CloudConfigService();
 
@@ -59,6 +60,7 @@ class CloudConfigService
                   utime: Value(e.utime),
                 ))
             .toList());
+        readProgressService.clearCacheAndRefresh();
         log.info('  ✅ Read index records imported');
         break;
       case CloudConfigTypeEnum.quickSearch:

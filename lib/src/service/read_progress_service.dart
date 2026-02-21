@@ -41,6 +41,12 @@ class ReadProgressService extends GetxController with JHLifeCircleBeanErrorCatch
     return progress;
   }
 
+  /// Clear cache and notify all listeners to rebuild (e.g. after cloud sync)
+  void clearCacheAndRefresh() {
+    _progressCache.clear();
+    update();
+  }
+
   /// Update read progress and notify listeners
   Future<void> updateReadProgress(String recordKey, int index) async {
     _progressCache[recordKey] = index;

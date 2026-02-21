@@ -32,6 +32,15 @@ class GalleryHistoryDao {
     return appDb.into(appDb.galleryHistoryV2).insertOnConflictUpdate(history);
   }
 
+  static Future<GalleryHistoryV2Data?> selectByGid(int gid) async {
+    List<GalleryHistoryV2Data> histories =
+        await (appDb.select(appDb.galleryHistoryV2)
+              ..where((tbl) => tbl.gid.equals(gid))
+              ..limit(1))
+            .get();
+    return histories.isEmpty ? null : histories.first;
+  }
+
   static Future<bool> existsHistory(int gid) async {
     List<GalleryHistoryV2Data> histories =
         await (appDb.select(appDb.galleryHistoryV2)

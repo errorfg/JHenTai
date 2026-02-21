@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:animate_do/animate_do.dart';
 import 'package:blur/blur.dart';
@@ -18,6 +19,8 @@ import '../utils/date_util.dart';
 import 'eh_image.dart';
 import 'eh_tag.dart';
 import 'eh_gallery_category_tag.dart';
+import '../database/dao/gallery_history_dao.dart';
+import '../model/gallery_history_model.dart';
 import '../service/read_progress_service.dart';
 
 typedef CardCallback = FutureOr<void> Function(Gallery gallery);
@@ -202,7 +205,7 @@ class EHGalleryListCard extends StatelessWidget {
           children: [
             EHGalleryCategoryTag(category: gallery.category),
             const Expanded(child: SizedBox()),
-            if (gallery.pageCount != null) _buildReadingProgress(context).marginOnly(right: 8),
+            _buildReadingProgress(context).marginOnly(right: 8),
             if (downloaded) _buildDownloadIcon(context).marginOnly(right: 4),
             if (gallery.isFavorite) _buildFavoriteIcon().marginOnly(right: 4),
             if (gallery.language != null) _buildLanguage(context).marginOnly(right: 4),
@@ -242,21 +245,21 @@ class EHGalleryListCard extends StatelessWidget {
       init: Get.find<ReadProgressService>(),
       id: '${ReadProgressService.readProgressUpdateId}::${gallery.gid}',
       builder: (_) {
-        return FutureBuilder<int>(
-          future: readProgressService.getReadProgress(gallery.gid),
+        return FutureBuilder<(int, int?)>(
+          future: _getReadProgressAndPageCount(),
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
               return const SizedBox.shrink();
             }
 
-            final readIndex = snapshot.data ?? 0;
-
-            double progress = gallery.pageCount != null && gallery.pageCount! > 0 ? ((readIndex + 1) / gallery.pageCount!).clamp(0.0, 1.0) : 0.0;
+            final (readIndex, pageCount) = snapshot.data ?? (0, null);
 
             // Don't show indicator if no progress
-            if (readIndex == 0.0) {
+            if (readIndex == 0) {
               return const SizedBox.shrink();
             }
+
+            double progress = pageCount != null && pageCount > 0 ? ((readIndex + 1) / pageCount).clamp(0.0, 1.0) : 0.0;
 
             return SizedBox(
               width: UIConfig.galleryCardReadProgressIndicatorSize,
@@ -272,6 +275,18 @@ class EHGalleryListCard extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<(int, int?)> _getReadProgressAndPageCount() async {
+    final readIndex = await readProgressService.getReadProgress(gallery.gid);
+    int? pageCount = gallery.pageCount;
+    if (pageCount == null && readIndex > 0) {
+      final history = await GalleryHistoryDao.selectByGid(gallery.gid);
+      if (history != null) {
+        pageCount = GalleryHistoryModel.fromJson(jsonDecode(history.jsonBody)).pageCount;
+      }
+    }
+    return (readIndex, pageCount);
   }
 
   Widget _buildDownloadIcon(BuildContext context) => Icon(Icons.downloading, size: 11, color: UIConfig.galleryCardTextColor(context));
