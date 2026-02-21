@@ -30,12 +30,16 @@ Compared with `upstream/master`, this fork currently contains additional commits
   - incremental/smart merge improvements.
   - auto sync on startup and app resumed/shown.
   - sync setting export support.
+  - home sync progress indicator with desktop support.
 - Gallery and search UX:
   - multi-tag selection in detail page.
   - client-side filters for Popular and Ranklist pages.
   - `nhentai` fallback search/detail/image flow support.
-  - dedicated `NH` keyword-mode toggle in search page.
+  - dedicated `NH` keyword-mode toggle in search page and NH tag translation.
   - dedicated `EH` action on `nhentai` details to extract title and search on E-Hentai.
+  - nhentai favorites aligned with EH flow, with separate display and menu switching.
+- Foldable device support:
+  - global floating button to toggle between portrait and landscape orientation (mobile layout only).
 - CI/workflow updates in this fork:
   - branch check focused on Android release APK artifact.
   - docs-only changes skip build.
