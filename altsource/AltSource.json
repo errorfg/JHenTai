@@ -61,11 +61,11 @@
       "versions": [
         {
           "version": "8.0.17",
-          "buildVersion": "316",
-          "date": "2026-02-21T06:48:32Z",
-          "localizedDescription": "- Add NH search option toggle and NH tag translation support\n- Add global rotation toggle FAB for foldable devices (mobile layout only)\n",
-          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.17+316/JHenTai_8.0.17+316.ipa",
-          "size": 15921698
+          "buildVersion": "317",
+          "date": "2026-02-21T09:58:13Z",
+          "localizedDescription": "- fix: show reading progress ring on favorites page by fetching pageCount from local history\n- fix: refresh reading progress cache after cloud sync so progress updates immediately without restart\n",
+          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.17+317/JHenTai_8.0.17+317.ipa",
+          "size": 15920234
         },
         {
           "version": "8.0.15",
