@@ -29,6 +29,7 @@ class SettingStylePage extends StatelessWidget {
             _buildCrossAxisCountInDetailPage(),
             if (!styleSetting.isInWaterFlowListMode) _buildMoveCover2RightSide().fadeIn(),
             _buildLayout(context),
+            if (styleSetting.isInMobileLayout) _buildShowRotationFAB().fadeIn(),
           ],
         ).withListTileTheme(context),
       ),
@@ -175,6 +176,15 @@ class SettingStylePage extends StatelessWidget {
       subtitle: Text('needRestart'.tr),
       value: styleSetting.moveCover2RightSide.value,
       onChanged: styleSetting.saveMoveCover2RightSide,
+    );
+  }
+
+  Widget _buildShowRotationFAB() {
+    return SwitchListTile(
+      title: Text('showRotationFAB'.tr),
+      subtitle: Text('showRotationFABHint'.tr),
+      value: styleSetting.showRotationFAB.value,
+      onChanged: styleSetting.saveShowRotationFAB,
     );
   }
 

@@ -294,6 +294,8 @@ class en_US {
 
       /// Layout
       'layoutMode': 'Layout Mode',
+      'showRotationFAB': 'Show Rotation Button',
+      'showRotationFABHint': 'Show a floating button to toggle between portrait and landscape',
       'mobileLayoutV2Name': 'Mobile',
       'mobileLayoutV2Desc': 'Single column',
       'mobileLayoutName': 'Mobile(old)',

@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:blur/blur.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_windowmanager_plus/flutter_windowmanager_plus.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
@@ -132,17 +133,69 @@ class _AppManagerState extends State<AppManager> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    Widget child = inBlur
+        ? Blur(
+            blur: 100,
+            blurColor: GetPlatform.isAndroid ? Colors.white : Colors.grey.shade600,
+            colorOpacity: 1,
+            child: widget.child,
+          )
+        : widget.child;
+
     return ScrollConfiguration(
       behavior: UIConfig.scrollBehaviourWithScrollBar,
-      child: inBlur
-          ? Blur(
-              blur: 100,
-              blurColor: GetPlatform.isAndroid ? Colors.white : Colors.grey.shade600,
-              colorOpacity: 1,
-              child: widget.child,
-            )
-          : widget.child,
+      child: Obx(() {
+        if (styleSetting.showRotationFAB.isTrue && styleSetting.isInMobileLayout) {
+          return Stack(
+            children: [
+              child,
+              Positioned(
+                left: 16,
+                bottom: MediaQuery.of(context).padding.bottom + 16,
+                child: _buildRotationFAB(),
+              ),
+            ],
+          );
+        }
+        return child;
+      }),
     );
+  }
+
+  Widget _buildRotationFAB() {
+    return Obx(() {
+      bool isLandscape = styleSetting.isLandscape.value;
+      return SizedBox(
+        width: 40,
+        height: 40,
+        child: FloatingActionButton(
+          heroTag: 'rotationFAB',
+          onPressed: _toggleOrientation,
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
+          elevation: 2,
+          child: Icon(
+            isLandscape ? Icons.screen_lock_portrait : Icons.screen_lock_landscape,
+            size: 20,
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
+          ),
+        ),
+      );
+    });
+  }
+
+  void _toggleOrientation() {
+    styleSetting.toggleOrientation();
+    if (styleSetting.isLandscape.value) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
   }
 
   void _changeTheme() {

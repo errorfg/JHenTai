@@ -295,6 +295,8 @@ class pt_BR {
 
       /// Layout
       'layoutMode': 'Modo de layout',
+      'showRotationFAB': 'Mostrar botão de rotação',
+      'showRotationFABHint': 'Mostrar um botão flutuante para alternar entre retrato e paisagem',
       'mobileLayoutV2Name': 'Celular',
       'mobileLayoutV2Desc': 'Uma coluna',
       'mobileLayoutName': 'Celular(antigo)',

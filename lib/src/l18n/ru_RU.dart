@@ -299,6 +299,8 @@ class ru_RU {
 
       /// Layout
       'layoutMode': 'Режим макета',
+      'showRotationFAB': 'Показать кнопку поворота',
+      'showRotationFABHint': 'Показать плавающую кнопку для переключения между портретным и альбомным режимами',
       'mobileLayoutV2Name': 'Мобильный',
       'mobileLayoutV2Desc': 'Одна колонка',
       'mobileLayoutName': 'Мобильный (старый)',

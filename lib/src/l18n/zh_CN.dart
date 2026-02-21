@@ -305,6 +305,8 @@ class zh_CN {
 
       /// style setting page
       'layoutMode': '布局模式',
+      'showRotationFAB': '显示旋转按钮',
+      'showRotationFABHint': '显示一个浮动按钮来切换竖屏和横屏',
       'enableTagZHTranslation': '开启标签中文翻译',
       'version': '版本',
       'downloadTagTranslationHint': '下载数据中... 已下载: ',

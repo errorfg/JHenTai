@@ -294,6 +294,8 @@ class ko_KR {
 
       /// Layout
       'layoutMode': '레이아웃 모드',
+      'showRotationFAB': '회전 버튼 표시',
+      'showRotationFABHint': '세로 및 가로 모드를 전환하는 플로팅 버튼 표시',
       'mobileLayoutV2Name': '모바일',
       'mobileLayoutV2Desc': '단일 리스트',
       'mobileLayoutName': '모바일(구형)',

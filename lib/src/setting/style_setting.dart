@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
@@ -23,6 +24,11 @@ class StyleSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircl
   RxnInt crossAxisCountInDetailPage = RxnInt(null);
   RxMap<String, ListMode> pageListMode = <String, ListMode>{}.obs;
   RxBool moveCover2RightSide = false.obs;
+  RxBool showRotationFAB = false.obs;
+
+  /// Non-persisted runtime state for the current orientation toggle
+  RxBool isLandscape = false.obs;
+
   Rx<LayoutMode> layout = PlatformDispatcher.instance.views.first.physicalSize.width / PlatformDispatcher.instance.views.first.devicePixelRatio < 600
       ? LayoutMode.mobileV2.obs
       : GetPlatform.isDesktop
@@ -72,6 +78,7 @@ class StyleSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircl
     crossAxisCountInDetailPage.value = map['crossAxisCountInDetailPage'];
     pageListMode.value = Map.from(map['pageListMode']?.map((route, listModeIndex) => MapEntry(route, ListMode.values[listModeIndex])) ?? {});
     moveCover2RightSide.value = map['moveCover2RightSide'] ?? moveCover2RightSide.value;
+    showRotationFAB.value = map['showRotationFAB'] ?? showRotationFAB.value;
     layout.value = LayoutMode.values[map['layout'] ?? layout.value.index];
 
     /// old layout has been removed in v5.0.0
@@ -98,6 +105,7 @@ class StyleSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircl
       'crossAxisCountInDetailPage': crossAxisCountInDetailPage.value,
       'pageListMode': pageListMode.map((route, listMode) => MapEntry(route, listMode.index)),
       'moveCover2RightSide': moveCover2RightSide.value,
+      'showRotationFAB': showRotationFAB.value,
       'layout': layout.value.index,
     });
   }
@@ -174,6 +182,20 @@ class StyleSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircl
     log.debug('saveMoveCover2RightSide:$moveCover2RightSide');
     this.moveCover2RightSide.value = moveCover2RightSide;
     await saveBeanConfig();
+  }
+
+  Future<void> saveShowRotationFAB(bool value) async {
+    log.debug('saveShowRotationFAB:$value');
+    showRotationFAB.value = value;
+    if (!value) {
+      isLandscape.value = false;
+      SystemChrome.setPreferredOrientations([]);
+    }
+    await saveBeanConfig();
+  }
+
+  void toggleOrientation() {
+    isLandscape.value = !isLandscape.value;
   }
 
   Future<void> saveLayoutMode(LayoutMode layoutMode) async {
