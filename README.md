@@ -20,30 +20,37 @@ Still in development stage, welcome to submit issues or feature requests.
 
 ## Fork Highlights
 
-Compared with `upstream/master`, this fork currently contains additional commits in these areas:
+Compared with `upstream/master` (based on current `upstream/master..master` commit history), this fork currently contains additional work in these areas:
 
 - HarmonyOS compatibility / app identity adjustments:
   - package/app identity related changes to reduce HarmonyOS risk-popup friction.
 - Cloud sync enhancements:
   - WebDAV config sync.
-  - S3-compatible sync provider.
-  - incremental/smart merge improvements.
-  - auto sync on startup and app resumed/shown.
-  - sync setting export support.
-  - home sync progress indicator with desktop support.
+  - S3-compatible sync provider (unified architecture).
+  - incremental/smart merge improvements with better local timestamp detection.
+  - auto sync on startup, app resumed/shown, and new history record creation.
+  - sync settings included in config export.
+  - home sync progress indicator with desktop entry via title/progress display.
+  - sync consistency fixes for search history merge and reading progress after cloud sync.
 - Gallery and search UX:
   - multi-tag selection in detail page.
   - client-side filters for Popular and Ranklist pages.
   - `nhentai` fallback search/detail/image flow support.
-  - dedicated `NH` keyword-mode toggle in search page and NH tag translation.
+  - `nhentai` search supports EH/NH mode toggle (non-prefix input works in NH mode), while keeping `nh:` keyword-prefix compatibility and NH tag translation.
   - dedicated `EH` action on `nhentai` details to extract title and search on E-Hentai.
-  - nhentai favorites aligned with EH flow, with separate display and menu switching.
+  - `nhentai` details page favorite action and EH-aligned favorite flow.
+  - `wnacg` site integration: search, browse, detail, download, local favorites, cloud sync with configurable domain.
+  - three-way EH/NH/WN search toggle and `wn:` keyword-prefix support.
+  - EH/NH/WN favorites support both mixed insertion and split display with menu switching.
+  - wnacg URL link jumping with automatic domain rewriting.
 - Foldable device support:
   - global floating button to toggle between portrait and landscape orientation (mobile layout only).
 - CI/workflow updates in this fork:
-  - branch check focused on Android release APK artifact.
+  - branch checks for non-master branches with Android APK artifact uploads.
+  - branch check focus on Android release APK artifact.
   - docs-only changes skip build.
-  - `[skip-build]` keyword support for skipping build jobs.
+  - `[skip-build]` keyword support with head-commit based checks.
+  - publish/release workflow hardening for tag detection timing and changelog handling.
 
 ## Download & Install
 
