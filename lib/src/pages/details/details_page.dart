@@ -131,7 +131,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                         children: [Text('share'.tr), const Icon(Icons.share)],
                       ),
                     ),
-                    if (state.galleryDetails != null && !state.galleryUrl.isNH)
+                    if (state.galleryDetails != null && !state.galleryUrl.isNH && !state.galleryUrl.isWN)
                       PopupMenuItem(
                         value: 2,
                         child: Row(
@@ -974,11 +974,11 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
               _buildFavoriteButton(context),
             ];
 
-            if (state.galleryUrl.isNH) {
+            if (state.galleryUrl.isNH || state.galleryUrl.isWN) {
               actions.add(_buildSearchInEHButton(context));
             }
 
-            if (!state.galleryUrl.isNH) {
+            if (!state.galleryUrl.isNH && !state.galleryUrl.isWN) {
               actions.addAll([
                 _buildRatingButton(context),
                 _buildArchiveButton(context),
@@ -1540,11 +1540,12 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                   rewriteSearchConfig: SearchConfig(
                     keyword: '${tag.tagData.namespace}:"${tag.tagData.key}\$"',
                     isNhSearch: state.galleryUrl.isNH,
+                    isWnacgSearch: state.galleryUrl.isWN,
                   ),
                   forceNewRoute: true,
                 ),
-        onSecondaryTap: state.galleryUrl.isNH ? null : logic.showTagDialog,
-        onLongPress: state.galleryUrl.isNH ? null : logic.showTagDialog,
+        onSecondaryTap: state.galleryUrl.isNH || state.galleryUrl.isWN ? null : logic.showTagDialog,
+        onLongPress: state.galleryUrl.isNH || state.galleryUrl.isWN ? null : logic.showTagDialog,
         showTagStatus: preferenceSetting.showGalleryTagVoteStatus.isTrue,
       );
 
@@ -1583,7 +1584,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
         global: false,
         init: logic,
         builder: (_) {
-          if (state.galleryDetails == null || state.galleryUrl.isNH) {
+          if (state.galleryDetails == null || state.galleryUrl.isNH || state.galleryUrl.isWN) {
             return const SizedBox();
           }
 

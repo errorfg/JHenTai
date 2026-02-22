@@ -18,6 +18,7 @@ import '../../model/gallery.dart';
 import '../../model/search_config.dart';
 import '../../service/local_config_service.dart';
 import '../../service/nhentai_favorite_service.dart';
+import '../../service/wnacg_favorite_service.dart';
 import '../../service/tag_translation_service.dart';
 import '../../utils/eh_spider_parser.dart';
 import '../../service/log.dart';
@@ -42,36 +43,40 @@ class FavoritePageLogic extends BasePageLogic {
       _loadNhFavorites();
       return;
     }
+    if (state.showWnFavorites) {
+      _loadWnFavorites();
+      return;
+    }
     await super.handleRefresh(updateId: updateId);
     if (state.mixedMode) {
-      _mergeNhFavoritesForDisplay();
+      _mergeLocalFavoritesForDisplay();
     }
   }
 
   @override
   Future<void> loadBefore() async {
-    if (state.showNhFavorites) return;
+    if (state.showNhFavorites || state.showWnFavorites) return;
     await super.loadBefore();
     if (state.mixedMode) {
-      _mergeNhFavoritesForDisplay();
+      _mergeLocalFavoritesForDisplay();
     }
   }
 
   @override
   Future<void> loadMore({bool checkLoadingState = true}) async {
-    if (state.showNhFavorites) return;
+    if (state.showNhFavorites || state.showWnFavorites) return;
     await super.loadMore(checkLoadingState: checkLoadingState);
     if (state.mixedMode) {
-      _mergeNhFavoritesForDisplay();
+      _mergeLocalFavoritesForDisplay();
     }
   }
 
   @override
   Future<void> jumpPage(DateTime dateTime) async {
-    if (state.showNhFavorites) return;
+    if (state.showNhFavorites || state.showWnFavorites) return;
     await super.jumpPage(dateTime);
     if (state.mixedMode) {
-      _mergeNhFavoritesForDisplay();
+      _mergeLocalFavoritesForDisplay();
     }
   }
 
@@ -93,7 +98,6 @@ class FavoritePageLogic extends BasePageLogic {
 
     if (state.showNhFavorites) {
       if (state.mixedMode) {
-        // switching from NH-only to mixed mode: go back to EH view with mix
         state.showNhFavorites = false;
         state.favoriteSortOrder = result.sortOrder;
         handleRefresh();
@@ -101,6 +105,18 @@ class FavoritePageLogic extends BasePageLogic {
       }
       state.favoriteSortOrder = result.sortOrder;
       _loadNhFavorites();
+      return;
+    }
+
+    if (state.showWnFavorites) {
+      if (state.mixedMode) {
+        state.showWnFavorites = false;
+        state.favoriteSortOrder = result.sortOrder;
+        handleRefresh();
+        return;
+      }
+      state.favoriteSortOrder = result.sortOrder;
+      _loadWnFavorites();
       return;
     }
 
@@ -153,13 +169,19 @@ class FavoritePageLogic extends BasePageLogic {
   }
 
   void handleToggleNhFavorites() {
+    handleSwitchFavoriteSource(state.showNhFavorites ? 'EH' : 'NH');
+  }
+
+  void handleSwitchFavoriteSource(String source) {
     if (state.mixedMode) {
-      // in mixed mode, toggling switches back to separate mode
       state.mixedMode = false;
     }
-    state.showNhFavorites = !state.showNhFavorites;
+    state.showNhFavorites = source == 'NH';
+    state.showWnFavorites = source == 'WN';
     if (state.showNhFavorites) {
       _loadNhFavorites();
+    } else if (state.showWnFavorites) {
+      _loadWnFavorites();
     } else {
       handleRefresh();
     }
@@ -169,7 +191,16 @@ class FavoritePageLogic extends BasePageLogic {
     if (state.showNhFavorites) {
       _loadNhFavorites();
     } else if (state.mixedMode) {
-      _mergeNhFavoritesForDisplay();
+      _mergeLocalFavoritesForDisplay();
+      updateSafely();
+    }
+  }
+
+  Future<void> reloadWnacgFavoriteGallerys() async {
+    if (state.showWnFavorites) {
+      _loadWnFavorites();
+    } else if (state.mixedMode) {
+      _mergeLocalFavoritesForDisplay();
       updateSafely();
     }
   }
@@ -197,7 +228,30 @@ class FavoritePageLogic extends BasePageLogic {
     updateSafely();
   }
 
-  Future<void> _mergeNhFavoritesForDisplay() async {
+  Future<void> _loadWnFavorites() async {
+    List<Gallery> wnFavorites = wnacgFavoriteService.getDisplayFavorites(
+      sortOrder: state.favoriteSortOrder,
+      searchConfig: state.searchConfig,
+    );
+
+    await Future.wait(wnFavorites.map((g) => tagTranslationService.translateTagsIfNeeded(g.tags)));
+
+    state.gallerys = wnFavorites;
+    state.prevGid = null;
+    state.nextGid = null;
+    state.galleryCollectionKey = Key(newUUID());
+
+    if (wnFavorites.isEmpty) {
+      state.loadingState = LoadingState.noData;
+    } else {
+      state.loadingState = LoadingState.noMore;
+    }
+
+    jump2Top();
+    updateSafely();
+  }
+
+  Future<void> _mergeLocalFavoritesForDisplay() async {
     // Check if EH galleries have favoritedTime
     bool ehHasFavoritedTime = state.gallerys.any((g) => g.favoritedTime != null);
     if (state.gallerys.isNotEmpty && !ehHasFavoritedTime) {
@@ -211,19 +265,24 @@ class FavoritePageLogic extends BasePageLogic {
       sortOrder: state.favoriteSortOrder,
       searchConfig: state.searchConfig,
     );
+    List<Gallery> wnFavorites = wnacgFavoriteService.getDisplayFavorites(
+      sortOrder: state.favoriteSortOrder,
+      searchConfig: state.searchConfig,
+    );
 
-    if (nhFavorites.isEmpty) {
+    List<Gallery> localFavorites = [...nhFavorites, ...wnFavorites];
+    if (localFavorites.isEmpty) {
       return;
     }
 
-    await Future.wait(nhFavorites.map((g) => tagTranslationService.translateTagsIfNeeded(g.tags)));
+    await Future.wait(localFavorites.map((g) => tagTranslationService.translateTagsIfNeeded(g.tags)));
 
-    // Remove any previously merged NH galleries (identified by NH URL)
-    state.gallerys.removeWhere((g) => g.galleryUrl.isNH);
+    // Remove any previously merged local favorites (identified by NH/WN URL)
+    state.gallerys.removeWhere((g) => g.galleryUrl.isNH || g.galleryUrl.isWN);
 
     // Combine and sort descending by the time matching current sort order
     bool sortByPublishTime = state.favoriteSortOrder == FavoriteSortOrder.publishedTime;
-    List<Gallery> combined = [...state.gallerys, ...nhFavorites];
+    List<Gallery> combined = [...state.gallerys, ...localFavorites];
     combined.sort((a, b) {
       String timeA = sortByPublishTime ? a.publishTime : (a.favoritedTime ?? '');
       String timeB = sortByPublishTime ? b.publishTime : (b.favoritedTime ?? '');

@@ -1,8 +1,10 @@
 import 'package:jhentai/src/exception/internal_exception.dart';
+import 'package:jhentai/src/setting/eh_setting.dart';
 
 class GalleryUrl {
   final bool isEH;
   final bool isNH;
+  final bool isWN;
 
   final int gid;
 
@@ -13,7 +15,8 @@ class GalleryUrl {
     required this.gid,
     required this.token,
     this.isNH = false,
-  }) : assert(isNH || token.length == 10);
+    this.isWN = false,
+  }) : assert(isWN || isNH || token.length == 10);
 
   static GalleryUrl? tryParse(String url) {
     RegExp regExp =
@@ -38,6 +41,24 @@ class GalleryUrl {
       );
     }
 
+    Uri? wnUri = Uri.tryParse(url);
+    if (wnUri != null) {
+      String host = wnUri.host;
+      bool isWnHost = host == 'wnacg.com' || host == 'www.wnacg.com' || host == ehSetting.wnacgDomain.value;
+      if (isWnHost) {
+        RegExp wnAidRegExp = RegExp(r'aid-(\d+)');
+        Match? wnMatch = wnAidRegExp.firstMatch(wnUri.path);
+        if (wnMatch != null) {
+          return GalleryUrl(
+            isEH: true,
+            isWN: true,
+            gid: int.parse(wnMatch.group(1)!),
+            token: 'wnacg',
+          );
+        }
+      }
+    }
+
     return null;
   }
 
@@ -51,6 +72,9 @@ class GalleryUrl {
   }
 
   String get url {
+    if (isWN) {
+      return 'https://${ehSetting.wnacgDomain.value}/photos-index-aid-$gid.html';
+    }
     if (isNH) {
       return 'https://nhentai.net/g/$gid/';
     }
@@ -62,12 +86,14 @@ class GalleryUrl {
   GalleryUrl copyWith({
     bool? isEH,
     bool? isNH,
+    bool? isWN,
     int? gid,
     String? token,
   }) {
     return GalleryUrl(
       isEH: isEH ?? this.isEH,
       isNH: isNH ?? this.isNH,
+      isWN: isWN ?? this.isWN,
       gid: gid ?? this.gid,
       token: token ?? this.token,
     );
@@ -75,6 +101,6 @@ class GalleryUrl {
 
   @override
   String toString() {
-    return 'GalleryUrl{isEH: $isEH, isNH: $isNH, gid: $gid, token: $token}';
+    return 'GalleryUrl{isEH: $isEH, isNH: $isNH, isWN: $isWN, gid: $gid, token: $token}';
   }
 }

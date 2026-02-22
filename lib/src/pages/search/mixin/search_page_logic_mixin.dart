@@ -94,6 +94,23 @@ mixin SearchPageLogicMixin on BasePageLogic {
     updateSafely([searchFieldId]);
   }
 
+  Future<void> setSiteSearchMode(String site) async {
+    await state.searchConfigInitCompleter.future;
+
+    bool newNh = site == 'NH';
+    bool newWn = site == 'WN';
+
+    if (state.searchConfig.isNhSearch == newNh &&
+        state.searchConfig.isWnacgSearch == newWn) {
+      return;
+    }
+
+    state.searchConfig.isNhSearch = newNh;
+    state.searchConfig.isWnacgSearch = newWn;
+    await onInputChanged(state.searchConfig.keyword ?? '');
+    updateSafely([searchFieldId]);
+  }
+
   @override
   Future<void> handleClearAndRefresh() async {
     state.searchFieldFocusNode.unfocus();
@@ -223,7 +240,8 @@ mixin SearchPageLogicMixin on BasePageLogic {
       return;
     }
 
-    if (state.searchConfig.isNhSearch || keyword.trimLeft().toLowerCase().startsWith('nh:')) {
+    if (state.searchConfig.isNhSearch || keyword.trimLeft().toLowerCase().startsWith('nh:') ||
+        state.searchConfig.isWnacgSearch || keyword.trimLeft().toLowerCase().startsWith('wn:')) {
       state.suggestions = [];
       if (state.bodyType == SearchPageBodyType.suggestionAndHistory) {
         updateSafely([suggestionBodyId]);

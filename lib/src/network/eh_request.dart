@@ -40,6 +40,7 @@ import 'package:jhentai/src/utils/eh_spider_parser.dart';
 import 'package:jhentai/src/utils/proxy_util.dart';
 import 'package:jhentai/src/utils/string_uril.dart';
 import 'package:http_parser/http_parser.dart' show MediaType;
+import 'package:html/parser.dart' as html_parser;
 import 'package:path/path.dart';
 import 'package:webview_flutter/webview_flutter.dart' show WebViewCookieManager;
 import '../service/jh_service.dart';
@@ -60,6 +61,10 @@ class EHRequest with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   static const String _nhApiBase = 'https://nhentai.net/api';
   static const int _nhThumbnailsPerPage = 40;
   final Map<int, _NHentaiGalleryCache> _nhGalleryCache = {};
+
+  static const String _wnDefaultDomain = 'www.wn07.ru';
+  static const int _wnThumbnailsPerPage = 40;
+  final Map<int, _WnacgGalleryCache> _wnGalleryCache = {};
 
   List<Cookie> get cookies => List.unmodifiable(_cookieManager.cookies);
 
@@ -364,6 +369,15 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     SearchConfig? searchConfig,
     required HtmlParser<T> parser,
   }) async {
+    if (_shouldUseWnSearch(url: url, searchConfig: searchConfig)) {
+      return _requestWnGalleryPage(
+        url: url,
+        prevGid: prevGid,
+        nextGid: nextGid,
+        searchConfig: searchConfig,
+      );
+    }
+
     if (_shouldUseNhSearch(url: url, searchConfig: searchConfig)) {
       return _requestNhGalleryPage(
         url: url,
@@ -392,6 +406,15 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     CancelToken? cancelToken,
     required HtmlParser<T> parser,
   }) async {
+    if (GalleryUrl.tryParse(galleryUrl)?.isWN == true ||
+        _isWnacgUrl(galleryUrl)) {
+      return _requestWnDetailPage(
+        galleryUrl: galleryUrl,
+        thumbnailsPageIndex: thumbnailsPageIndex,
+        parser: parser,
+      );
+    }
+
     if (GalleryUrl.tryParse(galleryUrl)?.isNH == true ||
         _isNhentaiUrl(galleryUrl)) {
       return _requestNhDetailPage(
@@ -580,6 +603,13 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     bool useCacheIfAvailable = true,
     required HtmlParser<T> parser,
   }) async {
+    if (href.startsWith('wn://') || _isWnacgUrl(href)) {
+      return _requestWnImagePage(
+        href: href,
+        parser: parser,
+      );
+    }
+
     if (href.startsWith('nh://') || _isNhentaiUrl(href)) {
       return _requestNhImagePage(
         href: href,
@@ -849,7 +879,7 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
 
   Future<T> requestTagSuggestion<T>(
       String keyword, HtmlParser<T> parser) async {
-    if (_isNhKeywordSearch(keyword)) {
+    if (_isNhKeywordSearch(keyword) || _isWnKeywordSearch(keyword)) {
       return <EHRawTag>[] as T;
     }
 
@@ -1883,6 +1913,518 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     return e;
   }
 
+  // ── wnacg detection ──────────────────────────────────────────────────
+
+  bool _isWnacgUrl(String? url) {
+    if (url == null || url.isEmpty) {
+      return false;
+    }
+    if (url.startsWith('wn://')) {
+      return true;
+    }
+    Uri? uri = Uri.tryParse(url);
+    if (uri == null) {
+      return false;
+    }
+    String host = uri.host.toLowerCase();
+    String wnHost = ehSetting.wnacgDomain.value.toLowerCase();
+    return host == wnHost || host.endsWith('.$wnHost');
+  }
+
+  bool _shouldUseWnSearch({String? url, SearchConfig? searchConfig}) {
+    if (_isWnacgUrl(url)) {
+      return true;
+    }
+
+    if (searchConfig == null) {
+      return false;
+    }
+
+    if (searchConfig.isWnacgSearch) {
+      return true;
+    }
+
+    if (searchConfig.searchType != SearchType.gallery) {
+      return false;
+    }
+
+    if (_isWnKeywordSearch(searchConfig.keyword)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  bool _isWnKeywordSearch(String? keyword) {
+    if (keyword == null) {
+      return false;
+    }
+
+    String normalized = keyword.trimLeft().toLowerCase();
+    return normalized.startsWith('wn:');
+  }
+
+  String get _wnDomain => ehSetting.wnacgDomain.value.isNotEmpty
+      ? ehSetting.wnacgDomain.value
+      : _wnDefaultDomain;
+
+  // ── wnacg gallery page (search / browse) ────────────────────────────
+
+  Future<T> _requestWnGalleryPage<T>({
+    String? url,
+    String? prevGid,
+    String? nextGid,
+    SearchConfig? searchConfig,
+  }) async {
+    SearchType? searchType = searchConfig?.searchType;
+    if (searchType == SearchType.favorite || searchType == SearchType.watched) {
+      return GalleryPageInfo(gallerys: []) as T;
+    }
+
+    int pageNo = int.tryParse(nextGid ?? prevGid ?? '') ?? 1;
+    if (pageNo < 1) {
+      pageNo = 1;
+    }
+
+    String? keyword = _normalizeWnKeyword(searchConfig?.keyword);
+
+    String requestUrl;
+    if (keyword != null && keyword.isNotEmpty) {
+      requestUrl =
+          'https://$_wnDomain/search/index.php?q=${Uri.encodeComponent(keyword)}&syn=yes&f=_all&s=create_time_DESC&p=$pageNo';
+    } else {
+      requestUrl = 'https://$_wnDomain/albums-index-page-$pageNo.html';
+    }
+
+    Response response = await _getWithErrorHandler(
+      requestUrl,
+      options: Options(headers: {'Referer': 'https://$_wnDomain/'}),
+    );
+
+    String htmlData = response.data.toString();
+    var document = html_parser.parse(htmlData);
+
+    // Parse gallery list
+    List<Gallery> gallerys = [];
+    var items = document.querySelectorAll('.li.gallary_item');
+    for (var item in items) {
+      var titleLink = item.querySelector('.title > a');
+      if (titleLink == null) {
+        continue;
+      }
+
+      String? href = titleLink.attributes['href'];
+      if (href == null) {
+        continue;
+      }
+
+      RegExpMatch? aidMatch =
+          RegExp(r'aid-(\d+)').firstMatch(href);
+      if (aidMatch == null) {
+        continue;
+      }
+
+      int aid = int.parse(aidMatch.group(1)!);
+      String title = titleLink.text.trim();
+
+      var img = item.querySelector('img');
+      String coverUrl = '';
+      if (img != null) {
+        coverUrl = _normalizeWnUrl(img.attributes['src'] ?? img.attributes['data-src'] ?? '');
+      }
+
+      gallerys.add(Gallery(
+        galleryUrl: GalleryUrl(
+          isEH: true,
+          isWN: true,
+          gid: aid,
+          token: 'wnacg',
+        ),
+        title: title,
+        category: 'Manga',
+        cover: GalleryImage(url: coverUrl),
+        pageCount: null,
+        rating: 0,
+        hasRated: false,
+        favoriteTagIndex: null,
+        favoriteTagName: null,
+        language: null,
+        uploader: null,
+        publishTime: '',
+        isExpunged: false,
+        tags: LinkedHashMap(),
+      ));
+    }
+
+    // Parse pagination
+    var thisPage = document.querySelector('.thispage');
+    int currentPage = int.tryParse(thisPage?.text ?? '') ?? pageNo;
+
+    // Try to get total count from result text
+    int? totalPages;
+    var resultElement = document.querySelector('#bodywrap .result > b');
+    if (resultElement != null) {
+      int? totalCount = int.tryParse(resultElement.text.trim().replaceAll(',', ''));
+      if (totalCount != null) {
+        totalPages = (totalCount / 24).ceil();
+      }
+    }
+
+    // Fallback: check if there's a next page link
+    if (totalPages == null) {
+      var pageLinks = document.querySelectorAll('.page_num a');
+      int maxPage = currentPage;
+      for (var link in pageLinks) {
+        int? p = int.tryParse(link.text.trim());
+        if (p != null && p > maxPage) {
+          maxPage = p;
+        }
+      }
+      if (maxPage > currentPage) {
+        totalPages = maxPage;
+      }
+    }
+
+    String? next;
+    if (totalPages != null) {
+      next = currentPage < totalPages ? (currentPage + 1).toString() : null;
+    } else {
+      next = gallerys.isEmpty ? null : (currentPage + 1).toString();
+    }
+
+    return GalleryPageInfo(
+      gallerys: gallerys,
+      prevGid: currentPage > 1 ? (currentPage - 1).toString() : null,
+      nextGid: next,
+    ) as T;
+  }
+
+  String? _normalizeWnKeyword(String? rawKeyword) {
+    if (rawKeyword == null) {
+      return null;
+    }
+
+    String keyword = rawKeyword.trim();
+    if (keyword.isEmpty) {
+      return '';
+    }
+
+    if (_isWnKeywordSearch(keyword)) {
+      keyword = keyword.trimLeft().substring(3).trim();
+    }
+
+    return keyword;
+  }
+
+  // ── wnacg detail page ───────────────────────────────────────────────
+
+  Future<T> _requestWnDetailPage<T>({
+    required String galleryUrl,
+    int thumbnailsPageIndex = 0,
+    required HtmlParser<T> parser,
+  }) async {
+    GalleryUrl parsedUrl = GalleryUrl.parse(galleryUrl);
+    _WnacgGalleryCache cache = await _getWnGalleryCache(parsedUrl.gid);
+
+    if (parser == EHSpiderParser.detailPage2GalleryAndDetailAndApikey) {
+      return (
+        galleryDetails: _buildWnGalleryDetail(cache),
+        apikey: '',
+      ) as T;
+    }
+
+    if (parser == EHSpiderParser.detailPage2Thumbnails) {
+      return _buildWnThumbnails(cache, thumbnailsPageIndex) as T;
+    }
+
+    if (parser == EHSpiderParser.detailPage2RangeAndThumbnails) {
+      return _buildWnDetailPageInfo(cache, thumbnailsPageIndex) as T;
+    }
+
+    if (parser == EHSpiderParser.detailPage2Comments) {
+      return <GalleryComment>[] as T;
+    }
+
+    throw EHSiteException(
+      type: EHSiteExceptionType.internalError,
+      message: 'Unsupported wnacg detail parser',
+      shouldPauseAllDownloadTasks: false,
+    );
+  }
+
+  Future<_WnacgGalleryCache> _getWnGalleryCache(int aid) async {
+    _WnacgGalleryCache? cached = _wnGalleryCache[aid];
+    if (cached != null) {
+      return cached;
+    }
+
+    // Fetch detail page
+    String detailUrl = 'https://$_wnDomain/photos-index-aid-$aid.html';
+    Response detailResponse = await _getWithErrorHandler(
+      detailUrl,
+      options: Options(headers: {'Referer': 'https://$_wnDomain/'}),
+    );
+
+    String detailHtml = detailResponse.data.toString();
+    var detailDoc = html_parser.parse(detailHtml);
+
+    String title = detailDoc.querySelector('#bodywrap > h2')?.text.trim() ?? '#$aid';
+    String cover = '';
+    var coverImg = detailDoc.querySelector('.asTBcell.uwthumb > img');
+    if (coverImg != null) {
+      cover = _normalizeWnUrl(coverImg.attributes['src'] ?? '');
+    }
+
+    // Parse tags
+    LinkedHashMap<String, List<GalleryTag>> tags = LinkedHashMap();
+    var tagElements = detailDoc.querySelectorAll('.tagshow');
+    for (var tagEl in tagElements) {
+      var tagLink = tagEl.querySelector('a');
+      if (tagLink != null) {
+        String tagName = tagLink.text.trim();
+        if (tagName.isNotEmpty) {
+          tags.putIfAbsent('tag', () => []).add(GalleryTag(
+            tagData: TagData(namespace: 'tag', key: tagName),
+          ));
+        }
+      }
+    }
+
+    // Fetch gallery page (image list)
+    String galleryPageUrl = 'https://$_wnDomain/photos-gallery-aid-$aid.html';
+    Response galleryResponse = await _getWithErrorHandler(
+      galleryPageUrl,
+      options: Options(headers: {'Referer': 'https://$_wnDomain/'}),
+    );
+
+    String galleryHtml = galleryResponse.data.toString();
+    List<_WnacgImageInfo> imageInfos = _parseWnImageList(galleryHtml);
+
+    _WnacgGalleryCache cache = _WnacgGalleryCache(
+      aid: aid,
+      galleryUrl: GalleryUrl(
+        isEH: true,
+        isWN: true,
+        gid: aid,
+        token: 'wnacg',
+      ),
+      imageInfos: imageInfos,
+      title: title,
+      cover: cover,
+      category: 'Manga',
+      imageCount: imageInfos.length,
+      tags: tags,
+    );
+
+    _wnGalleryCache[aid] = cache;
+    return cache;
+  }
+
+  List<_WnacgImageInfo> _parseWnImageList(String html) {
+    // The gallery page wraps content in document.writeln("...") calls
+    // with escaped quotes, and URLs use JS concatenation: fast_img_host+"//domain/path"
+    // Unescape \" to " so regex can match the URL and caption values
+    String content = html.replaceAll(r'\"', '"');
+
+    // Match each entry: { url: fast_img_host+"//domain/path", caption: "[01]"}
+    // or: { url: "//domain/path", caption: "[01]"}
+    RegExp entryRegExp = RegExp(
+      r'''url:\s*(?:fast_img_host\s*\+\s*)?["']([^"']+)["']\s*,\s*caption:\s*["']([^"']*?)["']''',
+    );
+
+    List<_WnacgImageInfo> result = [];
+    for (var match in entryRegExp.allMatches(content)) {
+      String url = match.group(1)!;
+      String caption = match.group(2)!;
+
+      // Filter out trailing "shoucang" (收藏) images
+      if (url.isEmpty || caption.toLowerCase().contains('shoucang') || url.contains('shoucang')) {
+        continue;
+      }
+
+      url = _normalizeWnUrl(url);
+      result.add(_WnacgImageInfo(url: url, caption: caption));
+    }
+
+    return result;
+  }
+
+  /// Normalize wnacg URLs: strip excess leading slashes and add https://
+  String _normalizeWnUrl(String raw) {
+    if (raw.startsWith('//')) {
+      return 'https://${raw.replaceFirst(RegExp(r'^/+'), '')}';
+    }
+    return raw;
+  }
+
+  GalleryDetail _buildWnGalleryDetail(_WnacgGalleryCache cache) {
+    int pageCount = cache.imageCount;
+    int thumbnailsPageCount =
+        pageCount == 0 ? 1 : (pageCount / _wnThumbnailsPerPage).ceil();
+    if (thumbnailsPageCount < 1) {
+      thumbnailsPageCount = 1;
+    }
+
+    return GalleryDetail(
+      galleryUrl: cache.galleryUrl,
+      rawTitle: cache.title,
+      japaneseTitle: null,
+      category: cache.category,
+      cover: GalleryImage(url: cache.cover),
+      pageCount: pageCount,
+      rating: 0,
+      realRating: 0,
+      hasRated: false,
+      ratingCount: 0,
+      favoriteTagIndex: null,
+      favoriteTagName: null,
+      favoriteCount: 0,
+      language: 'N/A',
+      uploader: null,
+      publishTime: '2000-01-01 00:00',
+      isExpunged: false,
+      tags: cache.tags,
+      size: '$pageCount pages',
+      torrentCount: '0',
+      torrentPageUrl: '',
+      archivePageUrl: '',
+      parentGalleryUrl: null,
+      childrenGallerys: const [],
+      comments: const [],
+      thumbnails: _buildWnThumbnails(cache, 0),
+      thumbnailsPageCount: thumbnailsPageCount,
+    );
+  }
+
+  List<GalleryThumbnail> _buildWnThumbnails(
+      _WnacgGalleryCache cache, int thumbnailsPageIndex) {
+    int imageCount = cache.imageInfos.length;
+    if (imageCount == 0) {
+      return const [];
+    }
+
+    int start = thumbnailsPageIndex * _wnThumbnailsPerPage;
+    if (start < 0) {
+      start = 0;
+    }
+    if (start >= imageCount) {
+      return const [];
+    }
+
+    int end = start + _wnThumbnailsPerPage;
+    if (end > imageCount) {
+      end = imageCount;
+    }
+
+    List<GalleryThumbnail> thumbnails = [];
+    for (int i = start; i < end; i++) {
+      int pageNo = i + 1;
+      _WnacgImageInfo imageInfo = cache.imageInfos[i];
+      thumbnails.add(GalleryThumbnail(
+        href: 'wn://${cache.aid}/$pageNo',
+        isLarge: true,
+        thumbUrl: imageInfo.url,
+        thumbWidth: null,
+        thumbHeight: null,
+        originImageHash: 'wn-${cache.aid}-$pageNo',
+      ));
+    }
+
+    return thumbnails;
+  }
+
+  DetailPageInfo _buildWnDetailPageInfo(
+      _WnacgGalleryCache cache, int thumbnailsPageIndex) {
+    int imageCount = cache.imageInfos.length;
+    if (imageCount == 0) {
+      return const DetailPageInfo(
+        imageNoFrom: 0,
+        imageNoTo: 0,
+        imageCount: 0,
+        currentPageNo: 1,
+        pageCount: 1,
+        thumbnails: [],
+      );
+    }
+
+    int pageCount = (imageCount / _wnThumbnailsPerPage).ceil();
+    if (pageCount < 1) {
+      pageCount = 1;
+    }
+
+    int currentPageNo = thumbnailsPageIndex + 1;
+    if (currentPageNo < 1) {
+      currentPageNo = 1;
+    }
+    if (currentPageNo > pageCount) {
+      currentPageNo = pageCount;
+    }
+
+    int imageNoFrom = (currentPageNo - 1) * _wnThumbnailsPerPage;
+    int imageNoToExclusive = imageNoFrom + _wnThumbnailsPerPage;
+    if (imageNoToExclusive > imageCount) {
+      imageNoToExclusive = imageCount;
+    }
+
+    return DetailPageInfo(
+      imageNoFrom: imageNoFrom,
+      imageNoTo: imageNoToExclusive - 1,
+      imageCount: imageCount,
+      currentPageNo: currentPageNo,
+      pageCount: pageCount,
+      thumbnails: _buildWnThumbnails(cache, currentPageNo - 1),
+    );
+  }
+
+  // ── wnacg image page ────────────────────────────────────────────────
+
+  Future<T> _requestWnImagePage<T>({
+    required String href,
+    required HtmlParser<T> parser,
+  }) async {
+    if (_isWnacgUrl(href) && parser == EHSpiderParser.imagePage2GalleryUrl) {
+      return GalleryUrl.parse(href) as T;
+    }
+
+    RegExpMatch? match = RegExp(r'^wn://(\d+)/(\d+)$').firstMatch(href);
+    if (match == null) {
+      throw EHSiteException(
+        type: EHSiteExceptionType.internalError,
+        message: 'Invalid wnacg image url',
+        shouldPauseAllDownloadTasks: false,
+      );
+    }
+
+    int aid = int.parse(match.group(1)!);
+    int pageNo = int.parse(match.group(2)!);
+    _WnacgGalleryCache cache = await _getWnGalleryCache(aid);
+    if (pageNo < 1 || pageNo > cache.imageInfos.length) {
+      throw EHSiteException(
+        type: EHSiteExceptionType.internalError,
+        message: 'Invalid wnacg image index',
+        shouldPauseAllDownloadTasks: false,
+      );
+    }
+
+    _WnacgImageInfo imageInfo = cache.imageInfos[pageNo - 1];
+    GalleryImage image = GalleryImage(
+      url: imageInfo.url,
+      originalImageUrl: imageInfo.url,
+      imageHash: 'wn-${cache.aid}-$pageNo',
+    );
+
+    if (parser == EHSpiderParser.imagePage2GalleryImage ||
+        parser == EHSpiderParser.imagePage2OriginalGalleryImage) {
+      return image as T;
+    }
+
+    if (parser == EHSpiderParser.imagePage2GalleryUrl) {
+      return cache.galleryUrl as T;
+    }
+
+    return image as T;
+  }
+
   void _emitEHExceptionIfFailed(Response response) {
     if (!networkSetting.allHostAndIPs
         .contains(response.requestOptions.uri.host)) {
@@ -1949,5 +2491,34 @@ class _NHentaiGalleryCache {
     required this.galleryUrl,
     required this.pageInfos,
     required this.rawGallery,
+  });
+}
+
+class _WnacgImageInfo {
+  final String url;
+  final String caption;
+
+  const _WnacgImageInfo({required this.url, required this.caption});
+}
+
+class _WnacgGalleryCache {
+  final int aid;
+  final GalleryUrl galleryUrl;
+  final List<_WnacgImageInfo> imageInfos;
+  final String title;
+  final String cover;
+  final String category;
+  final int imageCount;
+  final LinkedHashMap<String, List<GalleryTag>> tags;
+
+  const _WnacgGalleryCache({
+    required this.aid,
+    required this.galleryUrl,
+    required this.imageInfos,
+    required this.title,
+    required this.cover,
+    required this.category,
+    required this.imageCount,
+    required this.tags,
   });
 }

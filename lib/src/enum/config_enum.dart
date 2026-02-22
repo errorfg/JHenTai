@@ -39,6 +39,7 @@ enum ConfigEnum {
   oldGalleryHistory('history'),
   searchHistory('searchHistory'),
   nhentaiFavorite('nhentaiFavorite'),
+  wnacgFavorite('wnacgFavorite'),
   myTagsSetting('MyTagsSetting'),
   builtInBlockedUser('builtInBlockedUser'),
 

@@ -62,6 +62,7 @@ import '../../service/history_service.dart';
 import '../../service/gallery_download_service.dart';
 import '../../service/local_block_rule_service.dart';
 import '../../service/nhentai_favorite_service.dart';
+import '../../service/wnacg_favorite_service.dart';
 import '../../setting/eh_setting.dart';
 import '../../setting/read_setting.dart';
 import '../../setting/site_setting.dart';
@@ -146,6 +147,7 @@ class DetailsPageLogic extends GetxController
     state.apikey = argument.detailsPageInfo?.apikey;
 
     _syncNhFavoriteStatus();
+    _syncWnFavoriteStatus();
   }
 
   @override
@@ -242,6 +244,7 @@ class DetailsPageLogic extends GetxController
     state.nextPageIndexToLoadThumbnails = 1;
 
     _syncNhFavoriteStatus();
+    _syncWnFavoriteStatus();
 
     await tagTranslationService
         .translateTagsIfNeeded(state.galleryDetails!.tags);
@@ -452,6 +455,9 @@ class DetailsPageLogic extends GetxController
   Future<void> handleTapFavorite({required bool useDefault}) async {
     if (state.galleryUrl.isNH) {
       return _handleTapNhentaiFavorite(useDefault: useDefault);
+    }
+    if (state.galleryUrl.isWN) {
+      return _handleTapWnacgFavorite(useDefault: useDefault);
     }
 
     if (!checkLogin()) {
@@ -746,6 +752,135 @@ class DetailsPageLogic extends GetxController
     );
   }
 
+  void _syncWnFavoriteStatus() {
+    if (!state.galleryUrl.isWN) {
+      return;
+    }
+
+    _applyLocalFavoriteStatus(
+      favoriteCategoryIndex:
+          wnacgFavoriteService.getFavoriteCategoryIndex(state.galleryUrl.gid),
+    );
+  }
+
+  Future<void> _handleTapWnacgFavorite({required bool useDefault}) async {
+    if (state.favoriteState == LoadingState.loading) {
+      return;
+    }
+
+    Gallery? gallerySnapshot = _getLocalFavoriteGallerySnapshot();
+    if (gallerySnapshot == null) {
+      return;
+    }
+
+    int? currentFavIndex =
+        wnacgFavoriteService.getFavoriteCategoryIndex(state.galleryUrl.gid);
+    ({bool isDelete, int favIndex, String note, bool remember}) operation;
+
+    if (useDefault && userSetting.defaultFavoriteIndex.value != null) {
+      operation = (
+        isDelete: currentFavIndex == userSetting.defaultFavoriteIndex.value,
+        favIndex: userSetting.defaultFavoriteIndex.value!,
+        note: '',
+        remember: false,
+      );
+    } else {
+      ({bool isDelete, int favIndex, String note, bool remember})? result =
+          await Get.dialog(
+        EHFavoriteDialog(
+          selectedIndex: currentFavIndex,
+          needInitNote: false,
+        ),
+      );
+      if (result == null) {
+        return;
+      }
+      operation = result;
+    }
+
+    if (operation.remember == true) {
+      userSetting.saveDefaultFavoriteIndex(operation.favIndex);
+    }
+
+    state.favoriteState = LoadingState.loading;
+    updateSafely([favoriteId]);
+
+    try {
+      if (operation.isDelete) {
+        await wnacgFavoriteService.removeFavorite(state.galleryUrl.gid);
+        _applyLocalFavoriteStatus(favoriteCategoryIndex: null);
+      } else {
+        await wnacgFavoriteService.addFavorite(
+          gallerySnapshot,
+          favoriteCategoryIndex: operation.favIndex,
+        );
+        _applyLocalFavoriteStatus(favoriteCategoryIndex: operation.favIndex);
+      }
+    } catch (e, s) {
+      log.error(
+        operation.isDelete
+            ? 'removeFavoriteFailed'.tr
+            : 'favoriteGalleryFailed'.tr,
+        e,
+        s,
+      );
+      snack(
+        operation.isDelete
+            ? 'removeFavoriteFailed'.tr
+            : 'favoriteGalleryFailed'.tr,
+        e.toString(),
+        isShort: true,
+      );
+      state.favoriteState = LoadingState.error;
+      updateSafely([favoriteId]);
+      return;
+    }
+
+    if (Get.isRegistered<FavoritePageLogic>()) {
+      await Get.find<FavoritePageLogic>().reloadWnacgFavoriteGallerys();
+    }
+
+    state.favoriteState = LoadingState.idle;
+    updateSafely([favoriteId]);
+
+    updateGlobalGalleryStatus();
+
+    toast(
+      operation.isDelete
+          ? 'removeFavoriteSuccess'.tr
+          : 'favoriteGallerySuccess'.tr,
+      isCenter: false,
+    );
+  }
+
+  Gallery? _getLocalFavoriteGallerySnapshot() {
+    if (state.gallery != null) {
+      return state.gallery;
+    }
+
+    if (state.galleryDetails != null) {
+      return state.galleryDetails!.toGallery();
+    }
+
+    return null;
+  }
+
+  void _applyLocalFavoriteStatus({required int? favoriteCategoryIndex}) {
+    String? favoriteTagName;
+    if (favoriteCategoryIndex != null &&
+        favoriteCategoryIndex >= 0 &&
+        favoriteCategoryIndex < favoriteSetting.favoriteTagNames.length) {
+      favoriteTagName = favoriteSetting.favoriteTagNames[favoriteCategoryIndex];
+    }
+
+    state.gallery
+      ?..favoriteTagIndex = favoriteCategoryIndex
+      ..favoriteTagName = favoriteTagName;
+    state.galleryDetails
+      ?..favoriteTagIndex = favoriteCategoryIndex
+      ..favoriteTagName = favoriteTagName;
+  }
+
   void _applyNhFavoriteStatus({required int? favoriteCategoryIndex}) {
     String? favoriteTagName;
     if (favoriteCategoryIndex != null &&
@@ -763,7 +898,7 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleTapRating() async {
-    if (state.galleryUrl.isNH) {
+    if (state.galleryUrl.isNH || state.galleryUrl.isWN) {
       return;
     }
 
@@ -845,7 +980,7 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleTapArchive(BuildContext context) async {
-    if (state.galleryUrl.isNH) {
+    if (state.galleryUrl.isNH || state.galleryUrl.isWN) {
       return;
     }
 
@@ -956,7 +1091,7 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleTapHH() async {
-    if (state.galleryUrl.isNH) {
+    if (state.galleryUrl.isNH || state.galleryUrl.isWN) {
       return;
     }
 
@@ -1005,13 +1140,15 @@ class DetailsPageLogic extends GetxController
 
     if (state.galleryUrl.isNH) {
       newSearch(rewriteSearchConfig: SearchConfig(keyword: keyword, isNhSearch: true), forceNewRoute: true);
+    } else if (state.galleryUrl.isWN) {
+      newSearch(rewriteSearchConfig: SearchConfig(keyword: keyword, isWnacgSearch: true), forceNewRoute: true);
     } else {
       newSearch(keyword: keyword, forceNewRoute: true);
     }
   }
 
   void searchInEhByNhTitle() {
-    if (!state.galleryUrl.isNH) {
+    if (!state.galleryUrl.isNH && !state.galleryUrl.isWN) {
       return;
     }
 
@@ -1033,13 +1170,15 @@ class DetailsPageLogic extends GetxController
         'uploader:"${state.galleryDetails?.uploader ?? state.gallery!.uploader}"';
     if (state.galleryUrl.isNH) {
       newSearch(rewriteSearchConfig: SearchConfig(keyword: keyword, isNhSearch: true), forceNewRoute: true);
+    } else if (state.galleryUrl.isWN) {
+      newSearch(rewriteSearchConfig: SearchConfig(keyword: keyword, isWnacgSearch: true), forceNewRoute: true);
     } else {
       newSearch(keyword: keyword, forceNewRoute: true);
     }
   }
 
   Future<void> handleTapTorrent() async {
-    if (state.galleryUrl.isNH) {
+    if (state.galleryUrl.isNH || state.galleryUrl.isWN) {
       return;
     }
 
@@ -1048,7 +1187,7 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleTapStatistic() async {
-    if (state.galleryUrl.isNH) {
+    if (state.galleryUrl.isNH || state.galleryUrl.isWN) {
       return;
     }
 
@@ -1146,7 +1285,7 @@ class DetailsPageLogic extends GetxController
   }
 
   void showTagDialog(GalleryTag tag) {
-    if (state.galleryUrl.isNH || state.apikey == null) {
+    if (state.galleryUrl.isNH || state.galleryUrl.isWN || state.apikey == null) {
       return;
     }
 
@@ -1160,7 +1299,7 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleAddTag(BuildContext context) async {
-    if (state.galleryUrl.isNH) {
+    if (state.galleryUrl.isNH || state.galleryUrl.isWN) {
       return;
     }
 
@@ -1334,7 +1473,7 @@ class DetailsPageLogic extends GetxController
 
   Future<({GalleryDetail galleryDetails, String apikey})>
       _getDetailsWithRedirectAndFallback({bool useCache = true}) async {
-    if (state.galleryUrl.isNH) {
+    if (state.galleryUrl.isNH || state.galleryUrl.isWN) {
       return ehRequest
           .requestDetailPage<({GalleryDetail galleryDetails, String apikey})>(
         galleryUrl: state.galleryUrl.url,
@@ -1563,6 +1702,9 @@ class DetailsPageLogic extends GetxController
     searchConfig.tags = state.selectedTags.map((t) => t.tagData).toList();
     if (state.galleryUrl.isNH) {
       searchConfig.isNhSearch = true;
+    }
+    if (state.galleryUrl.isWN) {
+      searchConfig.isWnacgSearch = true;
     }
 
     newSearch(rewriteSearchConfig: searchConfig, forceNewRoute: true);

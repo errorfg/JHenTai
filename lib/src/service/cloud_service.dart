@@ -6,6 +6,7 @@ import 'package:jhentai/src/model/config.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/nhentai_favorite_service.dart';
+import 'package:jhentai/src/service/wnacg_favorite_service.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
 import 'package:jhentai/src/service/search_history_service.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
@@ -30,6 +31,7 @@ class CloudConfigService
     CloudConfigTypeEnum.history: '1.0.0',
     CloudConfigTypeEnum.syncSetting: '1.0.0',
     CloudConfigTypeEnum.nhentaiFavorite: '1.0.0',
+    CloudConfigTypeEnum.wnacgFavorite: '1.0.0',
   };
 
   static const int localConfigId = -1;
@@ -122,6 +124,12 @@ class CloudConfigService
         await nhentaiFavoriteService.refreshBean();
         log.info('  ✅ nhentai favorites imported and refreshed');
         break;
+      case CloudConfigTypeEnum.wnacgFavorite:
+        await localConfigService.write(
+            configKey: ConfigEnum.wnacgFavorite, value: config.config);
+        await wnacgFavoriteService.refreshBean();
+        log.info('  ✅ wnacg favorites imported and refreshed');
+        break;
     }
   }
 
@@ -180,6 +188,14 @@ class CloudConfigService
           return null;
         }
         configValue = nhentaiFavoriteConfig;
+        break;
+      case CloudConfigTypeEnum.wnacgFavorite:
+        String? wnacgFavoriteConfig = await localConfigService.read(
+            configKey: ConfigEnum.wnacgFavorite);
+        if (wnacgFavoriteConfig == null) {
+          return null;
+        }
+        configValue = wnacgFavoriteConfig;
         break;
     }
 

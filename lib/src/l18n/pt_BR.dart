@@ -775,6 +775,9 @@ class pt_BR {
       'galleryHistory': 'Gallery History',
       'nhentaiFavorite': 'nhentai Favorites',
       'mixNhFavorites': 'Misturar Favoritos nhentai',
+      'wnacgFavorite': 'Favoritos wnacg',
+      'mixWnFavorites': 'Misturar Favoritos wnacg',
+      'wnacgDomain': 'Domínio wnacg',
       'mixedModeUnavailable': 'Modo misto indisponível: o layout atual não fornece o horário de favoritação',
 
       /// block rule page

@@ -783,6 +783,9 @@ class ru_RU {
       'galleryHistory': 'История галерей',
       'nhentaiFavorite': 'Избранное nhentai',
       'mixNhFavorites': 'Смешать избранное nhentai',
+      'wnacgFavorite': 'Избранное wnacg',
+      'mixWnFavorites': 'Смешать избранное wnacg',
+      'wnacgDomain': 'Домен wnacg',
       'mixedModeUnavailable': 'Смешанный режим недоступен: текущий макет не предоставляет время добавления в избранное',
 
       /// block rule page / Страница правил блокировки

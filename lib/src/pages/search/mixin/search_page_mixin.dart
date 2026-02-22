@@ -54,21 +54,34 @@ mixin SearchPageMixin<L extends SearchPageLogicMixin,
             logic.handleTapFilterButton(EHSearchConfigDialogType.filter),
         visualDensity: visualDensity,
       ),
-      PopupMenuButton<bool>(
+      PopupMenuButton<String>(
         icon: Icon(Icons.travel_explore,
-          color: state.searchConfig.isNhSearch ? Get.theme.colorScheme.primary : null),
-        tooltip: state.searchConfig.isNhSearch ? 'NH' : 'EH',
-        onSelected: (value) => logic.setNhSearchMode(value),
+          color: state.searchConfig.isNhSearch
+              ? Get.theme.colorScheme.primary
+              : state.searchConfig.isWnacgSearch
+                  ? Colors.orange
+                  : null),
+        tooltip: state.searchConfig.isNhSearch
+            ? 'NH'
+            : state.searchConfig.isWnacgSearch
+                ? 'WN'
+                : 'EH',
+        onSelected: (value) => logic.setSiteSearchMode(value),
         itemBuilder: (context) => [
           PopupMenuItem(
-            value: false,
-            enabled: state.searchConfig.isNhSearch,
+            value: 'EH',
+            enabled: state.searchConfig.isNhSearch || state.searchConfig.isWnacgSearch,
             child: const Text('EH'),
           ),
           PopupMenuItem(
-            value: true,
+            value: 'NH',
             enabled: !state.searchConfig.isNhSearch,
             child: const Text('NH'),
+          ),
+          PopupMenuItem(
+            value: 'WN',
+            enabled: !state.searchConfig.isWnacgSearch,
+            child: const Text('WN'),
           ),
         ],
       ),

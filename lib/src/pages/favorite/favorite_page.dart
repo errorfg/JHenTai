@@ -31,24 +31,29 @@ class FavoritePage extends BasePage {
   @override
   List<Widget> buildAppBarActions() {
     return [
-      if (state.gallerys.isNotEmpty && !state.showNhFavorites)
+      if (state.gallerys.isNotEmpty && !state.showNhFavorites && !state.showWnFavorites)
         IconButton(icon: const Icon(FontAwesomeIcons.paperPlane, size: 20), onPressed: logic.handleTapJumpButton),
       if (state.gallerys.isNotEmpty)
         IconButton(icon: const Icon(Icons.sort), onPressed: logic.handleChangeSortOrder),
       if (!state.mixedMode)
-        PopupMenuButton<bool>(
+        PopupMenuButton<String>(
           icon: const Icon(Icons.swap_horiz),
-          onSelected: (_) => logic.handleToggleNhFavorites(),
+          onSelected: (value) => logic.handleSwitchFavoriteSource(value),
           itemBuilder: (context) => [
             PopupMenuItem(
-              value: false,
-              enabled: state.showNhFavorites,
+              value: 'EH',
+              enabled: state.showNhFavorites || state.showWnFavorites,
               child: Text('EH ${'favorite'.tr}'),
             ),
             PopupMenuItem(
-              value: true,
+              value: 'NH',
               enabled: !state.showNhFavorites,
               child: Text('nhentaiFavorite'.tr),
+            ),
+            PopupMenuItem(
+              value: 'WN',
+              enabled: !state.showWnFavorites,
+              child: Text('wnacgFavorite'.tr),
             ),
           ],
         ),

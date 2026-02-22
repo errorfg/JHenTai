@@ -898,6 +898,9 @@ class en_US {
       'galleryHistory': 'Gallery History',
       'nhentaiFavorite': 'nhentai Favorites',
       'mixNhFavorites': 'Mix nhentai Favorites',
+      'wnacgFavorite': 'wnacg Favorites',
+      'mixWnFavorites': 'Mix wnacg Favorites',
+      'wnacgDomain': 'wnacg Domain',
       'mixedModeUnavailable': 'Mixed mode unavailable: current layout does not provide favorited time',
 
       /// block rule page

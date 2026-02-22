@@ -903,6 +903,9 @@ favnote：匹配收藏备注
       'galleryHistory': '画廊浏览历史',
       'nhentaiFavorite': 'nhentai 收藏',
       'mixNhFavorites': '混合显示 nhentai 收藏',
+      'wnacgFavorite': 'wnacg 收藏',
+      'mixWnFavorites': '混合显示 wnacg 收藏',
+      'wnacgDomain': 'wnacg 域名',
       'mixedModeUnavailable': '混合模式不可用：当前布局不提供收藏时间',
 
       /// block rule page
