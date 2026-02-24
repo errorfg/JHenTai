@@ -61,11 +61,11 @@
       "versions": [
         {
           "version": "8.0.18",
-          "buildVersion": "318",
-          "date": "2026-02-22T11:56:09Z",
-          "localizedDescription": "- feat: integrate wnacg site support (search, browse, download, local favorites, cloud sync) with configurable domain\n- feat: three-way EH/NH/WN search toggle and `wn:` keyword-prefix support\n- feat: EH/NH/WN favorites mixed insertion and split display with menu switching\n- feat: wnacg URL link jumping with automatic domain rewriting\n- fix: reading progress on favorites page and after cloud sync\n",
-          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.18+318/JHenTai_8.0.18+318.ipa",
-          "size": 15942861
+          "buildVersion": "319",
+          "date": "2026-02-24T18:18:34Z",
+          "localizedDescription": "- feat: add configurable nhentai domain list for URL matching (Settings > Advanced)\n- Users can add nhentai mirror domains (e.g. nhentai.to) to recognize pasted gallery URLs\n",
+          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.18+319/JHenTai_8.0.18+319.ipa",
+          "size": 15940937
         },
         {
           "version": "8.0.15",
