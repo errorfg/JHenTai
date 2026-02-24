@@ -418,6 +418,8 @@ class zh_CN {
       'longPress2Clear': '长按清除',
       'checkUpdateAfterLaunchingApp': '启动应用时检查更新',
       'checkClipboard': '检测剪切板中的画廊链接',
+      'nhentaiDomains': 'nhentai 域名',
+      'addNhentaiDomain': '添加 nhentai 域名',
       'clearPageCache': '清除页面缓存',
       'clearSuccess': '清除成功',
       'superResolution': '图片超分辨率',

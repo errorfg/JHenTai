@@ -20,6 +20,7 @@ import 'package:jhentai/src/widget/loading_state_indicator.dart';
 import 'package:path/path.dart';
 
 import '../../../config/ui_config.dart';
+import '../../../setting/eh_setting.dart';
 import '../../../enum/config_type_enum.dart';
 import '../../../routes/routes.dart';
 import '../../../service/isolate_service.dart';
@@ -75,6 +76,7 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
             if (GetPlatform.isDesktop) _buildSuperResolution(),
             _buildCheckUpdate(),
             _buildCheckClipboard(),
+            _buildNhentaiDomains(),
             if (GetPlatform.isAndroid) _buildVerifyAppLinks(),
             _buildInNoImageMode(),
             _buildImportData(context),
@@ -208,6 +210,15 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
           toast('error'.tr);
         }
       },
+    );
+  }
+
+  Widget _buildNhentaiDomains() {
+    return ListTile(
+      title: Text('nhentaiDomains'.tr),
+      subtitle: Obx(() => Text(ehSetting.nhentaiDomains.join(', '))),
+      trailing: const Icon(Icons.keyboard_arrow_right).marginOnly(right: 4),
+      onTap: () => toRoute(Routes.nhentaiDomains),
     );
   }
 

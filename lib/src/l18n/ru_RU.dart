@@ -423,6 +423,8 @@ class ru_RU {
       'longPress2Clear': 'Долгий тап для очистки',
       'checkUpdateAfterLaunchingApp': 'Проверять обновления при запуске',
       'checkClipboard': 'Проверять URL галереи в буфере обмена',
+      'nhentaiDomains': 'Домены nhentai',
+      'addNhentaiDomain': 'Добавить домен nhentai',
       'clearPageCache': 'Очистить кэш страниц',
       'clearSuccess': 'Успешно очищено',
       'superResolution': 'Супер-разрешение изображений',

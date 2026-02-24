@@ -30,15 +30,18 @@ class GalleryUrl {
       );
     }
 
-    RegExp nhRegExp = RegExp(r'https?://(?:www\.)?nhentai\.net/g/(\d+)(?:/|$)');
-    Match? nhMatch = nhRegExp.firstMatch(url);
-    if (nhMatch != null) {
-      return GalleryUrl(
-        isEH: true,
-        isNH: true,
-        gid: int.parse(nhMatch.group(1)!),
-        token: 'nhentai',
-      );
+    for (String domain in ehSetting.nhentaiDomains) {
+      String escapedDomain = domain.replaceAll('.', r'\.');
+      RegExp nhRegExp = RegExp('https?://(?:www\\.)?$escapedDomain/g/(\\d+)(?:/|\$)');
+      Match? nhMatch = nhRegExp.firstMatch(url);
+      if (nhMatch != null) {
+        return GalleryUrl(
+          isEH: true,
+          isNH: true,
+          gid: int.parse(nhMatch.group(1)!),
+          token: 'nhentai',
+        );
+      }
     }
 
     Uri? wnUri = Uri.tryParse(url);

@@ -419,6 +419,8 @@ class pt_BR {
       'longPress2Clear': 'Pressione e segure para limpar',
       'checkUpdateAfterLaunchingApp': 'Buscar atualizações após abrir o app',
       'checkClipboard': 'Verificar se há URL de Galeria na área de transferência',
+      'nhentaiDomains': 'Domínios nhentai',
+      'addNhentaiDomain': 'Adicionar domínio nhentai',
       'clearPageCache': 'Limpar cache de página',
       'clearSuccess': 'Limpado com Sucesso',
       'superResolution': 'Image Super Resolution',

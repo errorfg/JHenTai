@@ -15,6 +15,7 @@ class EHSetting
   RxString site = 'EH'.obs;
   RxBool redirect2Eh = true.obs;
   RxString wnacgDomain = 'www.wn07.ru'.obs;
+  RxList<String> nhentaiDomains = <String>['nhentai.net', 'nhentai.to'].obs;
 
   bool get isEHSite => site.value == 'EH';
   bool get isEXSite => site.value == 'EX';
@@ -39,6 +40,9 @@ class EHSetting
     site.value = siteValue;
     redirect2Eh.value = map['redirect2Eh'] ?? redirect2Eh.value;
     wnacgDomain.value = map['wnacgDomain'] ?? wnacgDomain.value;
+    if (map['nhentaiDomains'] != null) {
+      nhentaiDomains.value = (map['nhentaiDomains'] as List).cast<String>();
+    }
   }
 
   @override
@@ -47,6 +51,7 @@ class EHSetting
       'site': site.value,
       'redirect2Eh': redirect2Eh.value,
       'wnacgDomain': wnacgDomain.value,
+      'nhentaiDomains': nhentaiDomains.toList(),
     });
   }
 
@@ -79,6 +84,20 @@ class EHSetting
   Future<void> saveWnacgDomain(String domain) async {
     log.debug('saveWnacgDomain:$domain');
     wnacgDomain.value = domain;
+    await saveBeanConfig();
+  }
+
+  Future<void> addNhentaiDomain(String domain) async {
+    log.debug('addNhentaiDomain:$domain');
+    if (!nhentaiDomains.contains(domain)) {
+      nhentaiDomains.add(domain);
+      await saveBeanConfig();
+    }
+  }
+
+  Future<void> removeNhentaiDomain(String domain) async {
+    log.debug('removeNhentaiDomain:$domain');
+    nhentaiDomains.remove(domain);
     await saveBeanConfig();
   }
 }

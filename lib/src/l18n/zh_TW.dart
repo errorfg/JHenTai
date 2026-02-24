@@ -418,6 +418,8 @@ class zh_TW {
       'longPress2Clear': '長按清除',
       'checkUpdateAfterLaunchingApp': '啟動程式時檢查更新',
       'checkClipboard': '讀取剪貼簿中的畫廊連結',
+      'nhentaiDomains': 'nhentai 域名',
+      'addNhentaiDomain': '新增 nhentai 域名',
       'clearPageCache': '清除頁面快取',
       'clearSuccess': '清除成功',
       'superResolution': '圖片超解析度',

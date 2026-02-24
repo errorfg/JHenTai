@@ -418,6 +418,8 @@ class en_US {
       'longPress2Clear': 'Long press to clear',
       'checkUpdateAfterLaunchingApp': 'Check update after launching app',
       'checkClipboard': 'Check Gallery URL in Clipboard',
+      'nhentaiDomains': 'nhentai Domains',
+      'addNhentaiDomain': 'Add nhentai Domain',
       'clearPageCache': 'Clear Page Cache',
       'clearSuccess': 'Clear Success',
       'superResolution': 'Image Super Resolution',

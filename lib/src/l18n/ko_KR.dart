@@ -418,6 +418,8 @@ class ko_KR {
       'longPress2Clear': '길게 눌러 삭제하기',
       'checkUpdateAfterLaunchingApp': '앱 실행 후 업데이트 확인',
       'checkClipboard': '클립보드에서 갤러리 주소 검사',
+      'nhentaiDomains': 'nhentai 도메인',
+      'addNhentaiDomain': 'nhentai 도메인 추가',
       'clearPageCache': '페이지 캐시 삭제',
       'clearSuccess': '삭제 완료',
       'superResolution': '초고해상도 이미지 생성',
