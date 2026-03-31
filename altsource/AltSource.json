@@ -60,12 +60,12 @@
       },
       "versions": [
         {
-          "version": "8.0.19",
-          "buildVersion": "321",
-          "date": "2026-03-17T12:03:30Z",
-          "localizedDescription": "- 从上游合并: 修复修改画廊分组/排序后本地元数据未更新的bug\n- 从上游合并: 支持按gid屏蔽画廊\n\n--------------------\n\n- Merged from upstream: Fix bug where local metadata was not updated after modifying gallery group or sorting\n- Merged from upstream: Support block gallery by gid\n",
-          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.19+321/JHenTai_8.0.19+321.ipa",
-          "size": 15946366
+          "version": "8.0.20",
+          "buildVersion": "322",
+          "date": "2026-03-31T20:06:22Z",
+          "localizedDescription": "- fix: NH/WH detail page now drops search preview data and reloads full detail data on entry\n- fix: NH search result metadata restored via bundled nhentai tag-id mapping (tags/language/category/artist)\n- fix: WH detail page restores publish time, tags, and uploader parsing from detail HTML\n- ref: implementation approach adapted from NClientV3, nhasixapp, and wnacg-downloader; changes were reimplemented locally for JHenTai\n",
+          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.20+322/JHenTai_8.0.20+322.ipa",
+          "size": 16818931
         },
         {
           "version": "8.0.15",
