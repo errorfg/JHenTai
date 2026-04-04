@@ -60,12 +60,12 @@
       },
       "versions": [
         {
-          "version": "8.0.20",
-          "buildVersion": "322",
-          "date": "2026-03-31T20:06:22Z",
-          "localizedDescription": "- fix: NH/WH detail page now drops search preview data and reloads full detail data on entry\n- fix: NH search result metadata restored via bundled nhentai tag-id mapping (tags/language/category/artist)\n- fix: WH detail page restores publish time, tags, and uploader parsing from detail HTML\n- ref: implementation approach adapted from NClientV3, nhasixapp, and wnacg-downloader; changes were reimplemented locally for JHenTai\n",
-          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.20+322/JHenTai_8.0.20+322.ipa",
-          "size": 16818931
+          "version": "8.0.21",
+          "buildVersion": "323",
+          "date": "2026-04-04T17:36:13Z",
+          "localizedDescription": "- fix: nhentai.to detail page support (JSON trailing comma fix, zrocdn.xyz CDN, thumbnail URL fix)\n- fix: nhentai source fallback - try preferred host first, then alternate (.net/.to)\n- feat: nhentai.to search support with query normalization\n- feat: Android deep link support for nhentai.net and nhentai.to URLs\n- fix: nhentai cover map bug when cover field is null\n",
+          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.21+323/JHenTai_8.0.21+323.ipa",
+          "size": 16840754
         },
         {
           "version": "8.0.15",
