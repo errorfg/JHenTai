@@ -47,6 +47,22 @@
                         android:scheme="https"
                         android:host="exhentai.org"
                         android:pathPrefix="/s/"/>
+                <data
+                        android:scheme="https"
+                        android:host="nhentai.net"
+                        android:pathPrefix="/g/"/>
+                <data
+                        android:scheme="https"
+                        android:host="www.nhentai.net"
+                        android:pathPrefix="/g/"/>
+                <data
+                        android:scheme="https"
+                        android:host="nhentai.to"
+                        android:pathPrefix="/g/"/>
+                <data
+                        android:scheme="https"
+                        android:host="www.nhentai.to"
+                        android:pathPrefix="/g/"/>
             </intent-filter>
 
             <intent-filter>
