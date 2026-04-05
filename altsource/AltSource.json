@@ -61,11 +61,11 @@
       "versions": [
         {
           "version": "8.0.21",
-          "buildVersion": "323",
-          "date": "2026-04-04T17:36:13Z",
-          "localizedDescription": "- fix: nhentai.to detail page support (JSON trailing comma fix, zrocdn.xyz CDN, thumbnail URL fix)\n- fix: nhentai source fallback - try preferred host first, then alternate (.net/.to)\n- feat: nhentai.to search support with query normalization\n- feat: Android deep link support for nhentai.net and nhentai.to URLs\n- fix: nhentai cover map bug when cover field is null\n",
-          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.21+323/JHenTai_8.0.21+323.ipa",
-          "size": 16840754
+          "buildVersion": "324",
+          "date": "2026-04-05T05:29:43Z",
+          "localizedDescription": "- fix: handle nhentai.to galleries where `images.pages` is a Map instead of a List\n- fix: infer language from title as fallback for nhentai.to search results\n",
+          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.21+324/JHenTai_8.0.21+324.ipa",
+          "size": 16829082
         },
         {
           "version": "8.0.15",
