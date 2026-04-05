@@ -1479,6 +1479,7 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
               'english_title': title,
               'thumbnail': coverUrl,
               'tag_ids': tagIds,
+              'inferred_language': _inferLanguageFromTitle(title),
             },
             sourceHost: host,
           );
@@ -1527,8 +1528,22 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
 
     List<html_dom.Element> thumbImgs =
         document.querySelectorAll('#thumbnail-container .thumb-container img');
-    List<dynamic> pages =
-        ((item['images'] as Map?)?['pages'] as List?) ?? const [];
+    dynamic pagesRaw = (item['images'] as Map?)?['pages'];
+    List<dynamic> pages;
+    if (pagesRaw is List) {
+      pages = pagesRaw;
+    } else if (pagesRaw is Map) {
+      List<int> sortedKeys = pagesRaw.keys
+          .map((k) => int.tryParse(k.toString()))
+          .whereType<int>()
+          .toList()
+        ..sort();
+      pages = sortedKeys.map((k) => pagesRaw[k.toString()]).toList();
+      // Replace the Map with the sorted List so downstream code works
+      (item['images'] as Map)['pages'] = pages;
+    } else {
+      pages = const [];
+    }
     for (int i = 0; i < pages.length && i < thumbImgs.length; i++) {
       Map<String, dynamic> page = (pages[i] as Map).cast<String, dynamic>();
       String thumbUrl = _normalizeNhToUrl(
@@ -2112,7 +2127,8 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
 
   List<_NHentaiImageInfo> _parseNhPageInfos(Map<String, dynamic> item) {
     // v2 format: pages[].path at top level
-    List<dynamic>? v2Pages = item['pages'] as List?;
+    dynamic v2Raw = item['pages'];
+    List<dynamic>? v2Pages = v2Raw is List ? v2Raw : null;
     if (v2Pages != null && v2Pages.isNotEmpty && v2Pages.first is Map) {
       Map firstPage = v2Pages.first as Map;
       if (firstPage.containsKey('path')) {
@@ -2129,10 +2145,24 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
       }
     }
 
-    // v1 format: images.pages[].{t,w,h,path}
+    // v1 format: images.pages (List or Map keyed by page number)
     Map<String, dynamic> images =
         ((item['images'] as Map?) ?? const {}).cast<String, dynamic>();
-    List<dynamic> pages = (images['pages'] as List?) ?? const [];
+    dynamic pagesRaw = images['pages'];
+    List<dynamic> pages;
+    if (pagesRaw is List) {
+      pages = pagesRaw;
+    } else if (pagesRaw is Map) {
+      // nhentai.to may return pages as {"2":{...},"3":{...}} instead of [{...},{...}]
+      List<int> sortedKeys = pagesRaw.keys
+          .map((k) => int.tryParse(k.toString()))
+          .whereType<int>()
+          .toList()
+        ..sort();
+      pages = sortedKeys.map((k) => pagesRaw[k.toString()]).toList();
+    } else {
+      pages = const [];
+    }
     return pages.whereType<Map>().map((raw) {
       Map<String, dynamic> page = raw.cast<String, dynamic>();
       return _NHentaiImageInfo(
@@ -2274,6 +2304,23 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
         continue;
       }
       return language;
+    }
+    return item['inferred_language']?.toString();
+  }
+
+  String? _inferLanguageFromTitle(String title) {
+    String lower = title.toLowerCase();
+    if (lower.contains('[chinese]') || lower.contains('[中国翻訳]') || lower.contains('[中国語]')) {
+      return 'chinese';
+    }
+    if (lower.contains('[english]')) {
+      return 'english';
+    }
+    if (lower.contains('[japanese]')) {
+      return 'japanese';
+    }
+    if (lower.contains('[korean]')) {
+      return 'korean';
     }
     return null;
   }
