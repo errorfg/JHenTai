@@ -1,4 +1,4 @@
-import 'package:animate_do/animate_do.dart';
+﻿import 'package:animate_do/animate_do.dart';
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +9,8 @@ import 'package:jhentai/src/model/gallery_image.dart';
 import 'package:jhentai/src/setting/advanced_setting.dart';
 import 'package:jhentai/src/setting/style_setting.dart';
 import 'dart:io' as io;
+
+import 'dart:ui' as ui;
 
 import '../service/gallery_download_service.dart';
 
@@ -40,6 +42,7 @@ class EHImage extends StatelessWidget {
   final PausedWidgetBuilder? pausedWidgetBuilder;
   final LoadingWidgetBuilder? loadingWidgetBuilder;
   final CompletedWidgetBuilder? completedWidgetBuilder;
+  final bool disableGifAnimation;
 
   const EHImage({
     Key? key,
@@ -56,6 +59,7 @@ class EHImage extends StatelessWidget {
     this.shadows,
     this.forceFadeIn = false,
     this.maxBytes,
+    this.disableGifAnimation = false,
     this.loadingProgressWidgetBuilder,
     this.failedWidgetBuilder,
     this.downloadingWidgetBuilder,
@@ -79,6 +83,7 @@ class EHImage extends StatelessWidget {
     this.shadows,
     this.forceFadeIn = false,
     this.maxBytes,
+    this.disableGifAnimation = false,
     this.loadingProgressWidgetBuilder,
     this.failedWidgetBuilder,
     this.downloadingWidgetBuilder,
@@ -175,15 +180,22 @@ class EHImage extends StatelessWidget {
       return downloadingWidgetBuilder?.call() ?? const Center(child: CircularProgressIndicator());
     }
 
-    return ExtendedImage.file(
-      io.File(GalleryDownloadService.computeImageDownloadAbsolutePathFromRelativePath(galleryImage.path!)),
+    final io.File file = io.File(GalleryDownloadService.computeImageDownloadAbsolutePathFromRelativePath(galleryImage.path!));
+    final bool shouldRenderSingleFrame = disableGifAnimation && (galleryImage.path!.toLowerCase().endsWith('.webp') || galleryImage.path!.toLowerCase().endsWith('.gif'));
+
+    final ImageProvider provider = shouldRenderSingleFrame
+        ? _SingleFrameExtendedFileImageProvider(file)
+        : ExtendedFileImageProvider(file);
+
+    return ExtendedImage(
+      image: ExtendedResizeImage.resizeIfNeeded(provider: provider, maxBytes: maxBytes),
       fit: fit,
       height: containerHeight,
       width: containerWidth,
       enableLoadState: loadingWidgetBuilder != null || failedWidgetBuilder != null || completedWidgetBuilder != null,
       enableSlideOutPage: enableSlideOutPage,
       borderRadius: borderRadius,
-      shape: borderRadius != null ? BoxShape.rectangle : null,
+      shape: BoxShape.rectangle,
       clearMemoryCacheWhenDispose: clearMemoryCacheWhenDispose,
       loadStateChanged: (ExtendedImageState state) {
         switch (state.extendedImageLoadState) {
@@ -199,9 +211,7 @@ class EHImage extends StatelessWidget {
 
             Widget child = completedWidgetBuilder?.call(state) ?? _buildExtendedRawImage(state);
 
-            if (borderRadius != null) {
-              child = ClipRRect(child: child, borderRadius: borderRadius);
-            }
+            child = ClipRRect(child: child, borderRadius: borderRadius);
 
             if (state.slidePageState != null) {
               child = ExtendedImageSlidePageHandler(child: child, extendedImageSlidePageState: state.slidePageState);
@@ -217,7 +227,6 @@ class EHImage extends StatelessWidget {
             );
         }
       },
-      maxBytes: maxBytes,
       filterQuality: FilterQuality.medium,
     );
   }
@@ -259,5 +268,36 @@ class EHImage extends StatelessWidget {
       scale: state.extendedImageInfo?.scale ?? 1.0,
       fit: fit,
     );
+  }
+}
+
+class _SingleFrameCodec implements ui.Codec {
+  final ui.Codec _inner;
+
+  _SingleFrameCodec(this._inner);
+
+  @override
+  int get frameCount => 1;
+
+  @override
+  int get repetitionCount => 0;
+
+  @override
+  Future<ui.FrameInfo> getNextFrame() => _inner.getNextFrame();
+
+  @override
+  void dispose() => _inner.dispose();
+}
+
+class _SingleFrameExtendedFileImageProvider extends ExtendedFileImageProvider {
+  const _SingleFrameExtendedFileImageProvider(super.file);
+
+  @override
+  Future<ui.Codec> instantiateImageCodec(Uint8List data, ImageDecoderCallback decode) async {
+    final ui.Codec codec = await super.instantiateImageCodec(data, decode);
+    if (codec.frameCount > 1) {
+      return _SingleFrameCodec(codec);
+    }
+    return codec;
   }
 }

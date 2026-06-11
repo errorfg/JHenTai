@@ -1140,6 +1140,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
               ),
               onPressed: disabled ? null : logic.handleTapDownload,
               onLongPress: () => toRoute(Routes.download),
+              onSecondaryTap: () => toRoute(Routes.download),
             );
           },
         );
@@ -1188,6 +1189,10 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                 : () => logic.handleTapFavorite(
                     useDefault: preferenceSetting.enableDefaultFavorite.isTrue),
             onLongPress:
+                disabled || preferenceSetting.enableDefaultFavorite.isFalse
+                    ? null
+                    : () => logic.handleTapFavorite(useDefault: false),
+            onSecondaryTap:
                 disabled || preferenceSetting.enableDefaultFavorite.isFalse
                     ? null
                     : () => logic.handleTapFavorite(useDefault: false),
@@ -1291,6 +1296,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
               onPressed:
                   disabled ? null : () => logic.handleTapArchive(context),
               onLongPress: () => toRoute(Routes.download),
+              onSecondaryTap: () => toRoute(Routes.download),
             );
           },
         );
