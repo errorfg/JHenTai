@@ -61,11 +61,11 @@
       "versions": [
         {
           "version": "8.0.21",
-          "buildVersion": "324",
-          "date": "2026-04-05T05:29:43Z",
-          "localizedDescription": "- fix: handle nhentai.to galleries where `images.pages` is a Map instead of a List\n- fix: infer language from title as fallback for nhentai.to search results\n",
-          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.21+324/JHenTai_8.0.21+324.ipa",
-          "size": 16829082
+          "buildVersion": "325",
+          "date": "2026-06-11T05:41:40Z",
+          "localizedDescription": "- 全是合并上游的更改。\n",
+          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.21+325/JHenTai_8.0.21+325.ipa",
+          "size": 16836714
         },
         {
           "version": "8.0.15",
