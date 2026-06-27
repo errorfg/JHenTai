@@ -1411,6 +1411,12 @@ class DetailsPageLogic extends GetxController
     toast('success'.tr);
   }
 
+  Future<void> handleResetReadProgress() async {
+    await readProgressService.deleteReadProgress(state.galleryUrl.gid.toString());
+    updateSafely([readButtonId]);
+    toast('success'.tr);
+  }
+
   Future<void> blockGallery() async {
     await localBlockRuleService.upsertBlockRule(
       LocalBlockRule(
