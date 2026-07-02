@@ -23,6 +23,7 @@ enum ConfigEnum {
   archiveBotSetting('archiveBotSetting'),
   webdavSetting('webdavSetting'),
   syncSetting('syncSetting'),
+  keyboardShortcutSetting('keyboardShortcutSetting'),
   downloadSearchPageType('downloadSearchPageType'),
   windowFullScreen('windowFullScreen'),
   windowMaximize('windowMaximize'),

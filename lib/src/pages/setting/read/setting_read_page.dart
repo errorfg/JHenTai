@@ -6,7 +6,9 @@ import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/setting/read_setting.dart';
 
+import '../../../routes/routes.dart';
 import '../../../service/log.dart';
+import '../../../utils/route_util.dart';
 import '../../../utils/text_input_formatter.dart';
 import '../../../utils/toast_util.dart';
 
@@ -45,6 +47,7 @@ class SettingReadPage extends StatelessWidget {
               _buildGestureRegionWidthRatio(context).center(),
               if (GetPlatform.isDesktop) _buildUseThirdPartyViewer().center(),
               if (GetPlatform.isDesktop) _buildThirdPartyViewerPath().center(),
+              if (GetPlatform.isDesktop) _buildKeyboardShortcuts().center(),
               if (GetPlatform.isMobile) _buildDeviceDirection().center(),
               _buildReadDirection().center(),
               if (GetPlatform.isMobile && readSetting.readDirection.value == ReadDirection.top2bottomList) _buildNotchOptimization().center(),
@@ -422,6 +425,15 @@ class SettingReadPage extends StatelessWidget {
 
         readSetting.saveThirdPartyViewerPath(result.files.single.path!);
       },
+    );
+  }
+
+  Widget _buildKeyboardShortcuts() {
+    return ListTile(
+      title: Text('keyboardShortcuts'.tr),
+      subtitle: Text('keyboardShortcutsHint'.tr),
+      trailing: const Icon(Icons.keyboard_arrow_right),
+      onTap: () => toRoute(Routes.settingKeyboardShortcuts),
     );
   }
 

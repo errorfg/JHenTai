@@ -5,9 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
-import 'package:jhentai/src/mixin/window_widget_mixin.dart';
 import 'package:jhentai/src/mixin/scroll_status_listener.dart';
 import 'package:jhentai/src/mixin/scroll_status_listener_state.dart';
+import 'package:jhentai/src/mixin/window_widget_mixin.dart';
 import 'package:jhentai/src/model/read_page_info.dart';
 import 'package:jhentai/src/pages/read/layout/horizontal_list/horizontal_list_layout.dart';
 import 'package:jhentai/src/pages/read/layout/horizontal_page/horizontal_page_layout.dart';
@@ -19,20 +19,17 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../config/ui_config.dart';
-import '../../routes/routes.dart';
 import '../../service/gallery_download_service.dart';
+import '../../setting/keyboard_shortcut_setting.dart';
 import '../../setting/read_setting.dart';
 import '../../utils/route_util.dart';
 import '../../utils/screen_size_util.dart';
-import '../../utils/toast_util.dart';
 import '../../widget/eh_image.dart';
 import '../../widget/eh_keyboard_listener.dart';
 import '../../widget/eh_read_page_stack.dart';
 import '../../widget/eh_thumbnail.dart';
 import '../../widget/eh_wheel_speed_controller_for_read_page.dart';
 import '../../widget/loading_state_indicator.dart';
-import '../home_page.dart';
-import '../setting/read/setting_read_page.dart';
 import 'layout/horizontal_double_column/horizontal_double_column_layout.dart';
 import 'layout/vertical_list/vertical_list_layout.dart';
 
@@ -70,43 +67,54 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
         statusBarIconBrightness: Brightness.light,
         statusBarBrightness: Brightness.dark,
       ),
-      child: EHMouseButtonListener(
-        onFifthButtonTapDown: (_) => backRoute(),
-        child: EHKeyboardListener(
-          focusNode: state.focusNode,
-          handleEsc: backRoute,
-          handleSpace: logic.toggleMenu,
-          handlePageDown: logic.toNext,
-          handlePageUp: logic.toPrev,
-          handleArrowDown: logic.toNext,
-          handleArrowUp: logic.toPrev,
-          handleArrowRight: logic.toRight,
-          handleArrowLeft: logic.toLeft,
-          handleA: logic.toLeft,
-          handleD: logic.toRight,
-          handleM: logic.handleM,
-          handleEnd: backRoute,
-          handleF11: toggleFullScreen,
-          child: DefaultTextStyle(
-            style: DefaultTextStyle.of(context).style.copyWith(
-                  color: UIConfig.readPageForeGroundColor,
-                  fontSize: 12,
-                  decoration: TextDecoration.none,
-                ),
-            child: Container(
-              color: Colors.black,
-              child: Stack(
-                children: [
-                  EHReadPageStack(
-                    children: [
-                      buildGestureRegion(),
-                      buildLayout(),
-                    ],
+      child: Obx(
+        () => EHMouseButtonListener(
+          mouseHandlers: keyboardShortcutSetting.buildMouseHandlerMap(
+            onToNext: logic.toNext,
+            onToPrev: logic.toPrev,
+            onToLeft: logic.toLeft,
+            onToRight: logic.toRight,
+            onBack: backRoute,
+            onToggleMenu: logic.toggleMenu,
+            onToggleFirstPageAlone: logic.handleM,
+            onToggleFullScreen: toggleFullScreen,
+          ),
+          child: EHKeyboardListener(
+            focusNode: state.focusNode,
+            keyHandlers: {
+              LogicalKeyboardKey.escape: backRoute,
+              ...keyboardShortcutSetting.buildHandlerMap(
+                onToNext: logic.toNext,
+                onToPrev: logic.toPrev,
+                onToLeft: logic.toLeft,
+                onToRight: logic.toRight,
+                onBack: backRoute,
+                onToggleMenu: logic.toggleMenu,
+                onToggleFirstPageAlone: logic.handleM,
+                onToggleFullScreen: toggleFullScreen,
+              ),
+            },
+            child: DefaultTextStyle(
+              style: DefaultTextStyle.of(context).style.copyWith(
+                    color: UIConfig.readPageForeGroundColor,
+                    fontSize: 12,
+                    decoration: TextDecoration.none,
                   ),
-                  buildRightBottomInfo(context),
-                  buildTopMenu(context),
-                  buildBottomMenu(context),
-                ],
+              child: Container(
+                color: Colors.black,
+                child: Stack(
+                  children: [
+                    EHReadPageStack(
+                      children: [
+                        buildGestureRegion(),
+                        buildLayout(),
+                      ],
+                    ),
+                    buildRightBottomInfo(context),
+                    buildTopMenu(context),
+                    buildBottomMenu(context),
+                  ],
+                ),
               ),
             ),
           ),
@@ -269,32 +277,6 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
           title: Text(state.readPageInfo.galleryTitle, style: const TextStyle(color: UIConfig.readPageButtonColor)),
           leading: const BackButton(color: UIConfig.readPageButtonColor),
           actions: [
-            if (GetPlatform.isDesktop)
-              ElevatedButton(
-                child: const Icon(Icons.help, color: UIConfig.readPageButtonColor),
-                onPressed: () => toast(
-                  'PageDown、→、↓ 、D :  ${'toNext'.tr}'
-                  '\n'
-                  'PageUp、←、↑、A  :  ${'toPrev'.tr}'
-                  '\n'
-                  'Esc、End  :  ${'back'.tr}'
-                  '\n'
-                  'Space  :  ${'toggleMenu'.tr}'
-                  '\n'
-                  'M  :  ${'displayFirstPageAlone'.tr}'
-                  '\n'
-                  'F11  :  ${'toggleFullScreen'.tr}',
-                  isShort: false,
-                ),
-                style: ElevatedButton.styleFrom(
-                  elevation: 0,
-                  padding: const EdgeInsets.all(0),
-                  surfaceTintColor: Colors.transparent,
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  minimumSize: const Size(56, 56),
-                ),
-              ),
             if (GetPlatform.isDesktop &&
                 state.readPageInfo.gid != null &&
                 (state.readPageInfo.mode == ReadMode.downloaded || state.readPageInfo.mode == ReadMode.archive) &&
