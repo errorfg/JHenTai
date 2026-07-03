@@ -7,8 +7,9 @@ import 'package:jhentai/src/utils/search_util.dart';
 
 class QuickSearchPage extends StatelessWidget {
   final bool automaticallyImplyLeading;
+  final ScrollController? scrollController;
 
-  const QuickSearchPage({Key? key, this.automaticallyImplyLeading = false}) : super(key: key);
+  const QuickSearchPage({Key? key, this.automaticallyImplyLeading = false, this.scrollController}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +27,7 @@ class QuickSearchPage extends StatelessWidget {
           List<MapEntry<String, SearchConfig>> entries = quickSearchService.quickSearchConfigs.entries.toList();
 
           return ReorderableListView.builder(
+            scrollController: scrollController,
             itemCount: quickSearchService.quickSearchConfigs.length,
             onReorder: quickSearchService.reOrderQuickSearch,
             padding: const EdgeInsets.only(bottom: 120),
