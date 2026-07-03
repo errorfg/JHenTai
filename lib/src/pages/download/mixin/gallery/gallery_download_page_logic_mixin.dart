@@ -136,7 +136,7 @@ mixin GalleryDownloadPageLogicMixin on GetxController
 
   Future<void> goToReadPage(GalleryDownloadedData gallery) async {
     if (readSetting.useThirdPartyViewer.isTrue && readSetting.thirdPartyViewerPath.value != null) {
-      openThirdPartyViewer(downloadService.computeGalleryDownloadAbsolutePath(gallery.title, gallery.gid));
+      openThirdPartyViewer(downloadService.computeGalleryDownloadAbsolutePath(gallery));
     } else {
       int readIndexRecord = await readProgressService.getReadProgress(gallery.gid);
 

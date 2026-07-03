@@ -256,13 +256,13 @@ class SuperResolutionService extends GetxController with JHLifeCircleBeanErrorCa
       if (gallery == null) {
         return;
       }
-      dirPath = join(galleryDownloadService.computeGalleryDownloadAbsolutePath(gallery.title, gallery.gid), imageDirName);
+      dirPath = join(galleryDownloadService.computeGalleryDownloadAbsolutePath(gallery), imageDirName);
     } else {
       ArchiveDownloadedData? archive = archiveDownloadService.archives.firstWhereOrNull((a) => a.gid == gid);
       if (archive == null) {
         return;
       }
-      dirPath = join(archiveDownloadService.computeArchiveUnpackingPath(archive.title, archive.gid), imageDirName);
+      dirPath = join(archiveDownloadService.computeArchiveUnpackingPath(archive), imageDirName);
     }
 
     Directory directory = Directory(dirPath);

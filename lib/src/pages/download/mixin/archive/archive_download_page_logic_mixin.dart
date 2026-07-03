@@ -383,8 +383,7 @@ mixin ArchiveDownloadPageLogicMixin on GetxController
 
     if (readSetting.useThirdPartyViewer.isTrue &&
         readSetting.thirdPartyViewerPath.value != null) {
-      openThirdPartyViewer(archiveDownloadService.computeArchiveUnpackingPath(
-          archive.title, archive.gid));
+      openThirdPartyViewer(archiveDownloadService.computeArchiveUnpackingPath(archive));
     } else {
       int readIndexRecord =
           await readProgressService.getReadProgress(archive.gid);

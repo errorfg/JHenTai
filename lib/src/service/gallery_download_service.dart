@@ -5,6 +5,7 @@ import 'dart:io' as io;
 
 import 'package:collection/collection.dart';
 import 'package:dio/dio.dart';
+import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:executor/executor.dart';
 import 'package:extended_image/extended_image.dart';
@@ -29,6 +30,7 @@ import 'package:jhentai/src/model/jh_response/fetch_image_hashes_vo.dart';
 import 'package:jhentai/src/model/jh_response/jh_response.dart';
 import 'package:jhentai/src/network/jh_request.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
+import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/super_resolution_service.dart';
 import 'package:jhentai/src/setting/download_setting.dart';
 import 'package:jhentai/src/setting/site_setting.dart';
@@ -36,12 +38,10 @@ import 'package:jhentai/src/setting/user_setting.dart';
 import 'package:jhentai/src/utils/convert_util.dart';
 import 'package:jhentai/src/utils/jh_response_parser.dart';
 import 'package:jhentai/src/utils/speed_computer.dart';
-import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
 import 'package:path/path.dart' as path;
 import 'package:path/path.dart';
 import 'package:retry/retry.dart';
-import 'package:drift/drift.dart';
 
 import '../consts/locale_consts.dart';
 import '../database/dao/gallery_image_dao.dart';
@@ -53,11 +53,12 @@ import '../model/gallery_detail.dart';
 import '../model/gallery_image.dart';
 import '../network/eh_request.dart';
 import '../pages/download/grid/mixin/grid_download_page_service_mixin.dart';
-import 'jh_service.dart';
-import 'path_service.dart';
 import '../utils/eh_executor.dart';
 import '../utils/eh_spider_parser.dart';
+import '../utils/file_util.dart';
 import '../utils/snack_util.dart';
+import 'jh_service.dart';
+import 'path_service.dart';
 
 /// Responsible for local images meta-data and download all images of a gallery
 GalleryDownloadService galleryDownloadService = GalleryDownloadService();
@@ -80,8 +81,6 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
   static const int _maxRetryTimes = 3;
   static const int _maxRetryTimes4FetchImageHashes = 1;
   static const String metadataFileName = 'metadata';
-  static const int _maxTitleLength = 85;
-
   static const int defaultDownloadGalleryPriority = 4;
   static const int _priorityBase = 100000000;
 
@@ -325,7 +324,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
 
     _ensureDownloadDirExists();
 
-    io.Directory galleryDir = io.Directory(computeGalleryDownloadAbsolutePath(gallery.title, gallery.gid));
+    io.Directory galleryDir = io.Directory(computeGalleryDownloadAbsolutePath(gallery));
     if (!galleryDir.existsSync()) {
       galleryDir.createSync(recursive: true);
     }
@@ -335,10 +334,10 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
     for (int i = 0; i < images.length; i++) {
       GalleryImage image = images[i];
       String oldPath = computeImageDownloadAbsolutePathFromRelativePath(image.path!);
-      String newPath = _computeImageDownloadAbsolutePath(gallery.title, gallery.gid, image.url, i);
+      String newPath = _computeImageDownloadAbsolutePath(gallery, image.url, i);
       futures.add(io.File(oldPath).copy(newPath));
 
-      copiedImages.add(image.copyWith(path: _computeImageDownloadRelativePath(gallery.title, gallery.gid, image.url, i)));
+      copiedImages.add(image.copyWith(path: _computeImageDownloadRelativePath(gallery, image.url, i)));
     }
 
     await Future.wait(futures);
@@ -559,6 +558,12 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
       }
 
       GalleryDownloadedData gallery = GalleryDownloadedData.fromJson(metadata['gallery']);
+
+      /// Back-fill sanitizedTitle for metadata files written before this field was introduced.
+      if (gallery.sanitizedTitle == null) {
+        final int reservedBytes = utf8.encode('${gallery.gid} - ').length;
+        gallery = gallery.copyWith(sanitizedTitle: Value(_computeSanitizedGalleryTitle(gallery.title, reservedBytes)));
+      }
       List<GalleryImage?> images = (jsonDecode(metadata['images']) as List).map((_map) => _map == null ? null : GalleryImage.fromJson(_map)).toList();
 
       /// skip if exists
@@ -571,7 +576,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
         if (images[serialNo] == null) {
           continue;
         }
-        images[serialNo]!.path = _computeImageDownloadRelativePath(gallery.title, gallery.gid, images[serialNo]!.url, serialNo);
+        images[serialNo]!.path = _computeImageDownloadRelativePath(gallery, images[serialNo]!.url, serialNo);
         images[serialNo]!.imageHash ??= '';
       }
 
@@ -611,7 +616,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
             continue;
           }
 
-          String newPath = _computeImageDownloadRelativePath(gallery.title, gallery.gid, images[serialNo]!.url, serialNo);
+          String newPath = _computeImageDownloadRelativePath(gallery, images[serialNo]!.url, serialNo);
 
           if (!await _updateImageInDatabase(
             ImageCompanion(gid: Value(gallery.gid), serialNo: Value(serialNo), path: Value(newPath)),
@@ -725,7 +730,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
     );
 
     try {
-      io.File file = io.File(path.join(computeGalleryDownloadAbsolutePath(gallery.title, gallery.gid), 'ComicInfo.xml'));
+      io.File file = io.File(path.join(computeGalleryDownloadAbsolutePath(gallery), 'ComicInfo.xml'));
       if (!await file.exists()) {
         await file.create(recursive: true);
       }
@@ -819,34 +824,34 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
     return _computeGalleryTaskPriority(gallery) + serialNo;
   }
 
-  String _computeGalleryTitle(String rawTitle) {
+  static const int _maxFileNameBytes = 200;
+
+  /// Compute the sanitized title for the first time. Strips illegal file-name
+  /// characters then truncates to fit within [_maxFileNameBytes] bytes minus
+  /// [reservedBytes] (the byte length of the surrounding prefix).
+  String _computeSanitizedGalleryTitle(String rawTitle, int reservedBytes) {
     String title = rawTitle.replaceAll(RegExp(r'[/|?,:*"<>\\.]'), ' ').trim();
-
-    if (title.length > _maxTitleLength) {
-      title = title.substring(0, _maxTitleLength).trim();
-    }
-
-    return title;
+    return FileUtil.truncateTitleToBytes(title, _maxFileNameBytes - reservedBytes);
   }
 
-  String computeGalleryDownloadAbsolutePath(String rawTitle, int gid) {
-    String title = _computeGalleryTitle(rawTitle);
-    return path.join(downloadSetting.downloadPath.value, '$gid - $title');
+  String computeGalleryDownloadAbsolutePath(GalleryDownloadedData gallery) {
+    /// Directory name format: '{gid} - {title}'
+    return path.join(downloadSetting.downloadPath.value, '${gallery.gid} - ${gallery.sanitizedTitle}');
   }
 
-  String _computeImageDownloadAbsolutePath(String title, int gid, String imageUrl, int serialNo) {
+  String _computeImageDownloadAbsolutePath(GalleryDownloadedData gallery, String imageUrl, int serialNo) {
     /// original image's url doesn't has an ext
     String? ext = imageUrl.contains('fullimg.php') ? 'jpg' : imageUrl.split('.').last;
 
     return path.join(
-      computeGalleryDownloadAbsolutePath(title, gid),
+      computeGalleryDownloadAbsolutePath(gallery),
       '$serialNo.$ext',
     );
   }
 
-  String _computeImageDownloadRelativePath(String title, int gid, String imageUrl, int serialNo) {
+  String _computeImageDownloadRelativePath(GalleryDownloadedData gallery, String imageUrl, int serialNo) {
     return path.relative(
-      _computeImageDownloadAbsolutePath(title, gid, imageUrl, serialNo),
+      _computeImageDownloadAbsolutePath(gallery, imageUrl, serialNo),
       from: pathService.getVisibleDir().path,
     );
   }
@@ -1152,7 +1157,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
         return;
       }
 
-      image.path = _computeImageDownloadRelativePath(gallery.title, gallery.gid, image.url, serialNo);
+      image.path = _computeImageDownloadRelativePath(gallery, image.url, serialNo);
       image.downloadStatus = DownloadStatus.downloading;
 
       await _saveNewImageInfoInDatabase(image, serialNo, gallery.gid);
@@ -1190,7 +1195,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
         }
       }
 
-      String path = _computeImageDownloadAbsolutePath(gallery.title, gallery.gid, image.url, serialNo);
+      String path = _computeImageDownloadAbsolutePath(gallery, image.url, serialNo);
 
       await _tryLoadFromCacheInsteadDownload(gallery, image, serialNo, path);
       if (image.downloadStatus == DownloadStatus.downloaded) {
@@ -1317,8 +1322,8 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
 
     GalleryImage oldImage = galleryDownloadInfos[oldGallery.gid]!.images[oldImageSerialNo]!;
     GalleryImage newImage = oldImage.copyWith(
-      path: _computeImageDownloadRelativePath(newGallery.title, newGallery.gid, oldImage.url, newImageSerialNo),
-      downloadStatus: DownloadStatus.downloading,
+        path: _computeImageDownloadRelativePath(newGallery, oldImage.url, newImageSerialNo),
+        downloadStatus: DownloadStatus.downloading,
     );
 
     await _saveNewImageInfoInDatabase(newImage, newImageSerialNo, newGallery.gid);
@@ -1371,7 +1376,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
       GalleryImage oldImage = galleryDownloadInfos[oldGallery.gid]!.images[oldImageSerialNo]!;
 
       GalleryImage newImage = oldImage.copyWith(
-        path: _computeImageDownloadRelativePath(newGallery.title, newGallery.gid, oldImage.url, serialNo),
+        path: _computeImageDownloadRelativePath(newGallery, oldImage.url, serialNo),
         downloadStatus: DownloadStatus.downloaded,
       );
 
@@ -1476,6 +1481,11 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
   }
 
   Future<bool> _initGalleryInfo(GalleryDownloadedData gallery) async {
+    /// Compute and attach the sanitized title before the first DB write so the
+    /// path is frozen for the lifetime of this download task.
+    final int reservedBytes = utf8.encode('${gallery.gid} - ').length;
+    gallery = gallery.copyWith(sanitizedTitle: Value(_computeSanitizedGalleryTitle(gallery.title, reservedBytes)));
+    
     if (!await _saveGalleryInfoAndGroupInDB(gallery)) {
       return false;
     }
@@ -1601,6 +1611,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
               groupName: gallery.groupName,
               tags: Value(gallery.tags),
               tagRefreshTime: Value(gallery.tagRefreshTime),
+              sanitizedTitle: Value(gallery.sanitizedTitle),
             ),
           ) >
           0;
@@ -1686,7 +1697,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
       'images': jsonEncode(galleryDownloadInfo.images),
     };
 
-    io.File file = io.File(path.join(computeGalleryDownloadAbsolutePath(gallery.title, gallery.gid), metadataFileName));
+    io.File file = io.File(path.join(computeGalleryDownloadAbsolutePath(gallery), metadataFileName));
     if (!file.existsSync()) {
       file.createSync(recursive: true);
     }
@@ -1694,7 +1705,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
   }
 
   void _clearDownloadedImageInDisk(GalleryDownloadedData gallery) {
-    io.Directory directory = io.Directory(computeGalleryDownloadAbsolutePath(gallery.title, gallery.gid));
+    io.Directory directory = io.Directory(computeGalleryDownloadAbsolutePath(gallery));
     if (!directory.existsSync()) {
       return;
     }

@@ -338,8 +338,7 @@ class _ArchivePreviewPageState extends State<ArchivePreviewPage> {
 
     if (readSetting.useThirdPartyViewer.isTrue &&
         readSetting.thirdPartyViewerPath.value != null) {
-      openThirdPartyViewer(archiveDownloadService.computeArchiveUnpackingPath(
-          archive!.title, archive!.gid));
+      openThirdPartyViewer(archiveDownloadService.computeArchiveUnpackingPath(archive!));
       return;
     }
 

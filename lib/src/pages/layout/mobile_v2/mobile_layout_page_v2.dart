@@ -84,7 +84,7 @@ class MobileLayoutPageV2 extends StatelessWidget {
   }
 
   Widget buildRightDrawer() {
-    return Drawer(width: 278, child: QuickSearchPage(scrollController: quickSearchService.drawerScrollController)),
+    return Drawer(width: 278, child: QuickSearchPage(scrollController: quickSearchService.drawerScrollController));
   }
 
   Widget buildBottomNavigationBar(BuildContext context) {

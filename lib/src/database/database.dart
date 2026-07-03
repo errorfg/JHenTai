@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:collection/collection.dart';
 import 'package:drift/drift.dart';
-
 import 'package:drift/native.dart';
 import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_instance/src/extension_instance.dart';
@@ -27,11 +26,11 @@ import 'package:jhentai/src/database/table/tag_count.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/exception/upload_exception.dart';
 import 'package:jhentai/src/extension/directory_extension.dart';
-import 'package:jhentai/src/service/path_service.dart';
 import 'package:jhentai/src/service/log.dart';
+import 'package:jhentai/src/service/path_service.dart';
 import 'package:path/path.dart';
-import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 import 'package:sqlite3/sqlite3.dart';
+import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 
 import '../model/gallery.dart';
 import '../model/gallery_history_model.dart';
@@ -67,7 +66,7 @@ class AppDb extends _$AppDb {
   AppDb() : super(_openConnection());
 
   @override
-  int get schemaVersion => 23;
+  int get schemaVersion => 24;
 
   @override
   MigrationStrategy get migration {
@@ -161,6 +160,11 @@ class AppDb extends _$AppDb {
             }
             if (17 <= from && from < 23) {
               await m.alterTable(TableMigration(archiveDownloaded, newColumns: [archiveDownloaded.parseSource]));
+            }
+            if (from < 24) {
+              await m.alterTable(TableMigration(archiveDownloaded, newColumns: [archiveDownloaded.sanitizedTitle]));
+              await m.alterTable(TableMigration(galleryDownloaded, newColumns: [galleryDownloaded.sanitizedTitle]));
+              await _backfillSanitizedTitles();
             }
           });
         } on Exception catch (e) {
@@ -379,6 +383,47 @@ class AppDb extends _$AppDb {
     await ArchiveDao.updateArchiveStatus(OldArchiveStatus.downloaded.index, ArchiveStatus.downloaded.code);
     await ArchiveDao.updateArchiveStatus(OldArchiveStatus.unpacking.index, ArchiveStatus.unpacking.code);
     await ArchiveDao.updateArchiveStatus(OldArchiveStatus.completed.index, ArchiveStatus.completed.code);
+  }
+
+  /// Back-fill [sanitizedTitle] for existing rows using the old character-count
+  /// truncation algorithm so their on-disk paths remain unchanged after the
+  /// upgrade to the byte-based algorithm.
+  Future<void> _backfillSanitizedTitles() async {
+    final RegExp illegalChars = RegExp(r'[/|?,:*"<>\\.]');
+
+    String legacyArchiveTitle(String rawTitle) {
+      String title = rawTitle.replaceAll(illegalChars, ' ').trim();
+      if (title.length > 80) {
+        title = title.substring(0, 80).trim();
+      }
+      return title;
+    }
+
+    String legacyGalleryTitle(String rawTitle) {
+      String title = rawTitle.replaceAll(illegalChars, ' ').trim();
+      if (title.length > 85) {
+        title = title.substring(0, 85).trim();
+      }
+      return title;
+    }
+
+    final List<ArchiveDownloadedData> archives = await ArchiveDao.selectArchives();
+    await transaction(() async {
+      for (final ArchiveDownloadedData a in archives) {
+        await (update(archiveDownloaded)..where((t) => t.gid.equals(a.gid))).write(
+          ArchiveDownloadedCompanion(sanitizedTitle: Value(legacyArchiveTitle(a.title))),
+        );
+      }
+    });
+
+    final List<GalleryDownloadedData> galleries = await GalleryDao.selectGallerys();
+    await transaction(() async {
+      for (final GalleryDownloadedData g in galleries) {
+        await (update(galleryDownloaded)..where((t) => t.gid.equals(g.gid))).write(
+          GalleryDownloadedCompanion(sanitizedTitle: Value(legacyGalleryTitle(g.title))),
+        );
+      }
+    });
   }
 }
 

@@ -1461,10 +1461,8 @@ class DetailsPageLogic extends GetxController
     GalleryDownloadedData gallery = galleryDownloadService.gallerys
         .firstWhere((g) => g.gid == state.galleryUrl.gid);
 
-    if (readSetting.useThirdPartyViewer.isTrue &&
-        readSetting.thirdPartyViewerPath.value != null) {
-      openThirdPartyViewer(galleryDownloadService
-          .computeGalleryDownloadAbsolutePath(gallery.title, gallery.gid));
+    if (readSetting.useThirdPartyViewer.isTrue && readSetting.thirdPartyViewerPath.value != null) {
+      openThirdPartyViewer(galleryDownloadService.computeGalleryDownloadAbsolutePath(gallery));
       return;
     }
 
