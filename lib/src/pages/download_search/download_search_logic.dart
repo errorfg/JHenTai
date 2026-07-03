@@ -248,7 +248,8 @@ class DownloadSearchLogic extends GetxController with UpdateGlobalGalleryStatusL
     }
 
     if (readSetting.useThirdPartyViewer.isTrue && readSetting.thirdPartyViewerPath.value != null) {
-      openThirdPartyViewer(galleryDownloadService.computeGalleryDownloadAbsolutePath(gallery));
+      GalleryDownloadedData galleryData = galleryDownloadService.gallerys.firstWhere((g) => g.gid == gallery.gid);
+      openThirdPartyViewer(galleryDownloadService.computeGalleryDownloadAbsolutePath(galleryData));
     } else {
       String? string = await localConfigService.read(configKey: ConfigEnum.readIndexRecord, subConfigKey: gallery.gid.toString());
       int readIndexRecord = (string == null ? 0 : (int.tryParse(string) ?? 0));
@@ -276,7 +277,8 @@ class DownloadSearchLogic extends GetxController with UpdateGlobalGalleryStatusL
     }
 
     if (readSetting.useThirdPartyViewer.isTrue && readSetting.thirdPartyViewerPath.value != null) {
-      openThirdPartyViewer(archiveDownloadService.computeArchiveUnpackingPath(archive));
+      ArchiveDownloadedData archiveData = archiveDownloadService.archives.firstWhere((a) => a.gid == archive.gid);
+      openThirdPartyViewer(archiveDownloadService.computeArchiveUnpackingPath(archiveData));
     } else {
       String? string = await localConfigService.read(configKey: ConfigEnum.readIndexRecord, subConfigKey: archive.gid.toString());
       int readIndexRecord = (string == null ? 0 : (int.tryParse(string) ?? 0));
