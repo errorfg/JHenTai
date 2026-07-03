@@ -592,6 +592,7 @@ class en_US {
       'landscape': 'Landscape',
       'portrait': 'Portrait',
       'readDirection': 'Read Direction',
+      'enableOrientationSpecificReadDirection': 'Orientation-Specific Read Direction',
       'notchOptimization': 'Notch Optimization',
       'notchOptimizationHint': 'Add padding before the first image to avoid the notch and status bar',
       'imageRegionWidthRatio': 'Image Region Width Ratio',

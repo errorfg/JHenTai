@@ -536,6 +536,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
   }
 
   Widget _buildBottomAction() {
+    final bool isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
     return SizedBox(
       height: UIConfig.readPageBottomActionHeight,
       width: fullScreenWidth,

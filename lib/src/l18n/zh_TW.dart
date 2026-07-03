@@ -472,6 +472,7 @@ class zh_TW {
       'landscape': '橫向',
       'portrait': '直向',
       'readDirection': '閱讀方向',
+      'enableOrientationSpecificReadDirection': '橫直向獨立閱讀方向',
       'notchOptimization': '瀏海屏最佳化',
       'notchOptimizationHint': '在第一張圖片之前加入空白區域，以應對瀏海屏與狀態欄',
       'imageRegionWidthRatio': '圖片區域寬度比例',

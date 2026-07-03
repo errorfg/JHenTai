@@ -478,6 +478,7 @@ class ru_RU {
       'landscape': 'Альбомная',
       'portrait': 'Портретная',
       'readDirection': 'Направление чтения',
+      'enableOrientationSpecificReadDirection': 'Направление чтения по ориентации',
       'notchOptimization': 'Оптимизация под вырез',
       'notchOptimizationHint': 'Добавить отступ перед первым изображением, чтобы избежать выреза и строки состояния',
       'imageRegionWidthRatio': 'Соотношение ширины области изображения',

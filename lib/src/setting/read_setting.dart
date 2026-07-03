@@ -25,6 +25,9 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
   RxBool enableBottomMenu = false.obs;
   Rx<DeviceDirection> deviceDirection = DeviceDirection.followSystem.obs;
   Rx<ReadDirection> readDirection = GetPlatform.isMobile ? ReadDirection.top2bottomList.obs : ReadDirection.left2rightList.obs;
+  RxBool enableOrientationSpecificReadDirection = false.obs;
+  Rx<ReadDirection> portraitReadDirection = GetPlatform.isMobile ? ReadDirection.top2bottomList.obs : ReadDirection.left2rightList.obs;
+  Rx<ReadDirection> landscapeReadDirection = ReadDirection.left2rightList.obs;
   RxBool notchOptimization = false.obs;
   RxInt imageRegionWidthRatio = 100.obs;
   RxInt gestureRegionWidthRatio = 60.obs;
@@ -118,6 +121,10 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
     disablePageTurningOnTap.value = map['disablePageTurningOnTap'] ?? disablePageTurningOnTap.value;
     enableMaxImageKilobyte.value = map['enableMaxImageKilobyte'] ?? enableMaxImageKilobyte.value;
     maxImageKilobyte.value = map['maxImageKilobyte'] ?? maxImageKilobyte.value;
+    enableOrientationSpecificReadDirection.value = map['enableOrientationSpecificReadDirection'] ?? enableOrientationSpecificReadDirection.value;
+    /// On first load, migrate existing readDirection to both portrait and landscape
+    portraitReadDirection.value = ReadDirection.values[map['portraitReadDirection'] ?? map['readDirection']];
+    landscapeReadDirection.value = ReadDirection.values[map['landscapeReadDirection'] ?? map['readDirection']];
   }
 
   @override
@@ -155,6 +162,9 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
       'disablePageTurningOnTap': disablePageTurningOnTap.value,
       'enableMaxImageKilobyte': enableMaxImageKilobyte.value,
       'maxImageKilobyte': maxImageKilobyte.value,
+      'enableOrientationSpecificReadDirection': enableOrientationSpecificReadDirection.value,
+      'portraitReadDirection': portraitReadDirection.value.index,
+      'landscapeReadDirection': landscapeReadDirection.value.index,
     });
   }
 
@@ -353,6 +363,24 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
   Future<void> saveMaxImageKilobyte(int value) async {
     log.debug('saveMaxImageKilobyte:$value');
     maxImageKilobyte.value = value;
+    await saveBeanConfig();
+  }
+
+  Future<void> saveEnableOrientationSpecificReadDirection(bool value) async {
+    log.debug('saveEnableOrientationSpecificReadDirection:$value');
+    enableOrientationSpecificReadDirection.value = value;
+    await saveBeanConfig();
+  }
+
+  Future<void> savePortraitReadDirection(ReadDirection value) async {
+    log.debug('savePortraitReadDirection:${value.name}');
+    portraitReadDirection.value = value;
+    await saveBeanConfig();
+  }
+
+  Future<void> saveLandscapeReadDirection(ReadDirection value) async {
+    log.debug('saveLandscapeReadDirection:${value.name}');
+    landscapeReadDirection.value = value;
     await saveBeanConfig();
   }
 }

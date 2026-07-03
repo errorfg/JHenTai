@@ -472,6 +472,7 @@ class ko_KR {
       'landscape': 'Landscape',
       'portrait': 'Portrait',
       'readDirection': '읽는 방향',
+      'enableOrientationSpecificReadDirection': '화면 방향별 읽기 방향',
       'notchOptimization': 'Notch Optimization',
       'notchOptimizationHint': 'Add padding before the first image to avoid the notch and status bar',
       'imageRegionWidthRatio': 'Image Region Width Ratio',

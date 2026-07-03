@@ -33,18 +33,18 @@ import '../../model/gallery_image.dart';
 import '../../model/read_page_info.dart';
 import '../../network/eh_request.dart';
 import '../../routes/routes.dart';
-import '../../service/storage_service.dart';
+import '../../service/log.dart';
+import '../../service/read_progress_service.dart';
 import '../../setting/read_setting.dart';
 import '../../utils/eh_spider_parser.dart';
-import '../../service/log.dart';
 import '../../utils/route_util.dart';
+import '../../utils/toast_util.dart';
 import '../../widget/auto_mode_interval_dialog.dart';
 import '../../widget/loading_state_indicator.dart';
-import '../../service/read_progress_service.dart';
 import '../home_page.dart';
 import '../setting/read/setting_read_page.dart';
 
-class ReadPageLogic extends GetxController {
+class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   final String pageId = 'pageId';
   final String layoutId = 'layoutId';
   final String onlineImageId = 'onlineImageId';
@@ -84,6 +84,9 @@ class ReadPageLogic extends GetxController {
   late Worker preloadListener;
   late Worker enableBottomMenuListener;
 
+  /// Tracks the last known portrait state for orientation-specific read direction
+  bool? _lastIsPortrait;
+
   /// limit the rate of parsing to decrease the lagging of build
   final EHExecutor executor = EHExecutor(
     concurrency: 100,
@@ -99,6 +102,8 @@ class ReadPageLogic extends GetxController {
   @override
   void onReady() {
     super.onReady();
+
+    WidgetsBinding.instance.addObserver(this);
 
     Timer(const Duration(milliseconds: 120), () {
       if (inited && !delayInitCompleter.isCompleted) {
@@ -197,6 +202,8 @@ class ReadPageLogic extends GetxController {
   @override
   void onClose() {
     super.onClose();
+
+    WidgetsBinding.instance.removeObserver(this);
 
     state.focusNode.dispose();
     refreshCurrentTimeAndBatteryLevelTimer.cancel();
@@ -428,6 +435,42 @@ class ReadPageLogic extends GetxController {
     }
 
     SystemChrome.setPreferredOrientations([]);
+  }
+
+  @override
+  void didChangeMetrics() {
+    if (!GetPlatform.isMobile) {
+      return;
+    }
+
+    if (readSetting.enableOrientationSpecificReadDirection.isFalse) {
+      return;
+    }
+
+    if (readSetting.deviceDirection.value != DeviceDirection.followSystem) {
+      return;
+    }
+
+    final Size size = WidgetsBinding.instance.platformDispatcher.views.first.physicalSize;
+    final bool isPortrait = size.height >= size.width;
+
+    if (_lastIsPortrait == isPortrait) {
+      return;
+    }
+
+    _lastIsPortrait = isPortrait;
+
+    final ReadDirection targetDirection = isPortrait ? readSetting.portraitReadDirection.value : readSetting.landscapeReadDirection.value;
+
+    if (readSetting.readDirection.value == targetDirection) {
+      return;
+    }
+
+    readSetting.saveReadDirection(targetDirection);
+
+    final String directionName = targetDirection.name.tr;
+    final String orientationKey = isPortrait ? 'portrait' : 'landscape';
+    toast('${'autoSwitchedReadDirection'.tr}: $directionName (${'$orientationKey'.tr})');
   }
 
   void toggleMenu() {

@@ -592,6 +592,7 @@ class zh_CN {
       'landscape': '横屏',
       'portrait': '竖屏',
       'readDirection': '阅读方向',
+      'enableOrientationSpecificReadDirection': '横竖屏独立阅读方向',
       'notchOptimization': '刘海屏优化',
       'notchOptimizationHint': '在第一张图片之前加入空白区域，以应对刘海屏与状态栏',
       'imageRegionWidthRatio': '图片区域宽度比例',

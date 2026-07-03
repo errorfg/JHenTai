@@ -49,6 +49,9 @@ class SettingReadPage extends StatelessWidget {
               if (GetPlatform.isDesktop) _buildThirdPartyViewerPath().center(),
               if (GetPlatform.isDesktop) _buildKeyboardShortcuts().center(),
               if (GetPlatform.isMobile) _buildDeviceDirection().center(),
+              if (GetPlatform.isMobile) _buildEnableOrientationSpecificReadDirection().center(),
+              if (GetPlatform.isMobile && readSetting.enableOrientationSpecificReadDirection.isTrue) _buildPortraitReadDirection().fadeIn(const Key('portraitReadDirection')).center(),
+              if (GetPlatform.isMobile && readSetting.enableOrientationSpecificReadDirection.isTrue) _buildLandscapeReadDirection().fadeIn(const Key('landscapeReadDirection')).center(),
               _buildReadDirection().center(),
               if (GetPlatform.isMobile && readSetting.readDirection.value == ReadDirection.top2bottomList) _buildNotchOptimization().center(),
               if (readSetting.readDirection.value == ReadDirection.top2bottomList) _buildImageRegionWidthRatio(context).center(),
@@ -283,6 +286,39 @@ class SettingReadPage extends StatelessWidget {
           DropdownMenuItem(child: Text('landscape'.tr), value: DeviceDirection.landscape),
           DropdownMenuItem(child: Text('portrait'.tr), value: DeviceDirection.portrait),
         ],
+      ).marginOnly(right: 12),
+    );
+  }
+
+  Widget _buildEnableOrientationSpecificReadDirection() {
+    return SwitchListTile(
+      title: Text('enableOrientationSpecificReadDirection'.tr),
+      subtitle: Text('enableOrientationSpecificReadDirectionHint'.tr),
+      value: readSetting.enableOrientationSpecificReadDirection.value,
+      onChanged: readSetting.saveEnableOrientationSpecificReadDirection,
+    );
+  }
+
+  Widget _buildPortraitReadDirection() {
+    return ListTile(
+      title: Text('portraitReadDirection'.tr),
+      trailing: DropdownButton<ReadDirection>(
+        value: readSetting.portraitReadDirection.value,
+        elevation: 4,
+        onChanged: (ReadDirection? newValue) => readSetting.savePortraitReadDirection(newValue!),
+        items: ReadDirection.values.map((e) => DropdownMenuItem(child: Text(e.name.tr), value: e)).toList(),
+      ).marginOnly(right: 12),
+    );
+  }
+
+  Widget _buildLandscapeReadDirection() {
+    return ListTile(
+      title: Text('landscapeReadDirection'.tr),
+      trailing: DropdownButton<ReadDirection>(
+        value: readSetting.landscapeReadDirection.value,
+        elevation: 4,
+        onChanged: (ReadDirection? newValue) => readSetting.saveLandscapeReadDirection(newValue!),
+        items: ReadDirection.values.map((e) => DropdownMenuItem(child: Text(e.name.tr), value: e)).toList(),
       ).marginOnly(right: 12),
     );
   }
