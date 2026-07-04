@@ -227,6 +227,7 @@ class pt_BR {
       'back': 'Voltar',
       'toggleMenu': 'Alternar menu',
       'share': 'Compartilhar',
+      'copyImage': 'Copiar imagem',
       'save': 'Salvar em imagens',
       'copyEHPageUrl': 'Copiar URL da página E-hentai',
 

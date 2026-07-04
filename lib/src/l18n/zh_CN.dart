@@ -225,6 +225,7 @@ class zh_CN {
       'back': '返回',
       'toggleMenu': '展示/隐藏菜单',
       'share': '分享',
+      'copyImage': '复制图片',
       'save': '保存至图库',
       'copyEHPageUrl': '复制E站页面链接',
 

@@ -225,6 +225,7 @@ class zh_TW {
       'back': '返回',
       'toggleMenu': '顯示/隱藏選單',
       'share': '分享',
+      'copyImage': '複製圖片',
       'save': '儲存至相簿',
       'copyEHPageUrl': '複製E站頁面鏈接',
 

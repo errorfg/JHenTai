@@ -136,6 +136,45 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
     }
   }
 
+  /// Desktop right-click context menu for online images.
+  Future<void> showOnlineDesktopContextMenu({required int index, required BuildContext context, required Offset position}) async {
+    final selected = await showMenu<String>(
+      context: context,
+      popUpAnimationStyle: AnimationStyle.noAnimation,
+      position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx, position.dy),
+      items: [
+        PopupMenuItem(value: 'reload', child: Text('reload'.tr)),
+        PopupMenuItem(value: 'copyImage', child: Text('copyImage'.tr)),
+        PopupMenuItem(value: 'copy_eh_page_url', child: Text('copyEHPageUrl'.tr)),
+        PopupMenuItem(value: 'save', child: Text('${'save'.tr}(${'resampleImage'.tr})')),
+        if (readPageState.images[index]!.originalImageUrl != null && userSetting.hasLoggedIn())
+          PopupMenuItem(value: 'save_original', child: Text('${'save'.tr}(${'originalImage'.tr})')),
+        PopupMenuItem(value: 'open_read_setting', child: Text('setting'.tr)),
+      ],
+    );
+
+    switch (selected) {
+      case 'reload':
+        readPageLogic.reloadImage(index);
+        break;
+      case 'copyImage':
+        copyOnlineImage(index);
+        break;
+      case 'copy_eh_page_url':
+        copyEHPageUrl(index);
+        break;
+      case 'save':
+        await saveOnlineImage(index);
+        break;
+      case 'save_original':
+        await saveOriginalOnlineImage(index);
+        break;
+      case 'open_read_setting':
+        readPageLogic.openReadSetting(context);
+        break;
+    }
+  }
+
   /// Mobile bottom action sheet for online images.
   void showOnlineMobileBottomMenu(int index, BuildContext context) {
     showCupertinoModalPopup(
@@ -154,6 +193,13 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
             onPressed: () async {
               backRoute();
               shareOnlineImage(index);
+            },
+          ),
+          CupertinoActionSheetAction(
+            child: Text('copyImage'.tr),
+            onPressed: () async {
+              backRoute();
+              copyOnlineImage(index);
             },
           ),
           CupertinoActionSheetAction(
@@ -182,72 +228,6 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
         cancelButton: CupertinoActionSheetAction(child: Text('cancel'.tr), onPressed: backRoute),
       ),
     );
-  }
-
-  /// Desktop right-click context menu for online images.
-  Future<void> showOnlineDesktopContextMenu({
-    required int index,
-    required BuildContext context,
-    required Offset position,
-  }) async {
-    final selected = await showMenu<String>(
-      context: context,
-      popUpAnimationStyle: AnimationStyle.noAnimation,
-      position: RelativeRect.fromLTRB(
-        position.dx,
-        position.dy,
-        position.dx,
-        position.dy,
-      ),
-      items: [
-        PopupMenuItem(
-          value: 'reload',
-          child: Text('reload'.tr),
-        ),
-        PopupMenuItem(
-          value: 'share',
-          child: Text('share'.tr),
-        ),
-        PopupMenuItem(
-          value: 'copy_eh_page_url',
-          child: Text('copyEHPageUrl'.tr),
-        ),
-        PopupMenuItem(
-          value: 'save',
-          child: Text('${'save'.tr}(${'resampleImage'.tr})'),
-        ),
-        if (readPageState.images[index]!.originalImageUrl != null && userSetting.hasLoggedIn())
-          PopupMenuItem(
-            value: 'save_original',
-            child: Text('${'save'.tr}(${'originalImage'.tr})'),
-          ),
-        PopupMenuItem(
-          value: 'open_read_setting',
-          child: Text('setting'.tr),
-        ),
-      ],
-    );
-
-    switch (selected) {
-      case 'reload':
-        readPageLogic.reloadImage(index);
-        break;
-      case 'share':
-        shareOnlineImage(index);
-        break;
-      case 'copy_eh_page_url':
-        copyEHPageUrl(index);
-        break;
-      case 'save':
-        await saveOnlineImage(index);
-        break;
-      case 'save_original':
-        await saveOriginalOnlineImage(index);
-        break;
-      case 'open_read_setting':
-        readPageLogic.openReadSetting(context);
-        break;
-    }
   }
 
   String _getDownloadedImageAbsolutePath(int index) {
@@ -305,6 +285,13 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
             },
           ),
           CupertinoActionSheetAction(
+            child: Text('copyImage'.tr),
+            onPressed: () {
+              backRoute();
+              copyDownloadedImageFile(index);
+            },
+          ),
+          CupertinoActionSheetAction(
             child: Text('copyEHPageUrl'.tr),
             onPressed: () async {
               backRoute();
@@ -349,6 +336,13 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
             },
           ),
           CupertinoActionSheetAction(
+            child: Text('copyImage'.tr),
+            onPressed: () {
+              backRoute();
+              copyArchiveImageFile(index);
+            },
+          ),
+          CupertinoActionSheetAction(
             child: Text('save'.tr),
             onPressed: () {
               backRoute();
@@ -376,7 +370,7 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
       popUpAnimationStyle: AnimationStyle.noAnimation,
       position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx, position.dy),
       items: [
-        PopupMenuItem(value: 'share', child: Text('share'.tr)),
+        PopupMenuItem(value: 'copyImage', child: Text('copyImage'.tr)),
         PopupMenuItem(value: 'copy_eh_page_url', child: Text('copyEHPageUrl'.tr)),
         PopupMenuItem(value: 'save', child: Text('save'.tr)),
         PopupMenuItem(value: 'redownload', child: Text('reDownload'.tr)),
@@ -385,8 +379,8 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
     );
 
     switch (selected) {
-      case 'share':
-        shareDownloadedImageFile(index);
+      case 'copyImage':
+        copyDownloadedImageFile(index);
         break;
       case 'copy_eh_page_url':
         copyEHPageUrl(index);
@@ -418,15 +412,15 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
       popUpAnimationStyle: AnimationStyle.noAnimation,
       position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx, position.dy),
       items: [
-        PopupMenuItem(value: 'share', child: Text('share'.tr)),
+        PopupMenuItem(value: 'copyImage', child: Text('copyImage'.tr)),
         PopupMenuItem(value: 'save', child: Text('save'.tr)),
         PopupMenuItem(value: 'open_read_setting', child: Text('setting'.tr)),
       ],
     );
 
     switch (selected) {
-      case 'share':
-        shareArchiveImageFile(index);
+      case 'copyImage':
+        copyArchiveImageFile(index);
         break;
       case 'save':
         saveArchiveImageFile(index);
@@ -437,7 +431,8 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
     }
   }
 
-  void shareOnlineImage(int index) async {
+  /// Share an online image via the system share sheet.
+  Future<void> shareOnlineImage(int index) async {
     if (readPageState.images[index] == null) {
       return;
     }
@@ -447,7 +442,6 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
       return;
     }
 
-    // deal with .webp/.jpg which has not basename
     String ext = extension(readPageState.images[index]!.url);
     if (isEmptyOrNull(ext)) {
       ext = basename(readPageState.images[index]!.url);
@@ -455,7 +449,48 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
 
     String fileName = '${readPageState.readPageInfo.gid!}_${readPageState.readPageInfo.token!}_$index$ext';
 
+    Share.shareXFiles(
+      [XFile.fromData(data)],
+      sharePositionOrigin: Rect.fromLTWH(0, 0, fullScreenWidth, readPageState.displayRegionSize.height * 2 / 3),
+      fileNameOverrides: [fileName],
+    );
+  }
+
+  /// Share a downloaded-mode image file via the system share sheet.
+  void shareDownloadedImageFile(int index) {
+    Share.shareXFiles(
+      [XFile(_getDownloadedImageAbsolutePath(index))],
+      sharePositionOrigin: Rect.fromLTWH(0, 0, fullScreenWidth, readPageState.displayRegionSize.height * 2 / 3),
+    );
+  }
+
+  /// Share an archive-mode image file via the system share sheet.
+  void shareArchiveImageFile(int index) {
+    Share.shareXFiles(
+      [XFile(_getArchiveImageAbsolutePath(index))],
+      sharePositionOrigin: Rect.fromLTWH(0, 0, fullScreenWidth, readPageState.displayRegionSize.height * 2 / 3),
+    );
+  }
+
+  /// Copy an online image to clipboard.
+  /// On desktop: writes image to temp file then uses [Pasteboard.writeFiles].
+  /// On mobile: uses [Pasteboard.writeImage] with raw bytes.
+  Future<void> copyOnlineImage(int index) async {
+    if (readPageState.images[index] == null) {
+      return;
+    }
+
+    Uint8List? data = await getNetworkImageData(readPageState.images[index]!.url);
+    if (data == null) {
+      return;
+    }
+
     if (GetPlatform.isDesktop) {
+      String ext = extension(readPageState.images[index]!.url);
+      if (isEmptyOrNull(ext)) {
+        ext = basename(readPageState.images[index]!.url);
+      }
+      String fileName = '${readPageState.readPageInfo.gid!}_${readPageState.readPageInfo.token!}_$index$ext';
       String filePath = join(downloadSetting.tempDownloadPath.value, fileName);
       File file = File(filePath);
       try {
@@ -468,40 +503,28 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
         toast('failed'.tr);
         file.delete().ignore();
       }
-      return;
+    } else {
+      await Pasteboard.writeImage(data);
+      toast('hasCopiedToClipboard'.tr);
     }
-
-    Share.shareXFiles(
-      [XFile.fromData(data)],
-      sharePositionOrigin: Rect.fromLTWH(0, 0, fullScreenWidth, readPageState.displayRegionSize.height * 2 / 3),
-      fileNameOverrides: [fileName],
-    );
   }
 
-  /// Share a downloaded-mode image file. On desktop, copies file path to clipboard; on mobile, invokes share sheet.
-  void shareDownloadedImageFile(int index) {
+  /// Copy a downloaded-mode image file to clipboard.
+  void copyDownloadedImageFile(int index) {
     if (GetPlatform.isDesktop) {
       Pasteboard.writeFiles([_getDownloadedImageAbsolutePath(index)]).then((_) => toast('hasCopiedToClipboard'.tr));
-      return;
+    } else {
+      Pasteboard.writeImage(File(_getDownloadedImageAbsolutePath(index)).readAsBytesSync()).then((_) => toast('hasCopiedToClipboard'.tr));
     }
-
-    Share.shareXFiles(
-      [XFile(_getDownloadedImageAbsolutePath(index))],
-      sharePositionOrigin: Rect.fromLTWH(0, 0, fullScreenWidth, readPageState.displayRegionSize.height * 2 / 3),
-    );
   }
 
-  /// Share an archive-mode image file. On desktop, copies file path to clipboard; on mobile, invokes share sheet.
-  void shareArchiveImageFile(int index) {
+  /// Copy an archive-mode image file to clipboard.
+  void copyArchiveImageFile(int index) {
     if (GetPlatform.isDesktop) {
       Pasteboard.writeFiles([_getArchiveImageAbsolutePath(index)]).then((_) => toast('hasCopiedToClipboard'.tr));
-      return;
+    } else {
+      Pasteboard.writeImage(File(_getArchiveImageAbsolutePath(index)).readAsBytesSync()).then((_) => toast('hasCopiedToClipboard'.tr));
     }
-
-    Share.shareXFiles(
-      [XFile(_getArchiveImageAbsolutePath(index))],
-      sharePositionOrigin: Rect.fromLTWH(0, 0, fullScreenWidth, readPageState.displayRegionSize.height * 2 / 3),
-    );
   }
 
   Future<void> saveOnlineImage(int index) async {

@@ -226,6 +226,7 @@ class en_US {
       'back': 'Back',
       'toggleMenu': 'Toggle menu',
       'share': 'Share',
+      'copyImage': 'Copy Image',
       'save': 'Save to Pictures',
       'copyEHPageUrl': 'Copy E-Hentai Page URL',
 

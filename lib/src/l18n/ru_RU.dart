@@ -230,6 +230,7 @@ class ru_RU {
       'back': 'Назад',
       'toggleMenu': 'Переключить меню',
       'share': 'Поделиться',
+      'copyImage': 'Копировать',
       'save': 'Сохранить в Изображения',
       'copyEHPageUrl': 'Скопировать URL страницы E-hentai',
 
