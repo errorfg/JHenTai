@@ -536,7 +536,8 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
   }
 
   Widget _buildBottomAction() {
-    final bool isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
+    final ReadDirection effectiveDirection = logic.effectiveReadDirection;
+
     return SizedBox(
       height: UIConfig.readPageBottomActionHeight,
       width: fullScreenWidth,
@@ -546,14 +547,14 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
           Material(
             color: Colors.transparent,
             child: PopupMenuButton<ReadDirection>(
-              initialValue: readSetting.readDirection.value,
+              initialValue: effectiveDirection,
               icon: const Icon(Icons.height, color: UIConfig.readPageButtonColor),
               itemBuilder: (_) => ReadDirection.values
                   .map(
                     (e) => PopupMenuItem<ReadDirection>(child: Text(e.name.tr), value: e),
                   )
                   .toList(),
-              onSelected: (ReadDirection value) => readSetting.saveReadDirection(value),
+              onSelected: (ReadDirection value) => logic.saveReadDirection(value),
             ),
           ),
           Material(
@@ -566,7 +567,10 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                     (e) => PopupMenuItem<DeviceDirection>(child: Text(e.name.tr), value: e),
                   )
                   .toList(),
-              onSelected: (DeviceDirection value) => readSetting.saveDeviceDirection(value),
+              onSelected: (DeviceDirection value) {
+                readSetting.saveDeviceDirection(value);
+                logic.syncReadDirectionToOrientation();
+              },
             ),
           ),
           GestureDetector(

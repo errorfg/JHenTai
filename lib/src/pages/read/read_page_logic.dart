@@ -475,6 +475,50 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     toast('${'autoSwitchedReadDirection'.tr}: $directionName (${'$orientationKey'.tr})');
   }
 
+  bool get isPortrait {
+    if (readSetting.deviceDirection.value == DeviceDirection.portrait) {
+      return true;
+    }
+    if (readSetting.deviceDirection.value == DeviceDirection.landscape) {
+      return false;
+    }
+    final size = WidgetsBinding.instance.platformDispatcher.views.first.physicalSize;
+    return size.height >= size.width;
+  }
+
+  ReadDirection get effectiveReadDirection {
+    if (readSetting.enableOrientationSpecificReadDirection.isFalse || !GetPlatform.isMobile) {
+      return readSetting.readDirection.value;
+    }
+    if (isPortrait) {
+      return readSetting.portraitReadDirection.value;
+    }
+    return readSetting.landscapeReadDirection.value;
+  }
+
+  void saveReadDirection(ReadDirection value) {
+    if (readSetting.enableOrientationSpecificReadDirection.isTrue && GetPlatform.isMobile) {
+      if (isPortrait) {
+        readSetting.savePortraitReadDirection(value);
+      } else {
+        readSetting.saveLandscapeReadDirection(value);
+      }
+    }
+    readSetting.saveReadDirection(value);
+  }
+
+  void syncReadDirectionToOrientation() {
+    if (readSetting.enableOrientationSpecificReadDirection.isFalse || !GetPlatform.isMobile) {
+      return;
+    }
+    final target = isPortrait
+        ? readSetting.portraitReadDirection.value
+        : readSetting.landscapeReadDirection.value;
+    if (readSetting.readDirection.value != target) {
+      readSetting.saveReadDirection(target);
+    }
+  }
+
   void toggleMenu() {
     state.isMenuOpen = !state.isMenuOpen;
     update([topMenuId, bottomMenuId, rightBottomInfoId]);
