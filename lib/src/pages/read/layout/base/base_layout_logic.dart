@@ -38,7 +38,6 @@ import '../../../../service/log.dart';
 import '../../../../setting/read_setting.dart';
 import '../../../../utils/route_util.dart';
 import '../../../../utils/screen_size_util.dart';
-import '../../../../routes/routes.dart';
 import '../../read_page_logic.dart';
 import '../../read_page_state.dart';
 
@@ -433,7 +432,7 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
         saveArchiveImageFile(index);
         break;
       case 'open_read_setting':
-        toRoute(Routes.settingRead);
+        readPageLogic.openReadSetting(context);
         break;
     }
   }

@@ -39,6 +39,8 @@ class UIConfig {
     scrollbars: false,
   );
 
+  static const Duration defaultPageRouteTransitionDuration = Duration(milliseconds: 150);
+  
   static const Color defaultLightThemeColor = Color(0xFF6750A4);
   static const Color defaultDarkThemeColor = Color(0xFFD0BCFF);
 

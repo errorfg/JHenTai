@@ -113,19 +113,19 @@ class ReadActionBinding {
 // ---------------------------------------------------------------------------
 
 class KeyboardShortcutSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBean {
-  static final Map<ReadAction, ReadActionBinding?> _defaults = {
-    ReadAction.toNext: ReadActionBinding.keyboard(LogicalKeyboardKey.pageDown.keyId),
-    ReadAction.toPrev: ReadActionBinding.keyboard(LogicalKeyboardKey.pageUp.keyId),
-    ReadAction.toLeft: ReadActionBinding.keyboard(LogicalKeyboardKey.arrowLeft.keyId),
-    ReadAction.toRight: ReadActionBinding.keyboard(LogicalKeyboardKey.arrowRight.keyId),
-    ReadAction.back: ReadActionBinding.keyboard(LogicalKeyboardKey.end.keyId),
-    ReadAction.toggleMenu: ReadActionBinding.keyboard(LogicalKeyboardKey.space.keyId),
-    ReadAction.toggleFirstPageAlone: ReadActionBinding.keyboard(LogicalKeyboardKey.keyM.keyId),
-    ReadAction.toggleFullScreen: ReadActionBinding.keyboard(LogicalKeyboardKey.f11.keyId),
+  static final Map<ReadAction, List<ReadActionBinding?>> _defaults = {
+    ReadAction.toNext: [ReadActionBinding.keyboard(LogicalKeyboardKey.pageDown.keyId), null],
+    ReadAction.toPrev: [ReadActionBinding.keyboard(LogicalKeyboardKey.pageUp.keyId), null],
+    ReadAction.toLeft: [ReadActionBinding.keyboard(LogicalKeyboardKey.arrowLeft.keyId), null],
+    ReadAction.toRight: [ReadActionBinding.keyboard(LogicalKeyboardKey.arrowRight.keyId), null],
+    ReadAction.back: [ReadActionBinding.keyboard(LogicalKeyboardKey.escape.keyId), null],
+    ReadAction.toggleMenu: [ReadActionBinding.keyboard(LogicalKeyboardKey.space.keyId), null],
+    ReadAction.toggleFirstPageAlone: [ReadActionBinding.keyboard(LogicalKeyboardKey.keyM.keyId), null],
+    ReadAction.toggleFullScreen: [ReadActionBinding.keyboard(LogicalKeyboardKey.f11.keyId), null],
   };
 
-  /// One binding slot per action (keyboard key or mouse side button, or null).
-  final RxMap<ReadAction, ReadActionBinding?> bindings = RxMap<ReadAction, ReadActionBinding?>({});
+  /// Two binding slots per action (keyboard key or mouse side button, or null).
+  final RxMap<ReadAction, List<ReadActionBinding?>> bindings = RxMap<ReadAction, List<ReadActionBinding?>>({});
 
   @override
   ConfigEnum get configEnum => ConfigEnum.keyboardShortcutSetting;
@@ -144,8 +144,17 @@ class KeyboardShortcutSetting with JHLifeCircleBeanWithConfigStorage implements 
     try {
       final Map map = jsonDecode(configString) as Map;
       for (final ReadAction action in ReadAction.values) {
-        if (map.containsKey(action.name)) {
-          bindings[action] = ReadActionBinding.fromJson(map[action.name]);
+        final value = map[action.name];
+        if (value == null) continue;
+
+        if (value is List) {
+          // New format: list of up to 2 bindings
+          final list = value.map((e) => ReadActionBinding.fromJson(e)).take(2).toList();
+          while (list.length < 2) { list.add(null); }
+          bindings[action] = list;
+        } else {
+          // Old format: single binding object
+          bindings[action] = [ReadActionBinding.fromJson(value), null];
         }
       }
     } catch (e) {
@@ -158,14 +167,14 @@ class KeyboardShortcutSetting with JHLifeCircleBeanWithConfigStorage implements 
   String toConfigString() {
     final Map<String, dynamic> map = {};
     for (final ReadAction action in ReadAction.values) {
-      map[action.name] = bindings[action]?.toJson();
+      map[action.name] = bindings[action]?.map((b) => b?.toJson()).toList();
     }
     return jsonEncode(map);
   }
 
   void resetToDefault() {
     for (final ReadAction action in ReadAction.values) {
-      bindings[action] = _defaults[action];
+      bindings[action] = List.from(_defaults[action]!);
     }
   }
 
@@ -173,16 +182,19 @@ class KeyboardShortcutSetting with JHLifeCircleBeanWithConfigStorage implements 
   // Query helpers
   // ---------------------------------------------------------------------------
 
-  ReadActionBinding? bindingFor(ReadAction action) => bindings[action];
+  List<ReadActionBinding?> bindingsFor(ReadAction action) => bindings[action] ?? [null, null];
 
   /// Returns the action whose binding matches [binding], skipping [excludeAction].
   ReadAction? getActionForBinding(ReadActionBinding binding, ReadAction excludeAction) {
-    for (final MapEntry<ReadAction, ReadActionBinding?> entry in bindings.entries) {
-      if (entry.key == excludeAction) {
-        continue;
-      }
-      if (entry.value == binding) {
-        return entry.key;
+    return _getActionForBindingWithExclude(binding, excludeAction, null);
+  }
+
+  ReadAction? _getActionForBindingWithExclude(ReadActionBinding binding, ReadAction excludeAction, int? excludeSlot) {
+    for (final MapEntry<ReadAction, List<ReadActionBinding?>> entry in bindings.entries) {
+      final bool isExcludedAction = entry.key == excludeAction;
+      for (int i = 0; i < entry.value.length; i++) {
+        if (isExcludedAction && i == excludeSlot) continue;
+        if (entry.value[i] == binding) return entry.key;
       }
     }
     return null;
@@ -192,13 +204,20 @@ class KeyboardShortcutSetting with JHLifeCircleBeanWithConfigStorage implements 
     return getActionForBinding(binding, excludeAction) != null;
   }
 
+  bool isBindingConflictingWithSlot(ReadActionBinding binding, ReadAction excludeAction, int excludeSlot) {
+    return _getActionForBindingWithExclude(binding, excludeAction, excludeSlot) != null;
+  }
+
   // ---------------------------------------------------------------------------
   // Mutation
   // ---------------------------------------------------------------------------
 
-  Future<void> bind(ReadAction action, ReadActionBinding? binding) async {
-    log.debug('bind: ${action.name} -> ${binding?.displayName}');
-    bindings[action] = binding;
+  Future<void> bind(ReadAction action, int slotIndex, ReadActionBinding? binding) async {
+    log.debug('bind: ${action.name}[$slotIndex] -> ${binding?.displayName}');
+    final list = List<ReadActionBinding?>.from(bindings[action] ?? [null, null]);
+    while (list.length < 2) { list.add(null); }
+    list[slotIndex] = binding;
+    bindings[action] = list;
     await saveBeanConfig();
   }
 
@@ -235,14 +254,11 @@ class KeyboardShortcutSetting with JHLifeCircleBeanWithConfigStorage implements 
     );
 
     final Map<LogicalKeyboardKey, VoidCallback> result = {};
-    for (final MapEntry<ReadAction, ReadActionBinding?> entry in bindings.entries) {
-      final ReadActionBinding? b = entry.value;
-      if (b == null || !b.isKeyboard) {
-        continue;
-      }
-      final LogicalKeyboardKey? key = b.logicalKey;
-      if (key != null) {
-        result[key] = callbacks[entry.key]!;
+    for (final MapEntry<ReadAction, List<ReadActionBinding?>> entry in bindings.entries) {
+      for (final ReadActionBinding? b in entry.value) {
+        if (b == null || !b.isKeyboard) continue;
+        final LogicalKeyboardKey? key = b.logicalKey;
+        if (key != null) result[key] = callbacks[entry.key]!;
       }
     }
     return result;
@@ -271,14 +287,11 @@ class KeyboardShortcutSetting with JHLifeCircleBeanWithConfigStorage implements 
     );
 
     final Map<int, VoidCallback> result = {};
-    for (final MapEntry<ReadAction, ReadActionBinding?> entry in bindings.entries) {
-      final ReadActionBinding? b = entry.value;
-      if (b == null) {
-        continue;
-      }
-      final int? button = b.mouseButton;
-      if (button != null) {
-        result[button] = callbacks[entry.key]!;
+    for (final MapEntry<ReadAction, List<ReadActionBinding?>> entry in bindings.entries) {
+      for (final ReadActionBinding? b in entry.value) {
+        if (b == null) continue;
+        final int? button = b.mouseButton;
+        if (button != null) result[button] = callbacks[entry.key]!;
       }
     }
     return result;

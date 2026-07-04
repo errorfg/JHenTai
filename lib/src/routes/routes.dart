@@ -312,7 +312,7 @@ class Routes {
     ),
     EHPage(
       name: settingKeyboardShortcuts,
-      page: () => const SettingKeyboardShortcutsPage().withEscOrFifthButton2BackRightRoute(),
+      page: () => const SettingKeyboardShortcutsPage(),
       transition: defaultTransition,
       offAllBefore: false,
     ),

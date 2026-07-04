@@ -4,13 +4,17 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
+import 'package:jhentai/src/pages/setting/keyboard_shortcuts/setting_keyboard_shortcuts_page.dart';
+import 'package:jhentai/src/setting/preference_setting.dart';
 import 'package:jhentai/src/setting/read_setting.dart';
+import 'package:jhentai/src/setting/style_setting.dart';
 
 import '../../../routes/routes.dart';
 import '../../../service/log.dart';
 import '../../../utils/route_util.dart';
 import '../../../utils/text_input_formatter.dart';
 import '../../../utils/toast_util.dart';
+import '../../home_page.dart';
 
 class SettingReadPage extends StatelessWidget {
   final TextEditingController imageRegionWidthRatioController = TextEditingController(text: readSetting.imageRegionWidthRatio.value.toString());
@@ -47,11 +51,13 @@ class SettingReadPage extends StatelessWidget {
               _buildGestureRegionWidthRatio(context).center(),
               if (GetPlatform.isDesktop) _buildUseThirdPartyViewer().center(),
               if (GetPlatform.isDesktop) _buildThirdPartyViewerPath().center(),
-              if (GetPlatform.isDesktop) _buildKeyboardShortcuts().center(),
+              if (GetPlatform.isDesktop) _buildKeyboardShortcuts(context).center(),
               if (GetPlatform.isMobile) _buildDeviceDirection().center(),
               if (GetPlatform.isMobile) _buildEnableOrientationSpecificReadDirection().center(),
-              if (GetPlatform.isMobile && readSetting.enableOrientationSpecificReadDirection.isTrue) _buildPortraitReadDirection().fadeIn(const Key('portraitReadDirection')).center(),
-              if (GetPlatform.isMobile && readSetting.enableOrientationSpecificReadDirection.isTrue) _buildLandscapeReadDirection().fadeIn(const Key('landscapeReadDirection')).center(),
+              if (GetPlatform.isMobile && readSetting.enableOrientationSpecificReadDirection.isTrue)
+                _buildPortraitReadDirection().fadeIn(const Key('portraitReadDirection')).center(),
+              if (GetPlatform.isMobile && readSetting.enableOrientationSpecificReadDirection.isTrue)
+                _buildLandscapeReadDirection().fadeIn(const Key('landscapeReadDirection')).center(),
               _buildReadDirection().center(),
               if (GetPlatform.isMobile && readSetting.readDirection.value == ReadDirection.top2bottomList) _buildNotchOptimization().center(),
               if (readSetting.readDirection.value == ReadDirection.top2bottomList) _buildImageRegionWidthRatio(context).center(),
@@ -464,12 +470,41 @@ class SettingReadPage extends StatelessWidget {
     );
   }
 
-  Widget _buildKeyboardShortcuts() {
+  Widget _buildKeyboardShortcuts(BuildContext context) {
     return ListTile(
       title: Text('keyboardShortcuts'.tr),
       subtitle: Text('keyboardShortcutsHint'.tr),
       trailing: const Icon(Icons.keyboard_arrow_right),
-      onTap: () => toRoute(Routes.settingKeyboardShortcuts),
+      onTap: () {
+        final rootNav = Navigator.of(context, rootNavigator: true);
+        final nearestNav = Navigator.of(context);
+        if (rootNav != nearestNav &&
+            nearestNav.widget.key != Get.keys[left] &&
+            nearestNav.widget.key != Get.keys[right] &&
+            nearestNav.widget.key != Get.keys[leftV2] &&
+            nearestNav.widget.key != Get.keys[rightV2]) {
+          nearestNav.push(
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) => const SettingKeyboardShortcutsPage(),
+              transitionsBuilder: preferenceSetting.enableSwipeBackGesture.isTrue && styleSetting.isInMobileLayout
+                  ? (context, animation, secondaryAnimation, child) => SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(1, 0),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeInOut,
+                        )),
+                        child: child,
+                      )
+                  : (context, animation, secondaryAnimation, child) => FadeTransition(opacity: animation, child: child),
+                transitionDuration: UIConfig.defaultPageRouteTransitionDuration
+            ),
+          );
+        } else {
+          toRoute(Routes.settingKeyboardShortcuts);
+        }
+      },
     );
   }
 

@@ -35,6 +35,7 @@ import '../../network/eh_request.dart';
 import '../../routes/routes.dart';
 import '../../service/log.dart';
 import '../../service/read_progress_service.dart';
+import '../../setting/preference_setting.dart';
 import '../../setting/read_setting.dart';
 import '../../utils/eh_spider_parser.dart';
 import '../../utils/route_util.dart';
@@ -43,6 +44,7 @@ import '../../widget/auto_mode_interval_dialog.dart';
 import '../../widget/loading_state_indicator.dart';
 import '../home_page.dart';
 import '../setting/read/setting_read_page.dart';
+import '../setting/keyboard_shortcuts/setting_keyboard_shortcuts_page.dart';
 
 class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   final String pageId = 'pageId';
@@ -712,7 +714,28 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
             width: width,
             child: Material(
               elevation: 16,
-              child: SettingReadPage(),
+              child: Navigator(
+                key: const Key('readPageLogic'),
+                initialRoute: '/',
+                onGenerateRoute: (settings) {
+                  final bool useCupertino = preferenceSetting.enableSwipeBackGesture.isTrue;
+                  if (settings.name == '/') {
+                    return _buildDrawerRoute(
+                      builder: (_) => SettingReadPage(),
+                      settings: settings,
+                      useCupertino: useCupertino,
+                    );
+                  }
+                  if (settings.name == '/keyboard_shortcuts') {
+                    return _buildDrawerRoute(
+                      builder: (_) => const SettingKeyboardShortcutsPage(),
+                      settings: settings,
+                      useCupertino: useCupertino,
+                    );
+                  }
+                  return null;
+                },
+              ),
             ),
           ),
         );
@@ -721,5 +744,27 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
     applyCurrentImmersiveMode();
     state.focusNode.requestFocus();
+  }
+
+  Route _buildDrawerRoute({
+    required Widget Function(BuildContext) builder,
+    required RouteSettings settings,
+    required bool useCupertino,
+  }) {
+    if (useCupertino) {
+      return PageRouteBuilder(
+        pageBuilder: (context, __, ___) => builder(context),
+        transitionsBuilder: (_, animation, __, child) => SlideTransition(
+          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(CurvedAnimation(parent: animation, curve: Curves.easeInOut)),
+          child: child,
+        ),
+        settings: settings,
+      );
+    }
+    return PageRouteBuilder(
+      pageBuilder: (context, __, ___) => builder(context),
+      transitionsBuilder: (_, animation, __, child) => FadeTransition(opacity: animation, child: child),
+      settings: settings,
+    );
   }
 }
