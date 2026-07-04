@@ -1296,6 +1296,7 @@ class DetailsPageLogic extends GetxController
       gid: state.galleryDetails!.galleryUrl.gid,
       token: state.galleryDetails!.galleryUrl.token,
       apikey: state.apikey!,
+      voteStatus: tag.voteStatus,
       onTagVoted: (bool isVoted) => onTagVoted(tag, isVoted),
     ));
   }

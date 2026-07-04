@@ -22,6 +22,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 
 import '../config/ui_config.dart';
 import '../database/database.dart';
+import '../model/gallery_tag.dart';
 import '../network/eh_request.dart';
 import '../setting/user_setting.dart';
 import '../service/log.dart';
@@ -34,6 +35,7 @@ class EHTagDialog extends StatefulWidget {
   final int gid;
   final String token;
   final String apikey;
+  final EHTagVoteStatus? voteStatus;
   final ValueChanged<bool>? onTagVoted;
 
   const EHTagDialog({
@@ -42,6 +44,7 @@ class EHTagDialog extends StatefulWidget {
     required this.gid,
     required this.token,
     required this.apikey,
+    this.voteStatus,
     this.onTagVoted,
   }) : super(key: key);
 
@@ -56,6 +59,18 @@ class _EHTagDialogState extends State<EHTagDialog> with LoginRequiredMixin {
   LoadingState addHiddenTagState = LoadingState.idle;
 
   ScrollController scrollController = ScrollController();
+
+  bool? _currentVote;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentVote = widget.voteStatus == EHTagVoteStatus.up
+        ? true
+        : widget.voteStatus == EHTagVoteStatus.down
+            ? false
+            : null;
+  }
 
   @override
   void dispose() {
@@ -127,23 +142,25 @@ class _EHTagDialogState extends State<EHTagDialog> with LoginRequiredMixin {
 
   Widget _buildVoteUpButton() {
     return LikeButton(
+      isLiked: _currentVote == true,
       likeBuilder: (bool liked) => Icon(
         Icons.thumb_up,
         size: UIConfig.tagDialogButtonSize,
         color: liked ? UIConfig.tagDialogLikedButtonColor(context) : UIConfig.tagDialogButtonColor(context),
       ),
-      onTap: (bool liked) => liked ? Future.value(true) : vote(isVotingUp: true),
+      onTap: (_) => vote(isVotingUp: true),
     );
   }
 
   Widget _buildVoteDownButton() {
     return LikeButton(
+      isLiked: _currentVote == false,
       likeBuilder: (bool liked) => Icon(
         Icons.thumb_down,
         size: UIConfig.tagDialogButtonSize,
         color: liked ? UIConfig.tagDialogLikedButtonColor(context) : UIConfig.tagDialogButtonColor(context),
       ),
-      onTap: (bool liked) => liked ? Future.value(true) : vote(isVotingUp: false),
+      onTap: (_) => vote(isVotingUp: false),
     );
   }
 
@@ -206,13 +223,20 @@ class _EHTagDialogState extends State<EHTagDialog> with LoginRequiredMixin {
       voteDownState = LoadingState.loading;
     }
 
+    final bool? previousVote = _currentVote;
+    final bool isCancel = _currentVote != null;
+    setState(() => _currentVote = isCancel ? null : isVotingUp);
+
     _doVote(isVotingUp: isVotingUp).then((bool success) {
+      if (!success) {
+        setState(() => _currentVote = previousVote);
+      }
       if (success) {
         widget.onTagVoted?.call(isVotingUp);
       }
     });
 
-    return true;
+    return !isCancel;
   }
 
   Future<bool> _doVote({required bool isVotingUp}) async {
