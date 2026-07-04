@@ -1297,7 +1297,7 @@ class DetailsPageLogic extends GetxController
       token: state.galleryDetails!.galleryUrl.token,
       apikey: state.apikey!,
       voteStatus: tag.voteStatus,
-      onTagVoted: (bool isVoted) => onTagVoted(tag, isVoted),
+      onTagVoted: (bool isVoted, bool isCancel) => onTagVoted(tag, isVoted, isCancel),
     ));
   }
 
@@ -1358,8 +1358,10 @@ class DetailsPageLogic extends GetxController
     }
   }
 
-  void onTagVoted(GalleryTag tag, bool isVoted) {
-    if (tag.voteStatus == EHTagVoteStatus.none) {
+  void onTagVoted(GalleryTag tag, bool isVoted, bool isCancel) {
+    if (isCancel) {
+      tag.voteStatus = EHTagVoteStatus.none;
+    } else if (tag.voteStatus == EHTagVoteStatus.none) {
       tag.voteStatus = isVoted ? EHTagVoteStatus.up : EHTagVoteStatus.down;
     } else if (tag.voteStatus == EHTagVoteStatus.up) {
       tag.voteStatus = isVoted ? EHTagVoteStatus.up : EHTagVoteStatus.none;

@@ -30,13 +30,15 @@ import '../utils/snack_util.dart';
 import '../utils/string_uril.dart';
 import 'loading_state_indicator.dart';
 
+typedef OnTagVoted = void Function(bool isVotingUp, bool isCancel);
+
 class EHTagDialog extends StatefulWidget {
   final TagData tagData;
   final int gid;
   final String token;
   final String apikey;
   final EHTagVoteStatus? voteStatus;
-  final ValueChanged<bool>? onTagVoted;
+  final OnTagVoted? onTagVoted;
 
   const EHTagDialog({
     Key? key,
@@ -227,12 +229,12 @@ class _EHTagDialogState extends State<EHTagDialog> with LoginRequiredMixin {
     final bool isCancel = _currentVote != null;
     setState(() => _currentVote = isCancel ? null : isVotingUp);
 
-    _doVote(isVotingUp: isVotingUp).then((bool success) {
+    _doVote(isVotingUp: isCancel ? !previousVote! : isVotingUp).then((bool success) {
       if (!success) {
         setState(() => _currentVote = previousVote);
       }
       if (success) {
-        widget.onTagVoted?.call(isVotingUp);
+        widget.onTagVoted?.call(isVotingUp, isCancel);
       }
     });
 
