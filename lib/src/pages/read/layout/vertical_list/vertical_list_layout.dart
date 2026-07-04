@@ -58,15 +58,15 @@ class VerticalListLayout extends BaseLayout {
     Widget child = Row(
       children: [
         Expanded(
-          flex: 100 - readSetting.imageRegionWidthRatio.value,
+          flex: 100 - logic.readPageLogic.effectiveImageRegionWidthRatio,
           child: const SizedBox(),
         ),
         Expanded(
-          flex: readSetting.imageRegionWidthRatio.value * 2,
+          flex: logic.readPageLogic.effectiveImageRegionWidthRatio * 2,
           child: readPageState.readPageInfo.mode == ReadMode.online ? buildItemInOnlineMode(context, index) : buildItemInLocalMode(context, index),
         ),
         Expanded(
-          flex: 100 - readSetting.imageRegionWidthRatio.value,
+          flex: 100 - logic.readPageLogic.effectiveImageRegionWidthRatio,
           child: const SizedBox(),
         ),
       ],

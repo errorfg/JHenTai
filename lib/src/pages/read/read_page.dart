@@ -154,13 +154,13 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
             logic.clearImageContainerSized();
             state.displayRegionSize = Size(constraints.maxWidth, constraints.maxHeight);
 
-            if (readSetting.readDirection.value == ReadDirection.top2bottomList) {
+            if (logic.effectiveReadDirection == ReadDirection.top2bottomList) {
               return VerticalListLayout();
             }
-            if (readSetting.isInListReadDirection) {
+            if (logic.isInListReadDirection) {
               return HorizontalListLayout();
             }
-            if (readSetting.isInDoubleColumnReadDirection) {
+            if (logic.isInDoubleColumnReadDirection) {
               return HorizontalDoubleColumnLayout();
             }
             return HorizontalPageLayout();
@@ -298,7 +298,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                 ),
               ),
             Obx(() {
-              if (!readSetting.isInDoubleColumnReadDirection) {
+              if (!logic.isInDoubleColumnReadDirection) {
                 return const SizedBox();
               }
               return ElevatedButton(
@@ -391,7 +391,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
           scrollOffsetController: state.thumbnailsScrollOffsetController,
           child: ScrollablePositionedList.separated(
             scrollDirection: Axis.horizontal,
-            reverse: readSetting.isInRight2LeftDirection,
+            reverse: logic.isInRight2LeftDirection,
             physics: const ClampingScrollPhysics(),
             minCacheExtent: 1 * fullScreenWidth,
             initialScrollIndex: state.readPageInfo.initialIndex,
@@ -502,7 +502,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(readSetting.isInRight2LeftDirection ? state.readPageInfo.pageCount.toString() : (state.readPageInfo.currentImageIndex + 1).toString())
+            Text(logic.isInRight2LeftDirection ? state.readPageInfo.pageCount.toString() : (state.readPageInfo.currentImageIndex + 1).toString())
                 .marginOnly(left: 36, right: 4),
             Expanded(
               child: Column(
@@ -512,7 +512,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                     child: Material(
                       color: Colors.transparent,
                       child: RotatedBox(
-                        quarterTurns: readSetting.isInRight2LeftDirection ? 2 : 0,
+                        quarterTurns: logic.isInRight2LeftDirection ? 2 : 0,
                         child: Slider(
                           min: 1,
                           max: state.readPageInfo.pageCount.toDouble(),
@@ -527,7 +527,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                 ],
               ),
             ),
-            Text(readSetting.isInRight2LeftDirection ? (state.readPageInfo.currentImageIndex + 1).toString() : state.readPageInfo.pageCount.toString())
+            Text(logic.isInRight2LeftDirection ? (state.readPageInfo.currentImageIndex + 1).toString() : state.readPageInfo.pageCount.toString())
                 .marginOnly(right: 36, left: 4),
           ],
         ),
@@ -569,7 +569,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                   .toList(),
               onSelected: (DeviceDirection value) {
                 readSetting.saveDeviceDirection(value);
-                logic.syncReadDirectionToOrientation();
+                logic.onEffectiveSettingChanged();
               },
             ),
           ),

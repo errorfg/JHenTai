@@ -36,7 +36,7 @@ class HorizontalListLayout extends BaseLayout {
           scrollOffsetController: state.scrollOffsetController,
           child: ScrollablePositionedList.separated(
             scrollDirection: Axis.horizontal,
-            reverse: readSetting.isInRight2LeftDirection,
+            reverse: logic.readPageLogic.isInRight2LeftDirection,
             physics: const ClampingScrollPhysics(),
             minCacheExtent: readPageState.readPageInfo.mode == ReadMode.online
                 ? readSetting.preloadDistance * screenHeight * 1

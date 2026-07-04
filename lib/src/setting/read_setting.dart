@@ -30,6 +30,8 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
   Rx<ReadDirection> landscapeReadDirection = ReadDirection.left2rightList.obs;
   RxBool notchOptimization = false.obs;
   RxInt imageRegionWidthRatio = 100.obs;
+  RxInt portraitImageRegionWidthRatio = 100.obs;
+  RxInt landscapeImageRegionWidthRatio = 100.obs;
   RxInt gestureRegionWidthRatio = 60.obs;
   RxBool useThirdPartyViewer = false.obs;
   RxnString thirdPartyViewerPath = RxnString();
@@ -41,6 +43,8 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
   RxInt preloadPageCount = 1.obs;
   RxInt preloadPageCountLocal = 3.obs;
   RxBool displayFirstPageAlone = true.obs;
+  RxBool portraitDisplayFirstPageAlone = true.obs;
+  RxBool landscapeDisplayFirstPageAlone = true.obs;
   RxBool reverseTurnPageDirection = false.obs;
   RxBool disablePageTurningOnTap = false.obs;
   RxBool enableMaxImageKilobyte =
@@ -49,38 +53,70 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
           : true.obs;
   RxInt maxImageKilobyte = (1024 * 5).obs;
 
-  bool get isInListReadDirection =>
-      readDirection.value == ReadDirection.top2bottomList ||
-      readDirection.value == ReadDirection.left2rightList ||
-      readDirection.value == ReadDirection.right2leftList;
+  static bool isListDirection(ReadDirection d) =>
+      d == ReadDirection.top2bottomList ||
+      d == ReadDirection.left2rightList ||
+      d == ReadDirection.right2leftList;
 
-  bool get isInHorizontalReadDirection =>
-      readDirection.value == ReadDirection.left2rightSinglePage ||
-      readDirection.value == ReadDirection.right2leftSinglePage ||
-      readDirection.value == ReadDirection.left2rightSinglePageFitWidth ||
-      readDirection.value == ReadDirection.right2leftSinglePageFitWidth ||
-      readDirection.value == ReadDirection.left2rightDoubleColumn ||
-      readDirection.value == ReadDirection.right2leftDoubleColumn ||
-      readDirection.value == ReadDirection.left2rightList ||
-      readDirection.value == ReadDirection.right2leftList;
+  static bool isDoubleColumnDirection(ReadDirection d) =>
+      d == ReadDirection.left2rightDoubleColumn || d == ReadDirection.right2leftDoubleColumn;
 
-  bool get isInSinglePageReadDirection =>
-      readDirection.value == ReadDirection.left2rightSinglePage ||
-      readDirection.value == ReadDirection.right2leftSinglePage ||
-      readDirection.value == ReadDirection.left2rightSinglePageFitWidth ||
-      readDirection.value == ReadDirection.right2leftSinglePageFitWidth;
+  static bool isSinglePageDirection(ReadDirection d) =>
+      d == ReadDirection.left2rightSinglePage ||
+      d == ReadDirection.right2leftSinglePage ||
+      d == ReadDirection.left2rightSinglePageFitWidth ||
+      d == ReadDirection.right2leftSinglePageFitWidth;
 
-  bool get isInFitWidthReadDirection =>
-      readDirection.value == ReadDirection.left2rightSinglePageFitWidth || readDirection.value == ReadDirection.right2leftSinglePageFitWidth;
+  static bool isFitWidthDirection(ReadDirection d) =>
+      d == ReadDirection.left2rightSinglePageFitWidth || d == ReadDirection.right2leftSinglePageFitWidth;
 
-  bool get isInDoubleColumnReadDirection =>
-      readDirection.value == ReadDirection.left2rightDoubleColumn || readDirection.value == ReadDirection.right2leftDoubleColumn;
+  static bool isRight2LeftDirection(ReadDirection d) =>
+      d == ReadDirection.right2leftSinglePage ||
+      d == ReadDirection.right2leftSinglePageFitWidth ||
+      d == ReadDirection.right2leftDoubleColumn ||
+      d == ReadDirection.right2leftList;
 
-  bool get isInRight2LeftDirection =>
-      readDirection.value == ReadDirection.right2leftSinglePage ||
-      readDirection.value == ReadDirection.right2leftSinglePageFitWidth ||
-      readDirection.value == ReadDirection.right2leftDoubleColumn ||
-      readDirection.value == ReadDirection.right2leftList;
+  bool get isInListReadDirection {
+    if (enableOrientationSpecificReadDirection.isTrue && GetPlatform.isMobile) {
+      return isListDirection(portraitReadDirection.value) || isListDirection(landscapeReadDirection.value);
+    }
+    return isListDirection(readDirection.value);
+  }
+
+  bool get isEveryInListReadDirection {
+    if (enableOrientationSpecificReadDirection.isTrue && GetPlatform.isMobile) {
+      return isListDirection(portraitReadDirection.value) && isListDirection(landscapeReadDirection.value);
+    }
+    return isListDirection(readDirection.value);
+  }
+
+  bool get isInSinglePageReadDirection {
+    if (enableOrientationSpecificReadDirection.isTrue && GetPlatform.isMobile) {
+      return isSinglePageDirection(portraitReadDirection.value) || isSinglePageDirection(landscapeReadDirection.value);
+    }
+    return isSinglePageDirection(readDirection.value);
+  }
+
+  bool get isInFitWidthReadDirection {
+    if (enableOrientationSpecificReadDirection.isTrue && GetPlatform.isMobile) {
+      return isFitWidthDirection(portraitReadDirection.value) || isFitWidthDirection(landscapeReadDirection.value);
+    }
+    return isFitWidthDirection(readDirection.value);
+  }
+
+  bool get isInDoubleColumnReadDirection {
+    if (enableOrientationSpecificReadDirection.isTrue && GetPlatform.isMobile) {
+      return isDoubleColumnDirection(portraitReadDirection.value) || isDoubleColumnDirection(landscapeReadDirection.value);
+    }
+    return isDoubleColumnDirection(readDirection.value);
+  }
+
+  bool get isInRight2LeftDirection {
+    if (enableOrientationSpecificReadDirection.isTrue && GetPlatform.isMobile) {
+      return isRight2LeftDirection(portraitReadDirection.value) || isRight2LeftDirection(landscapeReadDirection.value);
+    }
+    return isRight2LeftDirection(readDirection.value);
+  }
 
   @override
   ConfigEnum get configEnum => ConfigEnum.readSetting;
@@ -108,6 +144,8 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
     readDirection.value = ReadDirection.values[map['readDirection']];
     notchOptimization.value = map['notchOptimization'] ?? notchOptimization.value;
     imageRegionWidthRatio.value = map['imageRegionWidthRatio'] ?? imageRegionWidthRatio.value;
+    portraitImageRegionWidthRatio.value = map['portraitImageRegionWidthRatio'] ?? map['imageRegionWidthRatio'] ?? portraitImageRegionWidthRatio.value;
+    landscapeImageRegionWidthRatio.value = map['landscapeImageRegionWidthRatio'] ?? map['imageRegionWidthRatio'] ?? landscapeImageRegionWidthRatio.value;
     gestureRegionWidthRatio.value = map['gestureRegionWidthRatio'] ?? gestureRegionWidthRatio.value;
     useThirdPartyViewer.value = map['useThirdPartyViewer'] ?? useThirdPartyViewer.value;
     thirdPartyViewerPath.value = map['thirdPartyViewerPath'];
@@ -117,6 +155,8 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
     preloadPageCount.value = map['preloadPageCount'];
     preloadPageCountLocal.value = map['preloadPageCountLocal'] ?? preloadPageCountLocal.value;
     displayFirstPageAlone.value = map['displayFirstPageAlone'] ?? displayFirstPageAlone.value;
+    portraitDisplayFirstPageAlone.value = map['portraitDisplayFirstPageAlone'] ?? map['displayFirstPageAlone'] ?? portraitDisplayFirstPageAlone.value;
+    landscapeDisplayFirstPageAlone.value = map['landscapeDisplayFirstPageAlone'] ?? map['displayFirstPageAlone'] ?? landscapeDisplayFirstPageAlone.value;
     reverseTurnPageDirection.value = map['reverseTurnPageDirection'] ?? reverseTurnPageDirection.value;
     disablePageTurningOnTap.value = map['disablePageTurningOnTap'] ?? disablePageTurningOnTap.value;
     enableMaxImageKilobyte.value = map['enableMaxImageKilobyte'] ?? enableMaxImageKilobyte.value;
@@ -149,6 +189,8 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
       'readDirection': readDirection.value.index,
       'notchOptimization': notchOptimization.value,
       'imageRegionWidthRatio': imageRegionWidthRatio.value,
+      'portraitImageRegionWidthRatio': portraitImageRegionWidthRatio.value,
+      'landscapeImageRegionWidthRatio': landscapeImageRegionWidthRatio.value,
       'gestureRegionWidthRatio': gestureRegionWidthRatio.value,
       'useThirdPartyViewer': useThirdPartyViewer.value,
       'thirdPartyViewerPath': thirdPartyViewerPath.value,
@@ -158,6 +200,8 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
       'preloadPageCount': preloadPageCount.value,
       'preloadPageCountLocal': preloadPageCountLocal.value,
       'displayFirstPageAlone': displayFirstPageAlone.value,
+      'portraitDisplayFirstPageAlone': portraitDisplayFirstPageAlone.value,
+      'landscapeDisplayFirstPageAlone': landscapeDisplayFirstPageAlone.value,
       'reverseTurnPageDirection': reverseTurnPageDirection.value,
       'disablePageTurningOnTap': disablePageTurningOnTap.value,
       'enableMaxImageKilobyte': enableMaxImageKilobyte.value,
@@ -258,6 +302,18 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
     await saveBeanConfig();
   }
 
+  Future<void> savePortraitImageRegionWidthRatio(int value) async {
+    log.debug('savePortraitImageRegionWidthRatio:$value');
+    portraitImageRegionWidthRatio.value = value;
+    await saveBeanConfig();
+  }
+
+  Future<void> saveLandscapeImageRegionWidthRatio(int value) async {
+    log.debug('saveLandscapeImageRegionWidthRatio:$value');
+    landscapeImageRegionWidthRatio.value = value;
+    await saveBeanConfig();
+  }
+
   Future<void> saveGestureRegionWidthRatio(int value) async {
     log.debug('saveGestureRegionWidthRatio:$value');
     gestureRegionWidthRatio.value = value;
@@ -339,6 +395,18 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
   Future<void> saveDisplayFirstPageAlone(bool value) async {
     log.debug('saveDisplayFirstPageAlone:$value');
     displayFirstPageAlone.value = value;
+    await saveBeanConfig();
+  }
+
+  Future<void> savePortraitDisplayFirstPageAlone(bool value) async {
+    log.debug('savePortraitDisplayFirstPageAlone:$value');
+    portraitDisplayFirstPageAlone.value = value;
+    await saveBeanConfig();
+  }
+
+  Future<void> saveLandscapeDisplayFirstPageAlone(bool value) async {
+    log.debug('saveLandscapeDisplayFirstPageAlone:$value');
+    landscapeDisplayFirstPageAlone.value = value;
     await saveBeanConfig();
   }
 

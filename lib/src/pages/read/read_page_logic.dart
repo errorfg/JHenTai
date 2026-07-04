@@ -64,11 +64,11 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
   ReadPageState state = ReadPageState();
 
-  BaseLayoutLogic get layoutLogic => readSetting.readDirection.value == ReadDirection.top2bottomList
+  BaseLayoutLogic get layoutLogic => effectiveReadDirection == ReadDirection.top2bottomList
       ? Get.find<VerticalListLayoutLogic>()
-      : readSetting.isInListReadDirection
+      : isInListReadDirection
           ? Get.find<HorizontalListLayoutLogic>()
-          : readSetting.isInDoubleColumnReadDirection
+          : isInDoubleColumnReadDirection
               ? Get.find<HorizontalDoubleColumnLayoutLogic>()
               : Get.find<HorizontalPageLayoutLogic>();
 
@@ -85,6 +85,13 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   late Worker customBrightnessListener;
   late Worker preloadListener;
   late Worker enableBottomMenuListener;
+  late Worker orientationSpecificReadDirectionLister;
+  late Worker portraitReadDirectionLister;
+  late Worker landscapeReadDirectionLister;
+  late Worker portraitImageRegionWidthRatioLister;
+  late Worker landscapeImageRegionWidthRatioLister;
+  late Worker portraitDisplayFirstPageAloneListener;
+  late Worker landscapeDisplayFirstPageAloneListener;
 
   /// Tracks the last known portrait state for orientation-specific read direction
   bool? _lastIsPortrait;
@@ -130,21 +137,44 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     toggleDeviceOrientationLister = ever(readSetting.deviceDirection, (_) => updateDeviceOrientation());
 
     /// Listen to read direction change
-    readDirectionLister = ever(readSetting.readDirection, (_) {
-      clearImageContainerSized();
-      state.readPageInfo.initialIndex = state.readPageInfo.currentImageIndex;
-      updateSafely([layoutId]);
-    });
+    readDirectionLister = ever(readSetting.readDirection, (_) => onEffectiveSettingChanged());
 
     imageSpaceLister = ever(readSetting.imageSpace, (_) {
       updateSafely([layoutId]);
     });
 
-    displayFirstPageAloneListener = ever(readSetting.displayFirstPageAlone, (value) {
-      if (state.displayFirstPageAlone != value) {
-        state.displayFirstPageAlone = value;
-        layoutLogic.toggleDisplayFirstPageAlone();
-        updateSafely([topMenuId, bottomMenuId]);
+    displayFirstPageAloneListener = ever(readSetting.displayFirstPageAlone, (_) => _syncDisplayFirstPageAloneToState());
+    portraitDisplayFirstPageAloneListener = ever(readSetting.portraitDisplayFirstPageAlone, (_) {
+      if (readSetting.enableOrientationSpecificReadDirection.isTrue && isPortrait) {
+        _syncDisplayFirstPageAloneToState();
+      }
+    });
+    landscapeDisplayFirstPageAloneListener = ever(readSetting.landscapeDisplayFirstPageAlone, (_) {
+      if (readSetting.enableOrientationSpecificReadDirection.isTrue && !isPortrait) {
+        _syncDisplayFirstPageAloneToState();
+      }
+    });
+
+    /// Listen to orientation-specific settings changes for rebuild
+    orientationSpecificReadDirectionLister = ever(readSetting.enableOrientationSpecificReadDirection, (_) => onEffectiveSettingChanged());
+    portraitReadDirectionLister = ever(readSetting.portraitReadDirection, (_) {
+      if (readSetting.enableOrientationSpecificReadDirection.isTrue && isPortrait) {
+        onEffectiveSettingChanged();
+      }
+    });
+    landscapeReadDirectionLister = ever(readSetting.landscapeReadDirection, (_) {
+      if (readSetting.enableOrientationSpecificReadDirection.isTrue && !isPortrait) {
+        onEffectiveSettingChanged();
+      }
+    });
+    portraitImageRegionWidthRatioLister = ever(readSetting.portraitImageRegionWidthRatio, (_) {
+      if (readSetting.enableOrientationSpecificReadDirection.isTrue && isPortrait) {
+        updateSafely([layoutId]);
+      }
+    });
+    landscapeImageRegionWidthRatioLister = ever(readSetting.landscapeImageRegionWidthRatio, (_) {
+      if (readSetting.enableOrientationSpecificReadDirection.isTrue && !isPortrait) {
+        updateSafely([layoutId]);
       }
     });
 
@@ -195,6 +225,8 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       (_) => updateSafely([layoutId]),
     );
 
+    _syncDisplayFirstPageAloneToState();
+
     inited = true;
     if (!delayInitCompleter.isCompleted) {
       delayInitCompleter.complete();
@@ -218,6 +250,13 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     customBrightnessListener.dispose();
     preloadListener.dispose();
     enableBottomMenuListener.dispose();
+    orientationSpecificReadDirectionLister.dispose();
+    portraitReadDirectionLister.dispose();
+    landscapeReadDirectionLister.dispose();
+    portraitImageRegionWidthRatioLister.dispose();
+    landscapeImageRegionWidthRatioLister.dispose();
+    portraitDisplayFirstPageAloneListener.dispose();
+    landscapeDisplayFirstPageAloneListener.dispose();
 
     restoreVolumeListener();
 
@@ -456,6 +495,11 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     final Size size = WidgetsBinding.instance.platformDispatcher.views.first.physicalSize;
     final bool isPortrait = size.height >= size.width;
 
+    if (_lastIsPortrait == null) {
+      _lastIsPortrait = isPortrait;
+      return;
+    }
+
     if (_lastIsPortrait == isPortrait) {
       return;
     }
@@ -463,16 +507,27 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     _lastIsPortrait = isPortrait;
 
     final ReadDirection targetDirection = isPortrait ? readSetting.portraitReadDirection.value : readSetting.landscapeReadDirection.value;
-
-    if (readSetting.readDirection.value == targetDirection) {
-      return;
-    }
-
-    readSetting.saveReadDirection(targetDirection);
-
     final String directionName = targetDirection.name.tr;
     final String orientationKey = isPortrait ? 'portrait' : 'landscape';
-    toast('${'autoSwitchedReadDirection'.tr}: $directionName (${'$orientationKey'.tr})');
+    toast('${'autoSwitchedReadDirection'.tr}: $directionName (${orientationKey.tr})');
+
+    onEffectiveSettingChanged();
+  }
+
+  void onEffectiveSettingChanged() {
+    clearImageContainerSized();
+    state.readPageInfo.initialIndex = state.readPageInfo.currentImageIndex;
+    _syncDisplayFirstPageAloneToState();
+    updateSafely([layoutId]);
+  }
+
+  void _syncDisplayFirstPageAloneToState() {
+    final effective = effectiveDisplayFirstPageAlone;
+    if (state.displayFirstPageAlone != effective) {
+      state.displayFirstPageAlone = effective;
+      layoutLogic.toggleDisplayFirstPageAlone();
+      updateSafely([topMenuId, bottomMenuId]);
+    }
   }
 
   bool get isPortrait {
@@ -503,21 +558,38 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       } else {
         readSetting.saveLandscapeReadDirection(value);
       }
+    } else {
+      readSetting.saveReadDirection(value);
     }
-    readSetting.saveReadDirection(value);
   }
 
-  void syncReadDirectionToOrientation() {
-    if (readSetting.enableOrientationSpecificReadDirection.isFalse || !GetPlatform.isMobile) {
-      return;
+  int get effectiveImageRegionWidthRatio {
+    if (!GetPlatform.isMobile || readSetting.enableOrientationSpecificReadDirection.isFalse) {
+      return readSetting.imageRegionWidthRatio.value;
     }
-    final target = isPortrait
-        ? readSetting.portraitReadDirection.value
-        : readSetting.landscapeReadDirection.value;
-    if (readSetting.readDirection.value != target) {
-      readSetting.saveReadDirection(target);
-    }
+    return isPortrait
+        ? readSetting.portraitImageRegionWidthRatio.value
+        : readSetting.landscapeImageRegionWidthRatio.value;
   }
+
+  bool get effectiveDisplayFirstPageAlone {
+    if (!GetPlatform.isMobile || readSetting.enableOrientationSpecificReadDirection.isFalse) {
+      return readSetting.displayFirstPageAlone.value;
+    }
+    return isPortrait
+        ? readSetting.portraitDisplayFirstPageAlone.value
+        : readSetting.landscapeDisplayFirstPageAlone.value;
+  }
+
+  bool get isInListReadDirection => ReadSetting.isListDirection(effectiveReadDirection);
+
+  bool get isInDoubleColumnReadDirection => ReadSetting.isDoubleColumnDirection(effectiveReadDirection);
+
+  bool get isInSinglePageReadDirection => ReadSetting.isSinglePageDirection(effectiveReadDirection);
+
+  bool get isInFitWidthReadDirection => ReadSetting.isFitWidthDirection(effectiveReadDirection);
+
+  bool get isInRight2LeftDirection => ReadSetting.isRight2LeftDirection(effectiveReadDirection);
 
   void toggleMenu() {
     state.isMenuOpen = !state.isMenuOpen;
