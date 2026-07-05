@@ -128,6 +128,7 @@ dependencies:
   uuid: 4.5.3
   xml: 6.5.0
   telegram: 1.0.0
+  volume_key_board: 0.0.2
   webdav_client: ^1.2.2
   minio: ^3.5.8
 
