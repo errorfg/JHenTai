@@ -111,7 +111,7 @@ jobs:
         with:
           key: ${{ matrix.cache_pod_key }}
           path: ${{ matrix.cache_pod_path }}
-          restore-keys: ${{ matrix.cache_key }}-${{ hashFiles(matrix.cache_pod_restore_keys_hash_file)}}
+          restore-keys: ${{ matrix.cache_pod_key }}
       # Setup JDK
       - name: Setup JDK 17 (Android)
         if: matrix.target == 'Android'

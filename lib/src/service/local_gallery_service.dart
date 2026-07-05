@@ -180,6 +180,13 @@ class LocalGalleryService extends GetxController
     Completer<LocalGalleryParseResult> completer = Completer();
     LocalGalleryParseResult result = LocalGalleryParseResult();
 
+    /// skip hidden directories, especially [pdfPageCacheDirName]: rendered pdf pages
+    /// must not be rediscovered as standalone galleries when a scan path covers them
+    if (basename(directory.path).startsWith('.')) {
+      completer.complete(result);
+      return completer.future;
+    }
+
     Future<bool> future = directory.exists();
 
     /// skip if it is JHenTai gallery directory -> metadata file exists

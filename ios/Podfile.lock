@@ -5,7 +5,9 @@ PODS:
     - Toast
   - http_proxy (0.0.1):
     - Flutter
-  - pdf_render (0.0.1):
+  - pdfx (1.0.0):
+    - Flutter
+  - receive_sharing_intent (1.8.1):
     - Flutter
   - saver_gallery (0.0.1):
     - Flutter
@@ -17,7 +19,8 @@ DEPENDENCIES:
   - Flutter (from `Flutter`)
   - fluttertoast (from `.symlinks/plugins/fluttertoast/ios`)
   - http_proxy (from `.symlinks/plugins/http_proxy/ios`)
-  - pdf_render (from `.symlinks/plugins/pdf_render/ios`)
+  - pdfx (from `.symlinks/plugins/pdfx/ios`)
+  - receive_sharing_intent (from `.symlinks/plugins/receive_sharing_intent/ios`)
   - saver_gallery (from `.symlinks/plugins/saver_gallery/ios`)
   - system_network_proxy (from `.symlinks/plugins/system_network_proxy/ios`)
 
@@ -32,8 +35,10 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/fluttertoast/ios"
   http_proxy:
     :path: ".symlinks/plugins/http_proxy/ios"
-  pdf_render:
-    :path: ".symlinks/plugins/pdf_render/ios"
+  pdfx:
+    :path: ".symlinks/plugins/pdfx/ios"
+  receive_sharing_intent:
+    :path: ".symlinks/plugins/receive_sharing_intent/ios"
   saver_gallery:
     :path: ".symlinks/plugins/saver_gallery/ios"
   system_network_proxy:
@@ -43,7 +48,8 @@ SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   fluttertoast: 76fea30fcf04176325f6864c87306927bd7d2038
   http_proxy: 6e9876b8b0d8bd9378a526bf49c51d8df64e891e
-  pdf_render: 5f9586e5fd49519bf59ea14a6da4851616e91c81
+  pdfx: 77f4dddc48361fbb01486fa2bdee4532cbb97ef3
+  receive_sharing_intent: 222384f00ffe7e952bbfabaa9e3967cb87e5fe00
   saver_gallery: af2d0c762dafda254e0ad025ef0dabd6506cd490
   system_network_proxy: c0b2ba3a6d877b4861e22300ecfb60df4d200382
   Toast: 1f5ea13423a1e6674c4abdac5be53587ae481c4e

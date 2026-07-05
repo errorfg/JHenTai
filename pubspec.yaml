@@ -5,7 +5,7 @@ publish_to: 'none'
 version: 8.0.21+334
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.12.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -67,7 +67,8 @@ dependencies:
     git: https://github.com/jiangtian616/zoom_view
   package_info_plus: 9.0.1
   file_picker: ^8.1.3
-  pdfx: ^2.9.2
+  # pinned exactly: local_gallery_service imports pdfx/src (renderer only, viewer clashes with photo_view fork)
+  pdfx: 2.9.2
   local_auth: 3.0.1
   blur: 4.0.2
   flutter_windowmanager_plus: 1.0.1
