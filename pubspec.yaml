@@ -134,6 +134,10 @@ dependency_overrides:
   # Flutter 3.44 tool no longer tolerates the legacy `pluginClass: none` declaration
   system_network_proxy_macos:
     path: third_party/system_network_proxy_macos
+  system_network_proxy_linux:
+    path: third_party/system_network_proxy_linux
+  system_network_proxy_windows:
+    path: third_party/system_network_proxy_windows
   # j_downloader pins uuid 4.4.0 exactly; pdfx needs ^4.5.1
   uuid: ^4.5.1
   # pdfx depends on hosted photo_view; force the project's git fork

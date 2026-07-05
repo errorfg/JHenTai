@@ -1768,12 +1768,11 @@ packages:
     source: git
     version: "1.0.2"
   system_network_proxy_linux:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
-      name: system_network_proxy_linux
-      sha256: "34b4a9dbea76bcde366c6093c41d348c688d4fb16daba9a4b034a9d2b1b47ac9"
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/system_network_proxy_linux"
+      relative: true
+    source: path
     version: "1.0.2"
   system_network_proxy_macos:
     dependency: "direct overridden"
@@ -1799,12 +1798,11 @@ packages:
     source: hosted
     version: "1.0.2"
   system_network_proxy_windows:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
-      name: system_network_proxy_windows
-      sha256: "67f911602edd0a96890239090b8b929f90038547680264625f6f2334ef8a7a23"
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/system_network_proxy_windows"
+      relative: true
+    source: path
     version: "1.0.2"
   telegram:
     dependency: "direct main"
