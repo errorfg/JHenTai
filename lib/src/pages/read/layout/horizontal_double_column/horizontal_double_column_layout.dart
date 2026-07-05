@@ -30,6 +30,7 @@ class HorizontalDoubleColumnLayout extends BaseLayout {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
             return PhotoViewGallery.builder(
+              enableCtrlScrollZoom: true,
               scrollPhysics: const ClampingScrollPhysics(),
               pageController: state.pageController,
               cacheExtent: readPageState.readPageInfo.mode == ReadMode.online

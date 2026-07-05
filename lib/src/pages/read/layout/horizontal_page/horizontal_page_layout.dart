@@ -22,6 +22,7 @@ class HorizontalPageLayout extends BaseLayout {
     return EHWheelListener(
       onPointerScroll: logic.readPageLogic.isInFitWidthReadDirection ? null : logic.onPointerScroll,
       child: PhotoViewGallery.builder(
+        enableCtrlScrollZoom: true,
         itemCount: readPageState.readPageInfo.pageCount,
         scrollPhysics: const ClampingScrollPhysics(),
         pageController: logic.pageController,

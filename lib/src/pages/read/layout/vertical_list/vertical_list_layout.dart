@@ -24,6 +24,7 @@ class VerticalListLayout extends BaseLayout {
     return GetBuilder<VerticalListLayoutLogic>(
       id: logic.verticalLayoutId,
       builder: (_) => PhotoViewGallery.builder(
+        enableCtrlScrollZoom: true,
         scrollDirection: Axis.vertical,
         itemCount: 1,
         builder: (_, __) => PhotoViewGalleryPageOptions.customChild(
@@ -35,6 +36,7 @@ class VerticalListLayout extends BaseLayout {
           enableTapDragZoom: readSetting.enableTapDragToScaleUp.isTrue,
           child: EHWheelSpeedControllerForReadPage(
             scrollOffsetController: state.scrollOffsetController,
+            stopScrollWhenCtrlPressed: true,
             child: ScrollablePositionedList.separated(
               physics: const ClampingScrollPhysics(),
               minCacheExtent: readPageState.readPageInfo.mode == ReadMode.online

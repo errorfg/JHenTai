@@ -119,6 +119,12 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
   }
 
   void onPointerScroll(PointerScrollEvent value) {
+    final ctrlPressed = HardwareKeyboard.instance.logicalKeysPressed
+        .any((key) => key == LogicalKeyboardKey.controlLeft || key == LogicalKeyboardKey.controlRight);
+    if (ctrlPressed) {
+      return;
+    }
+    
     if (value.scrollDelta.dy > 0) {
       toNext();
     } else if (value.scrollDelta.dy < 0) {

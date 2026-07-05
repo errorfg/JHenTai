@@ -389,6 +389,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
       child: Obx(
         () => EHWheelSpeedControllerForReadPage(
           scrollOffsetController: state.thumbnailsScrollOffsetController,
+          stopScrollWhenCtrlPressed: false,
           child: ScrollablePositionedList.separated(
             scrollDirection: Axis.horizontal,
             reverse: logic.isInRight2LeftDirection,
