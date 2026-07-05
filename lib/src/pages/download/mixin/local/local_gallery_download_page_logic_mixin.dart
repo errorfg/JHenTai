@@ -12,7 +12,6 @@ import '../../../../model/read_page_info.dart';
 import '../../../../routes/routes.dart';
 import '../../../../service/local_config_service.dart';
 import '../../../../service/local_gallery_service.dart';
-import '../../../../service/storage_service.dart';
 import '../../../../setting/read_setting.dart';
 import '../../../../utils/process_util.dart';
 import '../../../../utils/route_util.dart' as route;
@@ -31,8 +30,11 @@ mixin LocalGalleryDownloadPageLogicMixin on GetxController {
 
   int computeItemCount() {
     return isAtRootPath
-        ? localGalleryService.rootDirectories.length
-        : (localGalleryService.path2GalleryDir[currentPath]?.length ?? 0) + (localGalleryService.path2SubDir[currentPath]?.length ?? 0) + 1;
+        ? localGalleryService.rootDirectories.length +
+            (localGalleryService.path2GalleryDir[currentPath]?.length ?? 0)
+        : (localGalleryService.path2GalleryDir[currentPath]?.length ?? 0) +
+            (localGalleryService.path2SubDir[currentPath]?.length ?? 0) +
+            1;
   }
 
   int computeCurrentDirectoryCount() {
@@ -52,7 +54,8 @@ mixin LocalGalleryDownloadPageLogicMixin on GetxController {
   }
 
   Future<void> handleRemoveItem(LocalGallery gallery) async {
-    bool? result = await Get.dialog(EHDialog(title: 'deleteLocalGalleryHint'.tr + '?'));
+    bool? result =
+        await Get.dialog(EHDialog(title: 'deleteLocalGalleryHint'.tr + '?'));
     if (result == true) {
       doRemoveItem(gallery);
     }
@@ -82,13 +85,22 @@ mixin LocalGalleryDownloadPageLogicMixin on GetxController {
   }
 
   Future<void> goToReadPage(LocalGallery gallery) async {
-    if (readSetting.useThirdPartyViewer.isTrue && readSetting.thirdPartyViewerPath.value != null) {
+    if (readSetting.useThirdPartyViewer.isTrue &&
+        readSetting.thirdPartyViewerPath.value != null) {
       openThirdPartyViewer(gallery.path);
     } else {
-      String? string = await localConfigService.read(configKey: ConfigEnum.readIndexRecord, subConfigKey: gallery.cover.path!);
+      String? string = await localConfigService.read(
+          configKey: ConfigEnum.readIndexRecord,
+          subConfigKey: gallery.cover.path!);
       int readIndexRecord = (string == null ? 0 : (int.tryParse(string) ?? 0));
 
-      List<GalleryImage> images = localGalleryService.getGalleryImages(gallery);
+      List<GalleryImage> images;
+      try {
+        images = await localGalleryService.getGalleryImages(gallery);
+      } catch (e) {
+        toast(e.toString(), isShort: false);
+        return;
+      }
 
       route.toRoute(
         Routes.read,
@@ -115,7 +127,8 @@ mixin LocalGalleryDownloadPageLogicMixin on GetxController {
     localGalleryService.refreshLocalGallerys().then((_) {
       currentPath = LocalGalleryService.rootPath;
       update([bodyId]);
-      toast('${'newGalleryCount'.tr}: ${localGalleryService.allGallerys.length - preCount}');
+      toast(
+          '${'newGalleryCount'.tr}: ${localGalleryService.allGallerys.length - preCount}');
     });
   }
 
@@ -125,7 +138,8 @@ mixin LocalGalleryDownloadPageLogicMixin on GetxController {
       builder: (BuildContext context) => CupertinoActionSheet(
         actions: <CupertinoActionSheetAction>[
           CupertinoActionSheetAction(
-            child: Text('delete'.tr, style: TextStyle(color: UIConfig.alertColor(context))),
+            child: Text('delete'.tr,
+                style: TextStyle(color: UIConfig.alertColor(context))),
             onPressed: () {
               route.backRoute();
               handleRemoveItem(gallery);
@@ -143,7 +157,8 @@ mixin LocalGalleryDownloadPageLogicMixin on GetxController {
   String transformDisplayPath(String path) {
     List<String> parts = path.split(separator);
     if (parts.length > 2) {
-      return '.../${parts[parts.length - 2]}/${parts[parts.length - 1]}'.breakWord;
+      return '.../${parts[parts.length - 2]}/${parts[parts.length - 1]}'
+          .breakWord;
     } else {
       return path.breakWord;
     }

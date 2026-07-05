@@ -12,7 +12,6 @@ import 'package:jhentai/src/pages/download/mixin/archive/archive_download_page_m
 import 'package:jhentai/src/pages/download/mixin/archive/archive_download_page_state_mixin.dart';
 import 'package:jhentai/src/service/super_resolution_service.dart';
 
-import '../../../../model/gallery_image.dart';
 import '../../../../routes/routes.dart';
 import '../../../../service/archive_download_service.dart';
 import '../../../../utils/byte_util.dart';
@@ -23,14 +22,25 @@ import 'archive_grid_download_page_logic.dart';
 import 'archive_grid_download_page_state.dart';
 
 class ArchiveGridDownloadPage extends StatelessWidget with Scroll2TopPageMixin, MultiSelectDownloadPageMixin, ArchiveDownloadPageMixin, GridBasePage {
-  ArchiveGridDownloadPage({Key? key}) : super(key: key);
+  static const String _readerLogicTag = 'reader';
+
+  final bool readerMode;
+  @override
+  late final ArchiveGridDownloadPageLogic logic;
+  @override
+  late final ArchiveGridDownloadPageState state;
+
+  ArchiveGridDownloadPage({Key? key, this.readerMode = false}) : super(key: key) {
+    logic = Get.put<ArchiveGridDownloadPageLogic>(
+      ArchiveGridDownloadPageLogic(readerMode: readerMode),
+      tag: readerMode ? _readerLogicTag : null,
+      permanent: true,
+    );
+    state = logic.state;
+  }
 
   @override
-  final DownloadPageGalleryType galleryType = DownloadPageGalleryType.archive;
-  @override
-  final ArchiveGridDownloadPageLogic logic = Get.put<ArchiveGridDownloadPageLogic>(ArchiveGridDownloadPageLogic(), permanent: true);
-  @override
-  final ArchiveGridDownloadPageState state = Get.find<ArchiveGridDownloadPageLogic>().state;
+  DownloadPageGalleryType get galleryType => logic.galleryType;
 
   @override
   ArchiveDownloadPageLogicMixin get archiveDownloadPageLogic => logic;
@@ -69,27 +79,38 @@ class ArchiveGridDownloadPage extends StatelessWidget with Scroll2TopPageMixin, 
                 children: [const Icon(Icons.done_all), const SizedBox(width: 12), Text('multiSelect'.tr)],
               ),
             ),
-            PopupMenuItem(
-              value: 2,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [const Icon(Icons.play_arrow), const SizedBox(width: 12), Text('resumeAllTasks'.tr)],
+            if (!logic.readerMode)
+              PopupMenuItem(
+                value: 2,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [const Icon(Icons.play_arrow), const SizedBox(width: 12), Text('resumeAllTasks'.tr)],
+                ),
               ),
-            ),
-            PopupMenuItem(
-              value: 3,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [const Icon(Icons.pause), const SizedBox(width: 12), Text('pauseAllTasks'.tr)],
+            if (!logic.readerMode)
+              PopupMenuItem(
+                value: 3,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [const Icon(Icons.pause), const SizedBox(width: 12), Text('pauseAllTasks'.tr)],
+                ),
               ),
-            ),
-            PopupMenuItem(
-              value: 4,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [const Icon(Icons.search), const SizedBox(width: 12), Text('search'.tr)],
+            if (!logic.readerMode)
+              PopupMenuItem(
+                value: 4,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [const Icon(Icons.search), const SizedBox(width: 12), Text('search'.tr)],
+                ),
               ),
-            ),
+            if (logic.readerMode)
+              PopupMenuItem(
+                value: 5,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [const Icon(Icons.file_open), const SizedBox(width: 12), Text('import'.tr)],
+                ),
+              ),
           ];
         },
         onSelected: (value) {
@@ -110,6 +131,9 @@ class ArchiveGridDownloadPage extends StatelessWidget with Scroll2TopPageMixin, 
           }
           if (value == 4) {
             toRoute(Routes.downloadSearch);
+          }
+          if (value == 5) {
+            logic.handleImportArchive();
           }
         },
       ),
@@ -134,7 +158,7 @@ class ArchiveGridDownloadPage extends StatelessWidget with Scroll2TopPageMixin, 
             (archive) => GetBuilder<ArchiveDownloadService>(
               id: '${ArchiveDownloadService.archiveStatusId}::${archive.gid}',
               builder: (_) {
-                Widget cover = buildGroupInnerImage(GalleryImage(url: archive.coverUrl));
+                Widget cover = buildGroupInnerImage(archiveDownloadService.buildArchiveCoverImage(archive));
 
                 if (archiveDownloadService.archiveDownloadInfos[archive.gid]?.archiveStatus == ArchiveStatus.completed) {
                   return cover;
@@ -161,21 +185,21 @@ class ArchiveGridDownloadPage extends StatelessWidget with Scroll2TopPageMixin, 
   }
 
   @override
-  GridGallery galleryBuilder(BuildContext context, ArchiveDownloadedData archive, bool inEditMode) {
+  GridGallery galleryBuilder(BuildContext context, ArchiveDownloadedData gallery, bool inEditMode) {
     return GridGallery(
-      title: archive.title,
+      title: gallery.title,
       widget: GetBuilder<ArchiveGridDownloadPageLogic>(
-        id: '${logic.itemCardId}::${archive.gid}',
+        id: '${logic.itemCardId}::${gallery.gid}',
         builder: (_) {
-          ArchiveDownloadInfo archiveDownloadInfo = archiveDownloadService.archiveDownloadInfos[archive.gid]!;
+          ArchiveDownloadInfo archiveDownloadInfo = archiveDownloadService.archiveDownloadInfos[gallery.gid]!;
 
           return GetBuilder<ArchiveDownloadService>(
-            id: '${ArchiveDownloadService.archiveStatusId}::${archive.gid}',
+            id: '${ArchiveDownloadService.archiveStatusId}::${gallery.gid}',
             builder: (_) {
-              Widget cover = buildGalleryImage(GalleryImage(url: archive.coverUrl));
+              Widget cover = buildGalleryImage(archiveDownloadService.buildArchiveCoverImage(gallery));
 
-              if (archiveDownloadService.archiveDownloadInfos[archive.gid]?.archiveStatus == ArchiveStatus.completed) {
-                if (state.selectedGids.contains(archive.gid)) {
+              if (archiveDownloadService.archiveDownloadInfos[gallery.gid]?.archiveStatus == ArchiveStatus.completed) {
+                if (state.selectedGids.contains(gallery.gid)) {
                   return Stack(
                     children: [cover, _buildSelectedIcon()],
                   );
@@ -195,25 +219,25 @@ class ArchiveGridDownloadPage extends StatelessWidget with Scroll2TopPageMixin, 
                       child: cover,
                     ),
                   ),
-                  _buildCircularProgressIndicator(archive, archiveDownloadInfo),
-                  _buildDownloadProgress(archive, archiveDownloadInfo),
-                  _buildActionButton(archiveDownloadInfo, archive),
-                  if (state.selectedGids.contains(archive.gid)) _buildSelectedIcon(),
+                  _buildCircularProgressIndicator(gallery, archiveDownloadInfo),
+                  _buildDownloadProgress(gallery, archiveDownloadInfo),
+                  _buildActionButton(archiveDownloadInfo, gallery),
+                  if (state.selectedGids.contains(gallery.gid)) _buildSelectedIcon(),
                 ],
               );
             },
           );
         },
       ),
-      parseFromBot: archiveDownloadService.archiveDownloadInfos[archive.gid]?.parseSource == ArchiveParseSource.bot.code,
-      isOriginal: archive.isOriginal,
-      gid: archive.gid,
+      parseFromBot: archiveDownloadService.archiveDownloadInfos[gallery.gid]?.parseSource == ArchiveParseSource.bot.code,
+      isOriginal: gallery.isOriginal,
+      gid: gallery.gid,
       superResolutionType: SuperResolutionType.archive,
-      onTapWidget: inEditMode ? null : () => logic.handleTapItem(archive),
-      onTapTitle: inEditMode ? null : () => logic.handleTapTitle(archive),
-      onLongPress: inEditMode ? null : () => logic.handleLongPressOrSecondaryTapItem(archive, context),
-      onSecondTap: inEditMode ? null : () => logic.handleLongPressOrSecondaryTapItem(archive, context),
-      onTertiaryTap: inEditMode ? null : () => logic.handleTapTitle(archive),
+      onTapWidget: inEditMode ? null : () => logic.handleTapItem(gallery),
+      onTapTitle: inEditMode ? null : () => logic.handleTapTitle(gallery),
+      onLongPress: inEditMode ? null : () => logic.handleLongPressOrSecondaryTapItem(gallery, context),
+      onSecondTap: inEditMode ? null : () => logic.handleLongPressOrSecondaryTapItem(gallery, context),
+      onTertiaryTap: inEditMode ? null : () => logic.handleTapTitle(gallery),
     );
   }
 

@@ -10,6 +10,7 @@ import '../../../../mixin/scroll_to_top_state_mixin.dart';
 import '../../../../service/archive_download_service.dart';
 import '../../../../service/local_config_service.dart';
 import '../../../../setting/performance_setting.dart';
+import '../../download_base_page.dart';
 import '../../mixin/archive/archive_download_page_logic_mixin.dart';
 import '../../mixin/archive/archive_download_page_state_mixin.dart';
 import '../../mixin/basic/multi_select/multi_select_download_page_logic_mixin.dart';
@@ -18,14 +19,34 @@ import 'archive_list_download_page_state.dart';
 class ArchiveListDownloadPageLogic extends GetxController
     with Scroll2TopLogicMixin, MultiSelectDownloadPageLogicMixin<ArchiveDownloadedData>, ArchiveDownloadPageLogicMixin, UpdateGlobalGalleryStatusLogicMixin {
   final String galleryId = 'galleryId';
+  final bool readerMode;
 
   ArchiveListDownloadPageState state = ArchiveListDownloadPageState();
+
+  ArchiveListDownloadPageLogic({this.readerMode = false});
 
   @override
   Scroll2TopStateMixin get scroll2TopState => state;
 
   @override
   ArchiveDownloadPageStateMixin get archiveDownloadPageState => state;
+
+  DownloadPageGalleryType get galleryType => readerMode ? DownloadPageGalleryType.read : DownloadPageGalleryType.archive;
+
+  List<ArchiveDownloadedData> get visibleArchives => archiveDownloadService.archives.where(_shouldShowArchive).toList();
+
+  List<String> get visibleGroups {
+    if (!readerMode) {
+      return archiveDownloadService.allGroups;
+    }
+
+    return archiveDownloadService.allGroups.where((group) => archivesWithGroup(group).isNotEmpty).toList();
+  }
+
+  List<ArchiveDownloadedData> archivesWithGroup(String group) =>
+      visibleArchives.where((archive) => archiveDownloadService.archiveDownloadInfos[archive.gid]!.group == group).toList();
+
+  bool _shouldShowArchive(ArchiveDownloadedData archive) => archiveDownloadService.isImportedArchive(archive) == readerMode;
 
   late Worker maxGalleryNum4AnimationListener;
 
@@ -88,12 +109,27 @@ class ArchiveListDownloadPageLogic extends GetxController
   }
 
   @override
+  Future<void> afterImportArchives(List<ArchiveDownloadedData> archives) async {
+    await state.displayGroupsCompleter.future;
+
+    bool changed = false;
+    for (ArchiveDownloadedData archive in archives) {
+      String group = archiveDownloadService.archiveDownloadInfos[archive.gid]!.group;
+      changed = state.displayGroups.add(group) || changed;
+    }
+
+    if (changed) {
+      await localConfigService.write(configKey: ConfigEnum.displayArchiveGroups, value: jsonEncode(state.displayGroups.toList()));
+    }
+  }
+
+  @override
   Future<void> selectAllItem() async {
     await state.displayGroupsCompleter.future;
 
     List<ArchiveDownloadedData> archives = [];
     for (String group in state.displayGroups) {
-      archives.addAll(archiveDownloadService.archivesWithGroup(group));
+      archives.addAll(archivesWithGroup(group));
     }
 
     multiSelectDownloadPageState.selectedGids.addAll(archives.map((archive) => archive.gid));

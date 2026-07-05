@@ -12,6 +12,15 @@ class FileUtil {
     return s.endsWith('.jpg') || s.endsWith('.png') || s.endsWith('.gif') || s.endsWith('.jpeg') || s.endsWith('.webp');
   }
 
+  static bool isPdfExtension(String path) {
+    return path.toLowerCase().endsWith('.pdf');
+  }
+
+  static bool isComicArchiveExtension(String path) {
+    String s = path.toLowerCase();
+    return s.endsWith('.zip') || s.endsWith('.cbz');
+  }
+
   static bool isJHenTaiGalleryDirectory(Directory directory) {
     return _galleryPathPattern.hasMatch(directory.path) || _archivePathPattern.hasMatch(directory.path);
   }

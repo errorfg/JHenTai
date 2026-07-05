@@ -1,4 +1,4 @@
-import 'package:animate_do/animate_do.dart';
+import 'package:animate_do/animate_do.dart' hide FadeInExtension, FadeOutExtension;
 import 'package:collection/collection.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
@@ -11,7 +11,6 @@ import 'package:jhentai/src/pages/search/mixin/search_page_mixin.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
 import 'package:jhentai/src/service/tag_translation_service.dart';
 import 'package:jhentai/src/setting/favorite_setting.dart';
-import 'package:jhentai/src/utils/route_util.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
 import 'package:jhentai/src/widget/eh_alert_dialog.dart';
 import 'package:jhentai/src/widget/eh_wheel_speed_controller.dart';
@@ -109,14 +108,30 @@ class _EHSearchConfigDialogState extends State<EHSearchConfigDialog> {
     }();
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        if (widget.type == EHSearchConfigDialogType.update) IconButton(icon: const Icon(Icons.delete), onPressed: _handleDeleteConfig),
-        if (widget.type == EHSearchConfigDialogType.filter) IconButton(icon: const Icon(Icons.refresh), onPressed: _resetAllConfig),
-        if (widget.type == EHSearchConfigDialogType.add) const IconButton(icon: Icon(Icons.close), onPressed: backRoute),
-        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        IconButton(icon: const Icon(Icons.check), onPressed: checkAndBack),
+        if (widget.type == EHSearchConfigDialogType.update) _buildHeaderButton(icon: Icons.delete, onPressed: _handleDeleteConfig),
+        if (widget.type == EHSearchConfigDialogType.filter) _buildHeaderButton(icon: Icons.refresh, onPressed: _resetAllConfig),
+        Expanded(
+          child: Text(
+            title,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ),
+        if (widget.type != EHSearchConfigDialogType.filter) _buildHeaderButton(icon: Icons.close, onPressed: _close),
+        _buildHeaderButton(icon: Icons.check, onPressed: checkAndBack),
       ],
+    );
+  }
+
+  Widget _buildHeaderButton({required IconData icon, required VoidCallback onPressed}) {
+    return IconButton(
+      icon: Icon(icon),
+      onPressed: onPressed,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 40),
+      visualDensity: VisualDensity.compact,
     );
   }
 
@@ -711,7 +726,7 @@ class _EHSearchConfigDialogState extends State<EHSearchConfigDialog> {
 
     if (result == true) {
       quickSearchService.removeQuickSearch(quickSearchName!);
-      backRoute();
+      _close();
     }
   }
 
@@ -810,7 +825,7 @@ class _EHSearchConfigDialogState extends State<EHSearchConfigDialog> {
 
   void checkAndBack() {
     if (widget.type == EHSearchConfigDialogType.filter) {
-      backRoute(result: {'searchConfig': searchConfig, 'quickSearchName': quickSearchName});
+      _close({'searchConfig': searchConfig, 'quickSearchName': quickSearchName});
       return;
     }
 
@@ -819,7 +834,11 @@ class _EHSearchConfigDialogState extends State<EHSearchConfigDialog> {
       return;
     }
 
-    backRoute(result: {'searchConfig': searchConfig, 'quickSearchName': quickSearchName});
+    _close({'searchConfig': searchConfig, 'quickSearchName': quickSearchName});
+  }
+
+  void _close([Object? result]) {
+    Navigator.of(context).pop(result);
   }
 }
 

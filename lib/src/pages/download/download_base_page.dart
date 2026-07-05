@@ -7,7 +7,6 @@ import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/pages/download/grid/local/local_gallery_grid_page.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
-import 'package:jhentai/src/service/storage_service.dart';
 import 'package:simple_animations/animation_controller_extension/animation_controller_extension.dart';
 import 'package:simple_animations/animation_mixin/animation_mixin.dart';
 import '../../config/ui_config.dart';
@@ -66,16 +65,20 @@ class _DownloadPageState extends State<DownloadPage> {
                       ? bodyType == DownloadPageBodyType.list
                           ? ArchiveListDownloadPage(key: const PageStorageKey('ArchiveListDownloadBody'))
                           : ArchiveGridDownloadPage(key: const PageStorageKey('ArchiveGridDownloadBody'))
-                      : bodyType == DownloadPageBodyType.list
-                          ? LocalGalleryListPage(key: const PageStorageKey('LocalGalleryListBody'))
-                          : LocalGalleryGridPage(key: const PageStorageKey('LocalGalleryGridBody')),
+                      : galleryType == DownloadPageGalleryType.local
+                          ? bodyType == DownloadPageBodyType.list
+                              ? LocalGalleryListPage(key: const PageStorageKey('LocalGalleryListBody'))
+                              : LocalGalleryGridPage(key: const PageStorageKey('LocalGalleryGridBody'))
+                          : bodyType == DownloadPageBodyType.list
+                              ? ArchiveListDownloadPage(key: const PageStorageKey('ReaderArchiveListDownloadBody'), readerMode: true)
+                              : ArchiveGridDownloadPage(key: const PageStorageKey('ReaderArchiveGridDownloadBody'), readerMode: true),
         ),
       ),
     ).enableMouseDrag();
   }
 }
 
-enum DownloadPageGalleryType { download, archive, local }
+enum DownloadPageGalleryType { download, archive, local, read }
 
 enum DownloadPageBodyType { list, grid }
 
@@ -116,6 +119,12 @@ class DownloadPageSegmentControl extends StatelessWidget {
         ),
         DownloadPageGalleryType.local: Text(
           'local'.tr,
+          style: const TextStyle(fontSize: UIConfig.downloadPageSegmentedTextSize, fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        DownloadPageGalleryType.read: Text(
+          'read'.tr,
           style: const TextStyle(fontSize: UIConfig.downloadPageSegmentedTextSize, fontWeight: FontWeight.bold),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
