@@ -60,12 +60,12 @@
       },
       "versions": [
         {
-          "version": "8.0.23",
-          "buildVersion": "336",
-          "date": "2026-07-05T15:53:18Z",
-          "localizedDescription": "本版本的功能变更全部来自合并上游（jiangtian616/JHenTai）：\n\n- iOS 支持音量键翻页\n- 支持横竖屏分别设置阅读方向\n- 桌面端支持 Ctrl + 鼠标滚轮缩放图片\n- 桌面模式和鼠标右键支持普通弹出菜单\n- 阅读页菜单支持复制图片到剪贴板、复制 E-Hentai 页面 URL、重置阅读进度\n- 支持键盘快捷键配置\n- 标签投票支持取消\n- 快速搜索抽屉保持滚动位置\n- 新增 sanitizedTitle 字段，修复下载路径一致性问题（含数据库迁移与旧数据回填）\n- 修复阅读页双击缩放问题\n- 修复部分归档下载问题\n",
-          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.23+336/JHenTai_8.0.23+336.ipa",
-          "size": 15012446
+          "version": "8.0.24",
+          "buildVersion": "337",
+          "date": "2026-07-05T18:39:01Z",
+          "localizedDescription": "- 云同步架构升级：历史记录与阅读进度改为增量同步（oplog + 快照），日常同步只传输变化部分，不再随数据量增长变慢\n- 修复多设备并发同步互相覆盖导致的同步丢失问题\n- 修复同步合并可能回滚正在阅读的最新进度的问题（时间戳守卫写回，SQLite 层原子保护）\n- 同步时间戳统一为 UTC 固定宽度格式，修复跨时区/时钟偏差下的合并错乱，存量数据自动迁移\n- 同步全程加互斥锁；内容无变化时跳过上传；同步数据 gzip 压缩\n- 首次升级后各设备自动完成 v2 格式迁移，过渡期与旧版本客户端兼容\n",
+          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.24+337/JHenTai_8.0.24+337.ipa",
+          "size": 15037486
         },
         {
           "version": "8.0.15",
