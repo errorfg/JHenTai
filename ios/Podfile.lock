@@ -14,6 +14,8 @@ PODS:
   - system_network_proxy (0.0.1):
     - Flutter
   - Toast (4.1.1)
+  - volume_key_board (0.0.1):
+    - Flutter
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
@@ -23,6 +25,7 @@ DEPENDENCIES:
   - receive_sharing_intent (from `.symlinks/plugins/receive_sharing_intent/ios`)
   - saver_gallery (from `.symlinks/plugins/saver_gallery/ios`)
   - system_network_proxy (from `.symlinks/plugins/system_network_proxy/ios`)
+  - volume_key_board (from `.symlinks/plugins/volume_key_board/ios`)
 
 SPEC REPOS:
   trunk:
@@ -43,6 +46,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/saver_gallery/ios"
   system_network_proxy:
     :path: ".symlinks/plugins/system_network_proxy/ios"
+  volume_key_board:
+    :path: ".symlinks/plugins/volume_key_board/ios"
 
 SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
@@ -53,6 +58,7 @@ SPEC CHECKSUMS:
   saver_gallery: af2d0c762dafda254e0ad025ef0dabd6506cd490
   system_network_proxy: c0b2ba3a6d877b4861e22300ecfb60df4d200382
   Toast: 1f5ea13423a1e6674c4abdac5be53587ae481c4e
+  volume_key_board: c239533af2ebd81e8534f921f8bc16f46dbed140
 
 PODFILE CHECKSUM: f6c7589325fb831bbaaf87a4b15e4f7689a16952
 
