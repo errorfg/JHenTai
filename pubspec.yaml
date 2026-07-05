@@ -63,7 +63,7 @@ dependencies:
   photo_view:
     git:
       url: https://github.com/jiangtian616/photo_view
-      ref: separate
+      ref: 1fecde37
   zoom_view: 
     git: https://github.com/jiangtian616/zoom_view
   package_info_plus: 9.0.1
@@ -146,7 +146,7 @@ dependency_overrides:
   photo_view:
     git:
       url: https://github.com/jiangtian616/photo_view
-      ref: separate
+      ref: 1fecde37
   chewie: 1.13.1
   http: 1.6.0
   cached_network_image: 3.4.0

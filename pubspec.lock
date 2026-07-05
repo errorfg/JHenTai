@@ -1314,8 +1314,8 @@ packages:
     dependency: "direct main"
     description:
       path: "."
-      ref: separate
-      resolved-ref: "56b92f7bfbd3bbf4eaa123933631d22b69a760fa"
+      ref: "1fecde37"
+      resolved-ref: "1fecde379eade5cadbe14fcf9f18482cd5b32db1"
       url: "https://github.com/jiangtian616/photo_view"
     source: git
     version: "0.14.0"
