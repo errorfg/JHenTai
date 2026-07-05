@@ -45,6 +45,11 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - wnacg URL link jumping with automatic domain rewriting.
 - Foldable device support:
   - global floating button to toggle between portrait and landscape orientation (mobile layout only).
+- Local library & downloads:
+  - archive preview page for browsing images inside downloaded archives.
+  - local PDF files scanned and readable as galleries (Windows PDF rendering newly supported via pdfx).
+- Framework:
+  - Flutter upgraded to 3.44.4, fixing dialogs auto-dismissing on iPadOS 26.1+ (flutter/flutter#177992).
 - CI/workflow updates in this fork:
   - branch checks for non-master branches with Android APK artifact uploads.
   - branch check focus on Android release APK artifact.
