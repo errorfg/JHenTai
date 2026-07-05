@@ -32,6 +32,7 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - sync settings included in config export.
   - home sync progress indicator with desktop entry via title/progress display.
   - sync consistency fixes for search history merge and reading progress after cloud sync.
+  - incremental oplog sync for history and read progress: routine syncs transfer only changes, immune to concurrent-device overwrites and clock skew.
 - Gallery and search UX:
   - multi-tag selection in detail page.
   - client-side filters for Popular and Ranklist pages.
