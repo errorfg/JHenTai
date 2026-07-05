@@ -67,6 +67,9 @@ jobs:
       FLUTTER_VERSION: 3.44.4
       # pdfx downloads pdfium via a legacy CMake project incompatible with CMake 4
       CMAKE_POLICY_VERSION_MINIMUM: 3.5
+      # New MSVC rejects <experimental/coroutine> (local_auth/permission_handler plugins)
+      # and its stricter /WX warnings break the clipboard plugin
+      CL: /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS /wd4189
     steps:
       # Checkout branch
       - name: Checkout
@@ -101,7 +104,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: 'stable'
+          channel: 'master'
           cache: true
       # Output Flutter Version
       - name: Output Flutter Version
