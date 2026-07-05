@@ -4,6 +4,14 @@ enum ConfigEnum {
   renameDownloadMetadata('renameDownloadMetadata'),
   migrateGalleryHistory('migrateGalleryHistory'),
   migrateStorageConfig('migrateStorageConfig'),
+  migrateLocalConfigUtimeToUtc('migrateLocalConfigUtimeToUtc'),
+  migrateHistoryTimeToUtc('migrateHistoryTimeToUtc'),
+
+  /// oplog-based cloud sync (format v2) state
+  syncDeviceId('syncDeviceId'),
+  oplogPushCursor('oplogPushCursor'),
+  oplogAppliedOps('oplogAppliedOps'),
+  oplogAppliedSnapshot('oplogAppliedSnapshot'),
 
   /// settings
   favoriteSetting('favoriteSetting'),

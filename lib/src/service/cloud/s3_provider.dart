@@ -197,4 +197,60 @@ class S3Provider implements CloudProvider {
   String _generateVersion() {
     return DateFormat('yyyyMMddHHmmss').format(DateTime.now());
   }
+
+  @override
+  Future<void> putRawObject(String key, List<int> bytes) async {
+    Uint8List data = bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
+    await _client.putObject(
+      _bucketName,
+      '$_baseKey$key',
+      Stream.value(data),
+      size: data.length,
+    );
+  }
+
+  @override
+  Future<List<int>?> getRawObject(String key) async {
+    String fullKey = '$_baseKey$key';
+
+    try {
+      var stream = await _client.getObject(_bucketName, fullKey);
+      List<int> result = [];
+      await for (var chunk in stream) {
+        result.addAll(chunk);
+      }
+      return result;
+    } on MinioS3Error catch (e) {
+      /// S3-level error: by far the most common case is NoSuchKey. Only the
+      /// runtime type is safe to log - minio-dart error objects can throw on
+      /// property access.
+      log.debug('S3 getObject miss for $fullKey (${e.runtimeType})');
+      return null;
+    }
+  }
+
+  @override
+  Future<List<RemoteObjectInfo>> listRawObjects(String prefix) async {
+    List<RemoteObjectInfo> result = [];
+    var chunks = await _client.listObjects(_bucketName, prefix: '$_baseKey$prefix', recursive: true).toList();
+    for (var chunk in chunks) {
+      for (var obj in chunk.objects) {
+        String? objKey = obj.key;
+        if (objKey == null) {
+          continue;
+        }
+        result.add(RemoteObjectInfo(
+          key: objKey.replaceFirst(_baseKey, ''),
+          size: obj.size ?? 0,
+          modifiedTime: obj.lastModified,
+        ));
+      }
+    }
+    return result;
+  }
+
+  @override
+  Future<void> deleteRawObject(String key) async {
+    await _client.removeObject(_bucketName, '$_baseKey$key');
+  }
 }

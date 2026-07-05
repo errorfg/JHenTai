@@ -44,6 +44,31 @@ abstract class CloudProvider {
   ///
   /// 返回 true 表示连接成功，false 表示连接失败
   Future<bool> testConnection();
+
+  /// ---- 通用对象操作（oplog 同步 / format v2 使用） ----
+  /// [key] 是相对于同步根目录的路径，可包含 '/'（如 'ops/device1/xxx.json.gz'）
+
+  /// 写入对象（覆盖）
+  Future<void> putRawObject(String key, List<int> bytes);
+
+  /// 读取对象；对象不存在时返回 null，其它错误抛出异常
+  Future<List<int>?> getRawObject(String key);
+
+  /// 列出指定前缀下的所有对象（前缀以 '/' 结尾表示目录语义）
+  Future<List<RemoteObjectInfo>> listRawObjects(String prefix);
+
+  /// 删除对象（对象不存在时不报错）
+  Future<void> deleteRawObject(String key);
+}
+
+/// 通用对象元数据
+class RemoteObjectInfo {
+  /// 相对于同步根目录的路径
+  final String key;
+  final int size;
+  final DateTime? modifiedTime;
+
+  RemoteObjectInfo({required this.key, required this.size, this.modifiedTime});
 }
 
 /// 云文件元数据

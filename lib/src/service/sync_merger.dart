@@ -31,13 +31,16 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     List<CloudConfig> localConfigs,
     List<CloudConfig> remoteConfigs,
     DateTime remoteFileTime,
-    List<CloudConfigTypeEnum> selectedTypes,
-  ) async {
+    List<CloudConfigTypeEnum> selectedTypes, {
+    DateTime? latestLocalTimeOverride,
+  }) async {
     List<CloudConfig> mergedConfigs = [];
     Map<CloudConfigTypeEnum, MergeStatistics> statistics = {};
 
-    // Extract latest local timestamp from configs with item timestamps
-    DateTime? latestLocalTime = await _getLatestLocalTimestamp(localConfigs);
+    // Extract latest local timestamp from configs with item timestamps.
+    // When hot types no longer travel through this merger, the caller
+    // computes the value from the database directly and passes it in.
+    DateTime? latestLocalTime = latestLocalTimeOverride ?? await _getLatestLocalTimestamp(localConfigs);
 
     for (var type in selectedTypes) {
       try {
@@ -208,24 +211,8 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       remoteMap[item['subConfigKey']] = item;
     }
 
-    // Debug: Print recent 10 records
-    log.info('📚 ReadIndexRecord Merge Details:');
     log.info(
-        '  Local total: ${localMap.length}, Remote total: ${remoteMap.length}');
-
-    var localRecent = localList.take(10).toList();
-    log.info('  Local recent 10 records:');
-    for (var item in localRecent) {
-      log.info(
-          '    gid=${item['subConfigKey']}, page=${item['value']}, utime=${item['utime']}');
-    }
-
-    var remoteRecent = remoteList.take(10).toList();
-    log.info('  Remote recent 10 records:');
-    for (var item in remoteRecent) {
-      log.info(
-          '    gid=${item['subConfigKey']}, page=${item['value']}, utime=${item['utime']}');
-    }
+        '📚 ReadIndexRecord merge: local=${localMap.length}, remote=${remoteMap.length}');
 
     Map<String, dynamic> merged = {};
     int conflicts = 0;
@@ -251,15 +238,6 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
 
     String mergedJson =
         await isolateService.jsonEncodeAsync(merged.values.toList());
-
-    // Debug: Print merged result
-    List mergedList = await isolateService.jsonDecodeAsync(mergedJson);
-    var mergedRecent = mergedList.take(10).toList();
-    log.info('  Merged recent 10 records:');
-    for (var item in mergedRecent) {
-      log.info(
-          '    gid=${item['subConfigKey']}, page=${item['value']}, utime=${item['utime']}');
-    }
 
     CloudConfig mergedConfig = CloudConfig(
       id: CloudConfigService.localConfigId,

@@ -192,4 +192,90 @@ class WebDavProvider implements CloudProvider {
   String _generateVersion() {
     return DateFormat('yyyyMMddHHmmss').format(DateTime.now());
   }
+
+  String get _root => remotePath.endsWith('/') ? remotePath : '$remotePath/';
+
+  @override
+  Future<void> putRawObject(String key, List<int> bytes) async {
+    _client ??= _initClient();
+
+    String fullPath = '$_root$key';
+    int slash = fullPath.lastIndexOf('/');
+    if (slash > 0) {
+      await _client!.mkdirAll(fullPath.substring(0, slash));
+    }
+    await _client!.write(fullPath, Uint8List.fromList(bytes));
+  }
+
+  @override
+  Future<List<int>?> getRawObject(String key) async {
+    _client ??= _initClient();
+
+    String fullPath = '$_root$key';
+    int slash = fullPath.lastIndexOf('/');
+    String dir = slash > 0 ? fullPath.substring(0, slash) : _root;
+    String name = fullPath.substring(slash + 1);
+
+    /// Probe via directory listing to distinguish "not found" from transport
+    /// errors (a missing parent directory also means "not found")
+    List<webdav.File> files;
+    try {
+      files = await _client!.readDir(dir);
+    } catch (_) {
+      return null;
+    }
+    bool exists = files.any((f) => (f.name ?? '') == name);
+    if (!exists) {
+      return null;
+    }
+
+    return await _client!.read(fullPath);
+  }
+
+  @override
+  Future<List<RemoteObjectInfo>> listRawObjects(String prefix) async {
+    _client ??= _initClient();
+
+    List<RemoteObjectInfo> result = [];
+
+    Future<void> walk(String relativeDir) async {
+      List<webdav.File> files;
+      try {
+        files = await _client!.readDir('$_root$relativeDir');
+      } catch (_) {
+        /// Directory does not exist yet
+        return;
+      }
+      for (webdav.File file in files) {
+        String? name = file.name;
+        if (name == null || name.isEmpty) {
+          continue;
+        }
+        String relativeKey = relativeDir.isEmpty ? name : '$relativeDir$name';
+        if (file.isDir == true) {
+          await walk('$relativeKey/');
+        } else {
+          result.add(RemoteObjectInfo(
+            key: relativeKey,
+            size: file.size ?? 0,
+            modifiedTime: file.mTime,
+          ));
+        }
+      }
+    }
+
+    String dirPrefix = prefix.endsWith('/') ? prefix : (prefix.isEmpty ? '' : '$prefix/');
+    await walk(dirPrefix);
+    return result;
+  }
+
+  @override
+  Future<void> deleteRawObject(String key) async {
+    _client ??= _initClient();
+    try {
+      await _client!.remove('$_root$key');
+    } catch (e) {
+      log.debug('WebDAV remove failed (object may not exist): $key');
+    }
+  }
 }

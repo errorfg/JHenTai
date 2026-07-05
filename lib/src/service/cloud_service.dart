@@ -52,18 +52,26 @@ class CloudConfigService
         List list = await isolateService.jsonDecodeAsync(config.config);
         List<LocalConfig> readIndexRecords =
             list.map((e) => LocalConfig.fromJson(e)).toList();
+
+        /// Only write rows that are newer than the local ones: the merge was
+        /// computed from a snapshot taken when the sync started, and progress
+        /// updated concurrently must not be rolled back.
+        int written = await localConfigService.batchWriteIfNewer(
+          configKey: ConfigEnum.readIndexRecord,
+          localConfigs: readIndexRecords
+              .map((e) => LocalConfigCompanion(
+                    configKey: Value(e.configKey.key),
+                    subConfigKey: Value(e.subConfigKey),
+                    value: Value(e.value),
+                    utime: Value(e.utime),
+                  ))
+              .toList(),
+        );
+        if (written > 0) {
+          readProgressService.clearCacheAndRefresh();
+        }
         log.info(
-            '  Writing ${readIndexRecords.length} read index records to database');
-        await localConfigService.batchWrite(readIndexRecords
-            .map((e) => LocalConfigCompanion(
-                  configKey: Value(e.configKey.key),
-                  subConfigKey: Value(e.subConfigKey),
-                  value: Value(e.value),
-                  utime: Value(e.utime),
-                ))
-            .toList());
-        readProgressService.clearCacheAndRefresh();
-        log.info('  ✅ Read index records imported');
+            '  ✅ Read index records imported ($written of ${readIndexRecords.length} rows newer than local)');
         break;
       case CloudConfigTypeEnum.quickSearch:
         await localConfigService.write(
@@ -108,9 +116,9 @@ class CloudConfigService
         List list = await isolateService.jsonDecodeAsync(config.config);
         List<GalleryHistoryV2Data> histories =
             list.map((e) => GalleryHistoryV2Data.fromJson(e)).toList();
-        log.info('  Writing ${histories.length} gallery history records');
-        await historyService.batchRecord(histories);
-        log.info('  ✅ Gallery history imported');
+        int writtenHistories = await historyService.batchRecordIfNewer(histories);
+        log.info(
+            '  ✅ Gallery history imported ($writtenHistories of ${histories.length} rows newer than local)');
         break;
       case CloudConfigTypeEnum.syncSetting:
         await localConfigService.write(

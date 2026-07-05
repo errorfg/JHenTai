@@ -2,8 +2,13 @@ import 'package:flutter/widgets.dart';
 import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/model/config.dart';
 import 'package:jhentai/src/service/cloud/cloud_provider.dart';
+import 'package:jhentai/src/service/cloud/hot_data_sync_engine.dart';
 import 'package:jhentai/src/service/cloud/s3_provider.dart';
 import 'package:jhentai/src/service/cloud/webdav_provider.dart';
+import 'package:jhentai/src/service/history_service.dart';
+import 'package:jhentai/src/service/local_config_service.dart';
+import 'package:jhentai/src/enum/config_enum.dart';
+import 'package:jhentai/src/utils/sync_time_util.dart';
 import 'package:jhentai/src/service/cloud_service.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/sync_merger.dart';
@@ -19,6 +24,8 @@ SyncService syncService = SyncService();
 /// 负责协调 CloudProvider 和 SyncMerger，提供统一的同步接口
 class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   final Map<String, CloudProvider> _providers = {};
+  final HotDataSyncEngine _hotEngine = HotDataSyncEngine();
+  bool _syncInProgress = false;
   DateTime? _lastSyncTime;
   int _lastHistoryAutoSyncCount = 0;
   bool _historyAutoSyncInProgress = false;
@@ -156,6 +163,12 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       return;
     }
 
+    if (_lastSyncTime != null &&
+        DateTime.now().difference(_lastSyncTime!) < _minSyncInterval) {
+      log.debug('Auto sync by history count skipped: too soon since last sync');
+      return;
+    }
+
     _historyAutoSyncInProgress = true;
     _lastHistoryAutoSyncCount = totalHistoryCount;
     _lastSyncTime = DateTime.now();
@@ -185,6 +198,27 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   /// [types]: List of config types to sync
   /// [providerName]: Optional provider name, defaults to current provider
   Future<SyncResult> sync({
+    required List<CloudConfigTypeEnum> types,
+    String? providerName,
+    void Function(double progress)? onProgress,
+  }) async {
+    if (_syncInProgress) {
+      log.info('Sync skipped: another sync is already in progress');
+      return SyncResult(
+        success: false,
+        message: 'Sync already in progress',
+        statistics: {},
+      );
+    }
+    _syncInProgress = true;
+    try {
+      return await _doSync(types: types, providerName: providerName, onProgress: onProgress);
+    } finally {
+      _syncInProgress = false;
+    }
+  }
+
+  Future<SyncResult> _doSync({
     required List<CloudConfigTypeEnum> types,
     String? providerName,
     void Function(double progress)? onProgress,
@@ -228,40 +262,17 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       log.info('🔄 Starting sync with provider: ${cloudProvider.name}');
       reportProgress(0.08);
 
-      // 1. Get local configs
-      List<CloudConfig> localConfigs = [];
-      for (int i = 0; i < types.length; i++) {
-        CloudConfigTypeEnum type = types[i];
-        CloudConfig? config = await cloudConfigService.getLocalConfig(type);
-        if (config != null) {
-          localConfigs.add(config);
-          log.info('  Local ${type.name}: ${config.config.length} bytes');
-        } else {
-          log.info('  Local ${type.name}: empty (skipped)');
-        }
-
-        if (types.isNotEmpty) {
-          reportProgress(0.08 + ((i + 1) / types.length) * 0.27);
-        }
-      }
-
-      log.info('Total local configs: ${localConfigs.length}');
-      reportProgress(0.38);
-
-      // 2. Download remote config
+      // 1. Download remote config (shared by hot-data bootstrap and legacy merge)
+      String? remoteData;
       List<CloudConfig> remoteConfigs = [];
       CloudFile? remoteFile = await cloudProvider.getFileMetadata();
 
       // Try to download even if metadata fetch failed
       try {
-        String data = await cloudProvider.download();
-        List list = await isolateService.jsonDecodeAsync(data);
+        remoteData = await cloudProvider.download();
+        List list = await isolateService.jsonDecodeAsync(remoteData!);
         remoteConfigs = list.map((e) => CloudConfig.fromJson(e)).toList();
         log.info('Downloaded ${remoteConfigs.length} remote configs');
-        for (var config in remoteConfigs) {
-          log.info(
-              '  Remote ${config.type.name}: ${config.config.length} bytes');
-        }
 
         // If download succeeded but metadata failed, create a placeholder
         if (remoteFile == null && remoteConfigs.isNotEmpty) {
@@ -270,51 +281,98 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           remoteFile = CloudFile(
             version: 'latest',
             modifiedTime: DateTime.now(),
-            size: data.length,
+            size: remoteData.length,
             etag: null,
           );
         }
       } catch (e) {
-        if (remoteConfigs.isEmpty) {
-          log.info(
-              'No remote config found (first sync), will upload local configs');
-        } else {
-          log.warning('Failed to download remote config, will upload local', e);
+        log.info(
+            'No remote config found (first sync), will upload local configs');
+      }
+      reportProgress(0.2);
+
+      // 2. Hot data types (history / read progress) sync incrementally through
+      // the oplog engine instead of travelling inside latest.json
+      const List<CloudConfigTypeEnum> hotTypes = [
+        CloudConfigTypeEnum.history,
+        CloudConfigTypeEnum.readIndexRecord,
+      ];
+      List<CloudConfigTypeEnum> effectiveTypes = types;
+      HotSyncResult? hotResult;
+
+      if (types.any(hotTypes.contains)) {
+        try {
+          hotResult = await _hotEngine.sync(cloudProvider, legacyRemoteConfigJson: remoteData);
+          effectiveTypes = types.where((t) => !hotTypes.contains(t)).toList();
+        } catch (e, stack) {
+          log.error('Hot data sync failed, falling back to legacy full-file sync', e, stack);
         }
       }
-      reportProgress(0.58);
+      reportProgress(0.5);
 
-      // 3. Merge configs (merger handles import internally)
+      if (effectiveTypes.isEmpty) {
+        log.info('Sync completed successfully (hot data only)');
+        reportProgress(1);
+        return SyncResult(
+          success: true,
+          message: 'Sync completed successfully',
+          statistics: {},
+        );
+      }
+
+      // 3. Get local configs for the remaining (small) types
+      List<CloudConfig> localConfigs = [];
+      for (CloudConfigTypeEnum type in effectiveTypes) {
+        CloudConfig? config = await cloudConfigService.getLocalConfig(type);
+        if (config != null) {
+          localConfigs.add(config);
+          log.info('  Local ${type.name}: ${config.config.length} bytes');
+        } else {
+          log.info('  Local ${type.name}: empty (skipped)');
+        }
+      }
+      reportProgress(0.6);
+
+      // 4. Merge configs (merger handles import internally).
+      // The "latest local activity" heuristic used by whole-file LWW types is
+      // computed from the hot tables directly since they no longer travel here.
+      DateTime? latestLocalTime = await _computeLatestLocalActivityTime();
       var mergeResult = await syncMerger.merge(
         localConfigs,
         remoteConfigs,
         remoteFile?.modifiedTime ?? DateTime.now(),
-        types,
+        effectiveTypes,
+        latestLocalTimeOverride: latestLocalTime,
       );
       reportProgress(0.74);
 
-      // 4. Upload merged result
-      // saveHistory is determined by user settings (default: false)
+      // 5. Upload merged result, unless it is identical to what the remote
+      // already holds (avoids churning latest.json and its version history)
       bool saveHistory = syncSetting.enableHistory.value;
       String encodedData =
           await isolateService.jsonEncodeAsync(mergeResult.merged);
-      log.info(
-          'Uploading ${mergeResult.merged.length} configs to remote (${encodedData.length} bytes)');
 
-      await cloudProvider.upload(
-        encodedData,
-        saveHistory: saveHistory,
-      );
-      log.info('Upload complete');
-      reportProgress(0.92);
+      if (remoteData != null && encodedData == remoteData) {
+        log.info('Merged result identical to remote, skipping upload');
+      } else {
+        log.info(
+            'Uploading ${mergeResult.merged.length} configs to remote (${encodedData.length} bytes)');
+        await cloudProvider.upload(
+          encodedData,
+          saveHistory: saveHistory,
+        );
+        log.info('Upload complete');
+        reportProgress(0.92);
 
-      // 5. If history is enabled and auto cleanup is on, clean up old versions
-      if (saveHistory && syncSetting.autoCleanHistory.value) {
-        await _cleanupOldVersions(cloudProvider);
+        // 6. If history is enabled and auto cleanup is on, clean up old versions
+        if (saveHistory && syncSetting.autoCleanHistory.value) {
+          await _cleanupOldVersions(cloudProvider);
+        }
       }
       reportProgress(1);
 
-      log.info('Sync completed successfully');
+      log.info('Sync completed successfully'
+          '${hotResult != null ? ' (hot: +${hotResult.appliedRows} applied, ${hotResult.pushedRows} pushed)' : ''}');
       return SyncResult(
         success: true,
         message: 'Sync completed successfully',
@@ -574,6 +632,21 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       log.error('Connection test failed for $providerName', e, stackTrace);
       return false;
     }
+  }
+
+  /// Latest local user activity, derived from the hot tables. Used by the
+  /// merger to decide whole-file conflicts for small config types.
+  Future<DateTime?> _computeLatestLocalActivityTime() async {
+    DateTime? latest;
+    String? historyTime = await historyService.getMaxLastReadTime();
+    String? progressTime = await localConfigService.maxUtime(configKey: ConfigEnum.readIndexRecord);
+    for (String? value in [historyTime, progressTime]) {
+      DateTime? parsed = SyncTimeUtil.tryParse(value);
+      if (parsed != null && (latest == null || parsed.isAfter(latest))) {
+        latest = parsed;
+      }
+    }
+    return latest;
   }
 
   /// Cleanup old versions exceeding the limit

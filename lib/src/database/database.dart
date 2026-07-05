@@ -65,6 +65,9 @@ part 'database.g.dart';
 class AppDb extends _$AppDb {
   AppDb() : super(_openConnection());
 
+  /// For unit tests: inject an in-memory executor
+  AppDb.forTesting(super.executor);
+
   @override
   int get schemaVersion => 24;
 

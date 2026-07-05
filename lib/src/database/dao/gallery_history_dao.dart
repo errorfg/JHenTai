@@ -61,6 +61,41 @@ class GalleryHistoryDao {
     });
   }
 
+  /// Rows with lastReadTime strictly greater than [lastReadTimeExclusive].
+  /// Requires canonical UTC ISO8601 timestamps for string comparison to be
+  /// chronological (see HistoryService migration).
+  static Future<List<GalleryHistoryV2Data>> selectNewerThan(
+      String lastReadTimeExclusive) {
+    return (appDb.select(appDb.galleryHistoryV2)
+          ..where(
+              (tbl) => tbl.lastReadTime.isBiggerThanValue(lastReadTimeExclusive)))
+        .get();
+  }
+
+  /// Map of gid -> lastReadTime for all rows, without loading json bodies.
+  static Future<Map<int, String>> selectGidToLastReadTime() async {
+    final query = appDb.selectOnly(appDb.galleryHistoryV2)
+      ..addColumns(
+          [appDb.galleryHistoryV2.gid, appDb.galleryHistoryV2.lastReadTime]);
+    final rows = await query.get();
+    return {
+      for (var row in rows)
+        row.read(appDb.galleryHistoryV2.gid)!:
+            row.read(appDb.galleryHistoryV2.lastReadTime)!
+    };
+  }
+
+  static Future<String?> selectMaxLastReadTime() async {
+    final rows = await (appDb.select(appDb.galleryHistoryV2)
+          ..orderBy([
+            (tbl) => OrderingTerm(
+                expression: tbl.lastReadTime, mode: OrderingMode.desc)
+          ])
+          ..limit(1))
+        .get();
+    return rows.isEmpty ? null : rows.first.lastReadTime;
+  }
+
   static Future<int> deleteHistory(int gid) {
     return (appDb.delete(appDb.galleryHistoryV2)
           ..where((tbl) => tbl.gid.equals(gid)))
