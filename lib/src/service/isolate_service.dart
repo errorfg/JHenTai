@@ -27,6 +27,6 @@ class IsolateService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean
   }
 
   Future<R> run<Q, R>(IsolateCallback<Q, R> callback, Q message, {String? debugLabel}) {
-    return _isolate.isolate(callback, message, debugLabel: debugLabel);
+    return _isolate.compute(callback, message, debugLabel: debugLabel);
   }
 }

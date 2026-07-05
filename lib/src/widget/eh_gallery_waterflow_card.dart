@@ -1,7 +1,7 @@
 import 'dart:collection';
 import 'dart:math';
 
-import 'package:animate_do/animate_do.dart';
+import 'package:animate_do/animate_do.dart' hide FadeInExtension, FadeOutExtension;
 import 'package:blur/blur.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';

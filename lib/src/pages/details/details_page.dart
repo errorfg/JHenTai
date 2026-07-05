@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'package:animate_do/animate_do.dart';
+import 'package:animate_do/animate_do.dart' hide FadeInExtension, FadeOutExtension;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -120,7 +120,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text('jump'.tr),
-                            const Icon(FontAwesomeIcons.paperPlane, size: 20)
+                            Icon(FontAwesomeIcons.paperPlane.data, size: 20)
                           ],
                         ),
                       ),

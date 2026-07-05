@@ -1,4 +1,4 @@
-import 'package:animate_do/animate_do.dart';
+import 'package:animate_do/animate_do.dart' hide FadeInExtension, FadeOutExtension;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';

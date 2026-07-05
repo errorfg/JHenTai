@@ -115,7 +115,7 @@ class _LockPageState extends State<LockPage> with WindowListener, WindowWidgetMi
       authMessages: [
         AndroidAuthMessages(
           signInTitle: 'localizedReason'.tr,
-          biometricHint: '',
+          signInHint: '',
           cancelButton: 'cancel'.tr,
         ),
         IOSAuthMessages(
@@ -124,13 +124,11 @@ class _LockPageState extends State<LockPage> with WindowListener, WindowWidgetMi
         ),
         const WindowsAuthMessages(),
       ],
-      options: AuthenticationOptions(
-        stickyAuth: true,
-        /**
-         * @see [local_auth_windows](https://github.com/flutter/packages/blob/733869c981a3d0c649d904febc486b47ddb5f672/packages/local_auth/local_auth_windows/lib/local_auth_windows.dart#L54)
-         */
-        biometricOnly: !GetPlatform.isWindows,
-      ),
+      /**
+       * @see [local_auth_windows](https://github.com/flutter/packages/blob/733869c981a3d0c649d904febc486b47ddb5f672/packages/local_auth/local_auth_windows/lib/local_auth_windows.dart#L54)
+       */
+      biometricOnly: !GetPlatform.isWindows,
+      persistAcrossBackgrounding: true,
     );
 
     if (!success) {

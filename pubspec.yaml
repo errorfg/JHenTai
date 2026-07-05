@@ -2,7 +2,7 @@ name: jhentai
 description: A flutter app for E-Hentai/EXHentai
 
 publish_to: 'none'
-version: 8.0.21+325
+version: 8.0.21+334
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -19,40 +19,40 @@ dependencies:
       url: https://github.com/jiangtian616/dio
       path: dio
       ref: append-mode
-  get: 4.6.6
-  get_storage: 2.0.3
-  extended_nested_scroll_view: 6.1.1
-  html: 0.15.1
+  get: 4.7.3
+  get_storage: 2.1.1
+  extended_nested_scroll_view: 6.2.1
+  html: 0.15.6
   logger: 2.2.0
   flutter_rating_bar: 4.0.1
-  waterfall_flow: 3.0.2
-  extended_image: 8.1.0
-  font_awesome_flutter: 9.2.0
-  intl: 0.19.0
-  collection: 1.19.0
-  clipboard: 0.1.3
+  waterfall_flow: 3.1.1
+  extended_image: 10.0.1
+  font_awesome_flutter: ^11.0.0
+  intl: 0.20.2
+  collection: 1.19.1
+  clipboard: 3.0.14
   scrollable_positioned_list: 
     git:
       url: https://github.com/jiangtian616/flutter.widgets
       path: packages/scrollable_positioned_list
-  flutter_list_view: 1.1.21
-  executor: 2.2.2
+  flutter_list_view: 1.1.29
+  executor: 2.2.5
   retry: 3.1.2
-  path: 1.9.0
-  drift: 2.21.0
-  sqlite3_flutter_libs: 0.5.32
-  path_provider: 2.1.3
+  path: 1.9.1
+  drift: 2.34.0
+  sqlite3_flutter_libs: ^0.5.42
+  path_provider: 2.1.6
   # https://github.com/letsar/flutter_slidable/issues/488
   flutter_slidable:
     git:
       url: https://github.com/letsar/flutter_slidable.git
       ref: master
-  flutter_widget_from_html: 0.15.2
-  url_launcher: 6.3.1
+  flutter_widget_from_html: 0.17.2
+  url_launcher: 6.3.2
   # add onLongPress
   like_button:
     git: https://github.com/jiangtian616/like_button
-  webview_flutter: 4.2.2
+  webview_flutter: 4.14.0
   desktop_webview_window:
     git:
       url: https://github.com/MixinNetwork/flutter-plugins
@@ -65,32 +65,36 @@ dependencies:
       ref: separate
   zoom_view: 
     git: https://github.com/jiangtian616/zoom_view
-  package_info_plus: 8.0.3
-  file_picker: 8.1.3
-  local_auth: 2.2.0
-  blur: 3.1.0
+  package_info_plus: 9.0.1
+  file_picker: ^8.1.3
+  pdfx: ^2.9.2
+  local_auth: 3.0.1
+  blur: 4.0.2
   flutter_windowmanager_plus: 1.0.1
-  animate_do: 3.3.4
-  share_plus: 10.1.1
-  syncfusion_flutter_charts: 27.1.48
-  archive: 3.6.1
+  animate_do: ^5.1.0
+  share_plus: 12.0.2
+  syncfusion_flutter_charts: 33.2.15
+  archive: ^3.6.1
   # https://github.com/ponnamkarthik/FlutterToast/pull/542
   fluttertoast: 
     git: 
       url: https://github.com/MarlonJD/FlutterToast
       ref: patch-1
-  battery_plus: 6.2.0
-  throttling: 1.0.0
-  receive_sharing_intent: 
-    git: https://github.com/KasemJaffer/receive_sharing_intent
-  window_manager: 0.3.9
-  permission_handler: 11.3.1
-  grouped_list: 5.1.2
+  battery_plus: 7.1.0
+  throttling: 2.0.1
+  receive_sharing_intent:
+    git:
+      url: https://github.com/KasemJaffer/receive_sharing_intent
+      # newer commits require compileSdk 37 (Android 17 preview)
+      ref: 2cea396843cd3ab1b5ec4334be4233864637874e
+  window_manager: 0.5.2
+  permission_handler: 12.0.3
+  grouped_list: 6.0.0
   flutter_resizable_container: 2.0.0
-  loading_animation_widget: 1.2.0+4
-  simple_animations: 5.0.2
-  animated_flip_counter: 0.2.6
-  saver_gallery: 3.0.5
+  loading_animation_widget: 1.3.0
+  simple_animations: 5.3.0
+  animated_flip_counter: 0.3.4
+  saver_gallery: ^3.0.5
   system_network_proxy: 
     git: 
       url: https://github.com/jiangtian616/system_network_proxy
@@ -104,49 +108,56 @@ dependencies:
     # remove assert
     git:
       url: https://github.com/jiangtian616/flutter_draggable_gridview
-  flutter_displaymode: 0.6.0
-  pinput: 2.2.31
-  wakelock_plus: 1.2.8
-  flex_color_picker: 3.1.0
+  flutter_displaymode: 0.7.0
+  pinput: 6.0.2
+  wakelock_plus: 1.5.2
+  flex_color_picker: 3.8.0
   zoom_widget: 2.0.1
-  android_intent_plus: 5.3.0
-  integral_isolates: 0.4.1
-  screen_brightness: 0.2.2+1
-  crypto: 3.0.3
-  csv: 5.1.1
-  dotted_border: 2.1.0
+  android_intent_plus: 6.0.0
+  integral_isolates: 0.5.1
+  screen_brightness: 2.1.11
+  crypto: 3.0.7
+  csv: ^6.0.0
+  dotted_border: ^2.1.0
   j_downloader:
     git: https://github.com/jiangtian616/JDownloader
-  device_info_plus: 11.1.0
-  template_expressions: 3.2.0+7
-  uuid: 4.4.0
+  device_info_plus: 12.4.0
+  template_expressions: 3.3.1+2
+  uuid: 4.5.3
   xml: 6.5.0
-  telegram: 0.0.9
+  telegram: 1.0.0
   webdav_client: ^1.2.2
   minio: ^3.5.8
 
 dependency_overrides:
-  test_api: 0.6.0
-  matcher: 0.12.16
-  chewie: 1.7.0
-  http: 1.1.0
-  cached_network_image: 3.3.0
+  # Flutter 3.44 tool no longer tolerates the legacy `pluginClass: none` declaration
+  system_network_proxy_macos:
+    path: third_party/system_network_proxy_macos
+  # j_downloader pins uuid 4.4.0 exactly; pdfx needs ^4.5.1
+  uuid: ^4.5.1
+  # pdfx depends on hosted photo_view; force the project's git fork
+  photo_view:
+    git:
+      url: https://github.com/jiangtian616/photo_view
+      ref: separate
+  chewie: 1.13.1
+  http: 1.6.0
+  cached_network_image: 3.4.0
   dio:
     git:
       url: https://github.com/jiangtian616/dio
       path: dio
       ref: append-mode
-  collection: 1.19.0
     
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^1.0.0
-  test: 1.25.2
-  drift_dev: 2.21.1
-  build_runner: 2.4.11
+  test: 1.31.0
+  drift_dev: 2.34.0
+  build_runner: 2.15.0
   frontend_server_client: 4.0.0
-  flutter_launcher_icons: 0.14.1
+  flutter_launcher_icons: 0.14.4
 
 flutter:
   uses-material-design: true

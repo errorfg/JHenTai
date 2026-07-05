@@ -32,7 +32,7 @@ class FavoritePage extends BasePage {
   List<Widget> buildAppBarActions() {
     return [
       if (state.gallerys.isNotEmpty && !state.showNhFavorites && !state.showWnFavorites)
-        IconButton(icon: const Icon(FontAwesomeIcons.paperPlane, size: 20), onPressed: logic.handleTapJumpButton),
+        IconButton(icon: Icon(FontAwesomeIcons.paperPlane.data, size: 20), onPressed: logic.handleTapJumpButton),
       if (state.gallerys.isNotEmpty)
         IconButton(icon: const Icon(Icons.sort), onPressed: logic.handleChangeSortOrder),
       if (!state.mixedMode)

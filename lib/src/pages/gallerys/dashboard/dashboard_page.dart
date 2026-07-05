@@ -41,7 +41,7 @@ class DashboardPage extends BasePage {
   AppBar? buildAppBar(BuildContext context) {
     return AppBar(
       leading: IconButton(
-        icon: const Icon(FontAwesomeIcons.bars, size: 20),
+        icon: Icon(FontAwesomeIcons.bars.data, size: 20),
         onPressed: () => TapMenuButtonNotification().dispatch(context),
       ),
       title: GestureDetector(

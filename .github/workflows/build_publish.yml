@@ -64,7 +64,7 @@ jobs:
       arch: ${{ steps.get_version.outputs.arch}}
     runs-on: ${{ matrix.os }}
     env:
-      FLUTTER_VERSION: 3.24.4
+      FLUTTER_VERSION: 3.44.4
     steps:
       # Checkout branch
       - name: Checkout
@@ -99,7 +99,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: 'master'
+          channel: 'stable'
           cache: true
       # Output Flutter Version
       - name: Output Flutter Version

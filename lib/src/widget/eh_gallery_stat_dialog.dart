@@ -1,4 +1,4 @@
-import 'package:animate_do/animate_do.dart';
+import 'package:animate_do/animate_do.dart' hide FadeInExtension, FadeOutExtension;
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
