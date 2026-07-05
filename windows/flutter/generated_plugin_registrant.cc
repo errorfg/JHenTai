@@ -7,7 +7,6 @@
 #include "generated_plugin_registrant.h"
 
 #include <battery_plus/battery_plus_windows_plugin.h>
-#include <clipboard/clipboard_plugin.h>
 #include <desktop_webview_window/desktop_webview_window_plugin.h>
 #include <local_auth_windows/local_auth_plugin.h>
 #include <pdfx/pdfx_plugin.h>
@@ -22,8 +21,6 @@
 void RegisterPlugins(flutter::PluginRegistry* registry) {
   BatteryPlusWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("BatteryPlusWindowsPlugin"));
-  ClipboardPluginRegisterWithRegistrar(
-      registry->GetRegistrarForPlugin("ClipboardPlugin"));
   DesktopWebviewWindowPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("DesktopWebviewWindowPlugin"));
   LocalAuthPluginRegisterWithRegistrar(

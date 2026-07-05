@@ -4,7 +4,6 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   battery_plus
-  clipboard
   desktop_webview_window
   local_auth_windows
   pdfx
