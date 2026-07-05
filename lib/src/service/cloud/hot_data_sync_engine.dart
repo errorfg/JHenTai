@@ -8,6 +8,7 @@ import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/model/config.dart';
 import 'package:jhentai/src/service/cloud/cloud_provider.dart';
+import 'package:jhentai/src/service/cloud/pending_sync_tracker.dart';
 import 'package:jhentai/src/service/history_service.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
@@ -19,8 +20,8 @@ import 'package:jhentai/src/utils/sync_time_util.dart';
 /// gallery history and read progress. Instead of shipping the full data set
 /// through a single shared file on every sync (O(total) transfer, last-writer-
 /// wins races between devices), each device appends small op packs containing
-/// only rows changed since its last push, and applies packs from other devices
-/// with per-row last-write-wins by timestamp.
+/// only locally-changed rows, and applies other devices' packs with per-row
+/// last-write-wins by timestamp.
 ///
 /// Remote layout (relative to the provider's sync root):
 ///   manifest.json                 format marker + current snapshot version
@@ -30,9 +31,21 @@ import 'package:jhentai/src/utils/sync_time_util.dart';
 /// Correctness notes:
 /// - Op packs are append-only and namespaced per device: concurrent syncs on
 ///   different devices can never overwrite each other's data.
+/// - Push eligibility comes from an explicit dirty set ([PendingSyncTracker])
+///   maintained by the user-originated write paths, NOT from comparing row
+///   timestamps against a cursor - row timestamps are cross-device LWW data
+///   and a skewed remote clock must not affect what this device uploads.
+/// - Every device performs one full push of its local state (as a normal op
+///   pack) before switching to incremental pushes. This makes the first-sync
+///   bootstrap race benign: even if two devices bootstrap concurrently and
+///   one manifest write wins, both devices' data still reaches the other
+///   through their full op packs.
 /// - Applying a pack or snapshot uses timestamp-guarded upserts
 ///   (batchRecordIfNewer / batchWriteIfNewer), so re-applying anything is
 ///   idempotent and stale data can never roll back newer local rows.
+/// - Op pack keys are forced monotonic per device (persisted last key), so a
+///   backwards clock step cannot produce a key that other devices' applied
+///   cursors would skip forever.
 /// - Compaction only deletes op packs older than [_opRetention] AND covered by
 ///   a snapshot; a device offline longer than that simply bootstraps from the
 ///   snapshot (which is a full state) plus surviving ops.
@@ -54,32 +67,51 @@ class HotDataSyncEngine {
   /// Sync the hot data types through [provider].
   ///
   /// [legacyRemoteConfigJson]: raw content of the legacy latest.json if the
-  /// caller already downloaded it; used once to bootstrap v2 from v1 data.
+  /// caller already downloaded it. Used to bootstrap v2 from v1 data, and -
+  /// during the transition period while not-yet-upgraded clients still write
+  /// hot data into latest.json - to keep absorbing their changes.
   Future<HotSyncResult> sync(
     CloudProvider provider, {
     String? legacyRemoteConfigJson,
   }) async {
+    /// Timestamp format migrations must complete before any timestamp
+    /// comparison below: bean ready hooks are fired without being awaited
+    await historyService.ensureMigrated();
+    await localConfigService.ensureMigrated();
+
     String deviceId = await _ensureDeviceId();
 
     _Manifest? manifest = await _readManifest(provider);
+    bool bootstrapped = false;
+    int applied = 0;
 
     if (manifest == null) {
       log.info('🔁 Hot sync: no manifest found, bootstrapping format v2');
-      return await _bootstrap(provider, deviceId, legacyRemoteConfigJson);
-    }
+      applied += await _bootstrap(provider, legacyRemoteConfigJson);
+      bootstrapped = true;
+    } else {
+      // 1. Apply a newer snapshot if another device compacted since our last sync
+      String appliedSnapshot = await localConfigService.read(configKey: ConfigEnum.oplogAppliedSnapshot) ?? '';
+      if (manifest.snapshot != null && manifest.snapshot!.compareTo(appliedSnapshot) > 0) {
+        log.info('🔁 Hot sync: applying snapshot ${manifest.snapshot}');
+        List<int>? bytes = await provider.getRawObject('$snapshotPrefix${manifest.snapshot}.json.gz');
+        if (bytes != null) {
+          applied += await _applyPacks([await _decodePack(bytes)]);
+          await localConfigService.write(configKey: ConfigEnum.oplogAppliedSnapshot, value: manifest.snapshot!);
+        } else {
+          log.warning('Hot sync: snapshot ${manifest.snapshot} listed in manifest but missing');
+        }
+      }
 
-    int applied = 0;
-
-    // 1. Apply a newer snapshot if another device compacted since our last sync
-    String appliedSnapshot = await localConfigService.read(configKey: ConfigEnum.oplogAppliedSnapshot) ?? '';
-    if (manifest.snapshot != null && manifest.snapshot!.compareTo(appliedSnapshot) > 0) {
-      log.info('🔁 Hot sync: applying snapshot ${manifest.snapshot}');
-      List<int>? bytes = await provider.getRawObject('$snapshotPrefix${manifest.snapshot}.json.gz');
-      if (bytes != null) {
-        applied += await _applyPack(await _decodePack(bytes));
-        await localConfigService.write(configKey: ConfigEnum.oplogAppliedSnapshot, value: manifest.snapshot!);
-      } else {
-        log.warning('Hot sync: snapshot ${manifest.snapshot} listed in manifest but missing');
+      /// Transition period: old-version clients still write their hot data
+      /// into latest.json. Absorb it with guarded upserts (cheap once those
+      /// clients are upgraded and latest.json no longer carries hot types).
+      if (legacyRemoteConfigJson != null) {
+        try {
+          applied += await _applyLegacyConfig(legacyRemoteConfigJson);
+        } catch (e) {
+          log.warning('Hot sync: failed to absorb legacy config data', e);
+        }
       }
     }
 
@@ -103,37 +135,54 @@ class HotDataSyncEngine {
     }
     pending.sort((a, b) => a.key.compareTo(b.key));
 
+    /// Download everything first, apply in ONE guarded write per type
+    /// (guarded writes read a full-table timestamp map, so applying pack by
+    /// pack would be O(packs x table size)), then advance cursors.
+    List<Map<String, dynamic>> packs = [];
     for (RemoteObjectInfo obj in pending) {
       List<int>? bytes = await provider.getRawObject(obj.key);
       if (bytes == null) {
         continue;
       }
-      applied += await _applyPack(await _decodePack(bytes));
+      packs.add(await _decodePack(bytes));
+    }
+    applied += await _applyPacks(packs);
+    for (RemoteObjectInfo obj in pending) {
       _OpKey parsed = _OpKey.tryParse(obj.key)!;
-      appliedCursors[parsed.deviceId] = parsed.ts;
+      String current = appliedCursors[parsed.deviceId] ?? '';
+      if (parsed.ts.compareTo(current) > 0) {
+        appliedCursors[parsed.deviceId] = parsed.ts;
+      }
     }
     if (pending.isNotEmpty) {
       await _writeAppliedCursors(appliedCursors);
+      log.info('🔁 Hot sync: applied ${pending.length} op packs ($applied rows total)');
     }
-    log.info('🔁 Hot sync: applied ${pending.length} op packs ($applied rows)');
 
-    // 3. Push local changes since our last push as a new op pack
+    // 3. Push local changes as a new op pack
     int pushed = await _pushLocalChanges(provider, deviceId);
 
     // 4. Compaction
-    await _maybeCompact(provider, deviceId, opObjects.length + (pushed > 0 ? 1 : 0));
+    await _maybeCompact(provider, opObjects.length + (pushed > 0 ? 1 : 0));
 
     return HotSyncResult(
       success: true,
       appliedRows: applied,
       pushedRows: pushed,
       appliedPacks: pending.length,
+      bootstrapped: bootstrapped,
     );
   }
 
   /// First sync against a v1 remote (or an empty remote): import legacy hot
   /// data if present, then publish a snapshot of the full local state.
-  Future<HotSyncResult> _bootstrap(CloudProvider provider, String deviceId, String? legacyRemoteConfigJson) async {
+  ///
+  /// Deliberately does NOT mark the full push as done: the caller continues
+  /// with the normal push step, which uploads the full local state as an op
+  /// pack once. That way, if two devices bootstrap concurrently and one
+  /// manifest/snapshot write shadows the other, the shadowed device's data
+  /// still propagates through its op pack.
+  Future<int> _bootstrap(CloudProvider provider, String? legacyRemoteConfigJson) async {
     int applied = 0;
 
     if (legacyRemoteConfigJson != null) {
@@ -149,12 +198,7 @@ class HotDataSyncEngine {
     await _writeManifest(provider, _Manifest(snapshot: snapshotTs));
     await localConfigService.write(configKey: ConfigEnum.oplogAppliedSnapshot, value: snapshotTs);
 
-    /// Everything local is inside the snapshot: start push cursors from the
-    /// current max timestamps so the first op pack only contains future changes.
-    await _setPushCursor(_historyCursorKey, await historyService.getMaxLastReadTime() ?? '');
-    await _setPushCursor(_readProgressCursorKey, await localConfigService.maxUtime(configKey: ConfigEnum.readIndexRecord) ?? '');
-
-    return HotSyncResult(success: true, appliedRows: applied, pushedRows: 0, appliedPacks: 0, bootstrapped: true);
+    return applied;
   }
 
   /// Extract the two hot types from a legacy latest.json payload and apply
@@ -191,24 +235,38 @@ class HotDataSyncEngine {
     return applied;
   }
 
-  /// Upload rows changed since the last push as one op pack.
+  /// Upload locally-changed rows as one op pack. The first push after
+  /// enabling format v2 uploads the full local state; afterwards only rows in
+  /// the pending set travel.
   Future<int> _pushLocalChanges(CloudProvider provider, String deviceId) async {
-    String historyCursor = await _getPushCursor(_historyCursorKey);
-    String progressCursor = await _getPushCursor(_readProgressCursorKey);
+    bool fullPushDone = await localConfigService.read(configKey: ConfigEnum.oplogFullPushDone) == 'true';
 
-    List<GalleryHistoryV2Data> pendingHistory = historyCursor.isEmpty
-        ? await historyService.getAllRawHistory()
-        : await historyService.getRawHistoryNewerThan(historyCursor);
-    List<LocalConfig> pendingProgress = progressCursor.isEmpty
-        ? await localConfigService.readWithAllSubKeys(configKey: ConfigEnum.readIndexRecord)
-        : await localConfigService.readNewerThan(configKey: ConfigEnum.readIndexRecord, utimeExclusive: progressCursor);
+    List<GalleryHistoryV2Data> pendingHistory;
+    List<LocalConfig> pendingProgress;
+    Set<int> pushedHistoryGids = {};
+    Set<String> pushedProgressKeys = {};
+
+    if (!fullPushDone) {
+      pendingHistory = await historyService.getAllRawHistory();
+      pendingProgress = await localConfigService.readWithAllSubKeys(configKey: ConfigEnum.readIndexRecord);
+      log.info('🔁 Hot sync: performing one-time full push (${pendingHistory.length} history, ${pendingProgress.length} progress)');
+    } else {
+      (pushedHistoryGids, pushedProgressKeys) = await pendingSyncTracker.snapshot();
+      pendingHistory = pushedHistoryGids.isEmpty ? [] : await historyService.getRawHistoryByGids(pushedHistoryGids);
+      pendingProgress = pushedProgressKeys.isEmpty
+          ? []
+          : await localConfigService.readBySubKeys(configKey: ConfigEnum.readIndexRecord, subConfigKeys: pushedProgressKeys);
+    }
 
     if (pendingHistory.isEmpty && pendingProgress.isEmpty) {
       log.info('🔁 Hot sync: nothing to push');
+      if (!fullPushDone) {
+        await localConfigService.write(configKey: ConfigEnum.oplogFullPushDone, value: 'true');
+      }
       return 0;
     }
 
-    String ts = _timestampKey();
+    String ts = await _nextMonotonicKey();
     Map<String, dynamic> pack = {
       'formatVersion': formatVersion,
       'deviceId': deviceId,
@@ -223,26 +281,52 @@ class HotDataSyncEngine {
 
     List<int> bytes = await _encodePack(pack);
     await provider.putRawObject('$opsPrefix$deviceId/$ts.json.gz', bytes);
+    await localConfigService.write(configKey: ConfigEnum.oplogLastPushedKey, value: ts);
 
-    /// Advance cursors to the max timestamp actually pushed (not "now"), so a
-    /// row written between the query and this line is picked up next time.
-    String maxHistory = pendingHistory.fold(historyCursor, (acc, h) => h.lastReadTime.compareTo(acc) > 0 ? h.lastReadTime : acc);
-    String maxProgress = pendingProgress.fold(progressCursor, (acc, p) => p.utime.compareTo(acc) > 0 ? p.utime : acc);
-    await _setPushCursor(_historyCursorKey, maxHistory);
-    await _setPushCursor(_readProgressCursorKey, maxProgress);
+    if (!fullPushDone) {
+      await localConfigService.write(configKey: ConfigEnum.oplogFullPushDone, value: 'true');
+      await pendingSyncTracker.clearAll();
+    } else {
+      await pendingSyncTracker.removePushed(pushedHistoryGids, pushedProgressKeys);
+    }
 
     int pushed = pendingHistory.length + pendingProgress.length;
     log.info('🔁 Hot sync: pushed $pushed rows (${bytes.length} bytes gz) as $ts');
     return pushed;
   }
 
-  /// Apply one decoded pack (op pack or snapshot) with guarded upserts.
-  Future<int> _applyPack(Map<String, dynamic> pack) async {
+  /// Apply decoded packs (op packs or snapshots) with guarded upserts:
+  /// merge rows across packs per key first (max timestamp wins) so each type
+  /// costs one guarded write regardless of pack count.
+  Future<int> _applyPacks(List<Map<String, dynamic>> packs) async {
+    if (packs.isEmpty) {
+      return 0;
+    }
+
+    Map<int, Map<String, dynamic>> historyByGid = {};
+    Map<String, Map<String, dynamic>> progressByKey = {};
+
+    for (Map<String, dynamic> pack in packs) {
+      for (var e in (pack['history'] as List? ?? [])) {
+        int gid = e['gid'];
+        var current = historyByGid[gid];
+        if (current == null || _timeOrEpoch(e['lastReadTime']).isAfter(_timeOrEpoch(current['lastReadTime']))) {
+          historyByGid[gid] = Map<String, dynamic>.from(e);
+        }
+      }
+      for (var e in (pack['readProgress'] as List? ?? [])) {
+        String key = e['subConfigKey'];
+        var current = progressByKey[key];
+        if (current == null || _timeOrEpoch(e['utime']).isAfter(_timeOrEpoch(current['utime']))) {
+          progressByKey[key] = Map<String, dynamic>.from(e);
+        }
+      }
+    }
+
     int applied = 0;
 
-    List history = pack['history'] ?? [];
-    if (history.isNotEmpty) {
-      applied += await historyService.batchRecordIfNewer(history
+    if (historyByGid.isNotEmpty) {
+      applied += await historyService.batchRecordIfNewer(historyByGid.values
           .map((e) => GalleryHistoryV2Data(
                 gid: e['gid'],
                 jsonBody: e['jsonBody'],
@@ -251,11 +335,10 @@ class HotDataSyncEngine {
           .toList());
     }
 
-    List progress = pack['readProgress'] ?? [];
-    if (progress.isNotEmpty) {
+    if (progressByKey.isNotEmpty) {
       int written = await localConfigService.batchWriteIfNewer(
         configKey: ConfigEnum.readIndexRecord,
-        localConfigs: progress
+        localConfigs: progressByKey.values
             .map((e) => LocalConfigCompanion(
                   configKey: const Value('readIndexRecord'),
                   subConfigKey: Value(e['subConfigKey']),
@@ -273,12 +356,16 @@ class HotDataSyncEngine {
     return applied;
   }
 
+  DateTime _timeOrEpoch(String? value) {
+    return SyncTimeUtil.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+
   /// Export the full local state as a new snapshot object. Returns its ts.
   Future<String> _writeSnapshot(CloudProvider provider) async {
     List<GalleryHistoryV2Data> history = await historyService.getAllRawHistory();
     List<LocalConfig> progress = await localConfigService.readWithAllSubKeys(configKey: ConfigEnum.readIndexRecord);
 
-    String ts = _timestampKey();
+    String ts = await _nextMonotonicKey();
     Map<String, dynamic> pack = {
       'formatVersion': formatVersion,
       'createdAt': SyncTimeUtil.nowIso(),
@@ -295,7 +382,7 @@ class HotDataSyncEngine {
   /// Compact when there are too many op packs: publish a fresh snapshot, then
   /// delete op packs old enough that every device can recover them from the
   /// snapshot instead.
-  Future<void> _maybeCompact(CloudProvider provider, String deviceId, int opCount) async {
+  Future<void> _maybeCompact(CloudProvider provider, int opCount) async {
     if (opCount <= _compactionThreshold) {
       return;
     }
@@ -363,17 +450,6 @@ class HotDataSyncEngine {
     return Map<String, dynamic>.from(await isolateService.jsonDecodeAsync(json));
   }
 
-  static const String _historyCursorKey = 'history';
-  static const String _readProgressCursorKey = 'readIndexRecord';
-
-  Future<String> _getPushCursor(String type) async {
-    return await localConfigService.read(configKey: ConfigEnum.oplogPushCursor, subConfigKey: type) ?? '';
-  }
-
-  Future<void> _setPushCursor(String type, String cursor) async {
-    await localConfigService.write(configKey: ConfigEnum.oplogPushCursor, subConfigKey: type, value: cursor);
-  }
-
   Future<Map<String, String>> _readAppliedCursors() async {
     String? raw = await localConfigService.read(configKey: ConfigEnum.oplogAppliedOps);
     if (raw == null || raw.isEmpty) {
@@ -406,12 +482,21 @@ class HotDataSyncEngine {
     return List.generate(12, (_) => chars[random.nextInt(chars.length)]).join();
   }
 
-  /// UTC timestamp usable as a lexicographically sortable object key.
-  String _timestampKey() => _timestampKeyFor(DateTime.now().toUtc());
+  /// Next object-key timestamp, forced strictly monotonic per device so a
+  /// backwards clock step cannot generate a key that other devices' applied
+  /// cursors have already passed.
+  Future<String> _nextMonotonicKey() async {
+    String now = _timestampKeyFor(DateTime.now().toUtc());
+    String last = await localConfigService.read(configKey: ConfigEnum.oplogLastPushedKey) ?? '';
+    if (last.length == now.length && now.compareTo(last) <= 0) {
+      now = (BigInt.parse(last) + BigInt.one).toString().padLeft(now.length, '0');
+    }
+    return now;
+  }
 
   String _timestampKeyFor(DateTime time) {
     String pad(int n, [int width = 2]) => n.toString().padLeft(width, '0');
-    return '${time.year}${pad(time.month)}${pad(time.day)}${pad(time.hour)}${pad(time.minute)}${pad(time.second)}${pad(time.millisecond, 3)}';
+    return '${pad(time.year, 4)}${pad(time.month)}${pad(time.day)}${pad(time.hour)}${pad(time.minute)}${pad(time.second)}${pad(time.millisecond, 3)}';
   }
 }
 

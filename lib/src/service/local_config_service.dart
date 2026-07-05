@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:jhentai/src/database/dao/local_config_dao.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/service/jh_service.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
@@ -46,17 +47,28 @@ class LocalConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
   @override
   Future<void> doInitBean() async {}
 
+  Future<void>? _migrationFuture;
+
   @override
   Future<void> doAfterBeanReady() async {
-    await _migrateReadIndexUtimeToUtc();
+    await ensureMigrated();
   }
 
   /// One-time migration: readIndexRecord utime values used to be local-time
-  /// strings; convert them to canonical UTC ISO8601 so that lexicographic
-  /// comparison (used by sync cursors) equals chronological comparison.
+  /// strings (and briefly variable-width ISO strings); convert them to the
+  /// canonical fixed-width UTC form so that lexicographic comparison (used by
+  /// sync cursors and SQL guards) equals chronological comparison.
+  ///
+  /// Awaitable and memoized: the sync service calls this before its first
+  /// sync because bean ready hooks are fired without being awaited.
+  Future<void> ensureMigrated() {
+    return _migrationFuture ??= _migrateReadIndexUtimeToUtc();
+  }
+
   Future<void> _migrateReadIndexUtimeToUtc() async {
+    /// v2: also rewrites variable-width ISO strings written by early builds
     String? done = await read(configKey: ConfigEnum.migrateLocalConfigUtimeToUtc);
-    if (done == 'true') {
+    if (done == '2') {
       return;
     }
 
@@ -75,7 +87,7 @@ class LocalConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
           configKey: Value(record.configKey.key),
           subConfigKey: Value(record.subConfigKey),
           value: Value(record.value),
-          utime: Value(parsed.toIso8601String()),
+          utime: Value(SyncTimeUtil.format(parsed)),
         ));
       }
 
@@ -83,7 +95,7 @@ class LocalConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
         await batchWrite(updates);
         log.info('Migrated ${updates.length} readIndexRecord utime values to UTC');
       }
-      await write(configKey: ConfigEnum.migrateLocalConfigUtimeToUtc, value: 'true');
+      await write(configKey: ConfigEnum.migrateLocalConfigUtimeToUtc, value: '2');
     } catch (e) {
       log.error('Migrate readIndexRecord utime to UTC failed', e);
     }
@@ -110,11 +122,19 @@ class LocalConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
     );
   }
 
+
   /// Write [localConfigs] but only rows that are newer (by utime) than what is
   /// already stored, or absent locally. Prevents a sync merge computed from a
   /// stale snapshot from rolling back progress written concurrently.
   ///
-  /// Returns the number of rows actually written.
+  /// Incoming timestamps are canonicalized so that no ingest path (legacy
+  /// remote data, packs pushed by not-yet-migrated devices) can reintroduce
+  /// non-canonical strings. The Dart-side prefilter provides the count and
+  /// avoids touching untouched rows; the final write is an atomic SQL-guarded
+  /// upsert so a row written concurrently can never be clobbered.
+  ///
+  /// Returns the number of rows that passed the prefilter (upper bound of
+  /// rows actually written).
   Future<int> batchWriteIfNewer({required ConfigEnum configKey, required List<LocalConfigCompanion> localConfigs}) async {
     if (localConfigs.isEmpty) {
       return 0;
@@ -131,22 +151,29 @@ class LocalConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
     for (LocalConfigCompanion companion in localConfigs) {
       String subKey = companion.subConfigKey.value;
       DateTime? incomingTime = SyncTimeUtil.tryParse(companion.utime.value);
-
-      DateTime? localTime = existingUtime[subKey];
-      if (localTime == null) {
-        newer.add(companion);
-        continue;
-      }
       if (incomingTime == null) {
         continue;
       }
+
+      LocalConfigCompanion canonical = LocalConfigCompanion(
+        configKey: companion.configKey,
+        subConfigKey: companion.subConfigKey,
+        value: companion.value,
+        utime: Value(SyncTimeUtil.format(incomingTime)),
+      );
+
+      DateTime? localTime = existingUtime[subKey];
+      if (localTime == null) {
+        newer.add(canonical);
+        continue;
+      }
       if (incomingTime.isAfter(localTime) && existingValue[subKey] != companion.value.value) {
-        newer.add(companion);
+        newer.add(canonical);
       }
     }
 
     if (newer.isNotEmpty) {
-      await batchWrite(newer);
+      await LocalConfigDao.batchUpsertIfNewer(newer);
     }
     return newer.length;
   }
@@ -186,6 +213,25 @@ class LocalConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
                   utime: e.utime,
                 ))
             .toList());
+  }
+
+  /// Rows of [configKey] whose subConfigKey is in [subConfigKeys].
+  Future<List<LocalConfig>> readBySubKeys({required ConfigEnum configKey, required Set<String> subConfigKeys}) async {
+    List<LocalConfig> result = [];
+    List<String> keys = subConfigKeys.toList();
+    for (int i = 0; i < keys.length; i += 500) {
+      List<String> chunk = keys.sublist(i, i + 500 > keys.length ? keys.length : i + 500);
+      List<LocalConfigData> rows = await (appDb.select(appDb.localConfig)
+            ..where((tbl) => tbl.configKey.equals(configKey.key) & tbl.subConfigKey.isIn(chunk)))
+          .get();
+      result.addAll(rows.map((e) => LocalConfig(
+            configKey: ConfigEnum.from(e.configKey),
+            subConfigKey: e.subConfigKey,
+            value: e.value,
+            utime: e.utime,
+          )));
+    }
+    return result;
   }
 
   /// Max utime of [configKey] rows, or null when empty.

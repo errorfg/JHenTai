@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:jhentai/src/database/database.dart';
+import 'package:jhentai/src/database/table/gallery_history.dart';
 
 class GalleryHistoryDao {
   static Future<int> selectTotalCount() {
@@ -61,6 +62,35 @@ class GalleryHistoryDao {
     });
   }
 
+  /// Upsert that only takes effect when the incoming row is strictly newer.
+  /// The comparison runs inside SQLite (requires canonical fixed-width UTC
+  /// timestamps so string comparison is chronological), which makes it atomic
+  /// with respect to concurrent local writes - unlike a check-then-write in
+  /// Dart, a row updated between the check and the write cannot be clobbered.
+  static Future<void> batchUpsertIfNewer(
+      List<GalleryHistoryV2Data> histories) async {
+    if (histories.isEmpty) {
+      return;
+    }
+
+    return appDb.batch((batch) {
+      for (GalleryHistoryV2Data history in histories) {
+        batch.insert(
+          appDb.galleryHistoryV2,
+          history,
+          onConflict: DoUpdate<GalleryHistoryV2, GalleryHistoryV2Data>.withExcluded(
+            (old, excluded) => GalleryHistoryV2Companion(
+              jsonBody: Value(history.jsonBody),
+              lastReadTime: Value(history.lastReadTime),
+            ),
+            where: (old, excluded) =>
+                excluded.lastReadTime.isBiggerThan(old.lastReadTime),
+          ),
+        );
+      }
+    });
+  }
+
   /// Rows with lastReadTime strictly greater than [lastReadTimeExclusive].
   /// Requires canonical UTC ISO8601 timestamps for string comparison to be
   /// chronological (see HistoryService migration).
@@ -83,6 +113,12 @@ class GalleryHistoryDao {
         row.read(appDb.galleryHistoryV2.gid)!:
             row.read(appDb.galleryHistoryV2.lastReadTime)!
     };
+  }
+
+  static Future<List<GalleryHistoryV2Data>> selectByGids(List<int> gids) {
+    return (appDb.select(appDb.galleryHistoryV2)
+          ..where((tbl) => tbl.gid.isIn(gids)))
+        .get();
   }
 
   static Future<String?> selectMaxLastReadTime() async {

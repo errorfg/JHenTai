@@ -8,6 +8,7 @@ import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/path_service.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
+import 'cloud/pending_sync_tracker.dart';
 import 'jh_service.dart';
 import 'log.dart';
 import 'sync_service.dart';
@@ -28,18 +29,27 @@ class HistoryService
   @override
   Future<void> doInitBean() async {}
 
+  Future<void>? _migrationFuture;
+
   @override
   Future<void> doAfterBeanReady() async {
-    await _migrateLastReadTimeToUtc();
+    await ensureMigrated();
+  }
+
+  /// Awaitable and memoized: the sync service calls this before its first
+  /// sync because bean ready hooks are fired without being awaited.
+  Future<void> ensureMigrated() {
+    return _migrationFuture ??= _migrateLastReadTimeToUtc();
   }
 
   /// One-time migration: lastReadTime used to be a local-time string; convert
   /// to canonical UTC ISO8601 so lexicographic order (used by DB sorting and
   /// sync cursors) equals chronological order.
   Future<void> _migrateLastReadTimeToUtc() async {
+    /// v2: also rewrites variable-width ISO strings written by early builds
     String? done = await localConfigService.read(
         configKey: ConfigEnum.migrateHistoryTimeToUtc);
-    if (done == 'true') {
+    if (done == '2') {
       return;
     }
 
@@ -63,7 +73,7 @@ class HistoryService
         updates.add(GalleryHistoryV2Data(
           gid: row.gid,
           jsonBody: row.jsonBody,
-          lastReadTime: parsed.toIso8601String(),
+          lastReadTime: SyncTimeUtil.format(parsed),
         ));
       }
 
@@ -75,7 +85,7 @@ class HistoryService
             'Migrated ${updates.length} history lastReadTime values to UTC');
       }
       await localConfigService.write(
-          configKey: ConfigEnum.migrateHistoryTimeToUtc, value: 'true');
+          configKey: ConfigEnum.migrateHistoryTimeToUtc, value: '2');
     } catch (e) {
       log.error('Migrate history lastReadTime to UTC failed', e);
     }
@@ -118,6 +128,14 @@ class HistoryService
     return GalleryHistoryDao.selectMaxLastReadTime();
   }
 
+  Future<List<GalleryHistoryV2Data>> getRawHistoryByGids(Set<int> gids) async {
+    List<GalleryHistoryV2Data> result = [];
+    for (List<int> partition in gids.toList().partition(500)) {
+      result.addAll(await GalleryHistoryDao.selectByGids(partition));
+    }
+    return result;
+  }
+
   Future<void> record(GalleryHistoryModel gallery) async {
     log.trace('Record history: ${gallery.galleryUrl.gid}');
 
@@ -132,6 +150,7 @@ class HistoryService
           lastReadTime: SyncTimeUtil.nowIso(),
         ),
       );
+      await pendingSyncTracker.markHistoryPending(gallery.galleryUrl.gid);
 
       if (isNewHistory) {
         int totalCount = await GalleryHistoryDao.selectTotalCount();
@@ -172,23 +191,30 @@ class HistoryService
 
       List<GalleryHistoryV2Data> newer = [];
       for (GalleryHistoryV2Data incoming in gallerys) {
-        String? localTime = existing[incoming.gid];
-        if (localTime == null) {
-          newer.add(incoming);
-          continue;
-        }
         DateTime? incomingTime = SyncTimeUtil.tryParse(incoming.lastReadTime);
-        DateTime? existingTime = SyncTimeUtil.tryParse(localTime);
         if (incomingTime == null) {
           continue;
         }
+
+        /// Canonicalize so no ingest path can reintroduce non-canonical
+        /// timestamp strings into the table
+        GalleryHistoryV2Data canonical = GalleryHistoryV2Data(
+          gid: incoming.gid,
+          jsonBody: incoming.jsonBody,
+          lastReadTime: SyncTimeUtil.format(incomingTime),
+        );
+
+        String? localTime = existing[incoming.gid];
+        DateTime? existingTime = SyncTimeUtil.tryParse(localTime);
         if (existingTime == null || incomingTime.isAfter(existingTime)) {
-          newer.add(incoming);
+          newer.add(canonical);
         }
       }
 
+      /// Atomic SQL-guarded upsert: a row written concurrently between the
+      /// prefilter above and this write cannot be clobbered by stale data
       for (List<GalleryHistoryV2Data> partition in newer.partition(2000)) {
-        await GalleryHistoryDao.batchReplaceHistory(partition);
+        await GalleryHistoryDao.batchUpsertIfNewer(partition);
       }
       return newer.length;
     } on Exception catch (e) {

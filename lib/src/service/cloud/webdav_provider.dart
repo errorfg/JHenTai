@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:intl/intl.dart';
 import 'package:jhentai/src/service/cloud/cloud_provider.dart';
 import 'package:jhentai/src/service/log.dart';
+import 'package:dio/dio.dart';
 import 'package:webdav_client/webdav_client.dart' as webdav;
 
 /// WebDAV 云存储提供商实现
@@ -211,25 +212,14 @@ class WebDavProvider implements CloudProvider {
   Future<List<int>?> getRawObject(String key) async {
     _client ??= _initClient();
 
-    String fullPath = '$_root$key';
-    int slash = fullPath.lastIndexOf('/');
-    String dir = slash > 0 ? fullPath.substring(0, slash) : _root;
-    String name = fullPath.substring(slash + 1);
-
-    /// Probe via directory listing to distinguish "not found" from transport
-    /// errors (a missing parent directory also means "not found")
-    List<webdav.File> files;
     try {
-      files = await _client!.readDir(dir);
-    } catch (_) {
-      return null;
+      return await _client!.read('$_root$key');
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return null;
+      }
+      rethrow;
     }
-    bool exists = files.any((f) => (f.name ?? '') == name);
-    if (!exists) {
-      return null;
-    }
-
-    return await _client!.read(fullPath);
   }
 
   @override

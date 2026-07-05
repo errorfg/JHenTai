@@ -4,6 +4,8 @@ import 'package:jhentai/src/extension/get_logic_extension.dart';
 import 'package:jhentai/src/service/jh_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 
+import 'cloud/pending_sync_tracker.dart';
+
 ReadProgressService readProgressService = ReadProgressService();
 
 class ReadProgressService extends GetxController with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
@@ -65,6 +67,7 @@ class ReadProgressService extends GetxController with JHLifeCircleBeanErrorCatch
       subConfigKey: recordKey,
       value: index.toString(),
     );
+    await pendingSyncTracker.markProgressPending(recordKey);
     updateSafely(['$readProgressUpdateId::$recordKey']);
   }
 }

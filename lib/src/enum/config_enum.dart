@@ -9,9 +9,11 @@ enum ConfigEnum {
 
   /// oplog-based cloud sync (format v2) state
   syncDeviceId('syncDeviceId'),
-  oplogPushCursor('oplogPushCursor'),
   oplogAppliedOps('oplogAppliedOps'),
   oplogAppliedSnapshot('oplogAppliedSnapshot'),
+  oplogFullPushDone('oplogFullPushDone'),
+  oplogLastPushedKey('oplogLastPushedKey'),
+  oplogPendingPush('oplogPendingPush'),
 
   /// settings
   favoriteSetting('favoriteSetting'),

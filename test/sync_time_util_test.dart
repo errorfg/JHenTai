@@ -16,25 +16,44 @@ void main() {
       expect(parsed, expected);
     });
 
-    test('isCanonical distinguishes formats', () {
-      expect(SyncTimeUtil.isCanonical('2026-07-05T13:30:00.123Z'), true);
+    test('format is fixed-width even when microsecond part is zero', () {
+      /// Dart's own toIso8601String emits ".123Z" here, which breaks
+      /// lexicographic ordering against 6-digit fractions
+      expect(SyncTimeUtil.format(DateTime.utc(2026, 7, 5, 13, 30, 0, 123, 0)), '2026-07-05T13:30:00.123000Z');
+      expect(SyncTimeUtil.format(DateTime.utc(2026, 7, 5, 13, 30, 0, 123, 456)), '2026-07-05T13:30:00.123456Z');
+      expect(SyncTimeUtil.format(DateTime.utc(2026, 7, 5, 13, 30)), '2026-07-05T13:30:00.000000Z');
+    });
+
+    test('fixed-width form is lexicographically ordered', () {
+      DateTime a = DateTime.utc(2026, 7, 5, 13, 30, 0, 123, 0);
+      DateTime b = DateTime.utc(2026, 7, 5, 13, 30, 0, 123, 456);
+
+      /// Dart's variable-width form misorders exactly this pair
+      expect(a.toIso8601String().compareTo(b.toIso8601String()) > 0, true);
+      expect(SyncTimeUtil.format(a).compareTo(SyncTimeUtil.format(b)) < 0, true);
+    });
+
+    test('isCanonical only accepts the fixed-width form', () {
+      expect(SyncTimeUtil.isCanonical('2026-07-05T13:30:00.123456Z'), true);
+      expect(SyncTimeUtil.isCanonical('2026-07-05T13:30:00.123Z'), false, reason: 'variable-width Dart ISO is not canonical');
       expect(SyncTimeUtil.isCanonical('2026-07-05 21:30:00.123456'), false);
     });
 
-    test('canonicalize converts legacy and keeps canonical unchanged', () {
-      String canonical = '2026-07-05T13:30:00.123Z';
+    test('canonicalize converts all supported formats to fixed width', () {
+      String canonical = '2026-07-05T13:30:00.123456Z';
       expect(SyncTimeUtil.canonicalize(canonical), canonical);
+      expect(SyncTimeUtil.canonicalize('2026-07-05T13:30:00.123Z'), '2026-07-05T13:30:00.123000Z');
 
       String converted = SyncTimeUtil.canonicalize('2026-07-05 21:30:00.123');
-      expect(converted.endsWith('Z'), true);
+      expect(SyncTimeUtil.isCanonical(converted), true);
       expect(SyncTimeUtil.parse(converted), DateTime(2026, 7, 5, 21, 30, 0, 123).toUtc());
     });
 
     test('isAfter works across mixed formats', () {
       DateTime base = DateTime(2026, 7, 5, 21, 30);
       String legacy = base.toString();
-      String canonicalEarlier = base.subtract(const Duration(minutes: 1)).toUtc().toIso8601String();
-      String canonicalLater = base.add(const Duration(minutes: 1)).toUtc().toIso8601String();
+      String canonicalEarlier = SyncTimeUtil.format(base.subtract(const Duration(minutes: 1)));
+      String canonicalLater = SyncTimeUtil.format(base.add(const Duration(minutes: 1)));
 
       expect(SyncTimeUtil.isAfter(canonicalLater, legacy), true);
       expect(SyncTimeUtil.isAfter(canonicalEarlier, legacy), false);

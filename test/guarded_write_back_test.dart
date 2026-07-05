@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/service/history_service.dart';
+import 'package:jhentai/src/database/dao/gallery_history_dao.dart';
+import 'package:jhentai/src/service/cloud/pending_sync_tracker.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/log.dart';
 
@@ -130,6 +132,51 @@ void main() {
       expect(bodies[1], 'local-1', reason: 'stale merge result must not roll back history');
       expect(bodies[2], 'newer');
       expect(bodies[3], 'fresh');
+    });
+  });
+
+  group('GalleryHistoryDao.batchUpsertIfNewer (SQL-level guard)', () {
+    test('stale row cannot clobber even without the Dart prefilter', () async {
+      await GalleryHistoryDao.batchReplaceHistory([
+        GalleryHistoryV2Data(gid: 1, jsonBody: 'current', lastReadTime: '2026-07-05T10:00:00.000000Z'),
+      ]);
+
+      /// Simulates the race window: the guard must hold inside SQLite itself
+      await GalleryHistoryDao.batchUpsertIfNewer([
+        GalleryHistoryV2Data(gid: 1, jsonBody: 'stale', lastReadTime: '2026-07-05T09:00:00.000000Z'),
+        GalleryHistoryV2Data(gid: 2, jsonBody: 'insert', lastReadTime: '2026-07-05T08:00:00.000000Z'),
+      ]);
+
+      Map<int, String> times = await GalleryHistoryDao.selectGidToLastReadTime();
+      expect(times[1], '2026-07-05T10:00:00.000000Z');
+      expect(times[2], '2026-07-05T08:00:00.000000Z');
+    });
+  });
+
+  group('PendingSyncTracker', () {
+    test('marks persist, snapshot is stable, removePushed keeps later marks', () async {
+      PendingSyncTracker tracker = PendingSyncTracker();
+      await tracker.markHistoryPending(1);
+      await tracker.markHistoryPending(2);
+      await tracker.markProgressPending('101');
+
+      var (historyGids, progressKeys) = await tracker.snapshot();
+      expect(historyGids, {1, 2});
+      expect(progressKeys, {'101'});
+
+      /// A row marked after the snapshot must survive removePushed
+      await tracker.markHistoryPending(3);
+      await tracker.removePushed(historyGids, progressKeys);
+
+      var (afterHistory, afterProgress) = await tracker.snapshot();
+      expect(afterHistory, {3});
+      expect(afterProgress, isEmpty);
+
+      /// State is persisted: a fresh tracker instance reloads it
+      await Future.delayed(const Duration(milliseconds: 20));
+      PendingSyncTracker reloaded = PendingSyncTracker();
+      var (reloadedHistory, _) = await reloaded.snapshot();
+      expect(reloadedHistory, {3});
     });
   });
 
