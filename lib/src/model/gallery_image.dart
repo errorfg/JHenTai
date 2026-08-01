@@ -16,6 +16,15 @@ class GalleryImage {
   String? imageHash;
   DownloadStatus downloadStatus;
 
+  /// Transient headers used by authenticated remote image sources.
+  ///
+  /// They are deliberately excluded from [toJson] so credentials never leak
+  /// into gallery history, downloads, or cloud-synced metadata.
+  Map<String, String>? headers;
+
+  /// Transient cache namespace for authenticated image sources.
+  String? cacheKey;
+
   GalleryImage({
     required this.url,
     this.height,
@@ -27,6 +36,8 @@ class GalleryImage {
     this.imageHash,
     this.path,
     this.downloadStatus = DownloadStatus.none,
+    this.headers,
+    this.cacheKey,
   });
 
   Map<String, dynamic> toJson() {
@@ -69,6 +80,8 @@ class GalleryImage {
     String? imageHash,
     String? path,
     DownloadStatus? downloadStatus,
+    Map<String, String>? headers,
+    String? cacheKey,
   }) {
     return GalleryImage(
       url: url ?? this.url,
@@ -81,6 +94,8 @@ class GalleryImage {
       imageHash: imageHash ?? this.imageHash,
       path: path ?? this.path,
       downloadStatus: downloadStatus ?? this.downloadStatus,
+      headers: headers ?? this.headers,
+      cacheKey: cacheKey ?? this.cacheKey,
     );
   }
 

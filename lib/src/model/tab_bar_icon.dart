@@ -10,6 +10,7 @@ enum TabBarIconNameEnum {
   history,
   download,
   setting,
+  readerSource,
 }
 
 class TabBarIcon {

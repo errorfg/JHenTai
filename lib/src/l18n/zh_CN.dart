@@ -88,8 +88,10 @@ class zh_CN {
       'refreshIgneousFailed': '刷新Igneous失败',
 
       /// request
-      'sadPanda': 'Sad Panda(无响应数据). 解决参考Github Wiki: https://github.com/jiangtian616/JHenTai/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98',
-      'sadPandaReferLink': 'https://github.com/jiangtian616/JHenTai/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98',
+      'sadPanda':
+          'Sad Panda(无响应数据). 解决参考Github Wiki: https://github.com/jiangtian616/JHenTai/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98',
+      'sadPandaReferLink':
+          'https://github.com/jiangtian616/JHenTai/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98',
 
       /// gallery card
       'filtered': '已过滤',
@@ -162,7 +164,8 @@ class zh_CN {
       'score': '分数',
       'NotOnTheList': '未上榜',
       'getGalleryArchiveFailed': '获取归档数据失败',
-      'parseGalleryArchiveFailed': '解析错误，确保你e站的[Archiver Settings]设置的是[Manual Select, Manual Start (Default)]',
+      'parseGalleryArchiveFailed':
+          '解析错误，确保你e站的[Archiver Settings]设置的是[Manual Select, Manual Start (Default)]',
       'original': '原图',
       'resample': '压缩',
       'beginToDownloadArchive': '开始下载归档',
@@ -219,7 +222,8 @@ class zh_CN {
       'paused': '已暂停',
       'exceedImageLimits': "超出图片配额限制",
       'ehServerError': 'E站服务器发生错误，请稍后重试',
-      'unsupportedImagePageStyle': "JHenTai当前不支持Multi-Page Viewer(MPV)多页查看，请在e-hentai.org更换为默认风格",
+      'unsupportedImagePageStyle':
+          "JHenTai当前不支持Multi-Page Viewer(MPV)多页查看，请在e-hentai.org更换为默认风格",
       'toNext': '下一页',
       'toPrev': '上一页',
       'back': '返回',
@@ -432,7 +436,8 @@ class zh_CN {
       'deleteSuperResolvedImage': '删除图片超分辨率后的图片',
       'superResolveOriginalImageHint': '处理原图会耗费更多的时间、空间和性能，确定继续？',
       'verityAppLinks4Android12': '验证应用链接（安卓12+）',
-      'verityAppLinks4Android12Hint': '对于Android 12+，您需要手动添加链接到已验证链接才能在其他应用中唤起JHenTai',
+      'verityAppLinks4Android12Hint':
+          '对于Android 12+，您需要手动添加链接到已验证链接才能在其他应用中唤起JHenTai',
       'noImageMode': '无图模式',
       'exportData': '导出数据',
       'exportDataHint': '导出配置、屏蔽规则与历史记录',
@@ -707,8 +712,10 @@ class zh_CN {
       'reUnlock': '重新解锁',
       'reUnlockHint': '注意！重新解锁需要重新购买此归档！',
       'downloadHelpInfo': '如果发现无法下载，在日志中发现了数据库表不存在等问题，卸载当前app重装即可。',
-      'localGalleryHelpInfo': '加载那些不是由JHenTai下载的画廊(当做本地阅览器)。在下载设置-额外的画廊扫描路径中配置，之后刷新即可',
-      'localGalleryHelpInfo4iOSAndMacOS': '加载那些不是由JHenTai下载的画廊(当做本地阅览器)。将你的画廊放在默认下载路径下，之后刷新即可',
+      'localGalleryHelpInfo':
+          '加载那些不是由JHenTai下载的画廊(当做本地阅览器)。在下载设置-额外的画廊扫描路径中配置，之后刷新即可',
+      'localGalleryHelpInfo4iOSAndMacOS':
+          '加载那些不是由JHenTai下载的画廊(当做本地阅览器)。将你的画廊放在默认下载路径下，之后刷新即可',
       'deleteLocalGalleryHint': '删除您的本地文件',
       'priority': '优先级',
       'highest': '最高',
@@ -739,7 +746,8 @@ class zh_CN {
       'peakHoursHint': '高峰段下载原图需要耗费GP，由于你的GP不足，下载已自动停止。',
       'oldGalleryHint': '部分画廊下载原图需要耗费GP，由于你的GP不足，下载已自动停止。',
       'exceedLimitHint': '图片配额已耗尽，由于你的GP不足，下载已自动停止。',
-      'deleteUpdatingDependentHint': '有其他画廊的更新依赖当前画廊，此时删除会影响其他画廊的更新速度，推荐在更新完毕后再执行删除操作。',
+      'deleteUpdatingDependentHint':
+          '有其他画廊的更新依赖当前画廊，此时删除会影响其他画廊的更新速度，推荐在更新完毕后再执行删除操作。',
       'migrateToDownload': '迁移至「下载」',
       'refresh': '刷新',
 
@@ -783,7 +791,8 @@ class zh_CN {
       'pageAtLeast': '页数至少',
       'pageAtMost': '页数最多',
       'pagesBetween': '页数范围',
-      'pageRangeSelectHint': 'min <= 1000, max >= 10\nmin/max <= 0.8, max-min >= 20',
+      'pageRangeSelectHint':
+          'min <= 1000, max >= 10\nmin/max <= 0.8, max-min >= 20',
       'to': '到',
       'minimumRating': '最低评分',
       'disableFilterForLanguage': '禁用语言过滤',
@@ -832,7 +841,8 @@ favnote：匹配收藏备注
 
       /// download setting page
       'downloadPath': '下载路径',
-      'changeDownloadPathHint': '长按来改变下载路径(请不要使用SD卡或系统路径)。会自动复制已下载的画廊到新路径，并保留原文件。如果你遇到相关错误，请尝试重置路径',
+      'changeDownloadPathHint':
+          '长按来改变下载路径(请不要使用SD卡或系统路径)。会自动复制已下载的画廊到新路径，并保留原文件。如果你遇到相关错误，请尝试重置路径',
       'resetDownloadPath': '重置下载路径',
       'singleImageSavePath': '单张图片保存路径',
       'extraGalleryScanPath': '额外的画廊扫描路径',
@@ -857,7 +867,8 @@ favnote：匹配收藏备注
       'per': '每',
       'images': '图片',
       'downloadAllGallerysOfSamePriority': '同一优先级下同时下载所有画廊',
-      'downloadAllGallerysOfSamePriorityHint': '默认情况下逐优先级下载画廊，且每个优先级下只会同时下载一个画廊',
+      'downloadAllGallerysOfSamePriorityHint':
+          '默认情况下逐优先级下载画廊，且每个优先级下只会同时下载一个画廊',
       'alwaysUseDefaultGroup': '总是使用默认分组',
       'restoreDownloadTasks': '恢复下载任务',
       'enableStoreMetadataForRestore': '允许储存下载元数据用来恢复下载记录',
@@ -992,6 +1003,66 @@ favnote：匹配收藏备注
 
       /// tagSet dialog
       'chooseTagSet': '选择标签集',
+
+      /// 阅读来源
+      'readerSourceJHenTai': 'JHenTai',
+      'readerSourceKomga': 'Komga',
+      'readerSourcePdf': 'PDF',
+      'readerSource': '阅读来源',
+      'switchReaderSource': '切换阅读来源',
+      'komgaSetting': 'Komga 服务器',
+      'komgaSettings': 'Komga 设置',
+      'komgaServerUrl': '服务器地址',
+      'komgaApiKey': 'API 密钥',
+      'komgaApiKeyHint': 'API 密钥优先于用户名和密码',
+      'or': '或',
+      'retry': '重试',
+      'saveSetting': '保存',
+      'books': '本书',
+      'invalidKomgaServerUrl': '请输入有效的 HTTP 或 HTTPS 服务器地址',
+      'komgaCredentialsRequired': '请输入 API 密钥或用户名',
+      'komgaConnectionSuccess': '已连接到 Komga',
+      'komgaNotConfigured': '配置 Komga 服务器后即可浏览其中的漫画',
+      'configureKomga': '配置 Komga',
+      'komgaNoLibraries': 'Komga 中没有可用的媒体库',
+      'komgaNoSeries': '没有找到系列',
+      'komgaNoBooks': '没有找到漫画',
+      'komgaBookNotReady': '这本漫画尚未准备好阅读',
+      'komgaBookHasNoPages': '这本 Komga 漫画没有可阅读的页面',
+      'komgaConfigSyncHint': '开启自动云同步后，服务器与认证信息会同步到你的其他设备。',
+      'komgaProgressSyncHint': '阅读进度以 JHenTai 为准，只单向上报给 Komga。',
+      'komgaImportProgress': '导入 Komga 阅读进度',
+      'komgaImportProgressEmpty': 'Komga 中没有可导入的阅读进度',
+      'komgaImportProgressImported': '已导入 @count 条 Komga 阅读进度',
+      'komgaImportProgressUpToDate': 'JHenTai 阅读进度已是最新',
+      'komgaSeriesView': '系列',
+      'komgaAllBooksView': '全部书籍',
+      'komgaAllStatuses': '全部状态',
+      'komgaUnread': '未读',
+      'komgaInProgress': '阅读中',
+      'komgaRead': '已读',
+      'komgaNewlyAdded': '新添加',
+      'komgaSortAdded': '添加时间',
+      'komgaSortLastRead': '最近阅读',
+      'komgaSortTitle': '标题',
+      'komgaAscending': '升序',
+      'komgaDescending': '降序',
+      'komgaCardView': '卡片',
+      'komgaListView': '列表',
+      'komgaDetailView': '详细信息',
+      'komgaAddedAt': '添加于 @date',
+      'komgaLastReadAt': '最近阅读于 @date',
+      'komgaUnreadPages': '未读 · 共 @total 页',
+      'komgaContinueAt': '继续阅读 · @current/@total',
+      'komgaCompletedPages': '已读完 · 共 @total 页',
+      'komgaSeriesProgress':
+          '已读 @completed · 阅读中 @ongoing · 未读 @remaining',
+      'komgaNewSinceLastVisit': '上次访问后新增',
+      'komgaNoMatchingItems': '没有符合当前筛选条件的内容',
+      'komgaBrowseOptions': '浏览选项',
+      'pdfLibrary': 'PDF 书库',
+      'pdfLibraryEmpty': '在额外画廊扫描路径中没有找到 PDF。',
+      'pdfHasNoPages': '这个 PDF 没有可阅读的页面',
 
       /// tag namespace
       'language': '语言',

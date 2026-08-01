@@ -12,6 +12,9 @@ import 'package:jhentai/src/pages/history/history_page.dart';
 import 'package:jhentai/src/pages/home_page.dart';
 import 'package:jhentai/src/pages/layout/desktop/desktop_home_page.dart';
 import 'package:jhentai/src/pages/lock_page.dart';
+import 'package:jhentai/src/pages/komga/komga_page.dart';
+import 'package:jhentai/src/pages/komga/komga_settings_page.dart';
+import 'package:jhentai/src/pages/pdf/pdf_library_page.dart';
 import 'package:jhentai/src/pages/popular/popular_page.dart';
 import 'package:jhentai/src/pages/ranklist/ranklist_page.dart';
 import 'package:jhentai/src/pages/read/read_page.dart';
@@ -68,6 +71,9 @@ class Routes {
 
   static const String read = "/read";
   static const String singleImagePage = "/single_image_page";
+  static const String komga = "/komga";
+  static const String komgaSettings = "/komga/settings";
+  static const String pdfLibrary = "/pdf_library";
 
   /// left
   static const String desktopHome = "/desktop_home";
@@ -166,6 +172,24 @@ class Routes {
     EHPage(
       name: read,
       page: () => ReadPage(),
+      transition: defaultTransition,
+      side: Side.fullScreen,
+    ),
+    EHPage(
+      name: komga,
+      page: () => const KomgaPage(),
+      transition: defaultTransition,
+      side: Side.fullScreen,
+    ),
+    EHPage(
+      name: komgaSettings,
+      page: () => const KomgaSettingsPage(),
+      transition: defaultTransition,
+      side: Side.fullScreen,
+    ),
+    EHPage(
+      name: pdfLibrary,
+      page: () => const PdfLibraryPage(),
       transition: defaultTransition,
       side: Side.fullScreen,
     ),

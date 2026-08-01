@@ -126,6 +126,8 @@ class EHImage extends StatelessWidget {
   Widget buildNetworkImage(BuildContext context) {
     return ExtendedImage.network(
       _replaceEXUrl(galleryImage.url),
+      headers: galleryImage.headers,
+      cacheKey: galleryImage.cacheKey,
       fit: fit,
       height: containerHeight,
       width: containerWidth,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/model/config.dart';
@@ -20,21 +22,59 @@ import 'log.dart';
 
 SyncService syncService = SyncService();
 
+typedef SyncRunner =
+    Future<SyncResult> Function({
+      required List<CloudConfigTypeEnum> types,
+      String? providerName,
+      void Function(double progress)? onProgress,
+    });
+
+class _QueuedReadProgressSync {
+  _QueuedReadProgressSync({required this.requireAutoSync});
+
+  final Completer<SyncResult?> completer = Completer<SyncResult?>();
+  bool requireAutoSync;
+
+  void merge({required bool requireAutoSync}) {
+    if (!requireAutoSync) {
+      this.requireAutoSync = false;
+    }
+  }
+}
+
 /// 统一同步服务（协调层）
 /// 负责协调 CloudProvider 和 SyncMerger，提供统一的同步接口
 class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
+  SyncService({
+    SyncRunner? executeSync,
+    DateTime Function()? now,
+    Duration progressCooldown = const Duration(seconds: 5),
+  }) : _syncRunner = executeSync,
+       _now = now ?? DateTime.now,
+       _readProgressSyncCooldown = progressCooldown;
+
   final Map<String, CloudProvider> _providers = {};
   final HotDataSyncEngine _hotEngine = HotDataSyncEngine();
+  final SyncRunner? _syncRunner;
+  final DateTime Function() _now;
+  final Duration _readProgressSyncCooldown;
   bool _syncInProgress = false;
   DateTime? _lastSyncTime;
+  DateTime? _lastReadProgressSyncSuccessTime;
+  _QueuedReadProgressSync? _queuedReadProgressSync;
   int _lastHistoryAutoSyncCount = 0;
   bool _historyAutoSyncInProgress = false;
   static const _minSyncInterval = Duration(seconds: 30);
   static const int _historyAutoSyncStep = 5;
 
   @override
-  List<JHLifeCircleBean> get initDependencies =>
-      [log, syncSetting, syncMerger, cloudConfigService, isolateService];
+  List<JHLifeCircleBean> get initDependencies => [
+    log,
+    syncSetting,
+    syncMerger,
+    cloudConfigService,
+    isolateService,
+  ];
 
   @override
   Future<void> doInitBean() async {
@@ -46,7 +86,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   Future<void> doAfterBeanReady() async {
     // Register app lifecycle callback to listen for app resumed events
     AppManager.registerDidChangeAppLifecycleStateCallback(
-        _onAppLifecycleStateChanged);
+      _onAppLifecycleStateChanged,
+    );
 
     // Auto sync on app startup if enabled
     if (syncSetting.enableSync.value && syncSetting.autoSync.value) {
@@ -97,33 +138,43 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   /// Handle app lifecycle state changes
   void _onAppLifecycleStateChanged(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _performAutoSyncOnResume();
+      unawaited(performAutoSyncOnResume());
     }
   }
 
   /// Perform auto sync when app resumes from background
-  void _performAutoSyncOnResume() async {
+  @visibleForTesting
+  Future<void> performAutoSyncOnResume() async {
     // Check if sync is enabled
     if (!syncSetting.enableSync.value || !syncSetting.autoSync.value) {
       log.debug('Auto sync on resume: disabled');
       return;
     }
 
-    // Prevent frequent syncs: require at least 30 seconds since last sync
-    if (_lastSyncTime != null &&
-        DateTime.now().difference(_lastSyncTime!) < _minSyncInterval) {
-      log.debug('Auto sync on resume: skipped (too soon since last sync)');
-      return;
-    }
-
     try {
+      if (_syncInProgress) {
+        log.debug(
+          'Auto sync on resume: sync already running; queueing read progress',
+        );
+        await syncReadProgress();
+        return;
+      }
+
+      // Keep the expensive full-config sync on its existing 30-second
+      // cadence, but still reconcile read progress on every foreground event.
+      if (_lastSyncTime != null &&
+          _now().difference(_lastSyncTime!) < _minSyncInterval) {
+        log.debug(
+          'Auto sync on resume: full sync skipped; reconciling read progress',
+        );
+        await syncReadProgress();
+        return;
+      }
+
       log.info('========================================');
       log.info('Auto sync on app resumed: starting...');
       log.info('Current provider: ${syncSetting.currentProvider.value}');
       log.info('========================================');
-
-      // Update last sync time
-      _lastSyncTime = DateTime.now();
 
       // Sync all config types
       List<CloudConfigTypeEnum> allTypes = CloudConfigTypeEnum.values;
@@ -179,8 +230,9 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       log.info('Current provider: ${syncSetting.currentProvider.value}');
       log.info('========================================');
 
-      SyncResult result =
-          await sync(types: const [CloudConfigTypeEnum.history]);
+      SyncResult result = await sync(
+        types: const [CloudConfigTypeEnum.history],
+      );
 
       if (result.success) {
         log.info('✅ Auto sync by history count completed successfully');
@@ -212,9 +264,107 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     }
     _syncInProgress = true;
     try {
-      return await _doSync(types: types, providerName: providerName, onProgress: onProgress);
+      final SyncResult result =
+          await (_syncRunner?.call(
+                types: types,
+                providerName: providerName,
+                onProgress: onProgress,
+              ) ??
+              _doSync(
+                types: types,
+                providerName: providerName,
+                onProgress: onProgress,
+              ));
+      if (result.success) {
+        final DateTime completedAt = _now();
+        if (types.contains(CloudConfigTypeEnum.readIndexRecord)) {
+          _lastReadProgressSyncSuccessTime = completedAt;
+        }
+        if (CloudConfigTypeEnum.values.every(types.contains)) {
+          _lastSyncTime = completedAt;
+        }
+      }
+      return result;
     } finally {
       _syncInProgress = false;
+      _drainQueuedReadProgressSync();
+    }
+  }
+
+  /// Reconcile read progress without letting foreground/reader-close bursts
+  /// start concurrent cloud operations.
+  ///
+  /// Calls received while another sync is running are merged into one
+  /// trailing sync. That trailing request is not discarded by the cooldown:
+  /// the active sync may already have captured its local/remote snapshots.
+  Future<SyncResult?> syncReadProgress({
+    bool requireAutoSync = true,
+    bool force = false,
+  }) {
+    if (!syncSetting.enableSync.value) {
+      return Future<SyncResult?>.value();
+    }
+    if (requireAutoSync && !syncSetting.autoSync.value) {
+      return Future<SyncResult?>.value();
+    }
+
+    if (_syncInProgress) {
+      return _queueReadProgressSync(requireAutoSync: requireAutoSync);
+    }
+
+    final DateTime? lastSuccess = _lastReadProgressSyncSuccessTime;
+    if (!force &&
+        lastSuccess != null &&
+        _now().difference(lastSuccess) < _readProgressSyncCooldown) {
+      return Future<SyncResult?>.value();
+    }
+
+    return sync(types: const [CloudConfigTypeEnum.readIndexRecord]);
+  }
+
+  Future<SyncResult?> _queueReadProgressSync({required bool requireAutoSync}) {
+    final _QueuedReadProgressSync? queued = _queuedReadProgressSync;
+    if (queued != null) {
+      queued.merge(requireAutoSync: requireAutoSync);
+      return queued.completer.future;
+    }
+
+    final _QueuedReadProgressSync request = _QueuedReadProgressSync(
+      requireAutoSync: requireAutoSync,
+    );
+    _queuedReadProgressSync = request;
+    return request.completer.future;
+  }
+
+  void _drainQueuedReadProgressSync() {
+    if (_syncInProgress) {
+      return;
+    }
+
+    final _QueuedReadProgressSync? request = _queuedReadProgressSync;
+    if (request == null) {
+      return;
+    }
+    _queuedReadProgressSync = null;
+    unawaited(_runQueuedReadProgressSync(request));
+  }
+
+  Future<void> _runQueuedReadProgressSync(
+    _QueuedReadProgressSync request,
+  ) async {
+    if (!syncSetting.enableSync.value ||
+        (request.requireAutoSync && !syncSetting.autoSync.value)) {
+      request.completer.complete();
+      return;
+    }
+
+    try {
+      final SyncResult result = await sync(
+        types: const [CloudConfigTypeEnum.readIndexRecord],
+      );
+      request.completer.complete(result);
+    } catch (error, stackTrace) {
+      request.completer.completeError(error, stackTrace);
     }
   }
 
@@ -270,14 +420,15 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       // Try to download even if metadata fetch failed
       try {
         remoteData = await cloudProvider.download();
-        List list = await isolateService.jsonDecodeAsync(remoteData!);
+        List list = await isolateService.jsonDecodeAsync(remoteData);
         remoteConfigs = list.map((e) => CloudConfig.fromJson(e)).toList();
         log.info('Downloaded ${remoteConfigs.length} remote configs');
 
         // If download succeeded but metadata failed, create a placeholder
         if (remoteFile == null && remoteConfigs.isNotEmpty) {
           log.warning(
-              'Metadata fetch failed but download succeeded, using current time as fallback');
+            'Metadata fetch failed but download succeeded, using current time as fallback',
+          );
           remoteFile = CloudFile(
             version: 'latest',
             modifiedTime: DateTime.now(),
@@ -287,7 +438,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         }
       } catch (e) {
         log.info(
-            'No remote config found (first sync), will upload local configs');
+          'No remote config found (first sync), will upload local configs',
+        );
       }
       reportProgress(0.2);
 
@@ -302,10 +454,17 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
 
       if (types.any(hotTypes.contains)) {
         try {
-          hotResult = await _hotEngine.sync(cloudProvider, legacyRemoteConfigJson: remoteData);
+          hotResult = await _hotEngine.sync(
+            cloudProvider,
+            legacyRemoteConfigJson: remoteData,
+          );
           effectiveTypes = types.where((t) => !hotTypes.contains(t)).toList();
         } catch (e, stack) {
-          log.error('Hot data sync failed, falling back to legacy full-file sync', e, stack);
+          log.error(
+            'Hot data sync failed, falling back to legacy full-file sync',
+            e,
+            stack,
+          );
         }
       }
       reportProgress(0.5);
@@ -349,18 +508,17 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       // 5. Upload merged result, unless it is identical to what the remote
       // already holds (avoids churning latest.json and its version history)
       bool saveHistory = syncSetting.enableHistory.value;
-      String encodedData =
-          await isolateService.jsonEncodeAsync(mergeResult.merged);
+      String encodedData = await isolateService.jsonEncodeAsync(
+        mergeResult.merged,
+      );
 
       if (remoteData != null && encodedData == remoteData) {
         log.info('Merged result identical to remote, skipping upload');
       } else {
         log.info(
-            'Uploading ${mergeResult.merged.length} configs to remote (${encodedData.length} bytes)');
-        await cloudProvider.upload(
-          encodedData,
-          saveHistory: saveHistory,
+          'Uploading ${mergeResult.merged.length} configs to remote (${encodedData.length} bytes)',
         );
+        await cloudProvider.upload(encodedData, saveHistory: saveHistory);
         log.info('Upload complete');
         reportProgress(0.92);
 
@@ -371,8 +529,10 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       }
       reportProgress(1);
 
-      log.info('Sync completed successfully'
-          '${hotResult != null ? ' (hot: +${hotResult.appliedRows} applied, ${hotResult.pushedRows} pushed)' : ''}');
+      log.info(
+        'Sync completed successfully'
+        '${hotResult != null ? ' (hot: +${hotResult.appliedRows} applied, ${hotResult.pushedRows} pushed)' : ''}',
+      );
       return SyncResult(
         success: true,
         message: 'Sync completed successfully',
@@ -380,11 +540,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       );
     } catch (e) {
       log.error('Sync failed', e);
-      return SyncResult(
-        success: false,
-        message: e.toString(),
-        statistics: {},
-      );
+      return SyncResult(success: false, message: e.toString(), statistics: {});
     }
   }
 
@@ -468,8 +624,9 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       // 1. Download specified history version
       String data = await cloudProvider.downloadVersion(version);
       List configs = await isolateService.jsonDecodeAsync(data);
-      List<CloudConfig> cloudConfigs =
-          configs.map((e) => CloudConfig.fromJson(e)).toList();
+      List<CloudConfig> cloudConfigs = configs
+          .map((e) => CloudConfig.fromJson(e))
+          .toList();
 
       // 2. Import to local (replace current config)
       for (var config in cloudConfigs) {
@@ -478,8 +635,10 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
 
       // 3. (Optional) Sync to cloud, making the restored version the new latest
       if (syncToCloud) {
-        await cloudProvider.upload(data,
-            saveHistory: syncSetting.enableHistory.value);
+        await cloudProvider.upload(
+          data,
+          saveHistory: syncSetting.enableHistory.value,
+        );
       }
 
       log.info('Restored from version: $version');
@@ -595,7 +754,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         }
 
         log.info(
-            'Creating S3 provider with endpoint: ${syncSetting.s3Endpoint.value}, bucket: ${syncSetting.s3BucketName.value}');
+          'Creating S3 provider with endpoint: ${syncSetting.s3Endpoint.value}, bucket: ${syncSetting.s3BucketName.value}',
+        );
         cloudProvider = S3Provider(
           endpoint: syncSetting.s3Endpoint.value,
           accessKey: syncSetting.s3AccessKey.value,
@@ -613,7 +773,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         }
 
         log.info(
-            'Creating WebDAV provider with server: ${syncSetting.webdavServerUrl.value}');
+          'Creating WebDAV provider with server: ${syncSetting.webdavServerUrl.value}',
+        );
         cloudProvider = WebDavProvider(
           serverUrl: syncSetting.webdavServerUrl.value,
           username: syncSetting.webdavUsername.value,
@@ -639,7 +800,9 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   Future<DateTime?> _computeLatestLocalActivityTime() async {
     DateTime? latest;
     String? historyTime = await historyService.getMaxLastReadTime();
-    String? progressTime = await localConfigService.maxUtime(configKey: ConfigEnum.readIndexRecord);
+    String? progressTime = await localConfigService.maxUtime(
+      configKey: ConfigEnum.readIndexRecord,
+    );
     for (String? value in [historyTime, progressTime]) {
       DateTime? parsed = SyncTimeUtil.tryParse(value);
       if (parsed != null && (latest == null || parsed.isAfter(latest))) {
@@ -663,7 +826,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       int maxVersions = syncSetting.maxHistoryVersions.value;
 
       log.info(
-          'Found ${versions.length} history versions, max allowed: $maxVersions');
+        'Found ${versions.length} history versions, max allowed: $maxVersions',
+      );
 
       if (versions.length > maxVersions) {
         // Sort by version (timestamp) in descending order (newest first)
@@ -705,9 +869,5 @@ class RestoreResult {
   final String? version;
   final String? error;
 
-  RestoreResult({
-    required this.success,
-    this.version,
-    this.error,
-  });
+  RestoreResult({required this.success, this.version, this.error});
 }

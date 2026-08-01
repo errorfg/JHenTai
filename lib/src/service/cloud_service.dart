@@ -9,7 +9,9 @@ import 'package:jhentai/src/service/nhentai_favorite_service.dart';
 import 'package:jhentai/src/service/wnacg_favorite_service.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
 import 'package:jhentai/src/service/search_history_service.dart';
+import 'package:jhentai/src/setting/komga_setting.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
+import 'package:jhentai/src/utils/sync_time_util.dart';
 
 import '../database/database.dart';
 import 'history_service.dart';
@@ -32,6 +34,7 @@ class CloudConfigService
     CloudConfigTypeEnum.syncSetting: '1.0.0',
     CloudConfigTypeEnum.nhentaiFavorite: '1.0.0',
     CloudConfigTypeEnum.wnacgFavorite: '1.0.0',
+    CloudConfigTypeEnum.komgaSetting: '1.0.0',
   };
 
   static const int localConfigId = -1;
@@ -50,8 +53,9 @@ class CloudConfigService
     switch (config.type) {
       case CloudConfigTypeEnum.readIndexRecord:
         List list = await isolateService.jsonDecodeAsync(config.config);
-        List<LocalConfig> readIndexRecords =
-            list.map((e) => LocalConfig.fromJson(e)).toList();
+        List<LocalConfig> readIndexRecords = list
+            .map((e) => LocalConfig.fromJson(e))
+            .toList();
 
         /// Only write rows that are newer than the local ones: the merge was
         /// computed from a snapshot taken when the sync started, and progress
@@ -59,23 +63,28 @@ class CloudConfigService
         int written = await localConfigService.batchWriteIfNewer(
           configKey: ConfigEnum.readIndexRecord,
           localConfigs: readIndexRecords
-              .map((e) => LocalConfigCompanion(
-                    configKey: Value(e.configKey.key),
-                    subConfigKey: Value(e.subConfigKey),
-                    value: Value(e.value),
-                    utime: Value(e.utime),
-                  ))
+              .map(
+                (e) => LocalConfigCompanion(
+                  configKey: Value(e.configKey.key),
+                  subConfigKey: Value(e.subConfigKey),
+                  value: Value(e.value),
+                  utime: Value(e.utime),
+                ),
+              )
               .toList(),
         );
         if (written > 0) {
           readProgressService.clearCacheAndRefresh();
         }
         log.info(
-            '  ✅ Read index records imported ($written of ${readIndexRecords.length} rows newer than local)');
+          '  ✅ Read index records imported ($written of ${readIndexRecords.length} rows newer than local)',
+        );
         break;
       case CloudConfigTypeEnum.quickSearch:
         await localConfigService.write(
-            configKey: ConfigEnum.quickSearch, value: config.config);
+          configKey: ConfigEnum.quickSearch,
+          value: config.config,
+        );
         log.info('  Refreshing quick search service');
         await quickSearchService.refreshBean();
         log.info('  ✅ Quick search imported and refreshed');
@@ -84,14 +93,17 @@ class CloudConfigService
         List historyList = await isolateService.jsonDecodeAsync(config.config);
         log.info('  Writing ${historyList.length} search history items');
         await localConfigService.write(
-            configKey: ConfigEnum.searchHistory, value: config.config);
+          configKey: ConfigEnum.searchHistory,
+          value: config.config,
+        );
         await searchHistoryService.refreshBean();
         log.info('  ✅ Search history imported and refreshed');
         break;
       case CloudConfigTypeEnum.blockRules:
         List list = await isolateService.jsonDecodeAsync(config.config);
-        List<LocalBlockRule> blockRules =
-            list.map((e) => LocalBlockRule.fromJson(e)).toList();
+        List<LocalBlockRule> blockRules = list
+            .map((e) => LocalBlockRule.fromJson(e))
+            .toList();
         log.info('  Processing ${blockRules.length} block rules');
 
         for (LocalBlockRule blockRule in blockRules) {
@@ -104,45 +116,71 @@ class CloudConfigService
           bool exists = await localBlockRuleService.existsGroup(group.key);
           if (!exists) {
             await localBlockRuleService.replaceBlockRulesByGroup(
-                group.key, group.value);
+              group.key,
+              group.value,
+            );
             imported += group.value.length;
           }
         }
         log.info(
-            '  ✅ Imported $imported new block rules (${blockRules.length - imported} groups already exist)');
+          '  ✅ Imported $imported new block rules (${blockRules.length - imported} groups already exist)',
+        );
 
         break;
       case CloudConfigTypeEnum.history:
         List list = await isolateService.jsonDecodeAsync(config.config);
-        List<GalleryHistoryV2Data> histories =
-            list.map((e) => GalleryHistoryV2Data.fromJson(e)).toList();
-        int writtenHistories = await historyService.batchRecordIfNewer(histories);
+        List<GalleryHistoryV2Data> histories = list
+            .map((e) => GalleryHistoryV2Data.fromJson(e))
+            .toList();
+        int writtenHistories = await historyService.batchRecordIfNewer(
+          histories,
+        );
         log.info(
-            '  ✅ Gallery history imported ($writtenHistories of ${histories.length} rows newer than local)');
+          '  ✅ Gallery history imported ($writtenHistories of ${histories.length} rows newer than local)',
+        );
         break;
       case CloudConfigTypeEnum.syncSetting:
         await localConfigService.write(
-            configKey: ConfigEnum.syncSetting, value: config.config);
+          configKey: ConfigEnum.syncSetting,
+          value: config.config,
+        );
         await syncSetting.refreshBean();
         log.info('  ✅ Sync setting imported and refreshed');
         break;
       case CloudConfigTypeEnum.nhentaiFavorite:
         await localConfigService.write(
-            configKey: ConfigEnum.nhentaiFavorite, value: config.config);
+          configKey: ConfigEnum.nhentaiFavorite,
+          value: config.config,
+        );
         await nhentaiFavoriteService.refreshBean();
         log.info('  ✅ nhentai favorites imported and refreshed');
         break;
       case CloudConfigTypeEnum.wnacgFavorite:
         await localConfigService.write(
-            configKey: ConfigEnum.wnacgFavorite, value: config.config);
+          configKey: ConfigEnum.wnacgFavorite,
+          value: config.config,
+        );
         await wnacgFavoriteService.refreshBean();
         log.info('  ✅ wnacg favorites imported and refreshed');
+        break;
+      case CloudConfigTypeEnum.komgaSetting:
+        await localConfigService.batchWrite([
+          LocalConfigCompanion(
+            configKey: Value(ConfigEnum.komgaSetting.key),
+            subConfigKey: const Value(LocalConfigService.defaultSubConfigKey),
+            value: Value(config.config),
+            utime: Value(SyncTimeUtil.format(config.ctime)),
+          ),
+        ]);
+        await komgaSetting.refreshBean();
+        log.info('  ✅ Komga setting imported and refreshed');
         break;
     }
   }
 
   Future<CloudConfig?> getLocalConfig(CloudConfigTypeEnum type) async {
     String configValue;
+    DateTime? localConfigTime;
     switch (type) {
       case CloudConfigTypeEnum.readIndexRecord:
         List<LocalConfig> readIndexRecords = await localConfigService
@@ -152,38 +190,42 @@ class CloudConfigService
           return null;
         }
         log.debug(
-            '  Found ${readIndexRecords.length} local read index records');
+          '  Found ${readIndexRecords.length} local read index records',
+        );
         configValue = await isolateService.jsonEncodeAsync(readIndexRecords);
         break;
       case CloudConfigTypeEnum.quickSearch:
-        String? quickSearches =
-            await localConfigService.read(configKey: ConfigEnum.quickSearch);
+        String? quickSearches = await localConfigService.read(
+          configKey: ConfigEnum.quickSearch,
+        );
         if (quickSearches == null) {
           return null;
         }
         configValue = quickSearches;
         break;
       case CloudConfigTypeEnum.searchHistory:
-        String? searchHistories =
-            await localConfigService.read(configKey: ConfigEnum.searchHistory);
+        String? searchHistories = await localConfigService.read(
+          configKey: ConfigEnum.searchHistory,
+        );
         if (searchHistories == null) {
           return null;
         }
         configValue = searchHistories;
         break;
       case CloudConfigTypeEnum.blockRules:
-        List<LocalBlockRule> blockRules =
-            await localBlockRuleService.getBlockRules();
+        List<LocalBlockRule> blockRules = await localBlockRuleService
+            .getBlockRules();
         configValue = await isolateService.jsonEncodeAsync(blockRules);
         break;
       case CloudConfigTypeEnum.history:
-        List<GalleryHistoryV2Data> histories =
-            await historyService.getLatest10000RawHistory();
+        List<GalleryHistoryV2Data> histories = await historyService
+            .getLatest10000RawHistory();
         configValue = await isolateService.jsonEncodeAsync(histories);
         break;
       case CloudConfigTypeEnum.syncSetting:
-        String? syncConfig =
-            await localConfigService.read(configKey: ConfigEnum.syncSetting);
+        String? syncConfig = await localConfigService.read(
+          configKey: ConfigEnum.syncSetting,
+        );
         if (syncConfig == null) {
           return null;
         }
@@ -191,7 +233,8 @@ class CloudConfigService
         break;
       case CloudConfigTypeEnum.nhentaiFavorite:
         String? nhentaiFavoriteConfig = await localConfigService.read(
-            configKey: ConfigEnum.nhentaiFavorite);
+          configKey: ConfigEnum.nhentaiFavorite,
+        );
         if (nhentaiFavoriteConfig == null) {
           return null;
         }
@@ -199,11 +242,22 @@ class CloudConfigService
         break;
       case CloudConfigTypeEnum.wnacgFavorite:
         String? wnacgFavoriteConfig = await localConfigService.read(
-            configKey: ConfigEnum.wnacgFavorite);
+          configKey: ConfigEnum.wnacgFavorite,
+        );
         if (wnacgFavoriteConfig == null) {
           return null;
         }
         configValue = wnacgFavoriteConfig;
+        break;
+      case CloudConfigTypeEnum.komgaSetting:
+        List<LocalConfig> records = await localConfigService.readWithAllSubKeys(
+          configKey: ConfigEnum.komgaSetting,
+        );
+        if (records.isEmpty) {
+          return null;
+        }
+        configValue = records.first.value;
+        localConfigTime = SyncTimeUtil.tryParse(records.first.utime);
         break;
     }
 
@@ -214,7 +268,7 @@ class CloudConfigService
       type: type,
       version: CloudConfigService.configTypeVersionMap[type]!,
       config: configValue,
-      ctime: DateTime.now(),
+      ctime: localConfigTime ?? DateTime.now(),
     );
   }
 }

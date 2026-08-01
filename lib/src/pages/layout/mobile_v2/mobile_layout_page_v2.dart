@@ -10,6 +10,7 @@ import 'package:jhentai/src/pages/layout/mobile_v2/notification/tap_menu_button_
 import 'package:jhentai/src/pages/search/quick_search/quick_search_page.dart';
 import 'package:jhentai/src/pages/setting/setting_page.dart';
 import 'package:jhentai/src/routes/routes.dart';
+import 'package:jhentai/src/model/reader_source.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
 import 'package:jhentai/src/setting/user_setting.dart';
 import 'package:jhentai/src/utils/route_util.dart';
@@ -18,6 +19,7 @@ import 'package:jhentai/src/widget/will_pop_interceptor.dart';
 import '../../../network/eh_request.dart';
 import '../../../setting/preference_setting.dart';
 import '../../../widget/eh_alert_dialog.dart';
+import '../../../widget/reader_source_switcher.dart';
 import 'notification/tap_tab_bat_button_notification.dart';
 
 class MobileLayoutPageV2 extends StatelessWidget {
@@ -75,6 +77,9 @@ class MobileLayoutPageV2 extends StatelessWidget {
                     ).marginOnly(right: 8, top: 2),
                   ),
                 ),
+              ),
+              const ReaderSourceSwitcher(
+                currentSource: ReaderSourceType.jhentai,
               ),
             ],
           ),

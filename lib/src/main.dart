@@ -43,6 +43,7 @@ import 'package:jhentai/src/setting/download_setting.dart';
 import 'package:jhentai/src/setting/eh_setting.dart';
 import 'package:jhentai/src/setting/favorite_setting.dart';
 import 'package:jhentai/src/setting/keyboard_shortcut_setting.dart';
+import 'package:jhentai/src/setting/komga_setting.dart';
 import 'package:jhentai/src/setting/mouse_setting.dart';
 import 'package:jhentai/src/setting/my_tags_setting.dart';
 import 'package:jhentai/src/setting/network_setting.dart';
@@ -116,6 +117,7 @@ List<JHLifeCircleBean> lifeCircleBeans = [
   userSetting,
   syncSetting,
   keyboardShortcutSetting,
+  komgaSetting,
   builtInBlockedUserService,
 ];
 

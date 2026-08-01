@@ -33,6 +33,7 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - home sync progress indicator with desktop entry via title/progress display.
   - sync consistency fixes for search history merge and reading progress after cloud sync.
   - incremental oplog sync for history and read progress: routine syncs transfer only changes, immune to concurrent-device overwrites and clock skew.
+  - Komga server configuration and credentials included in config sync for automatic cross-device setup.
 - Gallery and search UX:
   - multi-tag selection in detail page.
   - client-side filters for Popular and Ranklist pages.
@@ -48,7 +49,9 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - global floating button to toggle between portrait and landscape orientation (mobile layout only).
 - Local library & downloads:
   - archive preview page for browsing images inside downloaded archives.
-  - local PDF files scanned and readable as galleries (Windows PDF rendering newly supported via pdfx).
+  - switchable JHenTai, Komga, and PDF reading sources with a shared reader.
+  - dedicated PDF library for scanned local PDF files (including Windows rendering via pdfx).
+  - Komga library/series/book browsing with local progress states, new-content filtering, added/read/title sorting, card/list/detail layouts, and one-way progress reporting.
 - Framework:
   - Flutter upgraded to 3.44.4, fixing dialogs auto-dismissing on iPadOS 26.1+ (flutter/flutter#177992).
 - CI/workflow updates in this fork:

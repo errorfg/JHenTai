@@ -7,6 +7,7 @@ enum CloudConfigTypeEnum {
   syncSetting(6, 'syncSetting'),
   nhentaiFavorite(7, 'nhentaiFavorite'),
   wnacgFavorite(8, 'wnacgFavorite'),
+  komgaSetting(9, 'komgaSetting'),
   ;
 
   final int code;
@@ -33,6 +34,8 @@ enum CloudConfigTypeEnum {
         return CloudConfigTypeEnum.nhentaiFavorite;
       case 8:
         return CloudConfigTypeEnum.wnacgFavorite;
+      case 9:
+        return CloudConfigTypeEnum.komgaSetting;
       default:
         throw Exception('Unknown CloudConfigTypeEnum code: $code');
     }

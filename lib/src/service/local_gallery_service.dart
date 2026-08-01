@@ -1,19 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
-import 'dart:ui' as ui;
-
-import 'package:crypto/crypto.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/extension/list_extension.dart';
 import 'package:jhentai/src/service/gallery_download_service.dart';
 import 'package:jhentai/src/utils/file_util.dart';
 import 'package:path/path.dart';
-/// Import renderer only: the pdfx viewer widgets are incompatible with the project's photo_view fork
-import 'package:pdfx/src/renderer/interfaces/document.dart' as pdf;
-import 'package:pdfx/src/renderer/interfaces/page.dart' as pdf;
-
 import '../model/gallery_image.dart';
 import '../pages/download/grid/mixin/grid_download_page_service_mixin.dart';
 import '../setting/download_setting.dart';
@@ -30,10 +21,6 @@ class LocalGalleryService extends GetxController
     with GridBasePageServiceMixin, JHLifeCircleBeanErrorCatch
     implements JHLifeCircleBean {
   static const String rootPath = '';
-  static const String pdfPageCacheDirName = '.pdf_page_cache';
-  static const double _pdfRenderBaseScale = 2.0;
-  static const double _pdfRenderMinLongSide = 1800;
-  static const double _pdfRenderMaxLongSide = 2600;
 
   LoadingState loadingState = LoadingState.idle;
 
@@ -79,10 +66,6 @@ class LocalGalleryService extends GetxController
   }
 
   Future<List<GalleryImage>> getGalleryImages(LocalGallery gallery) {
-    if (gallery.isPdf) {
-      return _getPdfGalleryImages(gallery);
-    }
-
     List<File> imageFiles = Directory(gallery.path)
         .listSync()
         .whereType<File>()
@@ -103,28 +86,6 @@ class LocalGalleryService extends GetxController
 
   void deleteGallery(LocalGallery gallery, String parentPath) {
     log.info('Delete local gallery: ${gallery.title}');
-
-    if (gallery.isPdf) {
-      File pdfFile = File(gallery.path);
-      Directory cacheDirectory = _computePdfCacheDirectory(pdfFile);
-      if (cacheDirectory.existsSync()) {
-        cacheDirectory.delete(recursive: true).catchError((e) {
-          log.error('Delete local pdf cache error!', e);
-          log.uploadError(e);
-          return cacheDirectory;
-        });
-      }
-      pdfFile.delete().catchError((e) {
-        log.error('Delete local pdf gallery error!', e);
-        log.uploadError(e);
-        return pdfFile;
-      });
-
-      allGallerys.removeWhere((g) => g.title == gallery.title);
-      path2GalleryDir[parentPath]?.removeWhere((g) => g.title == gallery.title);
-      update([galleryCountChangedId]);
-      return;
-    }
 
     Directory dir = Directory(gallery.path);
 
@@ -180,8 +141,7 @@ class LocalGalleryService extends GetxController
     Completer<LocalGalleryParseResult> completer = Completer();
     LocalGalleryParseResult result = LocalGalleryParseResult();
 
-    /// skip hidden directories, especially [pdfPageCacheDirName]: rendered pdf pages
-    /// must not be rediscovered as standalone galleries when a scan path covers them
+    /// Render caches and other hidden folders are not local galleries.
     if (basename(directory.path).startsWith('.')) {
       completer.complete(result);
       return completer.future;
@@ -225,7 +185,6 @@ class LocalGalleryService extends GetxController
       if (success) {
         List<Future> subFutures = [];
         List<File> images = [];
-        List<File> pdfs = [];
         String parentPath = isRootDir ? rootPath : directory.parent.path;
 
         directory.list().listen(
@@ -233,9 +192,6 @@ class LocalGalleryService extends GetxController
             if (entity is File && FileUtil.isImageExtension(entity.path)) {
               result.isLegalGalleryDir = true;
               images.add(entity);
-            } else if (entity is File && FileUtil.isPdfExtension(entity.path)) {
-              result.isLegalGalleryDir = true;
-              pdfs.add(entity);
             } else if (entity is Directory) {
               subFutures.add(
                 _parseDirectory(entity, false).then((subResult) {
@@ -257,11 +213,6 @@ class LocalGalleryService extends GetxController
               if (images.isNotEmpty) {
                 images.sort(FileUtil.naturalCompareFile);
                 _initGalleryInfoInMemory(directory, images[0], parentPath);
-              }
-
-              pdfs.sort(FileUtil.naturalCompareFile);
-              for (File pdfFile in pdfs) {
-                await _initPdfGalleryInfoInMemory(pdfFile, parentPath);
               }
 
               await Future.wait(subFutures);
@@ -299,134 +250,17 @@ class LocalGalleryService extends GetxController
     allGallerys.add(gallery);
     (path2GalleryDir[parentPath] ??= []).add(gallery);
   }
-
-  Future<void> _initPdfGalleryInfoInMemory(
-      File pdfFile, String parentPath) async {
-    pdf.PdfDocument? document;
-    try {
-      document = await pdf.PdfDocument.openFile(pdfFile.path);
-      File coverFile = await _ensurePdfPageImage(pdfFile, document, 1);
-
-      LocalGallery gallery = LocalGallery(
-        title: basenameWithoutExtension(pdfFile.path),
-        path: pdfFile.path,
-        cover: GalleryImage(
-          url: '',
-          path:
-              relative(coverFile.path, from: pathService.getVisibleDir().path),
-          downloadStatus: DownloadStatus.downloaded,
-        ),
-        isPdf: true,
-      );
-
-      allGallerys.add(gallery);
-      (path2GalleryDir[parentPath] ??= []).add(gallery);
-    } catch (e, stack) {
-      log.error(
-          'Init local pdf gallery failed, path: ${pdfFile.path}', e, stack);
-      log.uploadError(e, stackTrace: stack);
-    } finally {
-      await document?.close();
-    }
-  }
-
-  Future<List<GalleryImage>> _getPdfGalleryImages(LocalGallery gallery) async {
-    File pdfFile = File(gallery.path);
-    pdf.PdfDocument document = await pdf.PdfDocument.openFile(pdfFile.path);
-
-    try {
-      List<GalleryImage> images = [];
-      for (int pageNumber = 1; pageNumber <= document.pagesCount; pageNumber++) {
-        File imageFile =
-            await _ensurePdfPageImage(pdfFile, document, pageNumber);
-        images.add(
-          GalleryImage(
-            url: '',
-            path: relative(imageFile.path,
-                from: pathService.getVisibleDir().path),
-            downloadStatus: DownloadStatus.downloaded,
-          ),
-        );
-      }
-      return images;
-    } finally {
-      await document.close();
-    }
-  }
-
-  Future<File> _ensurePdfPageImage(
-      File pdfFile, pdf.PdfDocument document, int pageNumber) async {
-    Directory cacheDirectory = _computePdfCacheDirectory(pdfFile);
-    File pageImageFile = File(join(
-        cacheDirectory.path, pageNumber.toString().padLeft(5, '0') + '.png'));
-    if (pageImageFile.existsSync()) {
-      return pageImageFile;
-    }
-
-    if (!cacheDirectory.existsSync()) {
-      cacheDirectory.createSync(recursive: true);
-    }
-
-    pdf.PdfPage page = await document.getPage(pageNumber);
-
-    try {
-      double scale = _computePdfRenderScale(page.width, page.height);
-      pdf.PdfPageImage? renderedImage = await page.render(
-        width: max(1, page.width * scale),
-        height: max(1, page.height * scale),
-        format: pdf.PdfPageImageFormat.png,
-        backgroundColor: '#FFFFFF',
-      );
-      if (renderedImage == null) {
-        throw StateError(
-            'Encode pdf page image failed: ${pdfFile.path}#$pageNumber');
-      }
-      await pageImageFile.writeAsBytes(renderedImage.bytes);
-      return pageImageFile;
-    } finally {
-      await page.close();
-    }
-  }
-
-  Directory _computePdfCacheDirectory(File pdfFile) {
-    FileStat stat = pdfFile.statSync();
-    String cacheKey = sha1
-        .convert(utf8.encode(
-            '${pdfFile.absolute.path}:${stat.size}:${stat.modified.millisecondsSinceEpoch}'))
-        .toString();
-    return Directory(
-        join(pathService.getVisibleDir().path, pdfPageCacheDirName, cacheKey));
-  }
-
-  double _computePdfRenderScale(double width, double height) {
-    double longSide = max(width, height);
-    if (longSide <= 0) {
-      return 1;
-    }
-
-    double scale = _pdfRenderBaseScale;
-    double targetLongSide = longSide * scale;
-    if (targetLongSide < _pdfRenderMinLongSide) {
-      return _pdfRenderMinLongSide / longSide;
-    }
-    if (targetLongSide > _pdfRenderMaxLongSide) {
-      return _pdfRenderMaxLongSide / longSide;
-    }
-    return scale;
-  }
 }
 
 class LocalGallery {
   String title;
   String path;
   GalleryImage cover;
-  bool isPdf;
 
   LocalGallery(
       {required this.title,
       required this.path,
-      required this.cover,
-      this.isPdf = false});
+      required this.cover});
 }
 
 class LocalGalleryParseResult {

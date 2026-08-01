@@ -29,7 +29,10 @@ class DesktopLayoutPageState with DoubleTapToRefreshStateMixin {
   int selectedTabIndex = 0;
 
   /// selectedTabIndex in [shouldRender] icons
-  int get selectedTabOrder => icons.where((icon) => icon.shouldRender).toList().indexWhere((icon) => icon.name == icons[selectedTabIndex].name);
+  int get selectedTabOrder => icons
+      .where((icon) => icon.shouldRender)
+      .toList()
+      .indexWhere((icon) => icon.name == icons[selectedTabIndex].name);
   int? hoveringTabIndex;
 
   final ScrollController leftTabBarScrollController = ScrollController();
@@ -42,17 +45,24 @@ class DesktopLayoutPageState with DoubleTapToRefreshStateMixin {
         selectedIcon: const Icon(Icons.home),
         unselectedIcon: const Icon(Icons.home_outlined),
         page: () => const GallerysPage(),
-        scrollController: () => Get.find<GallerysPageLogic>().state.scrollController,
+        scrollController: () =>
+            Get.find<GallerysPageLogic>().state.scrollController,
         shouldRender: false,
       ),
       TabBarIcon(
         name: TabBarIconNameEnum.search,
         routeName: Routes.desktopSearch,
-        selectedIcon: const Icon(Icons.search, shadows: [Shadow(blurRadius: 2)]),
+        selectedIcon: const Icon(
+          Icons.search,
+          shadows: [Shadow(blurRadius: 2)],
+        ),
         unselectedIcon: const Icon(Icons.search),
         page: () => const DesktopSearchPage(),
-        scrollController: () =>
-            Get.find<DesktopSearchPageLogic>().state.tabLogics[Get.find<DesktopSearchPageLogic>().state.currentTabIndex].state.scrollController,
+        scrollController: () => Get.find<DesktopSearchPageLogic>()
+            .state
+            .tabLogics[Get.find<DesktopSearchPageLogic>().state.currentTabIndex]
+            .state
+            .scrollController,
         shouldRender: true,
       ),
       TabBarIcon(
@@ -61,16 +71,21 @@ class DesktopLayoutPageState with DoubleTapToRefreshStateMixin {
         selectedIcon: const Icon(Icons.whatshot),
         unselectedIcon: const Icon(Icons.whatshot_outlined),
         page: () => const PopularPage(),
-        scrollController: () => Get.find<PopularPageLogic>().state.scrollController,
+        scrollController: () =>
+            Get.find<PopularPageLogic>().state.scrollController,
         shouldRender: false,
       ),
       TabBarIcon(
         name: TabBarIconNameEnum.ranklist,
         routeName: Routes.ranklist,
-        selectedIcon: const Icon(Icons.bar_chart_rounded, shadows: [Shadow(blurRadius: 2)]),
+        selectedIcon: const Icon(
+          Icons.bar_chart_rounded,
+          shadows: [Shadow(blurRadius: 2)],
+        ),
         unselectedIcon: const Icon(Icons.bar_chart_outlined),
         page: () => const RanklistPage(),
-        scrollController: () => Get.find<RanklistPageLogic>().state.scrollController,
+        scrollController: () =>
+            Get.find<RanklistPageLogic>().state.scrollController,
         shouldRender: false,
       ),
       TabBarIcon(
@@ -79,7 +94,8 @@ class DesktopLayoutPageState with DoubleTapToRefreshStateMixin {
         selectedIcon: const Icon(Icons.favorite),
         unselectedIcon: const Icon(Icons.favorite_outline),
         page: () => const FavoritePage(),
-        scrollController: () => Get.find<FavoritePageLogic>().state.scrollController,
+        scrollController: () =>
+            Get.find<FavoritePageLogic>().state.scrollController,
         shouldRender: false,
       ),
       TabBarIcon(
@@ -88,16 +104,21 @@ class DesktopLayoutPageState with DoubleTapToRefreshStateMixin {
         selectedIcon: const Icon(Icons.visibility),
         unselectedIcon: const Icon(Icons.visibility_outlined),
         page: () => const WatchedPage(),
-        scrollController: () => Get.find<WatchedPageLogic>().state.scrollController,
+        scrollController: () =>
+            Get.find<WatchedPageLogic>().state.scrollController,
         shouldRender: false,
       ),
       TabBarIcon(
         name: TabBarIconNameEnum.history,
         routeName: Routes.history,
-        selectedIcon: const Icon(Icons.history, shadows: [Shadow(blurRadius: 2)]),
+        selectedIcon: const Icon(
+          Icons.history,
+          shadows: [Shadow(blurRadius: 2)],
+        ),
         unselectedIcon: const Icon(Icons.history_outlined),
         page: () => HistoryPage(),
-        scrollController: () => Get.find<HistoryPageLogic>().state.scrollController,
+        scrollController: () =>
+            Get.find<HistoryPageLogic>().state.scrollController,
         shouldRender: false,
       ),
       TabBarIcon(
@@ -116,9 +137,21 @@ class DesktopLayoutPageState with DoubleTapToRefreshStateMixin {
         page: () => const SettingPage(),
         shouldRender: true,
       ),
+      TabBarIcon(
+        name: TabBarIconNameEnum.readerSource,
+        routeName: Routes.komga,
+        selectedIcon: const Icon(Icons.auto_stories),
+        unselectedIcon: const Icon(Icons.auto_stories_outlined),
+        page: () => const SizedBox.shrink(),
+        shouldRender: false,
+      ),
     ];
 
-    selectedTabIndex = icons.firstIndexWhereOrNull((icon) => icon.name == preferenceSetting.defaultTab.value) ?? 0;
+    selectedTabIndex =
+        icons.firstIndexWhereOrNull(
+          (icon) => icon.name == preferenceSetting.defaultTab.value,
+        ) ??
+        0;
     icons[selectedTabIndex].shouldRender = true;
   }
 }

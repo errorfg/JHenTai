@@ -41,7 +41,9 @@ class LocalConfig {
 
 LocalConfigService localConfigService = LocalConfigService();
 
-class LocalConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
+class LocalConfigService
+    with JHLifeCircleBeanErrorCatch
+    implements JHLifeCircleBean {
   static const String defaultSubConfigKey = '';
 
   @override
@@ -67,13 +69,17 @@ class LocalConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
 
   Future<void> _migrateReadIndexUtimeToUtc() async {
     /// v2: also rewrites variable-width ISO strings written by early builds
-    String? done = await read(configKey: ConfigEnum.migrateLocalConfigUtimeToUtc);
+    String? done = await read(
+      configKey: ConfigEnum.migrateLocalConfigUtimeToUtc,
+    );
     if (done == '2') {
       return;
     }
 
     try {
-      List<LocalConfig> records = await readWithAllSubKeys(configKey: ConfigEnum.readIndexRecord);
+      List<LocalConfig> records = await readWithAllSubKeys(
+        configKey: ConfigEnum.readIndexRecord,
+      );
       List<LocalConfigCompanion> updates = [];
       for (LocalConfig record in records) {
         if (SyncTimeUtil.isCanonical(record.utime)) {
@@ -83,27 +89,43 @@ class LocalConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
         if (parsed == null) {
           continue;
         }
-        updates.add(LocalConfigCompanion(
-          configKey: Value(record.configKey.key),
-          subConfigKey: Value(record.subConfigKey),
-          value: Value(record.value),
-          utime: Value(SyncTimeUtil.format(parsed)),
-        ));
+        updates.add(
+          LocalConfigCompanion(
+            configKey: Value(record.configKey.key),
+            subConfigKey: Value(record.subConfigKey),
+            value: Value(record.value),
+            utime: Value(SyncTimeUtil.format(parsed)),
+          ),
+        );
       }
 
       if (updates.isNotEmpty) {
         await batchWrite(updates);
-        log.info('Migrated ${updates.length} readIndexRecord utime values to UTC');
+        log.info(
+          'Migrated ${updates.length} readIndexRecord utime values to UTC',
+        );
       }
-      await write(configKey: ConfigEnum.migrateLocalConfigUtimeToUtc, value: '2');
+      await write(
+        configKey: ConfigEnum.migrateLocalConfigUtimeToUtc,
+        value: '2',
+      );
     } catch (e) {
       log.error('Migrate readIndexRecord utime to UTC failed', e);
     }
   }
 
-  Future<int> write({required ConfigEnum configKey, String subConfigKey = defaultSubConfigKey, required String value}) {
+  Future<int> write({
+    required ConfigEnum configKey,
+    String subConfigKey = defaultSubConfigKey,
+    required String value,
+  }) {
     return appDb.managers.localConfig.create(
-      (l) => l(configKey: configKey.key, subConfigKey: subConfigKey, value: value, utime: SyncTimeUtil.nowIso()),
+      (l) => l(
+        configKey: configKey.key,
+        subConfigKey: subConfigKey,
+        value: value,
+        utime: SyncTimeUtil.nowIso(),
+      ),
       mode: InsertMode.insertOrReplace,
     );
   }
@@ -111,17 +133,18 @@ class LocalConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
   Future<void> batchWrite(List<LocalConfigCompanion> localConfigs) async {
     return appDb.managers.localConfig.bulkCreate(
       (l) => localConfigs
-          .map((i) => l(
-                configKey: i.configKey.value,
-                subConfigKey: i.subConfigKey.value,
-                value: i.value.value,
-                utime: i.utime.value,
-              ))
+          .map(
+            (i) => l(
+              configKey: i.configKey.value,
+              subConfigKey: i.subConfigKey.value,
+              value: i.value.value,
+              utime: i.utime.value,
+            ),
+          )
           .toList(),
       mode: InsertMode.insertOrReplace,
     );
   }
-
 
   /// Write [localConfigs] but only rows that are newer (by utime) than what is
   /// already stored, or absent locally. Prevents a sync merge computed from a
@@ -135,7 +158,10 @@ class LocalConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
   ///
   /// Returns the number of rows that passed the prefilter (upper bound of
   /// rows actually written).
-  Future<int> batchWriteIfNewer({required ConfigEnum configKey, required List<LocalConfigCompanion> localConfigs}) async {
+  Future<int> batchWriteIfNewer({
+    required ConfigEnum configKey,
+    required List<LocalConfigCompanion> localConfigs,
+  }) async {
     if (localConfigs.isEmpty) {
       return 0;
     }
@@ -143,10 +169,9 @@ class LocalConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
     List<LocalConfig> existing = await readWithAllSubKeys(configKey: configKey);
     Map<String, DateTime> existingUtime = {
       for (LocalConfig record in existing)
-        if (SyncTimeUtil.tryParse(record.utime) != null) record.subConfigKey: SyncTimeUtil.parse(record.utime)
+        if (SyncTimeUtil.tryParse(record.utime) != null)
+          record.subConfigKey: SyncTimeUtil.parse(record.utime),
     };
-    Map<String, String> existingValue = {for (LocalConfig record in existing) record.subConfigKey: record.value};
-
     List<LocalConfigCompanion> newer = [];
     for (LocalConfigCompanion companion in localConfigs) {
       String subKey = companion.subConfigKey.value;
@@ -167,7 +192,7 @@ class LocalConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
         newer.add(canonical);
         continue;
       }
-      if (incomingTime.isAfter(localTime) && existingValue[subKey] != companion.value.value) {
+      if (incomingTime.isAfter(localTime)) {
         newer.add(canonical);
       }
     }
@@ -178,75 +203,149 @@ class LocalConfigService with JHLifeCircleBeanErrorCatch implements JHLifeCircle
     return newer.length;
   }
 
-  Future<String?> read({required ConfigEnum configKey, String subConfigKey = defaultSubConfigKey}) {
+  Future<LocalConfig?> readRecord({
+    required ConfigEnum configKey,
+    String subConfigKey = defaultSubConfigKey,
+  }) {
     return appDb.managers.localConfig
-        .filter((config) => config.configKey.equals(configKey.key) & config.subConfigKey.equals(subConfigKey))
+        .filter(
+          (config) =>
+              config.configKey.equals(configKey.key) &
+              config.subConfigKey.equals(subConfigKey),
+        )
+        .getSingleOrNull()
+        .then(
+          (value) => value == null
+              ? null
+              : LocalConfig(
+                  configKey: ConfigEnum.from(value.configKey),
+                  subConfigKey: value.subConfigKey,
+                  value: value.value,
+                  utime: value.utime,
+                ),
+        );
+  }
+
+  Future<String?> read({
+    required ConfigEnum configKey,
+    String subConfigKey = defaultSubConfigKey,
+  }) {
+    return appDb.managers.localConfig
+        .filter(
+          (config) =>
+              config.configKey.equals(configKey.key) &
+              config.subConfigKey.equals(subConfigKey),
+        )
         .getSingleOrNull()
         .then((value) => value?.value);
   }
 
-  Future<List<LocalConfig>> readWithAllSubKeys({required ConfigEnum configKey}) {
-    return appDb.managers.localConfig.filter((config) => config.configKey.equals(configKey.key)).get().then((value) {
-      return value
-          .map((e) => LocalConfig(
-                configKey: ConfigEnum.from(e.configKey),
-                subConfigKey: e.subConfigKey,
-                value: e.value,
-                utime: e.utime,
-              ))
-          .toList();
-    });
+  Future<List<LocalConfig>> readWithAllSubKeys({
+    required ConfigEnum configKey,
+  }) {
+    return appDb.managers.localConfig
+        .filter((config) => config.configKey.equals(configKey.key))
+        .get()
+        .then((value) {
+          return value
+              .map(
+                (e) => LocalConfig(
+                  configKey: ConfigEnum.from(e.configKey),
+                  subConfigKey: e.subConfigKey,
+                  value: e.value,
+                  utime: e.utime,
+                ),
+              )
+              .toList();
+        });
   }
 
   /// Rows of [configKey] with utime strictly greater than [utimeExclusive].
   /// Both sides must be canonical UTC ISO8601 (see migration above), which
   /// makes the string comparison chronological.
-  Future<List<LocalConfig>> readNewerThan({required ConfigEnum configKey, required String utimeExclusive}) {
-    return (appDb.select(appDb.localConfig)
-          ..where((tbl) => tbl.configKey.equals(configKey.key) & tbl.utime.isBiggerThanValue(utimeExclusive)))
+  Future<List<LocalConfig>> readNewerThan({
+    required ConfigEnum configKey,
+    required String utimeExclusive,
+  }) {
+    return (appDb.select(appDb.localConfig)..where(
+          (tbl) =>
+              tbl.configKey.equals(configKey.key) &
+              tbl.utime.isBiggerThanValue(utimeExclusive),
+        ))
         .get()
-        .then((value) => value
-            .map((e) => LocalConfig(
+        .then(
+          (value) => value
+              .map(
+                (e) => LocalConfig(
                   configKey: ConfigEnum.from(e.configKey),
                   subConfigKey: e.subConfigKey,
                   value: e.value,
                   utime: e.utime,
-                ))
-            .toList());
+                ),
+              )
+              .toList(),
+        );
   }
 
   /// Rows of [configKey] whose subConfigKey is in [subConfigKeys].
-  Future<List<LocalConfig>> readBySubKeys({required ConfigEnum configKey, required Set<String> subConfigKeys}) async {
+  Future<List<LocalConfig>> readBySubKeys({
+    required ConfigEnum configKey,
+    required Set<String> subConfigKeys,
+  }) async {
     List<LocalConfig> result = [];
     List<String> keys = subConfigKeys.toList();
     for (int i = 0; i < keys.length; i += 500) {
-      List<String> chunk = keys.sublist(i, i + 500 > keys.length ? keys.length : i + 500);
-      List<LocalConfigData> rows = await (appDb.select(appDb.localConfig)
-            ..where((tbl) => tbl.configKey.equals(configKey.key) & tbl.subConfigKey.isIn(chunk)))
-          .get();
-      result.addAll(rows.map((e) => LocalConfig(
+      List<String> chunk = keys.sublist(
+        i,
+        i + 500 > keys.length ? keys.length : i + 500,
+      );
+      List<LocalConfigData> rows =
+          await (appDb.select(appDb.localConfig)..where(
+                (tbl) =>
+                    tbl.configKey.equals(configKey.key) &
+                    tbl.subConfigKey.isIn(chunk),
+              ))
+              .get();
+      result.addAll(
+        rows.map(
+          (e) => LocalConfig(
             configKey: ConfigEnum.from(e.configKey),
             subConfigKey: e.subConfigKey,
             value: e.value,
             utime: e.utime,
-          )));
+          ),
+        ),
+      );
     }
     return result;
   }
 
   /// Max utime of [configKey] rows, or null when empty.
   Future<String?> maxUtime({required ConfigEnum configKey}) async {
-    List<LocalConfigData> rows = await (appDb.select(appDb.localConfig)
-          ..where((tbl) => tbl.configKey.equals(configKey.key))
-          ..orderBy([(tbl) => OrderingTerm(expression: tbl.utime, mode: OrderingMode.desc)])
-          ..limit(1))
-        .get();
+    List<LocalConfigData> rows =
+        await (appDb.select(appDb.localConfig)
+              ..where((tbl) => tbl.configKey.equals(configKey.key))
+              ..orderBy([
+                (tbl) => OrderingTerm(
+                  expression: tbl.utime,
+                  mode: OrderingMode.desc,
+                ),
+              ])
+              ..limit(1))
+            .get();
     return rows.isEmpty ? null : rows.first.utime;
   }
 
-  Future<bool> delete({required ConfigEnum configKey, String subConfigKey = defaultSubConfigKey}) {
+  Future<bool> delete({
+    required ConfigEnum configKey,
+    String subConfigKey = defaultSubConfigKey,
+  }) {
     return appDb.managers.localConfig
-        .filter((config) => config.configKey.equals(configKey.key) & config.subConfigKey.equals(subConfigKey))
+        .filter(
+          (config) =>
+              config.configKey.equals(configKey.key) &
+              config.subConfigKey.equals(subConfigKey),
+        )
         .delete()
         .then((value) => value > 0);
   }

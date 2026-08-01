@@ -1,15 +1,19 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_resizable_container/flutter_resizable_container.dart';
 import 'package:get/get.dart';
+import 'package:jhentai/src/model/reader_source.dart';
 import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/service/windows_service.dart';
 import 'package:jhentai/src/utils/route_util.dart';
+import 'package:jhentai/src/widget/reader_source_switcher.dart';
 
 import '../../../mixin/double_tap_to_refresh_logic_mixin.dart';
+import '../../../model/tab_bar_icon.dart';
 import '../../home_page.dart';
 import 'desktop_layout_page_state.dart';
 
-class DesktopLayoutPageLogic extends GetxController with DoubleTapToRefreshLogicMixin {
+class DesktopLayoutPageLogic extends GetxController
+    with DoubleTapToRefreshLogicMixin {
   final String tabBarId = 'tabBarId';
   final String leftColumnId = 'leftColumnId';
 
@@ -43,6 +47,11 @@ class DesktopLayoutPageLogic extends GetxController with DoubleTapToRefreshLogic
   /// at gallery bar and tap gallery bar again -> scroll to top
   /// at gallery bar and tap gallery bar twice -> scroll to top and refresh
   void handleTapTabBarButton(int index) {
+    if (state.icons[index].name == TabBarIconNameEnum.readerSource) {
+      showReaderSourcePicker(ReaderSourceType.jhentai);
+      return;
+    }
+
     state.icons[index].shouldRender = true;
 
     int prevIndex = state.selectedTabIndex;
@@ -59,7 +68,8 @@ class DesktopLayoutPageLogic extends GetxController with DoubleTapToRefreshLogic
       return;
     }
 
-    ScrollController? scrollController = state.icons[index].scrollController?.call();
+    ScrollController? scrollController = state.icons[index].scrollController
+        ?.call();
     handleTap2Scroll2Top(scrollController);
   }
 }

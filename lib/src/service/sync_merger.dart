@@ -176,7 +176,23 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         return await _mergeNhentaiFavorite(local, remote);
       case CloudConfigTypeEnum.wnacgFavorite:
         return await _mergeWnacgFavorite(local, remote);
+      case CloudConfigTypeEnum.komgaSetting:
+        return _mergeLatestConfig(local, remote);
     }
+  }
+
+  MergeConfigResult _mergeLatestConfig(CloudConfig local, CloudConfig remote) {
+    // Importing a config writes a fresh local database timestamp. Keeping the
+    // remote envelope when values already match avoids perpetual upload churn.
+    if (local.config == remote.config) {
+      return MergeConfigResult(remote, MergeStatistics(1, 1, 1, 0, 0));
+    }
+
+    bool useRemote = remote.ctime.isAfter(local.ctime);
+    return MergeConfigResult(
+      useRemote ? remote : local,
+      MergeStatistics(1, 1, 1, useRemote ? 1 : 0, 1),
+    );
   }
 
   Future<MergeConfigResult> _mergeSyncSetting(

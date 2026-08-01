@@ -252,7 +252,7 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
   /// [ReadMode.online] images use [showOnlineImageContextMenu] instead.
   void showLocalImageContextMenu(int index, BuildContext context, {Offset? position}) {
     final mode = readPageState.readPageInfo.mode;
-    if (mode == ReadMode.online || mode == ReadMode.local) {
+    if (mode == ReadMode.online || mode == ReadMode.local || mode == ReadMode.remote) {
       return;
     }
 

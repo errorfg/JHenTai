@@ -23,6 +23,24 @@
             </ActionContent>
          </ExecutionAction>
       </PreActions>
+      <PostActions>
+         <ExecutionAction
+            ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
+            <ActionContent
+               title = "Finalize App Bundle"
+               scriptText = "set -e&#10;&#10;app_path=&quot;${TARGET_BUILD_DIR}/${FULL_PRODUCT_NAME}&quot;&#10;&#10;if [ -d &quot;$app_path&quot; ]; then&#10;   if ! /usr/bin/codesign --verify --deep --strict &quot;$app_path&quot; &gt;/dev/null 2&gt;&amp;1; then&#10;      signing_identity=&quot;${EXPANDED_CODE_SIGN_IDENTITY:--}&quot;&#10;      /usr/bin/codesign --force --sign &quot;$signing_identity&quot; --preserve-metadata=identifier,entitlements,requirements,flags,runtime &quot;$app_path&quot;&#10;   fi&#10;&#10;   /usr/bin/codesign --verify --deep --strict --verbose=2 &quot;$app_path&quot;&#10;   /usr/bin/touch -m &quot;$app_path&quot;&#10;fi&#10;">
+               <EnvironmentBuildable>
+                  <BuildableReference
+                     BuildableIdentifier = "primary"
+                     BlueprintIdentifier = "33CC10EC2044A3C60003C045"
+                     BuildableName = "jhentai.app"
+                     BlueprintName = "Runner"
+                     ReferencedContainer = "container:Runner.xcodeproj">
+                  </BuildableReference>
+               </EnvironmentBuildable>
+            </ActionContent>
+         </ExecutionAction>
+      </PostActions>
       <BuildActionEntries>
          <BuildActionEntry
             buildForTesting = "YES"

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -54,7 +52,7 @@ class ReadPageState with ScrollStatusListerState {
       images = galleryDownloadService.galleryDownloadInfos[readPageInfo.gid]!.images;
     }
 
-    if (readPageInfo.mode == ReadMode.archive || readPageInfo.mode == ReadMode.local) {
+    if (readPageInfo.mode == ReadMode.archive || readPageInfo.mode == ReadMode.local || readPageInfo.mode == ReadMode.remote) {
       images = readPageInfo.images!.cast<GalleryImage?>();
     }
 

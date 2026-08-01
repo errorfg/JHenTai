@@ -91,15 +91,27 @@ class HotDataSyncEngine {
       bootstrapped = true;
     } else {
       // 1. Apply a newer snapshot if another device compacted since our last sync
-      String appliedSnapshot = await localConfigService.read(configKey: ConfigEnum.oplogAppliedSnapshot) ?? '';
-      if (manifest.snapshot != null && manifest.snapshot!.compareTo(appliedSnapshot) > 0) {
+      String appliedSnapshot =
+          await localConfigService.read(
+            configKey: ConfigEnum.oplogAppliedSnapshot,
+          ) ??
+          '';
+      if (manifest.snapshot != null &&
+          manifest.snapshot!.compareTo(appliedSnapshot) > 0) {
         log.info('🔁 Hot sync: applying snapshot ${manifest.snapshot}');
-        List<int>? bytes = await provider.getRawObject('$snapshotPrefix${manifest.snapshot}.json.gz');
+        List<int>? bytes = await provider.getRawObject(
+          '$snapshotPrefix${manifest.snapshot}.json.gz',
+        );
         if (bytes != null) {
           applied += await _applyPacks([await _decodePack(bytes)]);
-          await localConfigService.write(configKey: ConfigEnum.oplogAppliedSnapshot, value: manifest.snapshot!);
+          await localConfigService.write(
+            configKey: ConfigEnum.oplogAppliedSnapshot,
+            value: manifest.snapshot!,
+          );
         } else {
-          log.warning('Hot sync: snapshot ${manifest.snapshot} listed in manifest but missing');
+          log.warning(
+            'Hot sync: snapshot ${manifest.snapshot} listed in manifest but missing',
+          );
         }
       }
 
@@ -156,7 +168,9 @@ class HotDataSyncEngine {
     }
     if (pending.isNotEmpty) {
       await _writeAppliedCursors(appliedCursors);
-      log.info('🔁 Hot sync: applied ${pending.length} op packs ($applied rows total)');
+      log.info(
+        '🔁 Hot sync: applied ${pending.length} op packs ($applied rows total)',
+      );
     }
 
     // 3. Push local changes as a new op pack
@@ -182,21 +196,32 @@ class HotDataSyncEngine {
   /// pack once. That way, if two devices bootstrap concurrently and one
   /// manifest/snapshot write shadows the other, the shadowed device's data
   /// still propagates through its op pack.
-  Future<int> _bootstrap(CloudProvider provider, String? legacyRemoteConfigJson) async {
+  Future<int> _bootstrap(
+    CloudProvider provider,
+    String? legacyRemoteConfigJson,
+  ) async {
     int applied = 0;
 
     if (legacyRemoteConfigJson != null) {
       try {
         applied = await _applyLegacyConfig(legacyRemoteConfigJson);
-        log.info('🔁 Hot sync bootstrap: imported $applied rows from legacy config');
+        log.info(
+          '🔁 Hot sync bootstrap: imported $applied rows from legacy config',
+        );
       } catch (e) {
-        log.warning('Hot sync bootstrap: failed to parse legacy config, continuing with local data only', e);
+        log.warning(
+          'Hot sync bootstrap: failed to parse legacy config, continuing with local data only',
+          e,
+        );
       }
     }
 
     String snapshotTs = await _writeSnapshot(provider);
     await _writeManifest(provider, _Manifest(snapshot: snapshotTs));
-    await localConfigService.write(configKey: ConfigEnum.oplogAppliedSnapshot, value: snapshotTs);
+    await localConfigService.write(
+      configKey: ConfigEnum.oplogAppliedSnapshot,
+      value: snapshotTs,
+    );
 
     return applied;
   }
@@ -205,25 +230,31 @@ class HotDataSyncEngine {
   /// them with timestamp-guarded upserts.
   Future<int> _applyLegacyConfig(String legacyJson) async {
     List raw = await isolateService.jsonDecodeAsync(legacyJson);
-    List<CloudConfig> configs = raw.map((e) => CloudConfig.fromJson(e)).toList();
+    List<CloudConfig> configs = raw
+        .map((e) => CloudConfig.fromJson(e))
+        .toList();
     int applied = 0;
 
     for (CloudConfig config in configs) {
       if (config.type == CloudConfigTypeEnum.history) {
         List list = await isolateService.jsonDecodeAsync(config.config);
-        List<GalleryHistoryV2Data> histories = list.map((e) => GalleryHistoryV2Data.fromJson(e)).toList();
+        List<GalleryHistoryV2Data> histories = list
+            .map((e) => GalleryHistoryV2Data.fromJson(e))
+            .toList();
         applied += await historyService.batchRecordIfNewer(histories);
       } else if (config.type == CloudConfigTypeEnum.readIndexRecord) {
         List list = await isolateService.jsonDecodeAsync(config.config);
         applied += await localConfigService.batchWriteIfNewer(
           configKey: ConfigEnum.readIndexRecord,
           localConfigs: list
-              .map((e) => LocalConfigCompanion(
-                    configKey: const Value('readIndexRecord'),
-                    subConfigKey: Value(e['subConfigKey']),
-                    value: Value(e['value']),
-                    utime: Value(e['utime']),
-                  ))
+              .map(
+                (e) => LocalConfigCompanion(
+                  configKey: const Value('readIndexRecord'),
+                  subConfigKey: Value(e['subConfigKey']),
+                  value: Value(e['value']),
+                  utime: Value(e['utime']),
+                ),
+              )
               .toList(),
         );
       }
@@ -239,30 +270,50 @@ class HotDataSyncEngine {
   /// enabling format v2 uploads the full local state; afterwards only rows in
   /// the pending set travel.
   Future<int> _pushLocalChanges(CloudProvider provider, String deviceId) async {
-    bool fullPushDone = await localConfigService.read(configKey: ConfigEnum.oplogFullPushDone) == 'true';
+    bool fullPushDone =
+        await localConfigService.read(
+          configKey: ConfigEnum.oplogFullPushDone,
+        ) ==
+        'true';
+    final PendingSyncSnapshotToken pushedSnapshot = await pendingSyncTracker
+        .snapshotToken();
 
     List<GalleryHistoryV2Data> pendingHistory;
     List<LocalConfig> pendingProgress;
-    Set<int> pushedHistoryGids = {};
-    Set<String> pushedProgressKeys = {};
 
     if (!fullPushDone) {
+      // The token is captured before the full-table reads. Keys created or
+      // re-marked while the upload is in flight must survive acknowledgement.
       pendingHistory = await historyService.getAllRawHistory();
-      pendingProgress = await localConfigService.readWithAllSubKeys(configKey: ConfigEnum.readIndexRecord);
-      log.info('🔁 Hot sync: performing one-time full push (${pendingHistory.length} history, ${pendingProgress.length} progress)');
+      pendingProgress = await localConfigService.readWithAllSubKeys(
+        configKey: ConfigEnum.readIndexRecord,
+      );
+      log.info(
+        '🔁 Hot sync: performing one-time full push (${pendingHistory.length} history, ${pendingProgress.length} progress)',
+      );
     } else {
-      (pushedHistoryGids, pushedProgressKeys) = await pendingSyncTracker.snapshot();
-      pendingHistory = pushedHistoryGids.isEmpty ? [] : await historyService.getRawHistoryByGids(pushedHistoryGids);
+      Set<int> pushedHistoryGids = pushedSnapshot.historyGids;
+      Set<String> pushedProgressKeys = pushedSnapshot.progressKeys;
+      pendingHistory = pushedHistoryGids.isEmpty
+          ? []
+          : await historyService.getRawHistoryByGids(pushedHistoryGids);
       pendingProgress = pushedProgressKeys.isEmpty
           ? []
-          : await localConfigService.readBySubKeys(configKey: ConfigEnum.readIndexRecord, subConfigKeys: pushedProgressKeys);
+          : await localConfigService.readBySubKeys(
+              configKey: ConfigEnum.readIndexRecord,
+              subConfigKeys: pushedProgressKeys,
+            );
     }
 
     if (pendingHistory.isEmpty && pendingProgress.isEmpty) {
       log.info('🔁 Hot sync: nothing to push');
       if (!fullPushDone) {
-        await localConfigService.write(configKey: ConfigEnum.oplogFullPushDone, value: 'true');
+        await localConfigService.write(
+          configKey: ConfigEnum.oplogFullPushDone,
+          value: 'true',
+        );
       }
+      await pendingSyncTracker.removePushedSnapshot(pushedSnapshot);
       return 0;
     }
 
@@ -272,26 +323,44 @@ class HotDataSyncEngine {
       'deviceId': deviceId,
       'createdAt': SyncTimeUtil.nowIso(),
       'history': pendingHistory
-          .map((h) => {'gid': h.gid, 'jsonBody': h.jsonBody, 'lastReadTime': h.lastReadTime})
+          .map(
+            (h) => {
+              'gid': h.gid,
+              'jsonBody': h.jsonBody,
+              'lastReadTime': h.lastReadTime,
+            },
+          )
           .toList(),
       'readProgress': pendingProgress
-          .map((p) => {'subConfigKey': p.subConfigKey, 'value': p.value, 'utime': p.utime})
+          .map(
+            (p) => {
+              'subConfigKey': p.subConfigKey,
+              'value': p.value,
+              'utime': p.utime,
+            },
+          )
           .toList(),
     };
 
     List<int> bytes = await _encodePack(pack);
     await provider.putRawObject('$opsPrefix$deviceId/$ts.json.gz', bytes);
-    await localConfigService.write(configKey: ConfigEnum.oplogLastPushedKey, value: ts);
+    await localConfigService.write(
+      configKey: ConfigEnum.oplogLastPushedKey,
+      value: ts,
+    );
 
     if (!fullPushDone) {
-      await localConfigService.write(configKey: ConfigEnum.oplogFullPushDone, value: 'true');
-      await pendingSyncTracker.clearAll();
-    } else {
-      await pendingSyncTracker.removePushed(pushedHistoryGids, pushedProgressKeys);
+      await localConfigService.write(
+        configKey: ConfigEnum.oplogFullPushDone,
+        value: 'true',
+      );
     }
+    await pendingSyncTracker.removePushedSnapshot(pushedSnapshot);
 
     int pushed = pendingHistory.length + pendingProgress.length;
-    log.info('🔁 Hot sync: pushed $pushed rows (${bytes.length} bytes gz) as $ts');
+    log.info(
+      '🔁 Hot sync: pushed $pushed rows (${bytes.length} bytes gz) as $ts',
+    );
     return pushed;
   }
 
@@ -310,14 +379,18 @@ class HotDataSyncEngine {
       for (var e in (pack['history'] as List? ?? [])) {
         int gid = e['gid'];
         var current = historyByGid[gid];
-        if (current == null || _timeOrEpoch(e['lastReadTime']).isAfter(_timeOrEpoch(current['lastReadTime']))) {
+        if (current == null ||
+            _timeOrEpoch(
+              e['lastReadTime'],
+            ).isAfter(_timeOrEpoch(current['lastReadTime']))) {
           historyByGid[gid] = Map<String, dynamic>.from(e);
         }
       }
       for (var e in (pack['readProgress'] as List? ?? [])) {
         String key = e['subConfigKey'];
         var current = progressByKey[key];
-        if (current == null || _timeOrEpoch(e['utime']).isAfter(_timeOrEpoch(current['utime']))) {
+        if (current == null ||
+            _timeOrEpoch(e['utime']).isAfter(_timeOrEpoch(current['utime']))) {
           progressByKey[key] = Map<String, dynamic>.from(e);
         }
       }
@@ -326,25 +399,31 @@ class HotDataSyncEngine {
     int applied = 0;
 
     if (historyByGid.isNotEmpty) {
-      applied += await historyService.batchRecordIfNewer(historyByGid.values
-          .map((e) => GalleryHistoryV2Data(
+      applied += await historyService.batchRecordIfNewer(
+        historyByGid.values
+            .map(
+              (e) => GalleryHistoryV2Data(
                 gid: e['gid'],
                 jsonBody: e['jsonBody'],
                 lastReadTime: e['lastReadTime'],
-              ))
-          .toList());
+              ),
+            )
+            .toList(),
+      );
     }
 
     if (progressByKey.isNotEmpty) {
       int written = await localConfigService.batchWriteIfNewer(
         configKey: ConfigEnum.readIndexRecord,
         localConfigs: progressByKey.values
-            .map((e) => LocalConfigCompanion(
-                  configKey: const Value('readIndexRecord'),
-                  subConfigKey: Value(e['subConfigKey']),
-                  value: Value(e['value']),
-                  utime: Value(e['utime']),
-                ))
+            .map(
+              (e) => LocalConfigCompanion(
+                configKey: const Value('readIndexRecord'),
+                subConfigKey: Value(e['subConfigKey']),
+                value: Value(e['value']),
+                utime: Value(e['utime']),
+              ),
+            )
             .toList(),
       );
       applied += written;
@@ -357,25 +436,47 @@ class HotDataSyncEngine {
   }
 
   DateTime _timeOrEpoch(String? value) {
-    return SyncTimeUtil.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+    return SyncTimeUtil.tryParse(value) ??
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
   }
 
   /// Export the full local state as a new snapshot object. Returns its ts.
   Future<String> _writeSnapshot(CloudProvider provider) async {
-    List<GalleryHistoryV2Data> history = await historyService.getAllRawHistory();
-    List<LocalConfig> progress = await localConfigService.readWithAllSubKeys(configKey: ConfigEnum.readIndexRecord);
+    List<GalleryHistoryV2Data> history = await historyService
+        .getAllRawHistory();
+    List<LocalConfig> progress = await localConfigService.readWithAllSubKeys(
+      configKey: ConfigEnum.readIndexRecord,
+    );
 
     String ts = await _nextMonotonicKey();
     Map<String, dynamic> pack = {
       'formatVersion': formatVersion,
       'createdAt': SyncTimeUtil.nowIso(),
-      'history': history.map((h) => {'gid': h.gid, 'jsonBody': h.jsonBody, 'lastReadTime': h.lastReadTime}).toList(),
-      'readProgress': progress.map((p) => {'subConfigKey': p.subConfigKey, 'value': p.value, 'utime': p.utime}).toList(),
+      'history': history
+          .map(
+            (h) => {
+              'gid': h.gid,
+              'jsonBody': h.jsonBody,
+              'lastReadTime': h.lastReadTime,
+            },
+          )
+          .toList(),
+      'readProgress': progress
+          .map(
+            (p) => {
+              'subConfigKey': p.subConfigKey,
+              'value': p.value,
+              'utime': p.utime,
+            },
+          )
+          .toList(),
     };
 
     List<int> bytes = await _encodePack(pack);
     await provider.putRawObject('$snapshotPrefix$ts.json.gz', bytes);
-    log.info('🔁 Hot sync: wrote snapshot $ts (${history.length} history, ${progress.length} progress, ${bytes.length} bytes gz)');
+    log.info(
+      '🔁 Hot sync: wrote snapshot $ts (${history.length} history, ${progress.length} progress, ${bytes.length} bytes gz)',
+    );
     return ts;
   }
 
@@ -391,10 +492,17 @@ class HotDataSyncEngine {
       log.info('🔁 Hot sync: compacting ($opCount op packs)');
       String snapshotTs = await _writeSnapshot(provider);
       await _writeManifest(provider, _Manifest(snapshot: snapshotTs));
-      await localConfigService.write(configKey: ConfigEnum.oplogAppliedSnapshot, value: snapshotTs);
+      await localConfigService.write(
+        configKey: ConfigEnum.oplogAppliedSnapshot,
+        value: snapshotTs,
+      );
 
-      String deletionHorizon = _timestampKeyFor(DateTime.now().toUtc().subtract(_opRetention));
-      List<RemoteObjectInfo> opObjects = await provider.listRawObjects(opsPrefix);
+      String deletionHorizon = _timestampKeyFor(
+        DateTime.now().toUtc().subtract(_opRetention),
+      );
+      List<RemoteObjectInfo> opObjects = await provider.listRawObjects(
+        opsPrefix,
+      );
       int deleted = 0;
       for (RemoteObjectInfo obj in opObjects) {
         _OpKey? parsed = _OpKey.tryParse(obj.key);
@@ -405,7 +513,9 @@ class HotDataSyncEngine {
       }
 
       /// Garbage-collect old snapshots, keeping the most recent few
-      List<RemoteObjectInfo> snapshots = await provider.listRawObjects(snapshotPrefix);
+      List<RemoteObjectInfo> snapshots = await provider.listRawObjects(
+        snapshotPrefix,
+      );
       snapshots.sort((a, b) => b.key.compareTo(a.key));
       for (RemoteObjectInfo obj in snapshots.skip(_snapshotsToKeep)) {
         await provider.deleteRawObject(obj.key);
@@ -431,7 +541,10 @@ class HotDataSyncEngine {
     }
   }
 
-  Future<void> _writeManifest(CloudProvider provider, _Manifest manifest) async {
+  Future<void> _writeManifest(
+    CloudProvider provider,
+    _Manifest manifest,
+  ) async {
     Map<String, dynamic> json = {
       'formatVersion': formatVersion,
       'snapshot': manifest.snapshot,
@@ -447,11 +560,15 @@ class HotDataSyncEngine {
 
   Future<Map<String, dynamic>> _decodePack(List<int> bytes) async {
     String json = utf8.decode(gzip.decode(bytes));
-    return Map<String, dynamic>.from(await isolateService.jsonDecodeAsync(json));
+    return Map<String, dynamic>.from(
+      await isolateService.jsonDecodeAsync(json),
+    );
   }
 
   Future<Map<String, String>> _readAppliedCursors() async {
-    String? raw = await localConfigService.read(configKey: ConfigEnum.oplogAppliedOps);
+    String? raw = await localConfigService.read(
+      configKey: ConfigEnum.oplogAppliedOps,
+    );
     if (raw == null || raw.isEmpty) {
       return {};
     }
@@ -463,16 +580,24 @@ class HotDataSyncEngine {
   }
 
   Future<void> _writeAppliedCursors(Map<String, String> cursors) async {
-    await localConfigService.write(configKey: ConfigEnum.oplogAppliedOps, value: jsonEncode(cursors));
+    await localConfigService.write(
+      configKey: ConfigEnum.oplogAppliedOps,
+      value: jsonEncode(cursors),
+    );
   }
 
   Future<String> _ensureDeviceId() async {
-    String? id = await localConfigService.read(configKey: ConfigEnum.syncDeviceId);
+    String? id = await localConfigService.read(
+      configKey: ConfigEnum.syncDeviceId,
+    );
     if (id != null && id.isNotEmpty) {
       return id;
     }
     String generated = _generateDeviceId();
-    await localConfigService.write(configKey: ConfigEnum.syncDeviceId, value: generated);
+    await localConfigService.write(
+      configKey: ConfigEnum.syncDeviceId,
+      value: generated,
+    );
     return generated;
   }
 
@@ -487,9 +612,16 @@ class HotDataSyncEngine {
   /// cursors have already passed.
   Future<String> _nextMonotonicKey() async {
     String now = _timestampKeyFor(DateTime.now().toUtc());
-    String last = await localConfigService.read(configKey: ConfigEnum.oplogLastPushedKey) ?? '';
+    String last =
+        await localConfigService.read(
+          configKey: ConfigEnum.oplogLastPushedKey,
+        ) ??
+        '';
     if (last.length == now.length && now.compareTo(last) <= 0) {
-      now = (BigInt.parse(last) + BigInt.one).toString().padLeft(now.length, '0');
+      now = (BigInt.parse(last) + BigInt.one).toString().padLeft(
+        now.length,
+        '0',
+      );
     }
     return now;
   }

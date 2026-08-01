@@ -34,6 +34,8 @@ enum ConfigEnum {
   webdavSetting('webdavSetting'),
   syncSetting('syncSetting'),
   keyboardShortcutSetting('keyboardShortcutSetting'),
+  komgaSetting('komgaSetting'),
+  komgaBrowseSetting('komgaBrowseSetting'),
   downloadSearchPageType('downloadSearchPageType'),
   windowFullScreen('windowFullScreen'),
   windowMaximize('windowMaximize'),
@@ -63,13 +65,13 @@ enum ConfigEnum {
   tagTranslationServiceTimestamp('TagTranslationServiceTimestamp'),
   tagSearchOrderOptimizationServiceVersion('TagTranslationServiceVersion'),
   tagSearchOrderOptimizationServiceLoadingState(
-      'TagSearchOrderOptimizationServiceLoadingState'),
+    'TagSearchOrderOptimizationServiceLoadingState',
+  ),
   displayBlockingRulesGroup('displayBlockingRulesGroup'),
 
   /// cache
   isSpreadPage('isSpreadPage'),
-  galleryImageHash('galleryImageHash'),
-  ;
+  galleryImageHash('galleryImageHash');
 
   final String key;
 

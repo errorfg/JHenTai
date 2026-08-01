@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,16 +71,26 @@ void main() {
 
       expect(written, 2);
 
-      List<LocalConfig> rows = await service.readWithAllSubKeys(configKey: ConfigEnum.readIndexRecord);
-      Map<String, String> values = {for (var r in rows) r.subConfigKey: r.value};
-      expect(values['1001'], '20', reason: 'stale merge result must not roll back progress');
+      List<LocalConfig> rows = await service.readWithAllSubKeys(
+        configKey: ConfigEnum.readIndexRecord,
+      );
+      Map<String, String> values = {
+        for (var r in rows) r.subConfigKey: r.value,
+      };
+      expect(
+        values['1001'],
+        '20',
+        reason: 'stale merge result must not roll back progress',
+      );
       expect(values['1002'], '8');
       expect(values['1003'], '3');
     });
 
     test('same timestamp with same value is not rewritten', () async {
       LocalConfigService service = LocalConfigService();
-      await service.batchWrite([progressRow('1001', '20', '2026-07-05T10:00:00.000Z')]);
+      await service.batchWrite([
+        progressRow('1001', '20', '2026-07-05T10:00:00.000Z'),
+      ]);
 
       int written = await service.batchWriteIfNewer(
         configKey: ConfigEnum.readIndexRecord,
@@ -96,12 +108,18 @@ void main() {
       int written = await service.batchWriteIfNewer(
         configKey: ConfigEnum.readIndexRecord,
         localConfigs: [
-          progressRow('1001', '25', base.add(const Duration(minutes: 1)).toUtc().toIso8601String()),
+          progressRow(
+            '1001',
+            '25',
+            base.add(const Duration(minutes: 1)).toUtc().toIso8601String(),
+          ),
         ],
       );
       expect(written, 1);
 
-      List<LocalConfig> rows = await service.readWithAllSubKeys(configKey: ConfigEnum.readIndexRecord);
+      List<LocalConfig> rows = await service.readWithAllSubKeys(
+        configKey: ConfigEnum.readIndexRecord,
+      );
       expect(rows.single.value, '25');
     });
   });
@@ -129,7 +147,11 @@ void main() {
 
       List<GalleryHistoryV2Data> rows = await service.getAllRawHistory();
       Map<int, String> bodies = {for (var r in rows) r.gid: r.jsonBody};
-      expect(bodies[1], 'local-1', reason: 'stale merge result must not roll back history');
+      expect(
+        bodies[1],
+        'local-1',
+        reason: 'stale merge result must not roll back history',
+      );
       expect(bodies[2], 'newer');
       expect(bodies[3], 'fresh');
     });
@@ -138,45 +160,121 @@ void main() {
   group('GalleryHistoryDao.batchUpsertIfNewer (SQL-level guard)', () {
     test('stale row cannot clobber even without the Dart prefilter', () async {
       await GalleryHistoryDao.batchReplaceHistory([
-        GalleryHistoryV2Data(gid: 1, jsonBody: 'current', lastReadTime: '2026-07-05T10:00:00.000000Z'),
+        const GalleryHistoryV2Data(
+          gid: 1,
+          jsonBody: 'current',
+          lastReadTime: '2026-07-05T10:00:00.000000Z',
+        ),
       ]);
 
       /// Simulates the race window: the guard must hold inside SQLite itself
       await GalleryHistoryDao.batchUpsertIfNewer([
-        GalleryHistoryV2Data(gid: 1, jsonBody: 'stale', lastReadTime: '2026-07-05T09:00:00.000000Z'),
-        GalleryHistoryV2Data(gid: 2, jsonBody: 'insert', lastReadTime: '2026-07-05T08:00:00.000000Z'),
+        const GalleryHistoryV2Data(
+          gid: 1,
+          jsonBody: 'stale',
+          lastReadTime: '2026-07-05T09:00:00.000000Z',
+        ),
+        const GalleryHistoryV2Data(
+          gid: 2,
+          jsonBody: 'insert',
+          lastReadTime: '2026-07-05T08:00:00.000000Z',
+        ),
       ]);
 
-      Map<int, String> times = await GalleryHistoryDao.selectGidToLastReadTime();
+      Map<int, String> times =
+          await GalleryHistoryDao.selectGidToLastReadTime();
       expect(times[1], '2026-07-05T10:00:00.000000Z');
       expect(times[2], '2026-07-05T08:00:00.000000Z');
     });
   });
 
   group('PendingSyncTracker', () {
-    test('marks persist, snapshot is stable, removePushed keeps later marks', () async {
+    test(
+      'marks persist, snapshot is stable, removePushed keeps later marks',
+      () async {
+        PendingSyncTracker tracker = PendingSyncTracker();
+        await tracker.markHistoryPending(1);
+        await tracker.markHistoryPending(2);
+        await tracker.markProgressPending('101');
+
+        var (historyGids, progressKeys) = await tracker.snapshot();
+        expect(historyGids, {1, 2});
+        expect(progressKeys, {'101'});
+
+        /// A row marked after the snapshot must survive removePushed
+        await tracker.markHistoryPending(3);
+        await tracker.removePushed(historyGids, progressKeys);
+
+        var (afterHistory, afterProgress) = await tracker.snapshot();
+        expect(afterHistory, {3});
+        expect(afterProgress, isEmpty);
+
+        /// State is persisted: a fresh tracker instance reloads it
+        await Future.delayed(const Duration(milliseconds: 20));
+        PendingSyncTracker reloaded = PendingSyncTracker();
+        var (reloadedHistory, _) = await reloaded.snapshot();
+        expect(reloadedHistory, {3});
+      },
+    );
+
+    test('generation token preserves a same-key re-mark', () async {
+      PendingSyncTracker tracker = PendingSyncTracker();
+      await tracker.markProgressPending('same-key');
+      PendingSyncSnapshotToken pushed = await tracker.snapshotToken();
+
+      /// Simulate another local read while the previous value is uploading.
+      await tracker.markProgressPending('same-key');
+      await tracker.removePushedSnapshot(pushed);
+
+      var (_, progressKeys) = await tracker.snapshot();
+      expect(progressKeys, {'same-key'});
+
+      await tracker.removePushedSnapshot(await tracker.snapshotToken());
+      (_, progressKeys) = await tracker.snapshot();
+      expect(progressKeys, isEmpty);
+    });
+
+    test('full-push token preserves concurrent marks', () async {
       PendingSyncTracker tracker = PendingSyncTracker();
       await tracker.markHistoryPending(1);
       await tracker.markHistoryPending(2);
-      await tracker.markProgressPending('101');
+      await tracker.markProgressPending('existing-progress');
+      PendingSyncSnapshotToken fullPushSnapshot = await tracker.snapshotToken();
+
+      /// Simulate writes after the full-push token is captured.
+      await tracker.markHistoryPending(1);
+      await tracker.markHistoryPending(3);
+      await tracker.markProgressPending('new-progress');
+      await tracker.removePushedSnapshot(fullPushSnapshot);
 
       var (historyGids, progressKeys) = await tracker.snapshot();
-      expect(historyGids, {1, 2});
-      expect(progressKeys, {'101'});
+      expect(historyGids, {1, 3});
+      expect(progressKeys, {'new-progress'});
 
-      /// A row marked after the snapshot must survive removePushed
-      await tracker.markHistoryPending(3);
-      await tracker.removePushed(historyGids, progressKeys);
-
-      var (afterHistory, afterProgress) = await tracker.snapshot();
-      expect(afterHistory, {3});
-      expect(afterProgress, isEmpty);
-
-      /// State is persisted: a fresh tracker instance reloads it
-      await Future.delayed(const Duration(milliseconds: 20));
       PendingSyncTracker reloaded = PendingSyncTracker();
-      var (reloadedHistory, _) = await reloaded.snapshot();
-      expect(reloadedHistory, {3});
+      var (reloadedHistory, reloadedProgress) = await reloaded.snapshot();
+      expect(reloadedHistory, historyGids);
+      expect(reloadedProgress, progressKeys);
+    });
+
+    test('loads legacy array persistence into generation tokens', () async {
+      await localConfigService.write(
+        configKey: ConfigEnum.oplogPendingPush,
+        value: jsonEncode({
+          'history': [7],
+          'readProgress': ['legacy-progress'],
+        }),
+      );
+      PendingSyncTracker tracker = PendingSyncTracker();
+
+      PendingSyncSnapshotToken token = await tracker.snapshotToken();
+      expect(token.historyGids, {7});
+      expect(token.progressKeys, {'legacy-progress'});
+
+      await tracker.removePushedSnapshot(token);
+      var (historyGids, progressKeys) = await tracker.snapshot();
+      expect(historyGids, isEmpty);
+      expect(progressKeys, isEmpty);
     });
   });
 
@@ -189,11 +287,15 @@ void main() {
         progressRow('3', '3', '2026-07-05T12:00:00.000Z'),
       ]);
 
-      List<LocalConfig> newer =
-          await service.readNewerThan(configKey: ConfigEnum.readIndexRecord, utimeExclusive: '2026-07-05T10:00:00.000Z');
+      List<LocalConfig> newer = await service.readNewerThan(
+        configKey: ConfigEnum.readIndexRecord,
+        utimeExclusive: '2026-07-05T10:00:00.000Z',
+      );
       expect(newer.map((r) => r.subConfigKey).toSet(), {'2', '3'});
 
-      String? max = await service.maxUtime(configKey: ConfigEnum.readIndexRecord);
+      String? max = await service.maxUtime(
+        configKey: ConfigEnum.readIndexRecord,
+      );
       expect(max, '2026-07-05T12:00:00.000Z');
     });
   });

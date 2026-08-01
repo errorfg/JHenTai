@@ -152,7 +152,7 @@ jobs:
           mv app-x86_64-release.apk GalleryReader-${{ steps.get_version.outputs.version }}-x64.apk
       # Build iOS .ipa
       - name: Build iOS
-        if: matrix.target == 'ios'
+        if: matrix.target == 'iOS'
         run: |
           flutter precache --ios
           cd ios
@@ -363,5 +363,5 @@ jobs:
             echo "No AltSource.json changes to commit"
             exit 0
           fi
-          git commit -m "Update AltSource.json for version ${{ needs.Build.outputs.version }}"
+          git commit -m "Update AltSource.json for version ${{ needs.Build.outputs.version }} [skip-build]"
           git push origin HEAD:master
