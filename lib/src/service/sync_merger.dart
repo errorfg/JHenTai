@@ -206,6 +206,8 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         return _mergeLatestConfig(local, remote);
       case CloudConfigTypeEnum.nhentaiApiSetting:
         return _mergeLatestConfig(local, remote);
+      case CloudConfigTypeEnum.eh2telegraphSetting:
+        return _mergeLatestConfig(local, remote);
     }
   }
 

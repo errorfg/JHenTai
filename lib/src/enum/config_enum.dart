@@ -36,6 +36,7 @@ enum ConfigEnum {
   keyboardShortcutSetting('keyboardShortcutSetting'),
   komgaSetting('komgaSetting'),
   nhentaiApiSetting('nhentaiApiSetting'),
+  eh2telegraphSetting('eh2telegraphSetting'),
   komgaBrowseSetting('komgaBrowseSetting'),
   downloadSearchPageType('downloadSearchPageType'),
   windowFullScreen('windowFullScreen'),

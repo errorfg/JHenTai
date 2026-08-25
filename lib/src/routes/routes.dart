@@ -56,6 +56,7 @@ import '../pages/setting/account/setting_account_page.dart';
 import '../pages/setting/advanced/loglist/log/log_page.dart';
 import '../pages/setting/advanced/loglist/log_list_page.dart';
 import '../pages/setting/advanced/nhentai_domains/nhentai_domains_page.dart';
+import '../pages/setting/advanced/eh2telegraph/eh2telegraph_page.dart';
 import '../pages/setting/advanced/super_resolution/setting_super_resolution_page.dart';
 import '../pages/setting/download/archive_bot/archive_bot_settings_page.dart';
 import '../pages/setting/preference/block_rule/add_block_rule/configure_blocking_rule_page.dart';
@@ -114,7 +115,8 @@ class Routes {
   static const String settingCloud = "/setting_cloud";
   static const String settingSecurity = "/setting_security";
   static const String settingAbout = "/setting_about";
-  static const String settingKeyboardShortcuts = "/setting_read/keyboard_shortcuts";
+  static const String settingKeyboardShortcuts =
+      "/setting_read/keyboard_shortcuts";
 
   static const String login = "/setting_account/login";
   static const String cookie = "/setting_account/cookie";
@@ -137,6 +139,7 @@ class Routes {
 
   static const String superResolution = "/setting_advanced/superResolution";
   static const String nhentaiDomains = "/setting_advanced/nhentaiDomains";
+  static const String eh2telegraph = "/setting_advanced/eh2telegraph";
   static const String logList = "/setting_advanced/logList";
   static const String log = "/setting_advanced/logList/log";
 
@@ -146,8 +149,8 @@ class Routes {
 
   static final Transition defaultTransition =
       preferenceSetting.enableSwipeBackGesture.isTrue
-          ? Transition.cupertino
-          : Transition.fadeIn;
+      ? Transition.cupertino
+      : Transition.fadeIn;
 
   static List<EHPage> pages = <EHPage>[
     EHPage(
@@ -307,8 +310,9 @@ class Routes {
     ),
     EHPage(
       name: quickSearch,
-      page: () => QuickSearchPage(automaticallyImplyLeading: true)
-          .withEscOrFifthButton2BackRightRoute(),
+      page: () => QuickSearchPage(
+        automaticallyImplyLeading: true,
+      ).withEscOrFifthButton2BackRightRoute(),
       transition: defaultTransition,
       offAllBefore: false,
     ),
@@ -486,6 +490,13 @@ class Routes {
       name: nhentaiDomains,
       page: () =>
           const NhentaiDomainsPage().withEscOrFifthButton2BackRightRoute(),
+      transition: defaultTransition,
+      offAllBefore: false,
+    ),
+    EHPage(
+      name: eh2telegraph,
+      page: () =>
+          const Eh2TelegraphPage().withEscOrFifthButton2BackRightRoute(),
       transition: defaultTransition,
       offAllBefore: false,
     ),

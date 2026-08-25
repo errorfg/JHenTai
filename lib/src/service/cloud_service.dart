@@ -11,6 +11,7 @@ import 'package:jhentai/src/service/quick_search_service.dart';
 import 'package:jhentai/src/service/search_history_service.dart';
 import 'package:jhentai/src/setting/komga_setting.dart';
 import 'package:jhentai/src/setting/nhentai_api_setting.dart';
+import 'package:jhentai/src/setting/eh2telegraph_setting.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
 
@@ -37,6 +38,7 @@ class CloudConfigService
     CloudConfigTypeEnum.wnacgFavorite: '1.0.0',
     CloudConfigTypeEnum.komgaSetting: '1.0.0',
     CloudConfigTypeEnum.nhentaiApiSetting: '1.0.0',
+    CloudConfigTypeEnum.eh2telegraphSetting: '1.0.0',
   };
 
   static const int localConfigId = -1;
@@ -189,6 +191,18 @@ class CloudConfigService
         await nhentaiApiSetting.refreshBean();
         log.info('  ✅ nhentai API setting imported and refreshed');
         break;
+      case CloudConfigTypeEnum.eh2telegraphSetting:
+        await localConfigService.batchWrite([
+          LocalConfigCompanion(
+            configKey: Value(ConfigEnum.eh2telegraphSetting.key),
+            subConfigKey: const Value(LocalConfigService.defaultSubConfigKey),
+            value: Value(config.config),
+            utime: Value(SyncTimeUtil.format(config.ctime)),
+          ),
+        ]);
+        await eh2telegraphSetting.refreshBean();
+        log.info('  ✅ eh2telegraph setting imported and refreshed');
+        break;
     }
   }
 
@@ -276,6 +290,16 @@ class CloudConfigService
       case CloudConfigTypeEnum.nhentaiApiSetting:
         List<LocalConfig> records = await localConfigService.readWithAllSubKeys(
           configKey: ConfigEnum.nhentaiApiSetting,
+        );
+        if (records.isEmpty) {
+          return null;
+        }
+        configValue = records.first.value;
+        localConfigTime = SyncTimeUtil.tryParse(records.first.utime);
+        break;
+      case CloudConfigTypeEnum.eh2telegraphSetting:
+        List<LocalConfig> records = await localConfigService.readWithAllSubKeys(
+          configKey: ConfigEnum.eh2telegraphSetting,
         );
         if (records.isEmpty) {
           return null;
