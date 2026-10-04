@@ -47,12 +47,21 @@ class _TabletLayoutPageV2State extends State<TabletLayoutPageV2> {
           controller: resizableController,
           children: [
             ResizableChild(
-              child: _leftColumn(),
+              // Keep this Navigator's modal barrier from hiding sibling panes.
+              child: Semantics(
+                container: true,
+                explicitChildNodes: true,
+                child: _leftColumn(),
+              ),
               size: ResizableSize.ratio(windowService.leftColumnWidthRatio),
               minSize: 100,
             ),
             ResizableChild(
-              child: _rightColumn(),
+              child: Semantics(
+                container: true,
+                explicitChildNodes: true,
+                child: _rightColumn(),
+              ),
               size: ResizableSize.ratio(1 - windowService.leftColumnWidthRatio),
               minSize: 100,
             ),
