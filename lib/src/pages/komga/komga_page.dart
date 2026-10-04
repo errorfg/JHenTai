@@ -18,6 +18,7 @@ import 'package:jhentai/src/pages/layout/desktop/desktop_layout_page_logic.dart'
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2_logic.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2_state.dart';
+import 'package:jhentai/src/pages/read/read_page_logic.dart';
 import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/service/komga_download_service.dart';
 import 'package:jhentai/src/service/komga_progress_sync_service.dart';
@@ -302,9 +303,21 @@ class _KomgaPageState extends State<KomgaPage> {
         return;
       }
       setState(() => _openingBookId = null);
-      await toRoute<dynamic>(Routes.read, arguments: info);
-      if (identical(controller, _controller)) {
+      ReadPageInfo? session = info;
+      while (session != null) {
+        final dynamic result = await toRoute<dynamic>(
+          Routes.read,
+          arguments: session,
+        );
+        if (!mounted || !identical(controller, _controller)) {
+          return;
+        }
         await controller.refreshProgress();
+        // "Next/previous book" closes the reader with the sibling session.
+        session = result is ReadPageInfo ? result : null;
+        if (session != null) {
+          await _waitForReaderDisposed();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -314,6 +327,16 @@ class _KomgaPageState extends State<KomgaPage> {
       if (mounted && _openingBookId == book.id) {
         setState(() => _openingBookId = null);
       }
+    }
+  }
+
+  /// The reader's controllers are registered by type; the next reader must
+  /// not start until the previous one has released them.
+  Future<void> _waitForReaderDisposed() async {
+    final DateTime deadline = DateTime.now().add(const Duration(seconds: 5));
+    while (Get.isRegistered<ReadPageLogic>() &&
+        DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
     }
   }
 

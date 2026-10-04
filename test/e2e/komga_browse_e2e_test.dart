@@ -10,7 +10,9 @@ import 'package:jhentai/src/network/komga_client.dart';
 import 'package:jhentai/src/pages/komga/komga_browse_controller.dart';
 import 'package:jhentai/src/pages/komga/komga_reader_launcher.dart';
 import 'package:jhentai/src/service/komga_download_service.dart';
+import 'package:jhentai/src/service/komga_progress_sync_service.dart';
 import 'package:jhentai/src/service/log.dart';
+import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/setting/read_setting.dart';
 
 import 'support/e2e_app.dart';
@@ -104,6 +106,29 @@ void main() {
       await controller.markSeries(series, read: false);
       expect(level.continueRestarts, isFalse);
       expect(level.series.booksReadCount, 0);
+    });
+
+    test('a progress report landing after the reader closes updates the series header', () async {
+      final KomgaSeries series = await client.getSeries(alpha.first.seriesId);
+      await controller.openSeries(series);
+      final KomgaSeriesLevel level = controller.current as KomgaSeriesLevel;
+      expect(level.series.booksInProgressCount, 0);
+      final List<Object> books = List<Object>.of(level.loader.items);
+
+      // What the reader does on close: write local progress, then report.
+      await readProgressService.updateReadProgress(client.progressRecordKey(alpha[2].id), 1);
+      await komgaProgressSyncService.report(client, alpha[2], 1);
+
+      final DateTime deadline = DateTime.now().add(const Duration(seconds: 5));
+      while (level.series.booksInProgressCount == 0 && DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      expect(level.series.booksInProgressCount, 1);
+      expect(level.continueTarget!.id, alpha[2].id);
+      // Only the header refreshed; the loaded book list is the same.
+      expect(level.loader.items, books);
+
+      await controller.markSeries(series, read: false);
     });
 
     test('filters and search open their own levels; back restores the previous one', () async {

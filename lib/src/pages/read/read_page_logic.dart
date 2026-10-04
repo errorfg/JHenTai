@@ -845,7 +845,11 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
   bool get hasSiblingBooks => state.readPageInfo.loadSiblingBook != null;
 
-  /// Replace this reader with the previous or next book of the series.
+  /// Close this reader with the previous or next book as the result; the
+  /// page that opened the reader opens it once this reader is disposed.
+  /// Replacing the route in place would let the new page bind to this
+  /// reader's still-registered controllers, so the new book's page events
+  /// would be recorded as the old book's progress.
   Future<void> openSiblingBook({required bool next}) async {
     final Future<ReadPageInfo?> Function({required bool next})? load =
         state.readPageInfo.loadSiblingBook;
@@ -860,7 +864,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
         toast((next ? 'noNextBook' : 'noPreviousBook').tr);
         return;
       }
-      offRoute(Routes.read, arguments: sibling, preventDuplicates: false);
+      backRoute(currentRoute: Routes.read, result: sibling);
     } catch (e) {
       log.error('Open sibling book failed', e);
       toast(e.toString(), isShort: false);

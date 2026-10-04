@@ -22,6 +22,8 @@ sealed class KomgaLevel {
 }
 
 class KomgaHomeLevel extends KomgaLevel {
+  /// Server progress changed while home was not shown.
+  bool stale = false;
   List<KomgaLibrary> libraries = const <KomgaLibrary>[];
   List<KomgaBook> continueReading = const <KomgaBook>[];
   List<KomgaBook> onDeck = const <KomgaBook>[];
@@ -78,7 +80,11 @@ class KomgaDownloadsLevel extends KomgaLevel {}
 
 /// State and actions of the Komga browser, independent of widgets.
 class KomgaBrowseController extends ChangeNotifier {
-  KomgaBrowseController({required this.client});
+  KomgaBrowseController({required this.client}) {
+    _serverChanges = komgaProgressSyncService.serverProgressChanges.listen(
+      _onServerProgressChanged,
+    );
+  }
 
   static final DateTime _beforeAnyItem = DateTime.utc(1);
 
@@ -91,6 +97,9 @@ class KomgaBrowseController extends ChangeNotifier {
   final Map<String?, KomgaFilterOptions> _filterOptions =
       <String?, KomgaFilterOptions>{};
   bool _disposed = false;
+  late final StreamSubscription<String> _serverChanges;
+  final Set<String> _changedSeries = <String>{};
+  Timer? _serverChangeTimer;
 
   KomgaLevel get current => stack.last;
 
@@ -114,6 +123,9 @@ class KomgaBrowseController extends ChangeNotifier {
     }
     stack.removeLast().dispose();
     _notify();
+    if (current is KomgaHomeLevel && home.stale) {
+      unawaited(refreshHome());
+    }
     return true;
   }
 
@@ -372,6 +384,7 @@ class KomgaBrowseController extends ChangeNotifier {
   Future<void> refreshHome() async {
     final KomgaHomeLevel level = home;
     level.loading = true;
+    level.stale = false;
     level.error = null;
     _notify();
     try {
@@ -416,6 +429,13 @@ class KomgaBrowseController extends ChangeNotifier {
 
   Future<void> _refreshSeries(KomgaSeriesLevel level) async {
     final Future<void> books = level.loader.refresh();
+    await _refreshSeriesHeader(level);
+    await books;
+  }
+
+  /// Server counts and the "continue reading" target, without reloading the
+  /// book list (its scroll position stays).
+  Future<void> _refreshSeriesHeader(KomgaSeriesLevel level) async {
     try {
       level.series = await client.getSeries(level.series.id);
       final (KomgaBook? target, bool restarts) = await continueTarget(
@@ -429,7 +449,36 @@ class KomgaBrowseController extends ChangeNotifier {
       log.warning('Komga series details failed to load', e);
     }
     _notify();
-    await books;
+  }
+
+  /// JHenTai changed server progress (a reader report, a mark): refresh the
+  /// server-side counts shown for those series. Reports often land after the
+  /// reader has closed, so this cannot rely on the return from the reader.
+  void _onServerProgressChanged(String seriesId) {
+    _changedSeries.add(seriesId);
+    _serverChangeTimer?.cancel();
+    _serverChangeTimer = Timer(
+      const Duration(milliseconds: 300),
+      () => unawaited(_refreshAfterServerChange()),
+    );
+  }
+
+  Future<void> _refreshAfterServerChange() async {
+    final Set<String> changed = <String>{..._changedSeries};
+    _changedSeries.clear();
+    if (_disposed) {
+      return;
+    }
+    for (final KomgaLevel level in List<KomgaLevel>.of(stack)) {
+      if (level is KomgaSeriesLevel && changed.contains(level.series.id)) {
+        await _refreshSeriesHeader(level);
+      }
+    }
+    if (current is KomgaHomeLevel) {
+      await refreshHome();
+    } else {
+      home.stale = true;
+    }
   }
 
   KomgaQuery _libraryQuery(String libraryId) {
@@ -629,6 +678,8 @@ class KomgaBrowseController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _serverChangeTimer?.cancel();
+    unawaited(_serverChanges.cancel());
     for (final KomgaLevel level in stack) {
       level.dispose();
     }

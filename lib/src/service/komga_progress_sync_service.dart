@@ -54,6 +54,13 @@ class KomgaProgressSyncService
   /// one, so no future is created ahead of the caller's zone.
   Future<void>? _tail;
 
+  final StreamController<String> _serverChanges =
+      StreamController<String>.broadcast();
+
+  /// Series ids whose read progress JHenTai has just changed on the server,
+  /// so views showing server-side counts can refresh them.
+  Stream<String> get serverProgressChanges => _serverChanges.stream;
+
   @override
   List<JHLifeCircleBean> get initDependencies => super.initDependencies
     ..addAll([localConfigService, readProgressService, komgaSetting]);
@@ -195,6 +202,7 @@ class KomgaProgressSyncService
             : '',
     });
     await reconcileBooks(client, books);
+    _serverChanges.add(seriesId);
   }
 
   /// Re-check and send every pending book of [remote]'s connection. Stops at
@@ -375,6 +383,7 @@ class KomgaProgressSyncService
       ),
     });
     await _clearPending(key);
+    _serverChanges.add(book.seriesId);
   }
 
   Future<Map<String, KomgaProgressBase>> _readBases(Set<String> keys) async {
