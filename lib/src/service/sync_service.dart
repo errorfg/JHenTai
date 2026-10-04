@@ -29,6 +29,8 @@ typedef SyncRunner =
       void Function(double progress)? onProgress,
     });
 
+typedef CloudProviderFactory = CloudProvider? Function(String providerName);
+
 class _QueuedReadProgressSync {
   _QueuedReadProgressSync({required this.requireAutoSync});
 
@@ -47,18 +49,22 @@ class _QueuedReadProgressSync {
 class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   SyncService({
     SyncRunner? executeSync,
+    CloudProviderFactory? providerFactory,
     DateTime Function()? now,
     Duration progressCooldown = const Duration(seconds: 5),
   }) : _syncRunner = executeSync,
+       _providerFactory = providerFactory,
        _now = now ?? DateTime.now,
        _readProgressSyncCooldown = progressCooldown;
 
   final Map<String, CloudProvider> _providers = {};
   final HotDataSyncEngine _hotEngine = HotDataSyncEngine();
   final SyncRunner? _syncRunner;
+  final CloudProviderFactory? _providerFactory;
   final DateTime Function() _now;
   final Duration _readProgressSyncCooldown;
-  bool _syncInProgress = false;
+  Future<void>? _inFlightSync;
+  bool get _syncInProgress => _inFlightSync != null;
   DateTime? _lastSyncTime;
   DateTime? _lastReadProgressSyncSuccessTime;
   _QueuedReadProgressSync? _queuedReadProgressSync;
@@ -262,7 +268,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         statistics: {},
       );
     }
-    _syncInProgress = true;
+    final Completer<void> done = Completer<void>();
+    _inFlightSync = done.future;
     try {
       final SyncResult result =
           await (_syncRunner?.call(
@@ -286,9 +293,22 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       }
       return result;
     } finally {
-      _syncInProgress = false;
+      _inFlightSync = null;
+      done.complete();
       _drainQueuedReadProgressSync();
     }
+  }
+
+  /// Upload a locally changed setting. A sync that is already running may
+  /// have read local state before the change, so wait for it and sync again
+  /// instead of dropping the request.
+  Future<SyncResult> syncAfterLocalChange({
+    required List<CloudConfigTypeEnum> types,
+  }) async {
+    while (_inFlightSync != null) {
+      await _inFlightSync;
+    }
+    return sync(types: types);
   }
 
   /// Reconcile read progress without letting foreground/reader-close bursts
@@ -380,28 +400,9 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     try {
       reportProgress(0.03);
 
-      // Create provider dynamically with latest settings
       String provider = providerName ?? syncSetting.currentProvider.value;
-      CloudProvider cloudProvider;
-
-      if (provider == 's3') {
-        cloudProvider = S3Provider(
-          endpoint: syncSetting.s3Endpoint.value,
-          accessKey: syncSetting.s3AccessKey.value,
-          secretKey: syncSetting.s3SecretKey.value,
-          bucketName: syncSetting.s3BucketName.value,
-          region: syncSetting.s3Region.value,
-          baseKey: syncSetting.s3BaseKey.value,
-          useSSL: syncSetting.s3UseSSL.value,
-        );
-      } else if (provider == 'webdav') {
-        cloudProvider = WebDavProvider(
-          serverUrl: syncSetting.webdavServerUrl.value,
-          username: syncSetting.webdavUsername.value,
-          password: syncSetting.webdavPassword.value,
-          remotePath: syncSetting.webdavRemotePath.value,
-        );
-      } else {
+      CloudProvider? cloudProvider = _createProvider(provider);
+      if (cloudProvider == null) {
         return SyncResult(
           success: false,
           message: 'Unknown provider: $provider',
@@ -412,20 +413,33 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       log.info('🔄 Starting sync with provider: ${cloudProvider.name}');
       reportProgress(0.08);
 
-      // 1. Download remote config (shared by hot-data bootstrap and legacy merge)
-      String? remoteData;
-      List<CloudConfig> remoteConfigs = [];
+      // 1. Download remote config (shared by hot-data bootstrap and legacy merge).
+      // Only a missing file counts as a first sync. A failed download or an
+      // unreadable file aborts here: continuing would upload local configs
+      // alone and delete everything else the remote holds.
       CloudFile? remoteFile = await cloudProvider.getFileMetadata();
-
-      // Try to download even if metadata fetch failed
-      try {
-        remoteData = await cloudProvider.download();
-        List list = await isolateService.jsonDecodeAsync(remoteData);
-        remoteConfigs = list.map((e) => CloudConfig.fromJson(e)).toList();
-        log.info('Downloaded ${remoteConfigs.length} remote configs');
+      String? remoteData = await cloudProvider.download();
+      if (remoteData == null && remoteFile != null) {
+        // The S3 provider reports every S3-level read error as a missing
+        // object; metadata proves the file is there.
+        throw StateError('Remote config exists but could not be downloaded');
+      }
+      CloudConfigFile remoteConfigFile = CloudConfigFile.empty;
+      if (remoteData == null) {
+        log.info(
+          'No remote config found (first sync), will upload local configs',
+        );
+      } else {
+        remoteConfigFile = CloudConfigFile.fromJson(
+          await isolateService.jsonDecodeAsync(remoteData),
+        );
+        log.info(
+          'Downloaded ${remoteConfigFile.configs.length} remote configs'
+          '${remoteConfigFile.unknownEntries.isEmpty ? '' : ' and kept ${remoteConfigFile.unknownEntries.length} entries of unknown types'}',
+        );
 
         // If download succeeded but metadata failed, create a placeholder
-        if (remoteFile == null && remoteConfigs.isNotEmpty) {
+        if (remoteFile == null) {
           log.warning(
             'Metadata fetch failed but download succeeded, using current time as fallback',
           );
@@ -436,10 +450,6 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
             etag: null,
           );
         }
-      } catch (e) {
-        log.info(
-          'No remote config found (first sync), will upload local configs',
-        );
       }
       reportProgress(0.2);
 
@@ -498,7 +508,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       DateTime? latestLocalTime = await _computeLatestLocalActivityTime();
       var mergeResult = await syncMerger.merge(
         localConfigs,
-        remoteConfigs,
+        remoteConfigFile.configs,
         remoteFile?.modifiedTime ?? DateTime.now(),
         effectiveTypes,
         latestLocalTimeOverride: latestLocalTime,
@@ -506,17 +516,23 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       reportProgress(0.74);
 
       // 5. Upload merged result, unless it is identical to what the remote
-      // already holds (avoids churning latest.json and its version history)
+      // already holds (avoids churning latest.json and its version history).
+      // Remote entries of types outside this sync are carried over unchanged;
+      // hot types handled by the oplog engine no longer travel in this file.
       bool saveHistory = syncSetting.enableHistory.value;
-      String encodedData = await isolateService.jsonEncodeAsync(
+      List<Map<String, dynamic>> uploadEntries = remoteConfigFile.toUploadJson(
         mergeResult.merged,
+        dropped: hotResult == null
+            ? const {}
+            : types.where(hotTypes.contains).toSet(),
       );
+      String encodedData = await isolateService.jsonEncodeAsync(uploadEntries);
 
       if (remoteData != null && encodedData == remoteData) {
         log.info('Merged result identical to remote, skipping upload');
       } else {
         log.info(
-          'Uploading ${mergeResult.merged.length} configs to remote (${encodedData.length} bytes)',
+          'Uploading ${uploadEntries.length} configs to remote (${encodedData.length} bytes)',
         );
         await cloudProvider.upload(encodedData, saveHistory: saveHistory);
         log.info('Upload complete');
@@ -548,28 +564,9 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   /// [providerName]: Optional provider name, defaults to current provider
   Future<List<CloudFile>> listHistory({String? providerName}) async {
     try {
-      // Create provider dynamically with latest settings
       String provider = providerName ?? syncSetting.currentProvider.value;
-      CloudProvider cloudProvider;
-
-      if (provider == 's3') {
-        cloudProvider = S3Provider(
-          endpoint: syncSetting.s3Endpoint.value,
-          accessKey: syncSetting.s3AccessKey.value,
-          secretKey: syncSetting.s3SecretKey.value,
-          bucketName: syncSetting.s3BucketName.value,
-          region: syncSetting.s3Region.value,
-          baseKey: syncSetting.s3BaseKey.value,
-          useSSL: syncSetting.s3UseSSL.value,
-        );
-      } else if (provider == 'webdav') {
-        cloudProvider = WebDavProvider(
-          serverUrl: syncSetting.webdavServerUrl.value,
-          username: syncSetting.webdavUsername.value,
-          password: syncSetting.webdavPassword.value,
-          remotePath: syncSetting.webdavRemotePath.value,
-        );
-      } else {
+      CloudProvider? cloudProvider = _createProvider(provider);
+      if (cloudProvider == null) {
         log.warning('Unknown provider: $provider');
         return [];
       }
@@ -591,28 +588,9 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     String? providerName,
   }) async {
     try {
-      // Create provider dynamically with latest settings
       String provider = providerName ?? syncSetting.currentProvider.value;
-      CloudProvider cloudProvider;
-
-      if (provider == 's3') {
-        cloudProvider = S3Provider(
-          endpoint: syncSetting.s3Endpoint.value,
-          accessKey: syncSetting.s3AccessKey.value,
-          secretKey: syncSetting.s3SecretKey.value,
-          bucketName: syncSetting.s3BucketName.value,
-          region: syncSetting.s3Region.value,
-          baseKey: syncSetting.s3BaseKey.value,
-          useSSL: syncSetting.s3UseSSL.value,
-        );
-      } else if (provider == 'webdav') {
-        cloudProvider = WebDavProvider(
-          serverUrl: syncSetting.webdavServerUrl.value,
-          username: syncSetting.webdavUsername.value,
-          password: syncSetting.webdavPassword.value,
-          remotePath: syncSetting.webdavRemotePath.value,
-        );
-      } else {
+      CloudProvider? cloudProvider = _createProvider(provider);
+      if (cloudProvider == null) {
         return RestoreResult(
           success: false,
           error: 'Unknown provider: $provider',
@@ -623,13 +601,12 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
 
       // 1. Download specified history version
       String data = await cloudProvider.downloadVersion(version);
-      List configs = await isolateService.jsonDecodeAsync(data);
-      List<CloudConfig> cloudConfigs = configs
-          .map((e) => CloudConfig.fromJson(e))
-          .toList();
+      CloudConfigFile file = CloudConfigFile.fromJson(
+        await isolateService.jsonDecodeAsync(data),
+      );
 
       // 2. Import to local (replace current config)
-      for (var config in cloudConfigs) {
+      for (var config in file.configs) {
         await cloudConfigService.importConfig(config);
       }
 
@@ -657,28 +634,9 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     String? providerName,
   }) async {
     try {
-      // Create provider dynamically with latest settings
       String provider = providerName ?? syncSetting.currentProvider.value;
-      CloudProvider cloudProvider;
-
-      if (provider == 's3') {
-        cloudProvider = S3Provider(
-          endpoint: syncSetting.s3Endpoint.value,
-          accessKey: syncSetting.s3AccessKey.value,
-          secretKey: syncSetting.s3SecretKey.value,
-          bucketName: syncSetting.s3BucketName.value,
-          region: syncSetting.s3Region.value,
-          baseKey: syncSetting.s3BaseKey.value,
-          useSSL: syncSetting.s3UseSSL.value,
-        );
-      } else if (provider == 'webdav') {
-        cloudProvider = WebDavProvider(
-          serverUrl: syncSetting.webdavServerUrl.value,
-          username: syncSetting.webdavUsername.value,
-          password: syncSetting.webdavPassword.value,
-          remotePath: syncSetting.webdavRemotePath.value,
-        );
-      } else {
+      CloudProvider? cloudProvider = _createProvider(provider);
+      if (cloudProvider == null) {
         log.warning('Unknown provider: $provider');
         return false;
       }
@@ -696,28 +654,9 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   /// [providerName]: Optional provider name, defaults to current provider
   Future<bool> clearAllHistory({String? providerName}) async {
     try {
-      // Create provider dynamically with latest settings
       String provider = providerName ?? syncSetting.currentProvider.value;
-      CloudProvider cloudProvider;
-
-      if (provider == 's3') {
-        cloudProvider = S3Provider(
-          endpoint: syncSetting.s3Endpoint.value,
-          accessKey: syncSetting.s3AccessKey.value,
-          secretKey: syncSetting.s3SecretKey.value,
-          bucketName: syncSetting.s3BucketName.value,
-          region: syncSetting.s3Region.value,
-          baseKey: syncSetting.s3BaseKey.value,
-          useSSL: syncSetting.s3UseSSL.value,
-        );
-      } else if (provider == 'webdav') {
-        cloudProvider = WebDavProvider(
-          serverUrl: syncSetting.webdavServerUrl.value,
-          username: syncSetting.webdavUsername.value,
-          password: syncSetting.webdavPassword.value,
-          remotePath: syncSetting.webdavRemotePath.value,
-        );
-      } else {
+      CloudProvider? cloudProvider = _createProvider(provider);
+      if (cloudProvider == null) {
         log.warning('Unknown provider: $provider');
         return false;
       }
@@ -793,6 +732,33 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       log.error('Connection test failed for $providerName', e, stackTrace);
       return false;
     }
+  }
+
+  /// Create a provider from the latest settings; null for unknown names.
+  CloudProvider? _createProvider(String provider) {
+    if (_providerFactory != null) {
+      return _providerFactory(provider);
+    }
+    if (provider == 's3') {
+      return S3Provider(
+        endpoint: syncSetting.s3Endpoint.value,
+        accessKey: syncSetting.s3AccessKey.value,
+        secretKey: syncSetting.s3SecretKey.value,
+        bucketName: syncSetting.s3BucketName.value,
+        region: syncSetting.s3Region.value,
+        baseKey: syncSetting.s3BaseKey.value,
+        useSSL: syncSetting.s3UseSSL.value,
+      );
+    }
+    if (provider == 'webdav') {
+      return WebDavProvider(
+        serverUrl: syncSetting.webdavServerUrl.value,
+        username: syncSetting.webdavUsername.value,
+        password: syncSetting.webdavPassword.value,
+        remotePath: syncSetting.webdavRemotePath.value,
+      );
+    }
+    return null;
   }
 
   /// Latest local user activity, derived from the hot tables. Used by the

@@ -15,8 +15,9 @@ abstract class CloudProvider {
 
   /// 下载最新配置文件
   ///
-  /// 返回 JSON 字符串格式的配置数据
-  Future<String> download();
+  /// 返回 JSON 字符串格式的配置数据；文件不存在时返回 null，其它错误抛出异常。
+  /// 调用方据此区分首次同步与下载失败：把下载失败当作首次同步会用本机数据覆盖远端。
+  Future<String?> download();
 
   /// 下载指定历史版本
   ///

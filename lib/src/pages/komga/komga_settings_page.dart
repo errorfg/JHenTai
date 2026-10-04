@@ -180,7 +180,7 @@ class _KomgaSettingsPageState extends State<KomgaSettingsPage> {
     try {
       await komgaSetting.save(serverUrl: _serverUrlController.text, username: _usernameController.text, password: _passwordController.text, apiKey: _apiKeyController.text);
       if (syncSetting.enableSync.value && syncSetting.autoSync.value) {
-        await syncService.sync(types: CloudConfigTypeEnum.values);
+        await syncService.syncAfterLocalChange(types: CloudConfigTypeEnum.values);
       }
       toast('saveSuccess'.tr);
       Get.back(result: true);

@@ -77,14 +77,14 @@ class S3Provider implements CloudProvider {
   }
 
   @override
-  Future<String> download() async {
+  Future<String?> download() async {
     // Always download latest.json
-    String key = '${_baseKey}latest.json';
+    List<int>? bytes = await getRawObject('latest.json');
+    if (bytes == null) {
+      return null;
+    }
 
-    var stream = await _client.getObject(_bucketName, key);
-    List<int> bytes = await stream.expand((chunk) => chunk).toList();
-
-    log.info('Successfully downloaded from S3: $key');
+    log.info('Successfully downloaded from S3: ${_baseKey}latest.json');
     return utf8.decode(bytes);
   }
 

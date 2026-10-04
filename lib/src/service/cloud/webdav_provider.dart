@@ -85,12 +85,20 @@ class WebDavProvider implements CloudProvider {
   }
 
   @override
-  Future<String> download() async {
+  Future<String?> download() async {
     _client ??= _initClient();
 
     // Always download JHenTaiConfig.json
     String file = '$remotePath/JHenTaiConfig.json';
-    var bytes = await _client!.read(file);
+    List<int> bytes;
+    try {
+      bytes = await _client!.read(file);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return null;
+      }
+      rethrow;
+    }
 
     log.info('Successfully downloaded from WebDAV: $file');
     return utf8.decode(bytes);

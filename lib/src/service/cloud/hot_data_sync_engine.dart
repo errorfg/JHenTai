@@ -229,10 +229,9 @@ class HotDataSyncEngine {
   /// Extract the two hot types from a legacy latest.json payload and apply
   /// them with timestamp-guarded upserts.
   Future<int> _applyLegacyConfig(String legacyJson) async {
-    List raw = await isolateService.jsonDecodeAsync(legacyJson);
-    List<CloudConfig> configs = raw
-        .map((e) => CloudConfig.fromJson(e))
-        .toList();
+    List<CloudConfig> configs = CloudConfigFile.fromJson(
+      await isolateService.jsonDecodeAsync(legacyJson),
+    ).configs;
     int applied = 0;
 
     for (CloudConfig config in configs) {

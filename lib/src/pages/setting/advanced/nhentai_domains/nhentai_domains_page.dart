@@ -102,7 +102,7 @@ class NhentaiDomainsPage extends StatelessWidget {
       if (apiKey != null) {
         await nhentaiApiSetting.saveApiKey(apiKey);
         if (syncSetting.enableSync.value && syncSetting.autoSync.value) {
-          await syncService.sync(
+          await syncService.syncAfterLocalChange(
             types: const [CloudConfigTypeEnum.nhentaiApiSetting],
           );
         }

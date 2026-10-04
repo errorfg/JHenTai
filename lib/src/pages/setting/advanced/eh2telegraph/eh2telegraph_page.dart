@@ -98,7 +98,7 @@ class Eh2TelegraphPage extends StatelessWidget {
         token: editEndpoint ? eh2telegraphSetting.token.value : value,
       );
       if (syncSetting.enableSync.value && syncSetting.autoSync.value) {
-        await syncService.sync(
+        await syncService.syncAfterLocalChange(
           types: const [CloudConfigTypeEnum.eh2telegraphSetting],
         );
       }

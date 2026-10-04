@@ -17,6 +17,16 @@ enum CloudConfigTypeEnum {
 
   const CloudConfigTypeEnum(this.code, this.name);
 
+  /// Returns null for codes introduced by a newer client.
+  static CloudConfigTypeEnum? tryFromCode(int code) {
+    for (CloudConfigTypeEnum type in values) {
+      if (type.code == code) {
+        return type;
+      }
+    }
+    return null;
+  }
+
   static CloudConfigTypeEnum fromCode(int code) {
     switch (code) {
       case 1:
