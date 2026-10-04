@@ -149,7 +149,12 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
   void _readProgressListener() {
     int currentPage = state.pageController.page!.toInt();
     List<int> imageIndexes = computeImagesInPageIndex(currentPage);
-    readPageLogic.recordReadProgress(imageIndexes.first);
+    readPageLogic.recordReadProgress(
+      imageIndexes.first,
+      reachedEnd: imageIndexes.contains(
+        readPageState.readPageInfo.pageCount - 1,
+      ),
+    );
     readPageLogic.syncThumbnails(imageIndexes.first);
   }
 

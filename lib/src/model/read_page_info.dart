@@ -45,8 +45,8 @@ class ReadPageInfo {
   /// used for initialize
   bool useSuperResolution;
 
-  /// Optional one-way progress reporter for a remote content source.
-  /// JHenTai's own read-progress storage remains the source of truth.
+  /// Optional reporter that sends locally persisted progress to a remote
+  /// content source. Called after each local write.
   ReadProgressReporter? reportReadProgress;
 
   ReadPageInfo({

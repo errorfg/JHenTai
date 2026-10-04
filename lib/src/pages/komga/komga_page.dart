@@ -19,7 +19,9 @@ import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2_state.d
 import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/service/gallery_download_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
+import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
+import 'package:jhentai/src/service/komga_progress_sync_service.dart';
 import 'package:jhentai/src/service/sync_service.dart';
 import 'package:jhentai/src/setting/komga_setting.dart';
 import 'package:jhentai/src/setting/style_setting.dart';
@@ -1281,7 +1283,27 @@ class _KomgaPageState extends State<KomgaPage> {
       return;
     }
     unawaited(syncService.syncReadProgress());
+    unawaited(_drainPendingProgress(_client!));
     await _loadLibraries();
+  }
+
+  Future<void> _drainPendingProgress(KomgaClient client) async {
+    try {
+      await komgaProgressSyncService.drainPending(client);
+    } catch (e) {
+      log.warning('Komga pending progress drain failed', e);
+    }
+  }
+
+  Future<void> _reconcileListedProgress(
+    KomgaClient client,
+    List<KomgaBook> books,
+  ) async {
+    try {
+      await komgaProgressSyncService.reconcileBooks(client, books);
+    } catch (e) {
+      log.warning('Komga progress reconcile failed', e);
+    }
   }
 
   Future<void> _loadPreferences() async {
@@ -1437,6 +1459,9 @@ class _KomgaPageState extends State<KomgaPage> {
         );
       });
       unawaited(_persistPreferences());
+      // Local progress changes made here notify the progress listener, which
+      // refreshes the reading status shown above.
+      unawaited(_reconcileListedProgress(client, books));
     } catch (e) {
       if (mounted && generation == _loadGeneration) {
         final String message = KomgaClient.friendlyError(e);
@@ -1530,15 +1555,12 @@ class _KomgaPageState extends State<KomgaPage> {
       }
 
       final String progressKey = client.progressRecordKey(book.id);
-      final ReadProgressEntry? saved = await readProgressService
-          .getReadProgressEntryByKey(progressKey);
+      final int startIndex = await komgaProgressSyncService
+          .reconcileBeforeOpen(client, book);
       if (!_isCurrentBookOperation(operation, client, library, book.id)) {
         return;
       }
-      final int initialIndex = min(
-        max(saved?.pageIndex ?? 0, 0),
-        pages.length - 1,
-      );
+      final int initialIndex = min(max(startIndex, 0), pages.length - 1);
       final List<GalleryImage> images = List<GalleryImage>.generate(
         pages.length,
         (int index) {
@@ -1565,7 +1587,7 @@ class _KomgaPageState extends State<KomgaPage> {
         images: images,
         useSuperResolution: false,
         reportReadProgress: (int imageIndex) =>
-            client.reportReadProgress(book.id, imageIndex),
+            komgaProgressSyncService.report(client, book, imageIndex),
       );
       await toRoute<dynamic>(Routes.read, arguments: readPageInfo);
       await _reloadProgress();
@@ -1595,77 +1617,25 @@ class _KomgaPageState extends State<KomgaPage> {
     final int operation = ++_progressImportGeneration;
     setState(() => _importingProgress = true);
     try {
-      final List<KomgaBook> books = await client.getAllReadProgressBooks();
+      final KomgaProgressSyncResult result = await komgaProgressSyncService
+          .syncAll(client);
       if (!_isCurrentProgressImport(operation, client)) {
         return;
       }
-
-      final List<ReadProgressEntry> entries = <ReadProgressEntry>[];
-      for (final KomgaBook book in books) {
-        final KomgaReadProgress? progress = book.readProgress;
-        if (progress == null) {
-          continue;
-        }
-        final DateTime? lastReadAt =
-            progress.readDate ??
-            progress.lastModifiedDate ??
-            progress.createdDate;
-        if (lastReadAt == null) {
-          continue;
-        }
-
-        late final int pageIndex;
-        if (progress.completed) {
-          if (book.pageCount <= 0) {
-            continue;
-          }
-          pageIndex = book.pageCount - 1;
-        } else {
-          if (progress.page < 0) {
-            continue;
-          }
-          final int nonNegativePageIndex = max(progress.page - 1, 0);
-          pageIndex = book.pageCount > 0
-              ? min(nonNegativePageIndex, book.pageCount - 1)
-              : nonNegativePageIndex;
-        }
-        entries.add(
-          ReadProgressEntry(
-            key: client.progressRecordKey(book.id),
-            pageIndex: pageIndex,
-            lastReadAt: lastReadAt,
-          ),
-        );
-      }
-
-      if (!_isCurrentProgressImport(operation, client)) {
-        return;
-      }
-      if (entries.isEmpty) {
-        toast('komgaImportProgressEmpty'.tr);
-        return;
-      }
-
-      final ReadProgressImportResult result = await readProgressService
-          .importReadProgressEntries(entries);
-      if (!_isCurrentProgressImport(operation, client)) {
-        return;
-      }
-      if (result.imported > 0) {
+      final int synced = result.applied + result.pushed;
+      if (synced > 0) {
         await _reloadProgress();
         if (!_isCurrentProgressImport(operation, client)) {
           return;
         }
         toast(
           'komgaImportProgressImported'.trParams(<String, String>{
-            'count': result.imported.toString(),
+            'count': synced.toString(),
           }),
           isShort: false,
         );
-      } else if (result.isUpToDate) {
-        toast('komgaImportProgressUpToDate'.tr);
       } else {
-        toast('komgaImportProgressEmpty'.tr);
+        toast('komgaImportProgressUpToDate'.tr);
       }
     } catch (e) {
       if (_isCurrentProgressImport(operation, client)) {
@@ -1686,6 +1656,7 @@ class _KomgaPageState extends State<KomgaPage> {
       await _initialize();
       return;
     }
+    unawaited(_drainPendingProgress(_client!));
     if (_selectedLibrary != null) {
       await _loadLibraryContent();
     } else {

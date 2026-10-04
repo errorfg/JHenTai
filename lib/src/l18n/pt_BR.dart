@@ -1001,15 +1001,11 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'komgaBookHasNoPages': 'Este livro do Komga não tem páginas legíveis',
       'komgaConfigSyncHint':
           'Com a sincronização automática ativada, o servidor e as credenciais são enviados aos outros dispositivos.',
-      'komgaProgressSyncHint':
-          'O progresso do JHenTai é a fonte principal e só é enviado ao Komga.',
-      'komgaImportProgress': 'Importar progresso do Komga',
-      'komgaImportProgressEmpty':
-          'Nenhum progresso de leitura do Komga está disponível para importação',
-      'komgaImportProgressImported':
-          'Foram importados @count registros de progresso do Komga',
-      'komgaImportProgressUpToDate':
-          'O progresso de leitura do JHenTai já está atualizado',
+      'komgaProgressSyncHint': 'O progresso de leitura é sincronizado nos dois sentidos com o Komga; prevalece o progresso mais recente.',
+      'komgaImportProgress': 'Sincronizar progresso de leitura com o Komga',
+      'komgaImportProgressImported': 'Progresso de @count livros sincronizado',
+      'komgaImportProgressUpToDate': 'O progresso de leitura já está atualizado',
+      'komgaApiKeyRejected': 'A chave de API foi recusada. Verifique se ela é válida; versões do Komga anteriores à 1.20 não aceitam chave de API neste acesso, então use usuário e senha.',
       'komgaSeriesView': 'Séries',
       'komgaAllBooksView': 'Todos os livros',
       'komgaAllStatuses': 'Todos os estados',

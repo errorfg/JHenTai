@@ -2,11 +2,27 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
+import 'package:get/get_utils/get_utils.dart';
 import 'package:jhentai/src/model/komga/komga_models.dart';
 import 'package:jhentai/src/setting/komga_setting.dart';
 import 'package:jhentai/src/setting/network_setting.dart';
 
-class KomgaClient {
+/// The part of the Komga API that read-progress sync depends on.
+abstract interface class KomgaProgressRemote {
+  String get connectionId;
+
+  String progressRecordKey(String bookId);
+
+  Future<KomgaBook> getBook(String bookId);
+
+  Future<List<KomgaBook>> getAllReadProgressBooks();
+
+  Future<void> reportReadProgress(String bookId, int imageIndex);
+
+  Future<void> deleteReadProgress(String bookId);
+}
+
+class KomgaClient implements KomgaProgressRemote {
   KomgaClient({
     required String serverUrl,
     required this.username,
@@ -46,10 +62,17 @@ class KomgaClient {
 
   static const int _allItemsPageSize = 200;
 
+  /// Offset paging needs a total order; Komga adds no tiebreaker itself.
+  static const List<String> _readProgressSort = <String>[
+    'readProgress.readDate,desc',
+    'name,asc',
+  ];
+
   final String serverUrl;
   final String username;
   final String password;
   final String apiKey;
+  @override
   final String connectionId;
   final Dio _dio;
   bool _useLegacySeriesList = false;
@@ -69,6 +92,7 @@ class KomgaClient {
 
   String get sourceFingerprint => connectionId;
 
+  @override
   String progressRecordKey(String bookId) {
     return 'komga:$connectionId:$bookId';
   }
@@ -228,6 +252,7 @@ class KomgaClient {
     );
   }
 
+  @override
   Future<List<KomgaBook>> getAllReadProgressBooks() {
     return _loadAllPages<KomgaBook>(
       (int page) => _getReadProgressBooks(page: page, size: _allItemsPageSize),
@@ -242,7 +267,11 @@ class KomgaClient {
       try {
         final Response<dynamic> response = await _dio.post(
           '/api/v1/books/list',
-          queryParameters: {'page': page, 'size': size},
+          queryParameters: {
+            'page': page,
+            'size': size,
+            'sort': _readProgressSort,
+          },
           data: {
             'condition': {
               'readStatus': {'operator': 'isNot', 'value': 'UNREAD'},
@@ -264,9 +293,16 @@ class KomgaClient {
         'read_status': const <String>['READ', 'IN_PROGRESS'],
         'page': page,
         'size': size,
+        'sort': _readProgressSort,
       },
     );
     return _parsePage(response.data, KomgaBook.fromJson);
+  }
+
+  @override
+  Future<KomgaBook> getBook(String bookId) async {
+    final Response<dynamic> response = await _dio.get('/api/v1/books/$bookId');
+    return KomgaBook.fromJson((response.data as Map).cast<String, dynamic>());
   }
 
   Future<List<KomgaBookPage>> getBookPages(String bookId) async {
@@ -281,11 +317,17 @@ class KomgaClient {
         .toList();
   }
 
+  @override
   Future<void> reportReadProgress(String bookId, int imageIndex) async {
     await _dio.patch(
       '/api/v1/books/$bookId/read-progress',
       data: {'page': imageIndex + 1},
     );
+  }
+
+  @override
+  Future<void> deleteReadProgress(String bookId) async {
+    await _dio.delete('/api/v1/books/$bookId/read-progress');
   }
 
   String seriesThumbnailUrl(String seriesId) {
@@ -311,6 +353,10 @@ class KomgaClient {
     }
     if (error is DioException) {
       final int? statusCode = error.response?.statusCode;
+      if (statusCode == 401 &&
+          error.requestOptions.headers.containsKey('X-API-Key')) {
+        return 'komgaApiKeyRejected'.tr;
+      }
       if (statusCode == 401 || statusCode == 403) {
         return 'Komga authentication failed ($statusCode)';
       }

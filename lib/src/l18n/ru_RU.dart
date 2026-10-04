@@ -1005,14 +1005,11 @@ class ru_RU {
       'komgaBookHasNoPages': 'В этой книге Komga нет доступных страниц',
       'komgaConfigSyncHint':
           'При включённой автосинхронизации сервер и данные входа появятся на других устройствах.',
-      'komgaProgressSyncHint':
-          'Основным считается прогресс JHenTai; в Komga он передаётся только в одну сторону.',
-      'komgaImportProgress': 'Импортировать прогресс Komga',
-      'komgaImportProgressEmpty':
-          'В Komga нет доступного для импорта прогресса чтения',
-      'komgaImportProgressImported':
-          'Импортировано записей прогресса Komga: @count',
-      'komgaImportProgressUpToDate': 'Прогресс чтения JHenTai уже актуален',
+      'komgaProgressSyncHint': 'Прогресс чтения синхронизируется с Komga в обе стороны; побеждает более новый прогресс.',
+      'komgaImportProgress': 'Синхронизировать прогресс чтения с Komga',
+      'komgaImportProgressImported': 'Синхронизирован прогресс книг: @count',
+      'komgaImportProgressUpToDate': 'Прогресс чтения уже актуален',
+      'komgaApiKeyRejected': 'Ключ API отклонён. Убедитесь, что он действителен; версии Komga до 1.20 не поддерживают доступ по ключу API, используйте имя пользователя и пароль.',
       'komgaSeriesView': 'Серии',
       'komgaAllBooksView': 'Все книги',
       'komgaAllStatuses': 'Все статусы',

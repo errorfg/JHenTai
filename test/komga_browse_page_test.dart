@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:dio/dio.dart' as dio;
 import 'package:drift/drift.dart' as drift show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import 'package:jhentai/src/model/reader_source.dart';
 import 'package:jhentai/src/network/komga_client.dart';
 import 'package:jhentai/src/pages/komga/komga_page.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2.dart';
+import 'package:jhentai/src/service/komga_progress_sync_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
@@ -61,25 +63,81 @@ class _FakeKomgaClient extends KomgaClient {
     return <KomgaSeries>[_series()];
   }
 
+  /// Server-side book state after progress writes, keyed by book id.
+  final Map<String, KomgaBook> serverState = <String, KomgaBook>{};
+  final List<String> progressCalls = <String>[];
+
+  KomgaBook _current(KomgaBook book) => serverState[book.id] ?? book;
+
+  KomgaBook _find(String bookId) {
+    for (final KomgaBook book in <KomgaBook>[...serverState.values, ...books]) {
+      if (book.id == bookId) {
+        return _current(book);
+      }
+    }
+    final dio.RequestOptions options = dio.RequestOptions(path: '/');
+    throw dio.DioException(
+      requestOptions: options,
+      response: dio.Response<dynamic>(requestOptions: options, statusCode: 404),
+    );
+  }
+
+  void _setServerProgress(String bookId, Map<String, dynamic>? progress) {
+    final KomgaBook book = _find(bookId);
+    serverState[bookId] = _book(
+      bookId,
+      book.title,
+      book.createdDate ?? DateTime.utc(2026, 8),
+      readProgress: progress,
+    );
+  }
+
   @override
   Future<List<KomgaBook>> getAllBooks({
     required String libraryId,
     bool descending = true,
   }) async {
     allBooksCalls++;
-    return List<KomgaBook>.of(
-      allBooksCompleter == null ? books : await allBooksCompleter!.future,
-    );
+    final List<KomgaBook> listed = allBooksCompleter == null
+        ? books
+        : await allBooksCompleter!.future;
+    return listed.map(_current).toList();
   }
 
   @override
   Future<List<KomgaBook>> getAllReadProgressBooks() async {
     readProgressBooksCalls++;
-    return List<KomgaBook>.of(
-      readProgressBooksCompleter == null
-          ? readProgressBooks
-          : await readProgressBooksCompleter!.future,
-    );
+    final List<KomgaBook> provided = readProgressBooksCompleter == null
+        ? readProgressBooks
+        : await readProgressBooksCompleter!.future;
+    for (final KomgaBook book in provided) {
+      serverState[book.id] = book;
+    }
+    return serverState.values
+        .where((KomgaBook book) => book.readProgress != null)
+        .toList();
+  }
+
+  @override
+  Future<KomgaBook> getBook(String bookId) async {
+    progressCalls.add('GET $bookId');
+    return _find(bookId);
+  }
+
+  @override
+  Future<void> reportReadProgress(String bookId, int imageIndex) async {
+    progressCalls.add('PATCH $bookId ${imageIndex + 1}');
+    _setServerProgress(bookId, <String, dynamic>{
+      'page': imageIndex + 1,
+      'completed': imageIndex + 1 == _find(bookId).pageCount,
+      'readDate': '2026-08-10T00:00:00Z',
+    });
+  }
+
+  @override
+  Future<void> deleteReadProgress(String bookId) async {
+    progressCalls.add('DELETE $bookId');
+    _setServerProgress(bookId, null);
   }
 
   @override
@@ -130,6 +188,7 @@ void main() {
   late AppDb originalDb;
   late KomgaSetting originalKomgaSetting;
   late ReadProgressService originalReadProgressService;
+  late KomgaProgressSyncService originalKomgaProgressSyncService;
   late SyncService originalSyncService;
   late LogService originalLog;
   late _FakeSyncService fakeSyncService;
@@ -138,6 +197,7 @@ void main() {
     originalDb = appDb;
     originalKomgaSetting = komgaSetting;
     originalReadProgressService = readProgressService;
+    originalKomgaProgressSyncService = komgaProgressSyncService;
     originalSyncService = syncService;
     originalLog = log;
     log = _SilentLogService();
@@ -153,6 +213,7 @@ void main() {
         }),
       );
     readProgressService = ReadProgressService();
+    komgaProgressSyncService = KomgaProgressSyncService();
     fakeSyncService = _FakeSyncService();
     syncService = fakeSyncService;
     await localConfigService.batchWrite(<LocalConfigCompanion>[
@@ -187,6 +248,7 @@ void main() {
     appDb = originalDb;
     komgaSetting = originalKomgaSetting;
     readProgressService = originalReadProgressService;
+    komgaProgressSyncService = originalKomgaProgressSyncService;
     syncService = originalSyncService;
     log = originalLog;
     Get.reset();
@@ -666,7 +728,7 @@ void main() {
       Icons.settings_outlined,
     );
     expect(importButton, findsOneWidget);
-    expect(find.byTooltip('导入 Komga 阅读进度'), findsOneWidget);
+    expect(find.byTooltip('与 Komga 同步阅读进度'), findsOneWidget);
     expect(
       tester.getCenter(importButton).dx,
       lessThan(tester.getCenter(refreshButton).dx),
@@ -678,7 +740,7 @@ void main() {
   });
 
   testWidgets(
-    'progress import disables competing actions and merges server history',
+    'progress sync disables competing actions and reconciles both ways',
     (WidgetTester tester) async {
       final _FakeKomgaClient client = _FakeKomgaClient();
       client.readProgressBooksCompleter = Completer<List<KomgaBook>>();
@@ -687,6 +749,9 @@ void main() {
 
       await _openLibraryBooks(tester, client);
       expect(find.text('未读 · 共 10 页'), findsNWidgets(2));
+      // Local progress the server has never seen is reported on list load.
+      expect(client.progressCalls, <String>['PATCH book-1 1', 'PATCH book-3 10']);
+      client.progressCalls.clear();
 
       final Finder importButton = find.byKey(
         const ValueKey<String>('komgaImportProgressButton'),
@@ -727,6 +792,8 @@ void main() {
       );
       expect(unreadBook.onTap, isNull);
 
+      // Server state at sync time: book-1 was read further on another client
+      // after JHenTai reported it; the others are new to this device.
       client.readProgressBooksCompleter!.complete(<KomgaBook>[
         _book(
           'book-1',
@@ -775,26 +842,19 @@ void main() {
         findsOneWidget,
       );
       expect(tester.widget<IconButton>(importButton).onPressed, isNotNull);
-      expect(find.text('继续阅读 · 1/10'), findsNWidgets(2));
+      expect(client.progressCalls, isEmpty);
+      expect(find.text('继续阅读 · 7/10'), findsOneWidget);
+      expect(find.text('继续阅读 · 1/10'), findsOneWidget);
       expect(find.text('已读完 · 共 10 页'), findsNWidgets(2));
 
-      final ReadProgressEntry? olderLocal = await readProgressService
-          .getReadProgressEntryByKey('komga:fixture-connection:book-1');
-      final ReadProgressEntry? firstPage = await readProgressService
-          .getReadProgressEntryByKey('komga:fixture-connection:book-2');
-      final ReadProgressEntry? completed = await readProgressService
-          .getReadProgressEntryByKey('komga:fixture-connection:book-4');
-      final ReadProgressEntry? missingTime = await readProgressService
-          .getReadProgressEntryByKey(
-            'komga:fixture-connection:book-without-time',
-          );
-      expect(olderLocal?.pageIndex, 0);
-      expect(olderLocal?.lastReadAt, DateTime.utc(2026, 8, 4, 10));
-      expect(firstPage?.pageIndex, 0);
-      expect(firstPage?.lastReadAt, DateTime.utc(2026, 8, 5, 10));
-      expect(completed?.pageIndex, 9);
-      expect(completed?.lastReadAt, DateTime.utc(2026, 8, 6, 11));
-      expect(missingTime, isNull);
+      Future<int?> localIndex(String bookId) async => (await readProgressService
+              .getReadProgressEntryByKey('komga:fixture-connection:$bookId'))
+          ?.pageIndex;
+      expect(await localIndex('book-1'), 6);
+      expect(await localIndex('book-2'), 0);
+      expect(await localIndex('book-3'), 9);
+      expect(await localIndex('book-4'), 9);
+      expect(await localIndex('book-without-time'), 3);
     },
   );
 
@@ -850,7 +910,7 @@ void main() {
 
     expect(
       await readProgressService.getReadProgressEntryByKey(
-        'komga:fixture-connection:stale-book',
+        'komga:new-connection:stale-book',
       ),
       isNull,
     );

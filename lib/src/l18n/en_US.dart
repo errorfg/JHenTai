@@ -1125,14 +1125,11 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'komgaBookHasNoPages': 'This Komga book has no readable pages',
       'komgaConfigSyncHint':
           'With automatic cloud sync enabled, the server and credentials are synced to your other devices.',
-      'komgaProgressSyncHint':
-          'JHenTai progress is the source of truth and is reported one-way to Komga.',
-      'komgaImportProgress': 'Import Komga progress',
-      'komgaImportProgressEmpty': 'No usable Komga reading progress was found',
-      'komgaImportProgressImported':
-          'Imported @count Komga reading progress records',
-      'komgaImportProgressUpToDate':
-          'JHenTai reading progress is already up to date',
+      'komgaProgressSyncHint': 'Reading progress syncs both ways with Komga; the newer progress wins.',
+      'komgaImportProgress': 'Sync reading progress with Komga',
+      'komgaImportProgressImported': 'Synced progress for @count books',
+      'komgaImportProgressUpToDate': 'Reading progress is up to date',
+      'komgaApiKeyRejected': 'The API key was rejected. Check that it is valid; Komga versions before 1.20 do not accept API keys for this access, so use username and password instead.',
       'komgaSeriesView': 'Series',
       'komgaAllBooksView': 'All books',
       'komgaAllStatuses': 'All statuses',

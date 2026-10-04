@@ -45,6 +45,67 @@ void main() {
     );
   }
 
+  group('ReadProgressService unread marker', () {
+    test('an empty value reads as no progress', () async {
+      final ReadProgressService service = ReadProgressService();
+      await localConfigService.batchWrite([
+        progressRow('komga:server:unread', '', '2026-10-04T10:00:00.000000Z'),
+        progressRow('komga:server:read', '3', '2026-10-04T10:00:00.000000Z'),
+      ]);
+
+      expect(
+        await service.getReadProgressEntryByKey('komga:server:unread'),
+        isNull,
+      );
+      expect(await service.getReadProgressByKey('komga:server:unread'), 0);
+      expect(
+        (await service.getReadProgressEntriesByKeys({
+          'komga:server:unread',
+          'komga:server:read',
+        })).keys,
+        ['komga:server:read'],
+      );
+    });
+
+    test('raw records include unread markers and omit missing keys', () async {
+      final ReadProgressService service = ReadProgressService();
+      await localConfigService.batchWrite([
+        progressRow('a', '', '2026-10-04T10:00:00.000000Z'),
+        progressRow('b', '7', '2026-10-04T11:00:00.000000Z'),
+      ]);
+
+      final Map<String, ReadProgressRecord> records = await service
+          .getProgressRecords({'a', 'b', 'missing'});
+
+      expect(records.keys.toSet(), {'a', 'b'});
+      expect(records['a']!.value, '');
+      expect(records['b']!.value, '7');
+      expect(records['b']!.utime, '2026-10-04T11:00:00.000000Z');
+    });
+
+    test(
+      'deleting progress writes a newer unread marker and marks it for sync',
+      () async {
+        final ReadProgressService service = ReadProgressService();
+        await localConfigService.batchWrite([
+          progressRow('123', '9', '2026-01-01T10:00:00.000000Z'),
+        ]);
+
+        await service.deleteReadProgress('123');
+
+        final Map<String, ReadProgressRecord> records = await service
+            .getProgressRecords({'123'});
+        expect(records['123']!.value, '');
+        expect(
+          records['123']!.utime.compareTo('2026-01-01T10:00:00.000000Z'),
+          greaterThan(0),
+        );
+        expect(await service.getReadProgressEntryByKey('123'), isNull);
+        expect((await pendingSyncTracker.snapshot()).$2, contains('123'));
+      },
+    );
+  });
+
   group('ReadProgressService rich progress records', () {
     test('distinguishes an absent record from page index zero', () async {
       final ReadProgressService service = ReadProgressService();
@@ -149,153 +210,4 @@ void main() {
       expect(record.utime, '2026-08-02T11:00:00.000000Z');
     },
   );
-
-  group('ReadProgressService external progress import', () {
-    test(
-      'deduplicates, applies only newer rows, marks one pending batch, and notifies once',
-      () async {
-        await localConfigService.batchWrite([
-          progressRow('local-older', '1', '2026-08-02T09:00:00.000000Z'),
-          progressRow('local-newer', '9', '2026-08-02T12:00:00.000000Z'),
-          progressRow('local-equal', '3', '2026-08-02T10:00:00.000000Z'),
-        ]);
-        final ReadProgressService service = ReadProgressService();
-
-        // Prime a cached absence to prove that one final cache refresh makes
-        // the newly imported row visible.
-        expect(await service.getReadProgressEntryByKey('deduplicated'), isNull);
-        int notificationCount = 0;
-        final disposer = service.addListener(() => notificationCount++);
-
-        final ReadProgressImportResult result = await service
-            .importReadProgressEntries(<ReadProgressEntry>[
-              ReadProgressEntry(
-                key: 'deduplicated',
-                pageIndex: 2,
-                lastReadAt: _ImportTimes.earliest,
-              ),
-              ReadProgressEntry(
-                key: 'deduplicated',
-                pageIndex: 5,
-                lastReadAt: _ImportTimes.latest,
-              ),
-              ReadProgressEntry(
-                key: 'local-older',
-                pageIndex: 7,
-                lastReadAt: _ImportTimes.middle,
-              ),
-              ReadProgressEntry(
-                key: 'local-newer',
-                pageIndex: 4,
-                lastReadAt: _ImportTimes.latest,
-              ),
-              ReadProgressEntry(
-                key: 'local-equal',
-                pageIndex: 8,
-                lastReadAt: _ImportTimes.middle,
-              ),
-              ReadProgressEntry(
-                key: '',
-                pageIndex: 1,
-                lastReadAt: _ImportTimes.latest,
-              ),
-              ReadProgressEntry(
-                key: 'negative',
-                pageIndex: -1,
-                lastReadAt: _ImportTimes.latest,
-              ),
-            ]);
-
-        expect(result.total, 4);
-        expect(result.imported, 2);
-        expect(result.skipped, 2);
-        expect(result.invalid, 2);
-        expect(result.isEmpty, isFalse);
-        expect(result.isUpToDate, isFalse);
-        expect(notificationCount, 1);
-
-        final Map<String, ReadProgressEntry> stored = await service
-            .getReadProgressEntriesByKeys(<String>{
-              'deduplicated',
-              'local-older',
-              'local-newer',
-              'local-equal',
-            });
-        expect(stored['deduplicated']!.pageIndex, 5);
-        expect(stored['deduplicated']!.lastReadAt, _ImportTimes.latest);
-        expect(stored['local-older']!.pageIndex, 7);
-        expect(stored['local-newer']!.pageIndex, 9);
-        expect(stored['local-equal']!.pageIndex, 3);
-
-        final (_, Set<String> pendingKeys) = await pendingSyncTracker
-            .snapshot();
-        expect(pendingKeys, <String>{'deduplicated', 'local-older'});
-
-        // markProgressPendingAll awaits its single persistence write, so a
-        // fresh tracker can observe the complete batch immediately.
-        final PendingSyncTracker reloadedTracker = PendingSyncTracker();
-        final (_, Set<String> reloadedKeys) = await reloadedTracker.snapshot();
-        expect(reloadedKeys, pendingKeys);
-
-        disposer();
-      },
-    );
-
-    test('reports up-to-date without marking pending or notifying', () async {
-      await localConfigService.batchWrite([
-        progressRow('already-current', '6', '2026-08-02T11:00:00.000000Z'),
-      ]);
-      final ReadProgressService service = ReadProgressService();
-      int notificationCount = 0;
-      final disposer = service.addListener(() => notificationCount++);
-
-      final ReadProgressImportResult result = await service
-          .importReadProgressEntries(<ReadProgressEntry>[
-            ReadProgressEntry(
-              key: 'already-current',
-              pageIndex: 2,
-              lastReadAt: _ImportTimes.middle,
-            ),
-          ]);
-
-      expect(result.total, 1);
-      expect(result.imported, 0);
-      expect(result.skipped, 1);
-      expect(result.invalid, 0);
-      expect(result.isEmpty, isFalse);
-      expect(result.isUpToDate, isTrue);
-      expect(notificationCount, 0);
-      final (_, Set<String> pendingKeys) = await pendingSyncTracker.snapshot();
-      expect(pendingKeys, isEmpty);
-
-      disposer();
-    });
-
-    test(
-      'reports an empty import separately from an up-to-date import',
-      () async {
-        final ReadProgressImportResult result = await ReadProgressService()
-            .importReadProgressEntries(<ReadProgressEntry>[
-              ReadProgressEntry(
-                key: ' ',
-                pageIndex: 0,
-                lastReadAt: _ImportTimes.middle,
-              ),
-            ]);
-
-        expect(result.total, 0);
-        expect(result.imported, 0);
-        expect(result.skipped, 0);
-        expect(result.invalid, 1);
-        expect(result.isEmpty, isTrue);
-        expect(result.isUpToDate, isFalse);
-      },
-    );
-  });
-}
-
-abstract final class _ImportTimes {
-  static final DateTime earliest = DateTime.utc(2026, 8, 2, 8);
-  static final DateTime middle = DateTime.utc(2026, 8, 2, 10);
-  static final DateTime latest = DateTime.utc(2026, 8, 2, 11);
 }

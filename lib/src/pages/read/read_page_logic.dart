@@ -47,6 +47,28 @@ import '../home_page.dart';
 import '../setting/read/setting_read_page.dart';
 import '../setting/keyboard_shortcuts/setting_keyboard_shortcuts_page.dart';
 
+/// Whether a scrolling layout shows the end of the book: the last image is
+/// visible down to its trailing edge. The tolerance absorbs rounding when the
+/// list is scrolled exactly to its end.
+bool listShowsEnd(Iterable<ItemPosition> visible, int pageCount) {
+  return visible.any(
+    (ItemPosition item) =>
+        item.index == pageCount - 1 && item.itemTrailingEdge <= 1.005,
+  );
+}
+
+/// The index persisted as read progress: the last page once the end of the
+/// book is shown, otherwise the first visible image. Recording the first
+/// visible image alone would leave a finished book one page short whenever the
+/// last screen shows more than one page.
+int progressIndexFor({
+  required int currentIndex,
+  required bool reachedEnd,
+  required int pageCount,
+}) {
+  return reachedEnd && pageCount > 0 ? pageCount - 1 : currentIndex;
+}
+
 typedef PersistReadProgress = Future<void> Function(int imageIndex);
 typedef SyncReadProgress = Future<void> Function();
 typedef ReadProgressFlushErrorHandler =
@@ -261,6 +283,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   final int normalPriority = 10000;
 
   bool inited = false;
+  bool _reachedEnd = false;
   Completer<void> delayInitCompleter = Completer<void>();
   late final ReadProgressFlushCoordinator _progressFlushCoordinator;
 
@@ -1057,21 +1080,28 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     return positions;
   }
 
-  void recordReadProgress(int index) {
+  /// [index] is the first visible image; [reachedEnd] tells whether the end
+  /// of the book is on screen.
+  void recordReadProgress(int index, {bool reachedEnd = false}) {
     state.readPageInfo.currentImageIndex = index;
+    _reachedEnd = reachedEnd;
     update([sliderId, pageNoId, thumbnailNoId]);
   }
 
+  int get _progressIndex => progressIndexFor(
+    currentIndex: state.readPageInfo.currentImageIndex,
+    reachedEnd: _reachedEnd,
+    pageCount: state.readPageInfo.pageCount,
+  );
+
   Future<void> _scheduleReadProgressFlush() {
-    final int currentIndex = state.readPageInfo.currentImageIndex;
-    return _progressFlushCoordinator.schedule(currentIndex);
+    return _progressFlushCoordinator.schedule(_progressIndex);
   }
 
   Future<void> _flushReadProgressAndSync() async {
     try {
-      final int currentIndex = state.readPageInfo.currentImageIndex;
       await _progressFlushCoordinator.flushFinalAndSync(
-        currentIndex,
+        _progressIndex,
         sync: () async {
           await syncService.syncReadProgress(force: true);
         },

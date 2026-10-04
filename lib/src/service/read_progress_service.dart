@@ -23,28 +23,19 @@ class ReadProgressEntry {
   final DateTime lastReadAt;
 }
 
-/// Summary returned by [ReadProgressService.importReadProgressEntries].
-///
-/// [total] counts valid entries after de-duplicating by key. [imported]
-/// counts rows that actually survived the timestamp guard and were present in
-/// storage after the write. [skipped] is therefore always `total - imported`.
-/// Invalid entries are reported separately and are not included in [total].
-class ReadProgressImportResult {
-  const ReadProgressImportResult({
-    required this.total,
-    required this.imported,
-    required this.skipped,
-    required this.invalid,
+/// A raw stored progress value. An empty [value] is the unread marker: it
+/// replaces deletion so that "unread" propagates through cloud sync by its
+/// timestamp instead of being restored by another device's older row.
+class ReadProgressRecord {
+  const ReadProgressRecord({
+    required this.key,
+    required this.value,
+    required this.utime,
   });
 
-  final int total;
-  final int imported;
-  final int skipped;
-  final int invalid;
-
-  bool get isEmpty => total == 0;
-
-  bool get isUpToDate => total > 0 && imported == 0;
+  final String key;
+  final String value;
+  final String utime;
 }
 
 class ReadProgressService extends GetxController
@@ -128,9 +119,11 @@ class ReadProgressService extends GetxController
     final Set<String> foundKeys = {};
     for (final LocalConfig record in records) {
       foundKeys.add(record.subConfigKey);
-      final ReadProgressEntry entry = _entryFromRecord(record)!;
+      final ReadProgressEntry? entry = _entryFromRecord(record);
       _progressCache[record.subConfigKey] = entry;
-      result[record.subConfigKey] = entry;
+      if (entry != null) {
+        result[record.subConfigKey] = entry;
+      }
     }
     for (final String key in uncachedKeys.difference(foundKeys)) {
       _progressCache[key] = null;
@@ -138,117 +131,25 @@ class ReadProgressService extends GetxController
     return result;
   }
 
-  /// Import externally sourced progress using the same last-write-wins rule
-  /// as cloud progress sync.
-  ///
-  /// Entries are de-duplicated by key first, keeping the one with the newest
-  /// [ReadProgressEntry.lastReadAt]. Existing local rows with the same or a
-  /// newer timestamp are never overwritten. All qualifying rows are written
-  /// in one guarded batch, then only rows that are confirmed in storage are
-  /// marked pending for cloud sync in one operation. Cache listeners are
-  /// notified at most once.
-  Future<ReadProgressImportResult> importReadProgressEntries(
-    Iterable<ReadProgressEntry> entries,
+  /// Raw stored values, unread markers included, loaded in one query.
+  Future<Map<String, ReadProgressRecord>> getProgressRecords(
+    Set<String> recordKeys,
   ) async {
-    final Map<String, ReadProgressEntry> newestByKey =
-        <String, ReadProgressEntry>{};
-    int invalid = 0;
-
-    for (final ReadProgressEntry entry in entries) {
-      if (entry.key.trim().isEmpty || entry.pageIndex < 0) {
-        invalid++;
-        continue;
-      }
-
-      final ReadProgressEntry? existing = newestByKey[entry.key];
-      if (existing == null || entry.lastReadAt.isAfter(existing.lastReadAt)) {
-        newestByKey[entry.key] = entry;
-      }
+    if (recordKeys.isEmpty) {
+      return {};
     }
-
-    final int total = newestByKey.length;
-    if (total == 0) {
-      return ReadProgressImportResult(
-        total: 0,
-        imported: 0,
-        skipped: 0,
-        invalid: invalid,
-      );
-    }
-
-    final List<LocalConfig> localRecords = await localConfigService
-        .readBySubKeys(
-          configKey: ConfigEnum.readIndexRecord,
-          subConfigKeys: newestByKey.keys.toSet(),
-        );
-    final Map<String, DateTime> localTimes = <String, DateTime>{
-      for (final LocalConfig record in localRecords)
-        if (SyncTimeUtil.tryParse(record.utime) != null)
-          record.subConfigKey: SyncTimeUtil.parse(record.utime),
-    };
-
-    final Map<String, ReadProgressEntry> eligible =
-        <String, ReadProgressEntry>{};
-    for (final MapEntry<String, ReadProgressEntry> candidate
-        in newestByKey.entries) {
-      final DateTime? localTime = localTimes[candidate.key];
-      if (localTime == null || candidate.value.lastReadAt.isAfter(localTime)) {
-        eligible[candidate.key] = candidate.value;
-      }
-    }
-
-    if (eligible.isNotEmpty) {
-      await localConfigService.batchWriteIfNewer(
-        configKey: ConfigEnum.readIndexRecord,
-        localConfigs: eligible.values
-            .map(
-              (ReadProgressEntry entry) => LocalConfigCompanion(
-                configKey: drift.Value(ConfigEnum.readIndexRecord.key),
-                subConfigKey: drift.Value(entry.key),
-                value: drift.Value(entry.pageIndex.toString()),
-                utime: drift.Value(SyncTimeUtil.format(entry.lastReadAt)),
-              ),
-            )
-            .toList(growable: false),
-      );
-    }
-
-    // Re-read after the atomic SQL guard. A concurrent local read may have
-    // produced a newer row after our prefilter; that row must not be counted
-    // as imported or marked here (its normal write path marks it pending).
-    final List<LocalConfig> persistedRecords = eligible.isEmpty
-        ? const <LocalConfig>[]
-        : await localConfigService.readBySubKeys(
-            configKey: ConfigEnum.readIndexRecord,
-            subConfigKeys: eligible.keys.toSet(),
-          );
-    final Map<String, LocalConfig> persistedByKey = <String, LocalConfig>{
-      for (final LocalConfig record in persistedRecords)
-        record.subConfigKey: record,
-    };
-    final Set<String> importedKeys = <String>{};
-    for (final MapEntry<String, ReadProgressEntry> candidate
-        in eligible.entries) {
-      final LocalConfig? persisted = persistedByKey[candidate.key];
-      if (persisted != null &&
-          persisted.value == candidate.value.pageIndex.toString() &&
-          persisted.utime == SyncTimeUtil.format(candidate.value.lastReadAt)) {
-        importedKeys.add(candidate.key);
-      }
-    }
-
-    if (importedKeys.isNotEmpty) {
-      await pendingSyncTracker.markProgressPendingAll(importedKeys);
-      clearCacheAndRefresh();
-    }
-
-    final int imported = importedKeys.length;
-    return ReadProgressImportResult(
-      total: total,
-      imported: imported,
-      skipped: total - imported,
-      invalid: invalid,
+    final List<LocalConfig> records = await localConfigService.readBySubKeys(
+      configKey: ConfigEnum.readIndexRecord,
+      subConfigKeys: recordKeys,
     );
+    return {
+      for (final LocalConfig record in records)
+        record.subConfigKey: ReadProgressRecord(
+          key: record.subConfigKey,
+          value: record.value,
+          utime: record.utime,
+        ),
+    };
   }
 
   /// Clear cache and notify all listeners to rebuild (e.g. after cloud sync)
@@ -257,22 +158,23 @@ class ReadProgressService extends GetxController
     update();
   }
 
-  /// Delete read progress for a gallery and notify listeners
-  Future<void> deleteReadProgress(String recordKey) async {
-    await localConfigService.delete(
-      configKey: ConfigEnum.readIndexRecord,
-      subConfigKey: recordKey,
-    );
-    _progressCache[recordKey] = null;
-    _notifyProgressChanged(recordKey);
+  /// Reset read progress by writing the unread marker, and notify listeners
+  Future<void> deleteReadProgress(String recordKey) {
+    return writeProgressValue(recordKey, '');
   }
 
   /// Update read progress and notify listeners
-  Future<void> updateReadProgress(String recordKey, int index) async {
+  Future<void> updateReadProgress(String recordKey, int index) {
+    return writeProgressValue(recordKey, index.toString());
+  }
+
+  /// Write a page index or the unread marker ('') with the current time,
+  /// mark it for cloud sync and notify listeners.
+  Future<void> writeProgressValue(String recordKey, String value) async {
     await localConfigService.write(
       configKey: ConfigEnum.readIndexRecord,
       subConfigKey: recordKey,
-      value: index.toString(),
+      value: value,
     );
     final LocalConfig? record = await localConfigService.readRecord(
       configKey: ConfigEnum.readIndexRecord,
@@ -281,6 +183,39 @@ class ReadProgressService extends GetxController
     _progressCache[recordKey] = _entryFromRecord(record);
     await pendingSyncTracker.markProgressPending(recordKey);
     _notifyProgressChanged(recordKey);
+  }
+
+  /// Batch form of [writeProgressValue]: one write, one sync mark and one
+  /// notification. Returns the stored records.
+  Future<Map<String, ReadProgressRecord>> writeProgressValues(
+    Map<String, String> valuesByKey,
+  ) async {
+    if (valuesByKey.isEmpty) {
+      return {};
+    }
+    final String utime = SyncTimeUtil.nowIso();
+    await localConfigService.batchWrite(
+      valuesByKey.entries
+          .map(
+            (MapEntry<String, String> entry) => LocalConfigCompanion(
+              configKey: drift.Value(ConfigEnum.readIndexRecord.key),
+              subConfigKey: drift.Value(entry.key),
+              value: drift.Value(entry.value),
+              utime: drift.Value(utime),
+            ),
+          )
+          .toList(growable: false),
+    );
+    await pendingSyncTracker.markProgressPendingAll(valuesByKey.keys);
+    clearCacheAndRefresh();
+    return {
+      for (final MapEntry<String, String> entry in valuesByKey.entries)
+        entry.key: ReadProgressRecord(
+          key: entry.key,
+          value: entry.value,
+          utime: utime,
+        ),
+    };
   }
 
   void _notifyProgressChanged(String recordKey) {
@@ -292,7 +227,7 @@ class ReadProgressService extends GetxController
   }
 
   ReadProgressEntry? _entryFromRecord(LocalConfig? record) {
-    if (record == null) {
+    if (record == null || record.value.isEmpty) {
       return null;
     }
     return ReadProgressEntry(
