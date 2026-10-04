@@ -25,6 +25,11 @@ class GalleryImage {
   /// Transient cache namespace for authenticated image sources.
   String? cacheKey;
 
+  /// Transient small preview used by the reader's thumbnail strip, with its
+  /// own cache namespace.
+  String? thumbnailUrl;
+  String? thumbnailCacheKey;
+
   GalleryImage({
     required this.url,
     this.height,
@@ -38,6 +43,8 @@ class GalleryImage {
     this.downloadStatus = DownloadStatus.none,
     this.headers,
     this.cacheKey,
+    this.thumbnailUrl,
+    this.thumbnailCacheKey,
   });
 
   Map<String, dynamic> toJson() {

@@ -25,6 +25,7 @@ import 'package:jhentai/src/service/path_service.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/service/komga_progress_sync_service.dart';
+import 'package:jhentai/src/service/komga_download_service.dart';
 import 'package:jhentai/src/service/schedule_service.dart';
 import 'package:jhentai/src/service/search_history_service.dart';
 import 'package:jhentai/src/service/nhentai_favorite_service.dart';
@@ -124,6 +125,7 @@ List<JHLifeCircleBean> lifeCircleBeans = [
   keyboardShortcutSetting,
   komgaSetting,
   komgaProgressSyncService,
+  komgaDownloadService,
   builtInBlockedUserService,
 ];
 

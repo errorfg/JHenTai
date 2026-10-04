@@ -1,5 +1,11 @@
 {
-  "serverUrl": "http://komga.example:25600",
-  "apiKey": "your-komga-api-key",
-  "writableSeriesTitle": "A series the tests may modify; its read progress is restored afterwards"
+  "localKomga": {
+    "java": "/path/to/java21/bin/java",
+    "jar": "/path/to/komga-1.23.6.jar"
+  },
+  "realServer": {
+    "serverUrl": "http://komga.example:25600",
+    "apiKey": "your-komga-api-key",
+    "writableSeriesTitle": "A series final checks may modify; its read progress is restored afterwards"
+  }
 }

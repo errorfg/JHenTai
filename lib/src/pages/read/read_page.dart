@@ -22,6 +22,7 @@ import '../../config/ui_config.dart';
 import '../../service/gallery_download_service.dart';
 import '../../setting/keyboard_shortcut_setting.dart';
 import '../../setting/read_setting.dart';
+import '../../model/gallery_image.dart';
 import '../../utils/route_util.dart';
 import '../../utils/screen_size_util.dart';
 import '../../widget/eh_image.dart';
@@ -111,6 +112,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                       ],
                     ),
                     buildRightBottomInfo(context),
+                    buildNextBookButton(context),
                     buildTopMenu(context),
                     buildBottomMenu(context),
                   ],
@@ -277,6 +279,18 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
           title: Text(state.readPageInfo.galleryTitle, style: const TextStyle(color: UIConfig.readPageButtonColor)),
           leading: const BackButton(color: UIConfig.readPageButtonColor),
           actions: [
+            if (logic.hasSiblingBooks) ...[
+              IconButton(
+                tooltip: 'previousBook'.tr,
+                icon: const Icon(Icons.skip_previous, color: UIConfig.readPageButtonColor),
+                onPressed: logic.openingSibling ? null : () => logic.openSiblingBook(next: false),
+              ),
+              IconButton(
+                tooltip: 'nextBook'.tr,
+                icon: const Icon(Icons.skip_next, color: UIConfig.readPageButtonColor),
+                onPressed: logic.openingSibling ? null : () => logic.openSiblingBook(next: true),
+              ),
+            ],
             if (GetPlatform.isDesktop &&
                 state.readPageInfo.gid != null &&
                 (state.readPageInfo.mode == ReadMode.downloaded || state.readPageInfo.mode == ReadMode.archive) &&
@@ -473,6 +487,32 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
     );
   }
 
+  /// Shown at the end of a book that belongs to a series.
+  Widget buildNextBookButton(BuildContext context) {
+    return GetBuilder<ReadPageLogic>(
+      id: logic.endOfBookId,
+      builder: (_) {
+        if (!logic.hasSiblingBooks || !logic.reachedEnd) {
+          return const SizedBox();
+        }
+        return Positioned(
+          left: 0,
+          right: 0,
+          bottom: 48 + context.mediaQuery.padding.bottom,
+          child: Center(
+            child: FilledButton.icon(
+              onPressed: logic.openingSibling ? null : () => logic.openSiblingBook(next: true),
+              icon: logic.openingSibling
+                  ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.skip_next),
+              label: Text('nextBook'.tr),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildThumbnailInLocalMode(BuildContext context, int index) {
     return GetBuilder<GalleryDownloadService>(
       id: '${galleryDownloadService.downloadImageId}::${state.readPageInfo.gid}::$index',
@@ -480,9 +520,17 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
         if (state.images[index]?.downloadStatus != DownloadStatus.downloaded) {
           return Center(child: UIConfig.loadingAnimation(context));
         }
+        final GalleryImage image = state.images[index]!;
         return LayoutBuilder(
           builder: (_, constraints) => EHImage(
-            galleryImage: state.images[index]!,
+            galleryImage: image.thumbnailUrl == null
+                ? image
+                : GalleryImage(
+                    url: image.thumbnailUrl!,
+                    headers: image.headers,
+                    cacheKey: image.thumbnailCacheKey,
+                    downloadStatus: DownloadStatus.downloaded,
+                  ),
             containerHeight: constraints.maxHeight,
             containerWidth: constraints.maxWidth,
             borderRadius: BorderRadius.circular(8),

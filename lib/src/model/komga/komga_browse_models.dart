@@ -9,7 +9,8 @@ enum KomgaDisplayMode { grid, list, detail }
 
 enum KomgaProgressFilter { all, unread, inProgress, read, newlyAdded }
 
-enum KomgaSortMode { addedAt, lastReadAt, title }
+/// [number] sorts books by volume number; [relevance] is used for search.
+enum KomgaSortMode { addedAt, lastReadAt, title, number, relevance }
 
 enum KomgaReadingStatus { unread, inProgress, read }
 
@@ -20,6 +21,8 @@ class KomgaBrowsePreferences {
     this.progressFilter = KomgaProgressFilter.all,
     this.sortMode = KomgaSortMode.addedAt,
     this.descending = true,
+    this.seriesSortMode = KomgaSortMode.number,
+    this.seriesDescending = false,
     this.lastSeenByLibrary = const <String, String>{},
     this.seenLibraries = const <String>{},
   });
@@ -29,6 +32,11 @@ class KomgaBrowsePreferences {
   final KomgaProgressFilter progressFilter;
   final KomgaSortMode sortMode;
   final bool descending;
+
+  /// Sort inside one series; kept apart so reading order is not inherited
+  /// from the library-level "newest first".
+  final KomgaSortMode seriesSortMode;
+  final bool seriesDescending;
   final Map<String, String> lastSeenByLibrary;
   final Set<String> seenLibraries;
 
@@ -67,6 +75,12 @@ class KomgaBrowsePreferences {
           KomgaSortMode.addedAt,
         ),
         descending: json['descending'] as bool? ?? true,
+        seriesSortMode: _enumByName(
+          KomgaSortMode.values,
+          json['seriesSortMode'],
+          KomgaSortMode.number,
+        ),
+        seriesDescending: json['seriesDescending'] as bool? ?? false,
         lastSeenByLibrary: lastSeenByLibrary,
         seenLibraries: <String>{
           ...lastSeenByLibrary.keys,
@@ -87,6 +101,8 @@ class KomgaBrowsePreferences {
       'progressFilter': progressFilter.name,
       'sortMode': sortMode.name,
       'descending': descending,
+      'seriesSortMode': seriesSortMode.name,
+      'seriesDescending': seriesDescending,
       'lastSeenByLibrary': lastSeenByLibrary,
       'seenLibraries': seenLibraries.toList(growable: false),
     });
@@ -98,6 +114,8 @@ class KomgaBrowsePreferences {
     KomgaProgressFilter? progressFilter,
     KomgaSortMode? sortMode,
     bool? descending,
+    KomgaSortMode? seriesSortMode,
+    bool? seriesDescending,
     Map<String, String>? lastSeenByLibrary,
     Set<String>? seenLibraries,
   }) {
@@ -107,6 +125,8 @@ class KomgaBrowsePreferences {
       progressFilter: progressFilter ?? this.progressFilter,
       sortMode: sortMode ?? this.sortMode,
       descending: descending ?? this.descending,
+      seriesSortMode: seriesSortMode ?? this.seriesSortMode,
+      seriesDescending: seriesDescending ?? this.seriesDescending,
       lastSeenByLibrary: lastSeenByLibrary ?? this.lastSeenByLibrary,
       seenLibraries: seenLibraries ?? this.seenLibraries,
     );
@@ -218,170 +238,61 @@ class KomgaBookBrowseItem implements KomgaBrowseItem {
   }
 }
 
+/// A series with its reading state as Komga reports it. Since lists are
+/// paged, the books of a series are not all loaded; the counts come from the
+/// series itself.
 class KomgaSeriesBrowseItem implements KomgaBrowseItem {
-  const KomgaSeriesBrowseItem({
-    required this.series,
-    required this.books,
-    required this.readingStatus,
-    required this.isNew,
-    required this.addedAt,
-    required this.lastReadAt,
-    required this.readCount,
-    required this.inProgressCount,
-    required this.unreadCount,
-    required this.progressFraction,
-  });
+  const KomgaSeriesBrowseItem({required this.series, required this.isNew});
 
   final KomgaSeries series;
-  final List<KomgaBookBrowseItem> books;
-
-  @override
-  final KomgaReadingStatus readingStatus;
 
   @override
   final bool isNew;
 
-  @override
-  final DateTime? addedAt;
-
-  @override
-  final DateTime? lastReadAt;
-
-  final int readCount;
-  final int inProgressCount;
-  final int unreadCount;
-  final double progressFraction;
+  factory KomgaSeriesBrowseItem.fromSeries({
+    required KomgaSeries series,
+    DateTime? newSince,
+  }) {
+    return KomgaSeriesBrowseItem(
+      series: series,
+      isNew:
+          newSince != null &&
+          series.createdDate != null &&
+          series.createdDate!.isAfter(newSince),
+    );
+  }
 
   @override
   String get title => series.title;
 
-  int get bookCount =>
-      series.booksCount > books.length ? series.booksCount : books.length;
+  @override
+  DateTime? get addedAt => series.createdDate;
 
-  factory KomgaSeriesBrowseItem.fromSeries({
-    required KomgaSeries series,
-    required List<KomgaBookBrowseItem> books,
-    DateTime? newSince,
-  }) {
-    final int readCount = books
-        .where(
-          (KomgaBookBrowseItem item) =>
-              item.readingStatus == KomgaReadingStatus.read,
-        )
-        .length;
-    final int inProgressCount = books
-        .where(
-          (KomgaBookBrowseItem item) =>
-              item.readingStatus == KomgaReadingStatus.inProgress,
-        )
-        .length;
-    final int knownUnreadCount = books
-        .where(
-          (KomgaBookBrowseItem item) =>
-              item.readingStatus == KomgaReadingStatus.unread,
-        )
-        .length;
-    final int missingBookCount = (series.booksCount - books.length)
-        .clamp(0, series.booksCount)
-        .toInt();
-    final int unreadCount = knownUnreadCount + missingBookCount;
-    final int effectiveBookCount = books.length + missingBookCount;
+  @override
+  DateTime? get lastReadAt => null;
 
-    final KomgaReadingStatus readingStatus;
-    if (effectiveBookCount > 0 && readCount == effectiveBookCount) {
-      readingStatus = KomgaReadingStatus.read;
-    } else if (readCount > 0 || inProgressCount > 0) {
-      readingStatus = KomgaReadingStatus.inProgress;
-    } else {
-      readingStatus = KomgaReadingStatus.unread;
+  int get bookCount => series.booksCount;
+
+  int get readCount => series.booksReadCount;
+
+  int get inProgressCount => series.booksInProgressCount;
+
+  int get unreadCount => series.booksUnreadCount;
+
+  @override
+  KomgaReadingStatus get readingStatus {
+    if (series.booksCount > 0 && readCount >= series.booksCount) {
+      return KomgaReadingStatus.read;
     }
-
-    final Iterable<DateTime> addedDates = <DateTime?>[
-      series.createdDate,
-      ...books.map((KomgaBookBrowseItem item) => item.addedAt),
-    ].whereType<DateTime>();
-    final Iterable<DateTime> readDates = books
-        .map((KomgaBookBrowseItem item) => item.lastReadAt)
-        .whereType<DateTime>();
-    final int knownTotalPages = books.fold<int>(
-      0,
-      (int total, KomgaBookBrowseItem item) =>
-          total + (item.book.pageCount > 0 ? item.book.pageCount : 0),
-    );
-    final int estimatedMissingBookPages = missingBookCount == 0
-        ? 0
-        : missingBookCount *
-              (knownTotalPages > 0 && books.isNotEmpty
-                  ? (knownTotalPages / books.length).ceil()
-                  : 1);
-    final int totalPages = knownTotalPages + estimatedMissingBookPages;
-    final int readPages = books.fold<int>(
-      0,
-      (int total, KomgaBookBrowseItem item) => total + item.currentPage,
-    );
-
-    return KomgaSeriesBrowseItem(
-      series: series,
-      books: List<KomgaBookBrowseItem>.unmodifiable(books),
-      readingStatus: readingStatus,
-      isNew:
-          books.any((KomgaBookBrowseItem item) => item.isNew) ||
-          (newSince != null &&
-              series.createdDate != null &&
-              series.createdDate!.isAfter(newSince)),
-      addedAt: _latestOrNull(addedDates),
-      lastReadAt: _latestOrNull(readDates),
-      readCount: readCount,
-      inProgressCount: inProgressCount,
-      unreadCount: unreadCount,
-      progressFraction: totalPages == 0
-          ? 0
-          : (readPages / totalPages).clamp(0, 1).toDouble(),
-    );
+    if (readCount > 0 || inProgressCount > 0) {
+      return KomgaReadingStatus.inProgress;
+    }
+    return KomgaReadingStatus.unread;
   }
-}
 
-List<T> filterAndSortKomgaItems<T extends KomgaBrowseItem>(
-  Iterable<T> items, {
-  required KomgaProgressFilter filter,
-  required KomgaSortMode sortMode,
-  required bool descending,
-}) {
-  final List<T> result = items.where((T item) {
-    return switch (filter) {
-      KomgaProgressFilter.all => true,
-      KomgaProgressFilter.unread =>
-        item.readingStatus == KomgaReadingStatus.unread,
-      KomgaProgressFilter.inProgress =>
-        item.readingStatus == KomgaReadingStatus.inProgress,
-      KomgaProgressFilter.read => item.readingStatus == KomgaReadingStatus.read,
-      KomgaProgressFilter.newlyAdded => item.isNew,
-    };
-  }).toList();
-
-  result.sort((T a, T b) {
-    final int primary = switch (sortMode) {
-      KomgaSortMode.addedAt => _compareNullableDate(
-        a.addedAt,
-        b.addedAt,
-        descending,
-      ),
-      KomgaSortMode.lastReadAt => _compareNullableDate(
-        a.lastReadAt,
-        b.lastReadAt,
-        descending,
-      ),
-      KomgaSortMode.title =>
-        descending
-            ? b.title.toLowerCase().compareTo(a.title.toLowerCase())
-            : a.title.toLowerCase().compareTo(b.title.toLowerCase()),
-    };
-    if (primary != 0) {
-      return primary;
-    }
-    return a.title.toLowerCase().compareTo(b.title.toLowerCase());
-  });
-  return result;
+  double get progressFraction => series.booksCount == 0
+      ? 0
+      : (readCount / series.booksCount).clamp(0, 1).toDouble();
 }
 
 T _enumByName<T extends Enum>(List<T> values, dynamic name, T fallback) {
@@ -391,27 +302,4 @@ T _enumByName<T extends Enum>(List<T> values, dynamic name, T fallback) {
     }
   }
   return fallback;
-}
-
-DateTime? _latestOrNull(Iterable<DateTime> values) {
-  DateTime? latest;
-  for (final DateTime value in values) {
-    if (latest == null || value.isAfter(latest)) {
-      latest = value;
-    }
-  }
-  return latest;
-}
-
-int _compareNullableDate(DateTime? a, DateTime? b, bool descending) {
-  if (a == null && b == null) {
-    return 0;
-  }
-  if (a == null) {
-    return 1;
-  }
-  if (b == null) {
-    return -1;
-  }
-  return descending ? b.compareTo(a) : a.compareTo(b);
 }

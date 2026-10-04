@@ -72,6 +72,16 @@ class KomgaSeries {
     required this.summary,
     required this.tags,
     required this.authors,
+    this.booksReadCount = 0,
+    this.booksUnreadCount = 0,
+    this.booksInProgressCount = 0,
+    this.status = '',
+    this.publisher = '',
+    this.language = '',
+    this.genres = const <String>[],
+    this.readingDirection = '',
+    this.ageRating,
+    this.releaseDate,
   });
 
   final String id;
@@ -82,8 +92,23 @@ class KomgaSeries {
   final DateTime? createdDate;
   final DateTime? lastModifiedDate;
   final String summary;
+
+  /// Series tags together with the tags of its books, matching how Komga's
+  /// tag condition selects series.
   final List<String> tags;
   final List<KomgaAuthor> authors;
+  final int booksReadCount;
+  final int booksUnreadCount;
+  final int booksInProgressCount;
+  final String status;
+  final String publisher;
+  final String language;
+  final List<String> genres;
+
+  /// LEFT_TO_RIGHT, RIGHT_TO_LEFT, VERTICAL, WEBTOON, or empty when unset.
+  final String readingDirection;
+  final int? ageRating;
+  final DateTime? releaseDate;
 
   factory KomgaSeries.fromJson(Map<String, dynamic> json) {
     final Map<String, dynamic> metadata =
@@ -93,6 +118,7 @@ class KomgaSeries {
     final String metadataTitle = metadata['title'] as String? ?? '';
     final String name = json['name'] as String? ?? '';
 
+    final String summary = metadata['summary'] as String? ?? '';
     return KomgaSeries(
       id: json['id'] as String,
       libraryId: json['libraryId'] as String? ?? '',
@@ -103,9 +129,25 @@ class KomgaSeries {
       lastModifiedDate: _parseKomgaDate(
         json['lastModified'] ?? json['lastModifiedDate'],
       ),
-      summary: metadata['summary'] as String? ?? '',
-      tags: _parseStringList(metadata['tags']),
+      summary: summary.trim().isEmpty
+          ? booksMetadata['summary'] as String? ?? ''
+          : summary,
+      tags: <String>{
+        ..._parseStringList(metadata['tags']),
+        ..._parseStringList(booksMetadata['tags']),
+      }.toList(growable: false),
       authors: _parseAuthors(booksMetadata['authors']),
+      booksReadCount: (json['booksReadCount'] as num?)?.toInt() ?? 0,
+      booksUnreadCount: (json['booksUnreadCount'] as num?)?.toInt() ?? 0,
+      booksInProgressCount:
+          (json['booksInProgressCount'] as num?)?.toInt() ?? 0,
+      status: metadata['status'] as String? ?? '',
+      publisher: metadata['publisher'] as String? ?? '',
+      language: metadata['language'] as String? ?? '',
+      genres: _parseStringList(metadata['genres']),
+      readingDirection: metadata['readingDirection'] as String? ?? '',
+      ageRating: (metadata['ageRating'] as num?)?.toInt(),
+      releaseDate: _parseKomgaDate(booksMetadata['releaseDate']),
     );
   }
 }
@@ -131,6 +173,8 @@ class KomgaBook {
     required this.tags,
     required this.authors,
     this.readProgress,
+    this.numberSort = 0,
+    this.epubDivinaCompatible = false,
   });
 
   final String id;
@@ -152,8 +196,16 @@ class KomgaBook {
   final List<String> tags;
   final List<KomgaAuthor> authors;
   final KomgaReadProgress? readProgress;
+  final double numberSort;
 
-  bool get isReadable => mediaStatus == 'READY' && pageCount > 0;
+  /// Only image EPUBs expose pages; text EPUBs report a computed page count
+  /// but an empty page list.
+  final bool epubDivinaCompatible;
+
+  bool get isTextEpub => mediaProfile == 'EPUB' && !epubDivinaCompatible;
+
+  bool get isReadable =>
+      mediaStatus == 'READY' && pageCount > 0 && !isTextEpub;
 
   factory KomgaBook.fromJson(Map<String, dynamic> json) {
     final Map<String, dynamic> metadata =
@@ -189,6 +241,8 @@ class KomgaBook {
       readProgress: readProgress == null
           ? null
           : KomgaReadProgress.fromJson(readProgress),
+      numberSort: (metadata['numberSort'] as num?)?.toDouble() ?? 0,
+      epubDivinaCompatible: media['epubDivinaCompatible'] as bool? ?? false,
     );
   }
 }
@@ -199,6 +253,7 @@ class KomgaBookPage {
     this.width,
     this.height,
     required this.mediaType,
+    this.fileName = '',
   });
 
   final int number;
@@ -206,14 +261,26 @@ class KomgaBookPage {
   final int? height;
   final String mediaType;
 
+  /// Path of the page inside the book file (CBZ entry or EPUB image path).
+  final String fileName;
+
   factory KomgaBookPage.fromJson(Map<String, dynamic> json) {
     return KomgaBookPage(
       number: (json['number'] as num?)?.toInt() ?? 0,
       width: (json['width'] as num?)?.toInt(),
       height: (json['height'] as num?)?.toInt(),
       mediaType: json['mediaType'] as String? ?? '',
+      fileName: json['fileName'] as String? ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'number': number,
+    'width': width,
+    'height': height,
+    'mediaType': mediaType,
+    'fileName': fileName,
+  };
 }
 
 class KomgaPageResult<T> {
@@ -222,12 +289,14 @@ class KomgaPageResult<T> {
     required this.page,
     required this.totalPages,
     required this.isLast,
+    this.totalElements = 0,
   });
 
   final List<T> content;
   final int page;
   final int totalPages;
   final bool isLast;
+  final int totalElements;
 
   factory KomgaPageResult.fromJson(
     Map<String, dynamic> json,
@@ -246,6 +315,7 @@ class KomgaPageResult<T> {
       page: page,
       totalPages: totalPages,
       isLast: json['last'] as bool? ?? page + 1 >= totalPages,
+      totalElements: (json['totalElements'] as num?)?.toInt() ?? 0,
     );
   }
 }

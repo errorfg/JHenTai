@@ -235,6 +235,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   final String pageNoId = 'pageNoId';
   final String thumbnailNoId = 'thumbnailsId';
   final String sliderId = 'sliderId';
+  final String endOfBookId = 'endOfBookId';
 
   ReadPageState state = ReadPageState();
 
@@ -284,6 +285,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
   bool inited = false;
   bool _reachedEnd = false;
+  bool _openingSibling = false;
   Completer<void> delayInitCompleter = Completer<void>();
   late final ReadProgressFlushCoordinator _progressFlushCoordinator;
 
@@ -824,6 +826,11 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   }
 
   ReadDirection get effectiveReadDirection {
+    final ReadDirection user = _userReadDirection;
+    return state.readPageInfo.readDirectionFor?.call(user) ?? user;
+  }
+
+  ReadDirection get _userReadDirection {
     if (readSetting.enableOrientationSpecificReadDirection.isFalse ||
         !GetPlatform.isMobile) {
       return readSetting.readDirection.value;
@@ -833,6 +840,37 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     }
     return readSetting.landscapeReadDirection.value;
   }
+
+  bool get reachedEnd => _reachedEnd;
+
+  bool get hasSiblingBooks => state.readPageInfo.loadSiblingBook != null;
+
+  /// Replace this reader with the previous or next book of the series.
+  Future<void> openSiblingBook({required bool next}) async {
+    final Future<ReadPageInfo?> Function({required bool next})? load =
+        state.readPageInfo.loadSiblingBook;
+    if (load == null || _openingSibling) {
+      return;
+    }
+    _openingSibling = true;
+    update([endOfBookId, topMenuId]);
+    try {
+      final ReadPageInfo? sibling = await load(next: next);
+      if (sibling == null) {
+        toast((next ? 'noNextBook' : 'noPreviousBook').tr);
+        return;
+      }
+      offRoute(Routes.read, arguments: sibling, preventDuplicates: false);
+    } catch (e) {
+      log.error('Open sibling book failed', e);
+      toast(e.toString(), isShort: false);
+    } finally {
+      _openingSibling = false;
+      update([endOfBookId, topMenuId]);
+    }
+  }
+
+  bool get openingSibling => _openingSibling;
 
   void saveReadDirection(ReadDirection value) {
     if (readSetting.enableOrientationSpecificReadDirection.isTrue &&
@@ -1084,8 +1122,9 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   /// of the book is on screen.
   void recordReadProgress(int index, {bool reachedEnd = false}) {
     state.readPageInfo.currentImageIndex = index;
+    final bool endChanged = _reachedEnd != reachedEnd;
     _reachedEnd = reachedEnd;
-    update([sliderId, pageNoId, thumbnailNoId]);
+    update([sliderId, pageNoId, thumbnailNoId, if (endChanged) endOfBookId]);
   }
 
   int get _progressIndex => progressIndexFor(

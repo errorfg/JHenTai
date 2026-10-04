@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../setting/read_setting.dart';
 import 'gallery_image.dart';
 
 enum ReadMode { downloaded, online, archive, local, remote }
@@ -49,6 +50,14 @@ class ReadPageInfo {
   /// content source. Called after each local write.
   ReadProgressReporter? reportReadProgress;
 
+  /// Optional loader for the previous or next book of the same series;
+  /// completes with null at either end of the series.
+  Future<ReadPageInfo?> Function({required bool next})? loadSiblingBook;
+
+  /// Optional mapping from the user's read direction to the one this book
+  /// uses (for example a series that reads right to left).
+  ReadDirection Function(ReadDirection userDirection)? readDirectionFor;
+
   ReadPageInfo({
     required this.mode,
     this.gid,
@@ -62,5 +71,7 @@ class ReadPageInfo {
     this.images,
     required this.useSuperResolution,
     this.reportReadProgress,
+    this.loadSiblingBook,
+    this.readDirectionFor,
   }) : currentImageIndex = initialIndex;
 }

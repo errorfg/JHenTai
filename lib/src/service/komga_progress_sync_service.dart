@@ -8,6 +8,7 @@ import 'package:jhentai/src/database/database.dart' show LocalConfigCompanion;
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/model/komga/komga_models.dart';
 import 'package:jhentai/src/model/komga/komga_progress_state.dart';
+import 'package:jhentai/src/model/komga/komga_query.dart';
 import 'package:jhentai/src/network/komga_client.dart';
 import 'package:jhentai/src/service/jh_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
@@ -151,6 +152,49 @@ class KomgaProgressSyncService
         }
       }
     });
+  }
+
+  /// Mark one book read (last page) or unread, locally and on the server.
+  /// A failed send stays pending like any other report.
+  Future<void> markBook(
+    KomgaProgressRemote remote,
+    KomgaBook book, {
+    required bool read,
+  }) async {
+    final String key = remote.progressRecordKey(book.id);
+    await readProgressService.writeProgressValue(
+      key,
+      read ? (book.pageCount > 0 ? book.pageCount - 1 : 0).toString() : '',
+    );
+    await report(remote, book, read ? book.pageCount - 1 : 0);
+  }
+
+  /// Mark every book of a series read or unread on the server, then write
+  /// the same state locally so the follow-up reconcile only records bases.
+  /// Without the local write, books never reconciled before would count as
+  /// "only local has progress" and push their old progress back.
+  Future<void> markSeries(
+    KomgaClient client,
+    String seriesId, {
+    required bool read,
+  }) async {
+    if (read) {
+      await client.markSeriesRead(seriesId);
+    } else {
+      await client.markSeriesUnread(seriesId);
+    }
+    final List<KomgaBook> books = (await client.listBooks(
+      KomgaQuery(target: KomgaTarget.books, seriesId: seriesId),
+      page: 0,
+      size: 2000,
+    )).content;
+    await readProgressService.writeProgressValues(<String, String>{
+      for (final KomgaBook book in books)
+        client.progressRecordKey(book.id): read
+            ? (book.pageCount > 0 ? book.pageCount - 1 : 0).toString()
+            : '',
+    });
+    await reconcileBooks(client, books);
   }
 
   /// Re-check and send every pending book of [remote]'s connection. Stops at

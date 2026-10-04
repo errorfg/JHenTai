@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:get/get_utils/get_utils.dart';
 import 'package:jhentai/src/model/komga/komga_models.dart';
+import 'package:jhentai/src/model/komga/komga_query.dart';
 import 'package:jhentai/src/setting/komga_setting.dart';
 import 'package:jhentai/src/setting/network_setting.dart';
 
@@ -61,6 +62,7 @@ class KomgaClient implements KomgaProgressRemote {
   }
 
   static const int _allItemsPageSize = 200;
+  static const int defaultPageSize = 50;
 
   /// Offset paging needs a total order; Komga adds no tiebreaker itself.
   static const List<String> _readProgressSort = <String>[
@@ -75,8 +77,6 @@ class KomgaClient implements KomgaProgressRemote {
   @override
   final String connectionId;
   final Dio _dio;
-  bool _useLegacySeriesList = false;
-  bool _useLegacyBooksList = false;
 
   Map<String, String> get authHeaders {
     if (apiKey.trim().isNotEmpty) {
@@ -111,144 +111,147 @@ class KomgaClient implements KomgaProgressRemote {
         .toList();
   }
 
-  Future<KomgaPageResult<KomgaSeries>> getSeries({
-    required String libraryId,
+  Future<KomgaPageResult<KomgaSeries>> listSeries(
+    KomgaQuery query, {
     required int page,
-    int size = 40,
-    String? search,
-    String sort = 'metadata.titleSort,asc',
+    int size = defaultPageSize,
   }) async {
-    if (!_useLegacySeriesList) {
-      try {
-        final Response<dynamic> response = await _dio.post(
-          '/api/v1/series/list',
-          queryParameters: {'page': page, 'size': size, 'sort': sort},
-          data: {
-            'condition': {
-              'libraryId': {'operator': 'is', 'value': libraryId},
-            },
-            if (search != null && search.trim().isNotEmpty)
-              'fullTextSearch': search.trim(),
-          },
-        );
-        return _parsePage(response.data, KomgaSeries.fromJson);
-      } on DioException catch (e) {
-        if (!_shouldUseLegacyListEndpoint(e)) {
-          rethrow;
-        }
-        _useLegacySeriesList = true;
-      }
-    }
+    final Response<dynamic> response = await _dio.post(
+      '/api/v1/series/list',
+      queryParameters: _pageParams(page, size, query.toSortParams()),
+      data: query.toRequestBody(),
+    );
+    return _parsePage(response.data, KomgaSeries.fromJson);
+  }
 
+  Future<KomgaPageResult<KomgaBook>> listBooks(
+    KomgaQuery query, {
+    required int page,
+    int size = defaultPageSize,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      '/api/v1/books/list',
+      queryParameters: _pageParams(page, size, query.toSortParams()),
+      data: query.toRequestBody(),
+    );
+    return _parsePage(response.data, KomgaBook.fromJson);
+  }
+
+  Future<KomgaSeries> getSeries(String seriesId) async {
     final Response<dynamic> response = await _dio.get(
-      '/api/v1/series',
+      '/api/v1/series/$seriesId',
+    );
+    return KomgaSeries.fromJson((response.data as Map).cast<String, dynamic>());
+  }
+
+  /// First unread book of series with at least one book read and none in
+  /// progress.
+  Future<KomgaPageResult<KomgaBook>> onDeckBooks({
+    String? libraryId,
+    int page = 0,
+    int size = defaultPageSize,
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      '/api/v1/books/ondeck',
       queryParameters: {
-        'library_id': libraryId,
         'page': page,
         'size': size,
-        'sort': sort,
-        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+        if (libraryId != null) 'library_id': libraryId,
+      },
+    );
+    return _parsePage(response.data, KomgaBook.fromJson);
+  }
+
+  /// Series ordered by creation ([updated] false) or last modification.
+  Future<KomgaPageResult<KomgaSeries>> latestSeries({
+    required bool updated,
+    String? libraryId,
+    int page = 0,
+    int size = defaultPageSize,
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      updated ? '/api/v1/series/updated' : '/api/v1/series/new',
+      queryParameters: {
+        'page': page,
+        'size': size,
+        'deleted': false,
+        if (libraryId != null) 'library_id': libraryId,
       },
     );
     return _parsePage(response.data, KomgaSeries.fromJson);
   }
 
-  Future<List<KomgaSeries>> getAllSeries({
-    required String libraryId,
-    bool descending = true,
-  }) {
-    return _loadAllPages<KomgaSeries>(
-      (int page) => getSeries(
-        libraryId: libraryId,
-        page: page,
-        size: _allItemsPageSize,
-        sort: 'createdDate,${descending ? 'desc' : 'asc'}',
-      ),
-    );
+  /// Next or previous book of the same series by volume number; null at the
+  /// ends of the series.
+  Future<KomgaBook?> siblingBook(String bookId, {required bool next}) async {
+    try {
+      final Response<dynamic> response = await _dio.get(
+        '/api/v1/books/$bookId/${next ? 'next' : 'previous'}',
+      );
+      return KomgaBook.fromJson((response.data as Map).cast<String, dynamic>());
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return null;
+      }
+      rethrow;
+    }
   }
 
-  Future<KomgaPageResult<KomgaBook>> getBooks({
-    required String seriesId,
-    required int page,
-    int size = 40,
-    String sort = 'metadata.numberSort,asc',
-  }) async {
-    if (!_useLegacyBooksList) {
-      try {
-        final Response<dynamic> response = await _dio.post(
-          '/api/v1/books/list',
-          queryParameters: {'page': page, 'size': size, 'sort': sort},
-          data: {
-            'condition': {
-              'seriesId': {'operator': 'is', 'value': seriesId},
-            },
-          },
-        );
-        return _parsePage(response.data, KomgaBook.fromJson);
-      } on DioException catch (e) {
-        if (!_shouldUseLegacyListEndpoint(e)) {
-          rethrow;
-        }
-        _useLegacyBooksList = true;
-      }
+  Future<void> markSeriesRead(String seriesId) async {
+    await _dio.post('/api/v1/series/$seriesId/read-progress');
+  }
+
+  Future<void> markSeriesUnread(String seriesId) async {
+    await _dio.delete('/api/v1/series/$seriesId/read-progress');
+  }
+
+  /// Values available for each filter category, limited to [libraryId].
+  Future<KomgaFilterOptions> getFilterOptions({String? libraryId}) async {
+    final Map<String, dynamic> scope = <String, dynamic>{
+      if (libraryId != null) 'library_id': libraryId,
+    };
+    Future<List<String>> strings(String path) async {
+      final Response<dynamic> response = await _dio.get(
+        path,
+        queryParameters: scope,
+      );
+      return (response.data as List<dynamic>).whereType<String>().toList()
+        ..sort();
     }
 
-    final Response<dynamic> response = await _dio.get(
-      '/api/v1/series/$seriesId/books',
-      queryParameters: {'page': page, 'size': size, 'sort': sort},
+    final Response<dynamic> authors = await _dio.get(
+      '/api/v2/authors',
+      queryParameters: <String, dynamic>{...scope, 'unpaged': true},
     );
-    return _parsePage(response.data, KomgaBook.fromJson);
+    final List<String> authorNames =
+        ((authors.data as Map)['content'] as List<dynamic>)
+            .map((dynamic a) => (a as Map)['name'] as String? ?? '')
+            .where((String name) => name.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    return KomgaFilterOptions(
+      authors: authorNames,
+      publishers: await strings('/api/v1/publishers'),
+      languages: await strings('/api/v1/languages'),
+      tags: await strings('/api/v1/tags'),
+      genres: await strings('/api/v1/genres'),
+    );
   }
 
-  Future<KomgaPageResult<KomgaBook>> getLibraryBooks({
-    required String libraryId,
-    required int page,
-    int size = 40,
-    String sort = 'createdDate,desc',
+  /// Download the original book file. Requires the FILE_DOWNLOAD role.
+  Future<void> downloadBookFile(
+    String bookId,
+    String savePath, {
+    ProgressCallback? onReceiveProgress,
+    CancelToken? cancelToken,
   }) async {
-    if (!_useLegacyBooksList) {
-      try {
-        final Response<dynamic> response = await _dio.post(
-          '/api/v1/books/list',
-          queryParameters: {'page': page, 'size': size, 'sort': sort},
-          data: {
-            'condition': {
-              'libraryId': {'operator': 'is', 'value': libraryId},
-            },
-          },
-        );
-        return _parsePage(response.data, KomgaBook.fromJson);
-      } on DioException catch (e) {
-        if (!_shouldUseLegacyListEndpoint(e)) {
-          rethrow;
-        }
-        _useLegacyBooksList = true;
-      }
-    }
-
-    final Response<dynamic> response = await _dio.get(
-      '/api/v1/books',
-      queryParameters: {
-        'library_id': libraryId,
-        'page': page,
-        'size': size,
-        'sort': sort,
-      },
-    );
-    return _parsePage(response.data, KomgaBook.fromJson);
-  }
-
-  Future<List<KomgaBook>> getAllBooks({
-    required String libraryId,
-    bool descending = true,
-  }) {
-    return _loadAllPages<KomgaBook>(
-      (int page) => getLibraryBooks(
-        libraryId: libraryId,
-        page: page,
-        size: _allItemsPageSize,
-        sort: 'createdDate,${descending ? 'desc' : 'asc'}',
-      ),
+    await _dio.download(
+      '/api/v1/books/$bookId/file',
+      savePath,
+      onReceiveProgress: onReceiveProgress,
+      cancelToken: cancelToken,
+      options: Options(receiveTimeout: Duration.zero),
     );
   }
 
@@ -263,37 +266,13 @@ class KomgaClient implements KomgaProgressRemote {
     required int page,
     required int size,
   }) async {
-    if (!_useLegacyBooksList) {
-      try {
-        final Response<dynamic> response = await _dio.post(
-          '/api/v1/books/list',
-          queryParameters: {
-            'page': page,
-            'size': size,
-            'sort': _readProgressSort,
-          },
-          data: {
-            'condition': {
-              'readStatus': {'operator': 'isNot', 'value': 'UNREAD'},
-            },
-          },
-        );
-        return _parsePage(response.data, KomgaBook.fromJson);
-      } on DioException catch (e) {
-        if (!_shouldUseLegacyListEndpoint(e)) {
-          rethrow;
-        }
-        _useLegacyBooksList = true;
-      }
-    }
-
-    final Response<dynamic> response = await _dio.get(
-      '/api/v1/books',
-      queryParameters: {
-        'read_status': const <String>['READ', 'IN_PROGRESS'],
-        'page': page,
-        'size': size,
-        'sort': _readProgressSort,
+    final Response<dynamic> response = await _dio.post(
+      '/api/v1/books/list',
+      queryParameters: _pageParams(page, size, _readProgressSort),
+      data: {
+        'condition': {
+          'readStatus': {'operator': 'isNot', 'value': 'UNREAD'},
+        },
       },
     );
     return _parsePage(response.data, KomgaBook.fromJson);
@@ -301,8 +280,26 @@ class KomgaClient implements KomgaProgressRemote {
 
   @override
   Future<KomgaBook> getBook(String bookId) async {
+    return KomgaBook.fromJson(await getBookJson(bookId));
+  }
+
+  Future<Map<String, dynamic>> getBookJson(String bookId) async {
     final Response<dynamic> response = await _dio.get('/api/v1/books/$bookId');
-    return KomgaBook.fromJson((response.data as Map).cast<String, dynamic>());
+    return (response.data as Map).cast<String, dynamic>();
+  }
+
+  /// Save one page image as served to the reader (converted to PNG when
+  /// Flutter cannot decode the original format).
+  Future<void> downloadPageImage(
+    String bookId,
+    KomgaBookPage page,
+    String savePath,
+  ) async {
+    await _dio.download(
+      bookPageUrl(bookId, page.number, mediaType: page.mediaType),
+      savePath,
+      options: Options(headers: const <String, String>{'Accept': 'image/*'}),
+    );
   }
 
   Future<List<KomgaBookPage>> getBookPages(String bookId) async {
@@ -338,13 +335,37 @@ class KomgaClient implements KomgaProgressRemote {
     return '$serverUrl/api/v1/books/$bookId/thumbnail';
   }
 
-  String bookPageUrl(String bookId, int pageNumber) {
+  /// Formats Flutter decodes on every platform; other page images are
+  /// converted to PNG by the server.
+  static bool isDecodableMediaType(String mediaType) =>
+      _decodableMediaTypes.contains(mediaType);
+
+  static const Set<String> _decodableMediaTypes = <String>{
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/bmp',
+  };
+
+  String bookPageUrl(String bookId, int pageNumber, {String mediaType = ''}) {
     final Uri uri = Uri.parse(
       '$serverUrl/api/v1/books/$bookId/pages/$pageNumber',
     );
     return uri
-        .replace(queryParameters: const {'contentNegotiation': 'false'})
+        .replace(
+          queryParameters: <String, String>{
+            'contentNegotiation': 'false',
+            if (mediaType.isNotEmpty && !_decodableMediaTypes.contains(mediaType))
+              'convert': 'png',
+          },
+        )
         .toString();
+  }
+
+  /// Page thumbnail, resized by Komga to 300px on the longest side.
+  String bookPageThumbnailUrl(String bookId, int pageNumber) {
+    return '$serverUrl/api/v1/books/$bookId/pages/$pageNumber/thumbnail';
   }
 
   static String friendlyError(Object error) {
@@ -398,10 +419,15 @@ class KomgaClient implements KomgaProgressRemote {
     );
   }
 
-  static bool _shouldUseLegacyListEndpoint(DioException error) {
-    return error.response?.statusCode == 404 ||
-        error.response?.statusCode == 405;
-  }
+  static Map<String, dynamic> _pageParams(
+    int page,
+    int size,
+    List<String> sort,
+  ) => <String, dynamic>{
+    'page': page,
+    'size': size,
+    if (sort.isNotEmpty) 'sort': sort,
+  };
 
   static KomgaPageResult<T> _parsePage<T>(
     dynamic data,
