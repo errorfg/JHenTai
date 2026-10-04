@@ -129,15 +129,19 @@ class LogService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     if (await Directory(logDirPath!).exists()) {
       await Directory(logDirPath!).delete(recursive: true);
     }
+    _logDirReady = null;
   }
 
-  Future<void> _initLogDir() async {
-    if (logDirPath == null) {
-      logDirPath = path.join(pathService.getVisibleDir().path, 'logs');
-      if (!await Directory(logDirPath!).exists()) {
-        await Directory(logDirPath!).create();
-      }
-    }
+  Future<void>? _logDirReady;
+
+  /// Concurrent first log calls share one directory creation; otherwise a
+  /// second call could open a log file before the directory exists.
+  Future<void> _initLogDir() {
+    return _logDirReady ??= () async {
+      final String dir = path.join(pathService.getVisibleDir().path, 'logs');
+      await Directory(dir).create(recursive: true);
+      logDirPath = dir;
+    }();
   }
 
   Future<void> _initLogger() async {

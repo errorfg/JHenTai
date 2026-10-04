@@ -34,6 +34,10 @@ class PathService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       getExternalStorageDirectory().then((value) => externalStorageDir = value).catchError((error) => null),
       getDownloadsDirectory().then((value) => systemDownloadDir = value).catchError((error) => null),
     ]);
+    // On a fresh macOS install the temporary directory (Caches/<bundle id>)
+    // does not exist yet, and the image cache, temp downloads and cache
+    // cleanup all create or list folders inside it.
+    await tempDir.create(recursive: true);
   }
 
   @override
