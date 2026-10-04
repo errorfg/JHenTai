@@ -35,6 +35,7 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - incremental oplog sync for history and read progress: routine syncs transfer only changes, immune to concurrent-device overwrites and clock skew.
   - Komga server configuration and credentials included in config sync for automatic cross-device setup.
   - `nhentai` API key included in config sync, with automatic migration from the legacy EH setting payload.
+  - config sync keeps remote entries it does not understand (written by newer versions) and the types it is not syncing, and aborts instead of uploading when the remote file cannot be read.
 - Gallery and search UX:
   - multi-tag selection in detail page.
   - client-side filters for Popular and Ranklist pages.
@@ -48,13 +49,17 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - three-way EH/NH/WN search toggle and `wn:` keyword-prefix support.
   - EH/NH/WN favorites support both mixed insertion and split display with menu switching.
   - wnacg URL link jumping with automatic domain rewriting.
+  - "Send to Telegraph bot" button on E-Hentai/ExHentai/`nhentai` details, posting the gallery to a self-hosted eh2telegraph service; its address and token are included in config sync.
 - Foldable device support:
   - global floating button to toggle between portrait and landscape orientation (mobile layout only).
 - Local library & downloads:
   - archive preview page for browsing images inside downloaded archives.
   - switchable JHenTai, Komga, and PDF reading sources with a shared reader.
   - dedicated PDF library for scanned local PDF files (including Windows rendering via pdfx).
-  - Komga library/series/book browsing with local progress states, new-content filtering, added/read/title sorting, card/list/detail layouts, and one-way progress reporting.
+  - Komga browsing with server-side paging, sorting and filters, full-text search, a home page (continue reading, on deck, recently added/updated series, downloads), series details with clickable metadata, and card/list/detail layouts.
+  - two-way Komga read-progress sync that tolerates clock skew between devices and the server, with retry of failed reports; mark books or whole series read/unread.
+  - Komga reader integration: previous/next book, the series reading direction, page thumbnails, and PNG conversion for formats Flutter cannot decode.
+  - offline Komga downloads of single books or whole series, readable without the server, with progress reported once back online.
   - Komga source pages reuse the complete JHenTai navigation drawer and consistent light/dark app surfaces.
 - Framework:
   - Flutter upgraded to 3.44.4, fixing dialogs auto-dismissing on iPadOS 26.1+ (flutter/flutter#177992).
