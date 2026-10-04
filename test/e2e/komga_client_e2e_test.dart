@@ -348,6 +348,81 @@ void main() {
     }
   });
 
+  test('a rejected password yields the credentials hint', () async {
+    final KomgaClient wrongPassword = KomgaClient(
+      serverUrl: komga.serverUrl,
+      username: LocalKomga.email,
+      password: 'not-the-password',
+      apiKey: '',
+      connectionId: 'e2e',
+    );
+    try {
+      await wrongPassword.getLibraries();
+      fail('expected 401');
+    } on DioException catch (e) {
+      expect(e.response?.statusCode, 401);
+      expect(KomgaClient.friendlyError(e), 'komgaAuthFailed');
+    }
+  });
+
+  test('an account without the download role gets the permission hint', () async {
+    const String email = 'reader-only@example.com';
+    const String password = 'reader-password';
+    await komga.api(
+      'POST',
+      '/api/v2/users',
+      body: <String, dynamic>{
+        'email': email,
+        'password': password,
+        'roles': <String>['PAGE_STREAMING'],
+      },
+    );
+    final KomgaClient reader = KomgaClient(
+      serverUrl: komga.serverUrl,
+      username: email,
+      password: password,
+      apiKey: '',
+      connectionId: 'e2e-reader',
+    );
+    final KomgaBook book = (await volumes(TestLibrary.alpha)).first;
+    // The role only gates the file: this account still sees the book.
+    expect((await reader.getBookPages(book.id)), isNotEmpty);
+
+    final Directory dir = await Directory.systemTemp.createTemp('komga-403-');
+    try {
+      await reader.downloadBookFile(book.id, '${dir.path}/book.cbz');
+      fail('expected 403');
+    } on DioException catch (e) {
+      expect(e.response?.statusCode, 403);
+      expect(KomgaClient.friendlyError(e), 'komgaForbidden');
+    } finally {
+      await dir.delete(recursive: true);
+    }
+  });
+
+  test('a server that refuses the connection yields the network hint', () async {
+    final ServerSocket closed = await ServerSocket.bind(
+      InternetAddress.loopbackIPv4,
+      0,
+    );
+    final int port = closed.port;
+    await closed.close();
+    final KomgaClient unreachable = KomgaClient(
+      serverUrl: 'http://127.0.0.1:$port',
+      username: '',
+      password: '',
+      apiKey: komga.apiKey,
+      connectionId: 'e2e-unreachable',
+    );
+    try {
+      await unreachable.getLibraries();
+      fail('expected a connection error');
+    } on DioException catch (e) {
+      expect(e.response, isNull);
+      expect(KomgaClient.friendlyError(e), 'komgaConnectionFailed');
+    }
+  });
+
   // Runs last: removes a file from the library.
   test('books deleted from disk are excluded from lists', () async {
     final String betaId = (await seriesNamed(TestLibrary.beta)).id;

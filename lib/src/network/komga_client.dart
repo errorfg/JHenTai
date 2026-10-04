@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
@@ -372,21 +373,48 @@ class KomgaClient implements KomgaProgressRemote {
     if (error is FormatException) {
       return error.message;
     }
-    if (error is DioException) {
-      final int? statusCode = error.response?.statusCode;
-      if (statusCode == 401 &&
-          error.requestOptions.headers.containsKey('X-API-Key')) {
-        return 'komgaApiKeyRejected'.tr;
-      }
-      if (statusCode == 401 || statusCode == 403) {
-        return 'Komga authentication failed ($statusCode)';
-      }
-      if (statusCode != null) {
-        return 'Komga request failed (HTTP $statusCode)';
-      }
-      return error.message ?? error.type.name;
+    if (error is! DioException) {
+      return 'komgaRequestError'.trParams(<String, String>{
+        'detail': error.toString(),
+      });
     }
-    return error.toString();
+    final int? statusCode = error.response?.statusCode;
+    if (statusCode == 401 &&
+        error.requestOptions.headers.containsKey('X-API-Key')) {
+      return 'komgaApiKeyRejected'.tr;
+    }
+    if (statusCode == 401) {
+      return 'komgaAuthFailed'.tr;
+    }
+    // Komga answers 403 when the account lacks a role, such as
+    // FILE_DOWNLOAD for book files or PAGE_STREAMING for pages.
+    if (statusCode == 403) {
+      return 'komgaForbidden'.tr;
+    }
+    if (statusCode != null) {
+      return 'komgaRequestFailed'.trParams(<String, String>{
+        'code': '$statusCode',
+      });
+    }
+    final Object? cause = error.error;
+    // A failed TLS handshake is not a SocketException, so Dio reports it
+    // as an unknown error.
+    if (error.type == DioExceptionType.badCertificate ||
+        cause is TlsException) {
+      return 'komgaSecureConnectionFailed'.tr;
+    }
+    if (const <DioExceptionType>{
+          DioExceptionType.connectionError,
+          DioExceptionType.connectionTimeout,
+          DioExceptionType.sendTimeout,
+          DioExceptionType.receiveTimeout,
+        }.contains(error.type) ||
+        cause is SocketException) {
+      return 'komgaConnectionFailed'.tr;
+    }
+    return 'komgaRequestError'.trParams(<String, String>{
+      'detail': error.message ?? cause?.toString() ?? error.type.name,
+    });
   }
 
   static String _validateServerUrl(String rawUrl) {
@@ -395,9 +423,7 @@ class KomgaClient implements KomgaProgressRemote {
     if (uri == null ||
         (uri.scheme != 'http' && uri.scheme != 'https') ||
         uri.host.isEmpty) {
-      throw const FormatException(
-        'Komga server URL must start with http:// or https://',
-      );
+      throw FormatException('invalidKomgaServerUrl'.tr);
     }
     return normalized;
   }
