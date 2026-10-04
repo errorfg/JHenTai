@@ -131,6 +131,26 @@ void main() {
       await controller.markSeries(series, read: false);
     });
 
+    test('a library list refreshes the counts of a series read elsewhere in the app', () async {
+      await controller.openLibrary(controller.home.libraries.single);
+      final KomgaListLevel library = controller.current as KomgaListLevel;
+      KomgaSeries listed() => library.loader.items
+          .whereType<KomgaSeries>()
+          .singleWhere((KomgaSeries s) => s.title == TestLibrary.alpha);
+      expect(listed().booksInProgressCount, 0);
+
+      await readProgressService.updateReadProgress(client.progressRecordKey(alpha[3].id), 1);
+      await komgaProgressSyncService.report(client, alpha[3], 1);
+
+      final DateTime deadline = DateTime.now().add(const Duration(seconds: 5));
+      while (listed().booksInProgressCount == 0 && DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      expect(listed().booksInProgressCount, 1);
+
+      await controller.markSeries(listed(), read: false);
+    });
+
     test('filters and search open their own levels; back restores the previous one', () async {
       await controller.openLibrary(controller.home.libraries.single);
       final KomgaListLevel library = controller.current as KomgaListLevel;
@@ -276,7 +296,13 @@ void main() {
       final ReadPageInfo info = await offline.prepare(alpha[0]);
       expect(info.mode, ReadMode.local);
       expect(info.images!.every((dynamic image) => File(image.path as String).existsSync()), isTrue);
-      expect(info.readDirectionFor, isNull, reason: 'single downloads do not record the series direction');
+      // The series reads right to left; the download recorded it, so the
+      // direction applies offline too.
+      expect(
+        komgaDownloadService.downloaded(client.progressRecordKey(alpha[0].id))!.readingDirection,
+        'RIGHT_TO_LEFT',
+      );
+      expect(info.readDirectionFor!(ReadDirection.left2rightSinglePage), ReadDirection.right2leftSinglePage);
 
       final ReadPageInfo next = (await info.loadSiblingBook!(next: true))!;
       expect(next.mode, ReadMode.local);

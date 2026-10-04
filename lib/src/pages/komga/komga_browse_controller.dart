@@ -451,6 +451,26 @@ class KomgaBrowseController extends ChangeNotifier {
     _notify();
   }
 
+  /// Replace listed series whose server counts changed, in place, so a list
+  /// returned to shows current counts without reloading.
+  Future<void> _refreshListedSeries(
+    KomgaListLevel level,
+    Set<String> changed,
+  ) async {
+    final List<Object> items = level.loader.items;
+    for (int i = 0; i < items.length; i++) {
+      final Object item = items[i];
+      if (item is KomgaSeries && changed.contains(item.id)) {
+        try {
+          items[i] = await client.getSeries(item.id);
+        } catch (e) {
+          log.warning('Komga series refresh failed', e);
+        }
+      }
+    }
+    _notify();
+  }
+
   /// JHenTai changed server progress (a reader report, a mark): refresh the
   /// server-side counts shown for those series. Reports often land after the
   /// reader has closed, so this cannot rely on the return from the reader.
@@ -472,6 +492,9 @@ class KomgaBrowseController extends ChangeNotifier {
     for (final KomgaLevel level in List<KomgaLevel>.of(stack)) {
       if (level is KomgaSeriesLevel && changed.contains(level.series.id)) {
         await _refreshSeriesHeader(level);
+      }
+      if (level is KomgaListLevel) {
+        await _refreshListedSeries(level, changed);
       }
     }
     if (current is KomgaHomeLevel) {

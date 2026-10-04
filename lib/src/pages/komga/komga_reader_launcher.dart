@@ -65,7 +65,7 @@ class KomgaReaderLauncher {
       client.progressRecordKey(book.id),
     );
     if (downloaded != null) {
-      return _prepareDownloaded(downloaded);
+      return _prepareDownloaded(downloaded, seriesReadingDirection);
     }
     if (book.isTextEpub) {
       throw KomgaOpenException('komgaBookTextEpub'.tr);
@@ -99,7 +99,16 @@ class KomgaReaderLauncher {
     );
   }
 
-  Future<ReadPageInfo> _prepareDownloaded(KomgaDownloadedBook downloaded) async {
+  Future<ReadPageInfo> _prepareDownloaded(
+    KomgaDownloadedBook downloaded,
+    String? seriesReadingDirection,
+  ) async {
+    // Downloads made before the direction was recorded have none; ask the
+    // server when it is reachable.
+    final String direction = downloaded.readingDirection.isNotEmpty
+        ? downloaded.readingDirection
+        : seriesReadingDirection ??
+              await _seriesDirection(downloaded.book.seriesId);
     // Reconciles with the server when it is reachable, local progress
     // otherwise.
     final int start = await komgaProgressSyncService.reconcileBeforeOpen(
@@ -120,7 +129,7 @@ class KomgaReaderLauncher {
       mode: ReadMode.local,
       images: images,
       initialIndex: start.clamp(0, images.length - 1),
-      direction: downloaded.readingDirection,
+      direction: direction,
     );
   }
 

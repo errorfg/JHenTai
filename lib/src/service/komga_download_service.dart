@@ -249,6 +249,17 @@ class KomgaDownloadService extends ChangeNotifier
       throw StateError('Book has no image pages');
     }
     final Map<String, dynamic> bookJson = await client.getBookJson(book.id);
+    // Offline reading needs the series direction; single-book downloads from
+    // a book list do not know it.
+    String readingDirection = task.readingDirection;
+    if (readingDirection.isEmpty) {
+      try {
+        readingDirection = (await client.getSeries(book.seriesId))
+            .readingDirection;
+      } catch (e) {
+        log.warning('Komga series direction lookup failed', e);
+      }
+    }
 
     final Directory dir = _bookDir(client.connectionId, book.id);
     if (await dir.exists()) {
@@ -295,7 +306,7 @@ class KomgaDownloadService extends ChangeNotifier
       connectionId: client.connectionId,
       book: KomgaBook.fromJson(bookJson),
       bookJson: bookJson,
-      readingDirection: task.readingDirection,
+      readingDirection: readingDirection,
       imagePaths: images,
       downloadedAt: DateTime.now(),
     );

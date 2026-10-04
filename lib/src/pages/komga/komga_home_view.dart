@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/model/komga/komga_browse_models.dart';
@@ -128,13 +129,14 @@ class _KomgaHomeViewState extends State<KomgaHomeView> {
         _heading(context, title),
         SizedBox(
           height: 300,
+          // A plain mouse has no horizontal wheel; let it drag the shelf.
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             itemCount: count,
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: builder,
-          ),
+          ).withMouseDrag(context),
         ),
       ],
     );
@@ -162,6 +164,20 @@ class _KomgaHomeViewState extends State<KomgaHomeView> {
       ),
     );
   }
+}
+
+extension on Widget {
+  Widget withMouseDrag(BuildContext context) => ScrollConfiguration(
+    behavior: ScrollConfiguration.of(context).copyWith(
+      dragDevices: <PointerDeviceKind>{
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      },
+    ),
+    child: this,
+  );
 }
 
 /// Books stored on this device, readable without the server.
