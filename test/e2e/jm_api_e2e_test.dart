@@ -1,3 +1,7 @@
+// Live requests to a third-party server whose response times vary widely.
+@Timeout(Duration(minutes: 3))
+library;
+
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';

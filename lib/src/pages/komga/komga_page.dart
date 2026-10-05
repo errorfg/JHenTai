@@ -5,7 +5,7 @@ import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/model/komga/komga_models.dart';
 import 'package:jhentai/src/model/read_page_info.dart';
-import 'package:jhentai/src/model/reader_source.dart';
+import 'package:jhentai/src/model/content_scheme.dart';
 import 'package:jhentai/src/model/tab_bar_icon.dart';
 import 'package:jhentai/src/network/komga_client.dart';
 import 'package:jhentai/src/pages/komga/komga_browse_controller.dart';
@@ -127,7 +127,7 @@ class _KomgaPageState extends State<KomgaPage> {
         backgroundColor: UIConfig.backGroundColor(context),
         drawer: MobileLeftDrawer(
           state: _drawerState,
-          currentSource: ReaderSourceType.komga,
+          currentScheme: ContentScheme.komga,
           onBeforeSwitch: _prepareSourceSwitch,
           onDestinationSelected: _openJhentaiDestination,
           showSelectedDestination: false,

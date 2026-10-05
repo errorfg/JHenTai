@@ -59,6 +59,7 @@ import '../pages/setting/advanced/loglist/log/log_page.dart';
 import '../pages/setting/advanced/loglist/log_list_page.dart';
 import '../pages/setting/advanced/nhentai_domains/nhentai_domains_page.dart';
 import '../pages/setting/advanced/jm/jm_setting_page.dart';
+import '../pages/jm/jm_list_page.dart';
 import '../pages/setting/advanced/eh2telegraph/eh2telegraph_page.dart';
 import '../pages/setting/advanced/super_resolution/setting_super_resolution_page.dart';
 import '../pages/setting/download/archive_bot/archive_bot_settings_page.dart';
@@ -145,6 +146,7 @@ class Routes {
   static const String nhentaiDomains = "/setting_advanced/nhentaiDomains";
   static const String eh2telegraph = "/setting_advanced/eh2telegraph";
   static const String jmSetting = "/setting_advanced/jmSetting";
+  static const String jmList = "/jmList";
   static const String logList = "/setting_advanced/logList";
   static const String log = "/setting_advanced/logList/log";
 
@@ -516,6 +518,12 @@ class Routes {
           const Eh2TelegraphPage().withEscOrFifthButton2BackRightRoute(),
       transition: defaultTransition,
       offAllBefore: false,
+    ),
+    EHPage(
+      name: jmList,
+      page: () => JmListPage(),
+      transition: defaultTransition,
+      side: Side.left,
     ),
     EHPage(
       name: jmSetting,

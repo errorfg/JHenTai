@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/model/read_page_info.dart';
-import 'package:jhentai/src/model/reader_source.dart';
+import 'package:jhentai/src/model/content_scheme.dart';
 import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/service/pdf_service.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
@@ -11,7 +11,7 @@ import 'package:jhentai/src/utils/route_util.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
 import 'package:jhentai/src/widget/eh_image.dart';
 import 'package:jhentai/src/widget/loading_state_indicator.dart';
-import 'package:jhentai/src/widget/reader_source_switcher.dart';
+import 'package:jhentai/src/widget/scheme_header.dart';
 
 class PdfLibraryPage extends StatefulWidget {
   const PdfLibraryPage({super.key});
@@ -35,7 +35,7 @@ class _PdfLibraryPageState extends State<PdfLibraryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: const ReaderSourceDrawer(currentSource: ReaderSourceType.pdf),
+      drawer: const SchemeDrawer(current: ContentScheme.pdf),
       appBar: AppBar(
         title: Text('pdfLibrary'.tr),
         actions: [

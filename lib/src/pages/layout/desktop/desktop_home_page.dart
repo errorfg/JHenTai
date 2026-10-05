@@ -19,6 +19,8 @@ class DesktopHomePage extends StatelessWidget {
         children: state.icons
             .where((icon) => icon.shouldRender)
             .mapIndexed((index, icon) => Offstage(
+                  // Pages of two schemes may share a type; keep their states apart.
+                  key: ValueKey<String>(icon.routeName),
                   offstage: state.selectedTabOrder != index,
                   child: icon.page.call(),
                 ))

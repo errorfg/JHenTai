@@ -1,17 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
-import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/pages/setting/account/login/login_page_state.dart';
-import 'package:jhentai/src/service/sync_service.dart';
-import 'package:jhentai/src/setting/jm_setting.dart';
-import 'package:jhentai/src/setting/nhentai_api_setting.dart';
-import 'package:jhentai/src/setting/sync_setting.dart';
-import 'package:jhentai/src/setting/user_setting.dart';
+import 'package:jhentai/src/utils/account_util.dart';
 import '../../../routes/routes.dart';
 import '../../../utils/route_util.dart';
-import '../../../network/eh_request.dart';
 import '../../../widget/eh_alert_dialog.dart';
 
 /// Accounts of every site: one login entry, whose page picks the site, and
@@ -25,37 +19,15 @@ class SettingAccountPage extends StatelessWidget {
       appBar: AppBar(centerTitle: true, title: Text('accountSetting'.tr)),
       body: Obx(
         () {
-          bool ehLoggedIn = userSetting.hasLoggedIn();
-          bool nhLoggedIn = nhentaiApiSetting.apiKey.value.isNotEmpty;
-          bool jmLoggedIn = jmSetting.hasLoggedIn;
-
           return ListView(
             padding: const EdgeInsets.only(top: 12),
             children: [
-              if (!ehLoggedIn || !nhLoggedIn || !jmLoggedIn) _buildLogin().marginOnly(bottom: 12),
-              if (ehLoggedIn) ...[
-                _buildAccount(
-                  context,
-                  site: LoginSite.eh,
-                  subtitle: '${'youHaveLoggedInAs'.tr}${userSetting.nickName.value ?? userSetting.userName.value!}',
-                  onLogout: ehRequest.requestLogout,
-                ),
-                _buildCookiePage(),
-              ],
-              if (nhLoggedIn)
-                _buildAccount(
-                  context,
-                  site: LoginSite.nh,
-                  subtitle: '${'nhentaiApiKey'.tr} · ${'nhentaiApiKeyConfigured'.tr}',
-                  onLogout: _logoutNhentai,
-                ),
-              if (jmLoggedIn)
-                _buildAccount(
-                  context,
-                  site: LoginSite.jm,
-                  subtitle: '${'youHaveLoggedInAs'.tr}${jmSetting.userName.value}',
-                  onLogout: jmSetting.clearAccount,
-                ),
+              if (LoginSite.values.any((LoginSite site) => !isLoggedIn(site))) _buildLogin().marginOnly(bottom: 12),
+              for (final LoginSite site in LoginSite.values)
+                if (isLoggedIn(site)) ...[
+                  _buildAccount(context, site: site, subtitle: accountLabel(site)!),
+                  if (site == LoginSite.eh) _buildCookiePage(),
+                ],
             ],
           ).withListTileTheme(context);
         },
@@ -75,12 +47,11 @@ class SettingAccountPage extends StatelessWidget {
     BuildContext context, {
     required LoginSite site,
     required String subtitle,
-    required Future<void> Function() onLogout,
   }) {
     Future<void> confirmLogout() async {
       bool? result = await Get.dialog(EHDialog(title: '${'logout'.tr} ${site.title}?'));
       if (result == true) {
-        await onLogout();
+        await logout(site);
       }
     }
 
@@ -102,13 +73,5 @@ class SettingAccountPage extends StatelessWidget {
       trailing: const Icon(Icons.keyboard_arrow_right),
       onTap: () => toRoute(Routes.cookie),
     );
-  }
-
-  /// The nhentai account is the API key, which is cloud-synced.
-  Future<void> _logoutNhentai() async {
-    await nhentaiApiSetting.saveApiKey('');
-    if (syncSetting.enableSync.value && syncSetting.autoSync.value) {
-      await syncService.syncAfterLocalChange(types: const [CloudConfigTypeEnum.nhentaiApiSetting]);
-    }
   }
 }

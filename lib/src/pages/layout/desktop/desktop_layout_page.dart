@@ -10,6 +10,7 @@ import '../../../routes/routes.dart';
 import '../../../service/windows_service.dart';
 import '../../../setting/preference_setting.dart';
 import '../../blank_page.dart';
+import '../../../widget/scheme_header.dart';
 import 'desktop_layout_page_logic.dart';
 
 class DesktopLayoutPage extends StatelessWidget {
@@ -41,6 +42,10 @@ class DesktopLayoutPage extends StatelessWidget {
           id: logic.tabBarId,
           builder: (_) => Column(
             children: [
+              const SizedBox(
+                height: UIConfig.desktopLeftTabBarItemHeight,
+                child: Center(child: SchemeMenuButton()),
+              ),
               Expanded(
                 child: ScrollConfiguration(
                   behavior: UIConfig.scrollBehaviourWithoutScrollBarWithMouse,

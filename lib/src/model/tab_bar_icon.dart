@@ -11,6 +11,10 @@ enum TabBarIconNameEnum {
   download,
   setting,
   readerSource,
+
+  /// Appended only: [PreferenceSetting.defaultTab] is stored by index.
+  browse,
+  weekly,
 }
 
 class TabBarIcon {

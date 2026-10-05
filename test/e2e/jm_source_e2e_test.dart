@@ -1,3 +1,7 @@
+// Live requests to a third-party server whose response times vary widely.
+@Timeout(Duration(minutes: 3))
+library;
+
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -143,6 +147,63 @@ void main() {
     expect(restored.height, stored.height);
   });
 
+  test('home sections list comics and their lists page on', () async {
+    final List<JmHomeSection> sections = await source.home();
+    expect(sections, isNotEmpty);
+    expect(sections.every((JmHomeSection s) => s.title.isNotEmpty && s.gallerys.isNotEmpty), isTrue);
+    expect(sections.expand((JmHomeSection s) => s.gallerys).every((Gallery g) => g.galleryUrl.isJM), isTrue);
+
+    final JmHomeSection curated = sections.firstWhere((JmHomeSection s) => s.more is JmPromoteQuery);
+    final GalleryPageInfo first = await source.list(curated.more!);
+    expect(first.gallerys, isNotEmpty);
+    expect(first.prevGid, isNull);
+    expect(first.nextGid, '1');
+    final GalleryPageInfo second = await source.list(curated.more!, pageToken: first.nextGid);
+    expect(second.prevGid, '0');
+    expect(
+      second.gallerys.map((Gallery g) => g.gid).toSet().intersection(first.gallerys.map((Gallery g) => g.gid).toSet()),
+      isEmpty,
+    );
+
+    // Sections of one category open that category, newest first.
+    final JmHomeSection? byCategory = sections.where((JmHomeSection s) => s.more is JmFilterQuery).firstOrNull;
+    if (byCategory != null) {
+      expect((await source.list(byCategory.more!)).gallerys, isNotEmpty);
+    }
+  });
+
+  test('categories browse and rank', () async {
+    final JmCategories categories = await source.categoryList();
+    expect(categories.categories.where((JmCategory c) => c.slug.isNotEmpty), isNotEmpty);
+    expect(categories.blocks.expand((JmTagBlock b) => b.tags), isNotEmpty);
+
+    final JmCategory hanman = categories.categories.firstWhere((JmCategory c) => c.slug == 'hanman');
+    final GalleryPageInfo newest = await source.list(JmFilterQuery(category: hanman.slug));
+    expect(newest.gallerys, isNotEmpty);
+    expect(newest.nextGid, '2');
+
+    // A weekly ranking is short and has a single page.
+    final GalleryPageInfo weekly = await source.list(const JmFilterQuery(order: 'mv', period: 'w'));
+    expect(weekly.gallerys, isNotEmpty);
+    expect(weekly.gallerys.length, lessThanOrEqualTo(JmApi.searchPageSize));
+    final GalleryPageInfo liked = await source.list(const JmFilterQuery(order: 'tf', period: 'm'));
+    expect(liked.gallerys, isNotEmpty);
+  });
+
+  test('weekly picks and hot tags', () async {
+    final JmWeeks weeks = await source.weeks();
+    expect(weeks.issues, isNotEmpty);
+    expect(weeks.issues.first.title, isNotEmpty);
+    expect(weeks.types.map((({String id, String title}) t) => t.id), contains('hanman'));
+    final GalleryPageInfo picks = await source.list(JmWeekQuery(issueId: weeks.issues.first.id, type: weeks.types.first.id));
+    expect(picks.gallerys, isNotEmpty);
+    expect(picks.nextGid, isNull);
+
+    expect(await source.hotTags(), isNotEmpty);
+    // Asked once per run.
+    expect(identical(source.weeks(), source.weeks()), isTrue);
+  });
+
   test('concurrent first requests for a chapter share one request each', () async {
     final Map<String, int> requests = <String, int>{};
     final Dio counting = Dio(dio.options)
@@ -169,12 +230,12 @@ void main() {
       ),
     ]);
 
-    expect(requests, <String, int>{
-      '/setting': 1,
-      '/chapter': 1,
-      '/album': 1,
-      '/chapter_view_template': 1,
-    });
+    expect(requests['/chapter'], 1);
+    expect(requests['/album'], 1);
+    expect(requests['/chapter_view_template'], 1);
+    // One session start; a domain answering with a server error moves it
+    // on to the next domain.
+    expect(requests['/setting'], inInclusiveRange(1, domains.length));
   });
 
   test('chapters of a multi-chapter album are galleries of their own', () async {

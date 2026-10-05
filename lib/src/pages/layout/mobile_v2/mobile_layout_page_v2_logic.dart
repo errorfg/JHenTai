@@ -7,6 +7,7 @@ import 'package:jhentai/src/utils/route_util.dart';
 
 import '../../../mixin/double_tap_to_refresh_logic_mixin.dart';
 import '../../../setting/preference_setting.dart';
+import '../../../setting/scheme_setting.dart';
 
 class MobileLayoutPageV2Logic extends GetxController with DoubleTapToRefreshLogicMixin {
   final String bodyId = 'bodyId';
@@ -18,6 +19,7 @@ class MobileLayoutPageV2Logic extends GetxController with DoubleTapToRefreshLogi
 
   Worker? hideBottomBarLister;
   Worker? simpleModeLister;
+  Worker? schemeLister;
 
   @override
   void onReady() {
@@ -33,12 +35,23 @@ class MobileLayoutPageV2Logic extends GetxController with DoubleTapToRefreshLogi
     simpleModeLister = ever(preferenceSetting.simpleDashboardMode, (_) {
       update([bodyId]);
     });
+
+    schemeLister = ever(schemeSetting.site, (_) => applyScheme());
+  }
+
+  /// Shows the navigation of the saved site scheme, at its default tab.
+  void applyScheme() {
+    state.buildIcons();
+    state.selectedNavigationIndex = 0;
+    updateSafely([bodyId, tabBarId, bottomNavigationBarId]);
   }
 
   @override
   void onClose() {
     super.onClose();
     hideBottomBarLister?.dispose();
+    simpleModeLister?.dispose();
+    schemeLister?.dispose();
     state.scrollController.dispose();
   }
 

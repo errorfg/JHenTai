@@ -225,6 +225,123 @@ class JmComment {
   final int likes;
 }
 
+/// A section of the JM home page.
+class JmPromoteSection {
+  const JmPromoteSection({
+    required this.id,
+    required this.title,
+    required this.type,
+    required this.filterValue,
+    required this.albums,
+  });
+
+  factory JmPromoteSection.fromJson(Map<String, dynamic> json) =>
+      JmPromoteSection(
+        id: _int(json['id']),
+        title: _str(json['title']),
+        type: _str(json['type']),
+        filterValue: _str(json['filter_val']),
+        albums: _summaries(json['content']),
+      );
+
+  final int id;
+  final String title;
+
+  /// `promote` (a curated list), `category_id` (newest of the category
+  /// [filterValue]), `not_in_category_id`, `library`, `novels`.
+  final String type;
+  final String filterValue;
+  final List<JmAlbumSummary> albums;
+}
+
+/// One page of a curated list or of a weekly pick.
+class JmListPage {
+  const JmListPage({required this.total, required this.albums});
+
+  factory JmListPage.fromJson(Map<String, dynamic> json) => JmListPage(
+    total: _int(json['total']),
+    albums: _summaries(json['list']),
+  );
+
+  final int total;
+  final List<JmAlbumSummary> albums;
+}
+
+class JmCategory {
+  const JmCategory({required this.id, required this.name, required this.slug});
+
+  factory JmCategory.fromJson(Map<String, dynamic> json) => JmCategory(
+    id: _int(json['id']),
+    name: _str(json['name']),
+    slug: _str(json['slug']),
+  );
+
+  final int id;
+  final String name;
+
+  /// Empty for the "newest of all" entry.
+  final String slug;
+}
+
+class JmTagBlock {
+  const JmTagBlock({required this.title, required this.tags});
+
+  factory JmTagBlock.fromJson(Map<String, dynamic> json) =>
+      JmTagBlock(title: _str(json['title']), tags: _strings(json['content']));
+
+  final String title;
+  final List<String> tags;
+}
+
+class JmCategories {
+  const JmCategories({required this.categories, required this.blocks});
+
+  factory JmCategories.fromJson(Map<String, dynamic> json) => JmCategories(
+    categories: (json['categories'] as List? ?? const <dynamic>[])
+        .whereType<Map>()
+        .map((Map m) => JmCategory.fromJson(m.cast<String, dynamic>()))
+        .toList(),
+    blocks: (json['blocks'] as List? ?? const <dynamic>[])
+        .whereType<Map>()
+        .map((Map m) => JmTagBlock.fromJson(m.cast<String, dynamic>()))
+        .toList(),
+  );
+
+  final List<JmCategory> categories;
+  final List<JmTagBlock> blocks;
+}
+
+/// An issue of the weekly picks, and the kinds each issue is split into.
+class JmWeeks {
+  const JmWeeks({required this.issues, required this.types});
+
+  factory JmWeeks.fromJson(Map<String, dynamic> json) => JmWeeks(
+    issues: (json['categories'] as List? ?? const <dynamic>[])
+        .whereType<Map>()
+        .map(
+          (Map m) => (
+            id: _str(m['id']),
+            // The title is usually empty; the period names the issue.
+            title: _str(m['title']).isNotEmpty ? _str(m['title']) : _str(m['time']),
+          ),
+        )
+        .toList(),
+    types: (json['type'] as List? ?? const <dynamic>[])
+        .whereType<Map>()
+        .map((Map m) => (id: _str(m['id']), title: _str(m['title'])))
+        .toList(),
+  );
+
+  /// Newest first.
+  final List<({String id, String title})> issues;
+  final List<({String id, String title})> types;
+}
+
+List<JmAlbumSummary> _summaries(dynamic value) => (value as List? ?? const <dynamic>[])
+    .whereType<Map>()
+    .map((Map m) => JmAlbumSummary.fromJson(m.cast<String, dynamic>()))
+    .toList();
+
 /// A logged-in JM account.
 class JmUser {
   const JmUser({required this.id, required this.username});

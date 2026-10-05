@@ -39,6 +39,10 @@ class DesktopSearchPageTabLogic extends BasePageLogic with SearchPageLogicMixin 
       state.searchConfig = SearchConfig(keyword: keyword);
     }
 
+    if (rewriteSearchConfig == null) {
+      applySchemeSite();
+    }
+
     if (loadImmediately) {
       handleClearAndRefresh();
     }

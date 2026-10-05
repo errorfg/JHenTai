@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_navigation/get_navigation.dart';
 import 'package:get/get_utils/get_utils.dart';
+import 'package:get/get_rx/get_rx.dart';
 import 'package:jhentai/src/extension/dio_exception_extension.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
 import 'package:jhentai/src/model/gallery_page.dart';
@@ -22,6 +23,9 @@ import '../../service/nhentai_favorite_service.dart';
 import '../../service/jm_favorite_service.dart';
 import '../../service/local_source_favorite_service.dart';
 import '../../service/wnacg_favorite_service.dart';
+import '../../setting/scheme_setting.dart';
+import '../../setting/user_setting.dart';
+import '../../model/content_scheme.dart';
 import '../../service/tag_translation_service.dart';
 import '../../utils/eh_spider_parser.dart';
 import '../../service/log.dart';
@@ -34,8 +38,50 @@ class FavoritePageLogic extends BasePageLogic {
   @override
   bool get useSearchConfig => true;
 
+  /// Only E-Hentai favorites need an E-Hentai account.
   @override
-  bool get autoLoadNeedLogin => true;
+  bool get autoLoadNeedLogin => !state.showNhFavorites && _shownLocalSourceService == null;
+
+  Worker? _schemeWorker;
+
+  /// Opens on the favorites of the current scheme's site and follows
+  /// scheme switches.
+  @override
+  Future<void> onInit() async {
+    _showSource(_sourceOf(schemeSetting.site.value));
+    _schemeWorker = ever(schemeSetting.site, (ContentScheme scheme) {
+      if (scheme.isSite) {
+        handleSwitchFavoriteSource(_sourceOf(scheme));
+      }
+    });
+
+    await super.onInit();
+
+    // The first load of the base class covers E-Hentai and the nhentai
+    // API; favorites kept on this device load here.
+    if (_shownLocalSourceService != null || (state.showNhFavorites && !ehRequest.hasNhentaiApiKey)) {
+      handleRefresh();
+    }
+  }
+
+  @override
+  void onClose() {
+    _schemeWorker?.dispose();
+    super.onClose();
+  }
+
+  static String _sourceOf(ContentScheme scheme) => switch (scheme) {
+    ContentScheme.nhentai => 'NH',
+    ContentScheme.wnacg => 'WN',
+    ContentScheme.jm => 'JM',
+    _ => 'EH',
+  };
+
+  void _showSource(String source) {
+    state.showNhFavorites = source == 'NH';
+    state.showWnFavorites = source == 'WN';
+    state.showJmFavorites = source == 'JM';
+  }
 
   @override
   final FavoritePageState state = FavoritePageState();
@@ -199,13 +245,18 @@ class FavoritePageLogic extends BasePageLogic {
     if (state.mixedMode) {
       state.mixedMode = false;
     }
-    state.showNhFavorites = source == 'NH';
-    state.showWnFavorites = source == 'WN';
-    state.showJmFavorites = source == 'JM';
+    _showSource(source);
     if (state.showNhFavorites) {
       _loadNhFavorites();
     } else if (_shownLocalSourceService != null) {
       _loadLocalSourceFavorites();
+    } else if (!userSetting.hasLoggedIn()) {
+      // E-Hentai favorites need an account; nothing to request.
+      state.gallerys = [];
+      state.prevGid = null;
+      state.nextGid = null;
+      state.loadingState = LoadingState.noData;
+      updateSafely();
     } else {
       handleRefresh();
     }

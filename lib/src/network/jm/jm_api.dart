@@ -161,14 +161,67 @@ class JmApi {
   }
 
   /// The newest albums of every category.
-  Future<JmSearchResult> latest({int page = 1}) async {
+  Future<JmSearchResult> latest({int page = 1}) =>
+      filter(category: '0', order: 'mr', page: page);
+
+  /// Albums of [category] (a slug, `0` for all) sorted by [order]: `mr`
+  /// newest, `mv` views, `tf` likes, `mp` pages. [period] (`t` today, `w`
+  /// week, `m` month, `a` all time) restricts a ranking; rankings are
+  /// capped by the server.
+  Future<JmSearchResult> filter({
+    required String category,
+    required String order,
+    String period = 'a',
+    int page = 1,
+  }) async {
     final dynamic data = await _getJson('/categories/filter', <String, dynamic>{
       'page': page,
       'order': '',
-      'c': '0',
-      'o': 'mr',
+      'c': category,
+      'o': period == 'a' ? order : '${order}_$period',
     });
     return JmSearchResult.fromJson(_map(data));
+  }
+
+  /// Sections of the home page.
+  Future<List<JmPromoteSection>> promote() async {
+    final dynamic data = await _getJson('/promote', <String, dynamic>{'page': 0});
+    return (data as List? ?? const <dynamic>[])
+        .whereType<Map>()
+        .map((Map m) => JmPromoteSection.fromJson(m.cast<String, dynamic>()))
+        .toList();
+  }
+
+  /// A page, from 0, of the curated list behind a `promote` section.
+  Future<JmListPage> promoteList(int id, {int page = 0}) async =>
+      JmListPage.fromJson(
+        _map(await _getJson('/promote_list', <String, dynamic>{'id': id, 'page': page})),
+      );
+
+  Future<JmCategories> categories() async =>
+      JmCategories.fromJson(_map(await _getJson('/categories', const <String, dynamic>{})));
+
+  Future<JmWeeks> weeks() async =>
+      JmWeeks.fromJson(_map(await _getJson('/week', const <String, dynamic>{})));
+
+  /// The albums of a weekly pick; a single page.
+  Future<JmListPage> weekFilter(String issueId, String type) async =>
+      JmListPage.fromJson(
+        _map(
+          await _getJson('/week/filter', <String, dynamic>{
+            'id': issueId,
+            'category': type,
+            'page': 0,
+          }),
+        ),
+      );
+
+  Future<List<String>> hotTags() async {
+    final dynamic data = await _getJson('/hot_tags', const <String, dynamic>{});
+    return (data as List? ?? const <dynamic>[])
+        .map((dynamic t) => '$t')
+        .where((String t) => t.isNotEmpty)
+        .toList();
   }
 
   Future<JmAlbum> album(int id) async {

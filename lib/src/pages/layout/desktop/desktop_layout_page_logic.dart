@@ -1,14 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_resizable_container/flutter_resizable_container.dart';
 import 'package:get/get.dart';
-import 'package:jhentai/src/model/reader_source.dart';
 import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/service/windows_service.dart';
 import 'package:jhentai/src/utils/route_util.dart';
-import 'package:jhentai/src/widget/reader_source_switcher.dart';
+import 'package:jhentai/src/setting/scheme_setting.dart';
 
 import '../../../mixin/double_tap_to_refresh_logic_mixin.dart';
-import '../../../model/tab_bar_icon.dart';
 import '../../home_page.dart';
 import 'desktop_layout_page_state.dart';
 
@@ -22,6 +20,8 @@ class DesktopLayoutPageLogic extends GetxController
 
   final ResizableController resizableController = ResizableController();
 
+  Worker? schemeLister;
+
   @override
   void onInit() {
     super.onInit();
@@ -29,6 +29,8 @@ class DesktopLayoutPageLogic extends GetxController
     resizableController.addListener(() {
       windowService.handleDoubleColumnResized(resizableController.ratios);
     });
+
+    schemeLister = ever(schemeSetting.site, (_) => applyScheme());
   }
 
   @override
@@ -36,6 +38,18 @@ class DesktopLayoutPageLogic extends GetxController
     super.onClose();
 
     resizableController.dispose();
+    schemeLister?.dispose();
+  }
+
+  /// Shows the navigation of the saved site scheme, at its default tab.
+  void applyScheme() {
+    state.buildIcons();
+    if (!isRouteAtTop(Routes.desktopHome)) {
+      untilRoute2DesktopHomePage();
+    }
+    leftRouting.args = null;
+    Get.parameters = {};
+    update([tabBarId, leftColumnId]);
   }
 
   void updateHoveringTabIndex(int? index) {
@@ -47,11 +61,6 @@ class DesktopLayoutPageLogic extends GetxController
   /// at gallery bar and tap gallery bar again -> scroll to top
   /// at gallery bar and tap gallery bar twice -> scroll to top and refresh
   void handleTapTabBarButton(int index) {
-    if (state.icons[index].name == TabBarIconNameEnum.readerSource) {
-      showReaderSourcePicker(ReaderSourceType.jhentai);
-      return;
-    }
-
     state.icons[index].shouldRender = true;
 
     int prevIndex = state.selectedTabIndex;

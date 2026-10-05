@@ -6,7 +6,10 @@ import 'package:jhentai/src/pages/gallerys/dashboard/simple/simple_dashboard_pag
 import 'package:jhentai/src/pages/search/mobile_v2/search_page_mobile_v2.dart';
 
 import '../../../mixin/double_tap_to_refresh_state_mixin.dart';
+import '../../../model/content_scheme.dart';
 import '../../../model/tab_bar_icon.dart';
+import '../../../setting/scheme_setting.dart';
+import '../site_scheme_icons.dart';
 import '../../../routes/routes.dart';
 import '../../../setting/preference_setting.dart';
 import '../../download/download_base_page.dart';
@@ -25,7 +28,8 @@ import '../../watched/watched_page.dart';
 import '../../watched/watched_page_logic.dart';
 
 class MobileLayoutPageV2State with DoubleTapToRefreshStateMixin {
-  late final List<TabBarIcon> icons;
+  /// The navigation of the current site scheme; see [buildIcons].
+  late List<TabBarIcon> icons;
 
   int selectedDrawerTabIndex = 0;
   int selectedNavigationIndex = 0;
@@ -38,7 +42,28 @@ class MobileLayoutPageV2State with DoubleTapToRefreshStateMixin {
   static GlobalKey<ScaffoldState> scaffoldKey = GlobalKey();
 
   MobileLayoutPageV2State() {
-    icons = [
+    buildIcons();
+  }
+
+  /// Rebuilds the navigation for the saved site scheme and selects its
+  /// default tab.
+  void buildIcons() {
+    final ContentScheme scheme = schemeSetting.site.value;
+    icons = scheme == ContentScheme.ehentai
+        ? _ehIcons()
+        : siteSchemeIcons(
+            scheme,
+            mobile: true,
+            search: _searchIcon(),
+            shared: [_favoriteIcon(), _historyIcon(), _downloadIcon(), _settingIcon()],
+          );
+
+    selectedDrawerTabIndex = icons.firstIndexWhereOrNull((icon) => icon.name == preferenceSetting.defaultTab.value) ?? 0;
+    icons[selectedDrawerTabIndex].shouldRender = true;
+  }
+
+  List<TabBarIcon> _ehIcons() {
+    return [
       TabBarIcon(
         name: TabBarIconNameEnum.home,
         routeName: Routes.dashboard,
@@ -50,15 +75,7 @@ class MobileLayoutPageV2State with DoubleTapToRefreshStateMixin {
             : Get.find<DashboardPageLogic>().scroll2TopState.scrollController,
         shouldRender: false,
       ),
-      TabBarIcon(
-        name: TabBarIconNameEnum.search,
-        routeName: Routes.mobileV2Search,
-        selectedIcon: const Icon(Icons.search, shadows: [Shadow(blurRadius: 2)]),
-        unselectedIcon: const Icon(Icons.search),
-        page: () => SearchPageMobileV2(),
-        shouldRender: false,
-        enterNewRoute: true,
-      ),
+      _searchIcon(),
       TabBarIcon(
         name: TabBarIconNameEnum.popular,
         routeName: Routes.popular,
@@ -77,15 +94,7 @@ class MobileLayoutPageV2State with DoubleTapToRefreshStateMixin {
         scrollController: () => Get.find<RanklistPageLogic>().scroll2TopState.scrollController,
         shouldRender: false,
       ),
-      TabBarIcon(
-        name: TabBarIconNameEnum.favorite,
-        routeName: Routes.favorite,
-        selectedIcon: const Icon(Icons.favorite),
-        unselectedIcon: const Icon(Icons.favorite_outline),
-        page: () => FavoritePage(showMenuButton: true, showTitle: true, name: 'favorite'.tr),
-        scrollController: () => Get.find<FavoritePageLogic>().scroll2TopState.scrollController,
-        shouldRender: false,
-      ),
+      _favoriteIcon(),
       TabBarIcon(
         name: TabBarIconNameEnum.watched,
         routeName: Routes.watched,
@@ -95,7 +104,33 @@ class MobileLayoutPageV2State with DoubleTapToRefreshStateMixin {
         scrollController: () => Get.find<WatchedPageLogic>().scroll2TopState.scrollController,
         shouldRender: false,
       ),
-      TabBarIcon(
+      _historyIcon(),
+      _downloadIcon(),
+      _settingIcon(),
+    ];
+  }
+
+  TabBarIcon _searchIcon() => TabBarIcon(
+        name: TabBarIconNameEnum.search,
+        routeName: Routes.mobileV2Search,
+        selectedIcon: const Icon(Icons.search, shadows: [Shadow(blurRadius: 2)]),
+        unselectedIcon: const Icon(Icons.search),
+        page: () => SearchPageMobileV2(),
+        shouldRender: false,
+        enterNewRoute: true,
+      );
+
+  TabBarIcon _favoriteIcon() => TabBarIcon(
+        name: TabBarIconNameEnum.favorite,
+        routeName: Routes.favorite,
+        selectedIcon: const Icon(Icons.favorite),
+        unselectedIcon: const Icon(Icons.favorite_outline),
+        page: () => FavoritePage(showMenuButton: true, showTitle: true, name: 'favorite'.tr),
+        scrollController: () => Get.find<FavoritePageLogic>().scroll2TopState.scrollController,
+        shouldRender: false,
+      );
+
+  TabBarIcon _historyIcon() => TabBarIcon(
         name: TabBarIconNameEnum.history,
         routeName: Routes.history,
         selectedIcon: const Icon(Icons.history, shadows: [Shadow(blurRadius: 2)]),
@@ -103,16 +138,18 @@ class MobileLayoutPageV2State with DoubleTapToRefreshStateMixin {
         page: () => HistoryPage(showMenuButton: true, showTitle: true, name: 'history'.tr),
         scrollController: () => Get.find<HistoryPageLogic>().scroll2TopState.scrollController,
         shouldRender: false,
-      ),
-      TabBarIcon(
+      );
+
+  TabBarIcon _downloadIcon() => TabBarIcon(
         name: TabBarIconNameEnum.download,
         routeName: Routes.download,
         selectedIcon: const Icon(Icons.download),
         unselectedIcon: const Icon(Icons.download_outlined),
         page: () => const DownloadPage(),
         shouldRender: false,
-      ),
-      TabBarIcon(
+      );
+
+  TabBarIcon _settingIcon() => TabBarIcon(
         name: TabBarIconNameEnum.setting,
         routeName: Routes.setting,
         selectedIcon: const Icon(Icons.settings),
@@ -120,10 +157,6 @@ class MobileLayoutPageV2State with DoubleTapToRefreshStateMixin {
         page: () => const SettingPage(),
         shouldRender: false,
         enterNewRoute: true,
-      ),
-    ];
-
-    selectedDrawerTabIndex = icons.firstIndexWhereOrNull((icon) => icon.name == preferenceSetting.defaultTab.value) ?? 0;
-    icons[selectedDrawerTabIndex].shouldRender = true;
-  }
+      );
 }
+

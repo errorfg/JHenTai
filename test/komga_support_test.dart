@@ -122,10 +122,11 @@ void main() {
     expect(GalleryImage.fromJson(image.toJson()).headers, null);
   });
 
-  test('desktop menu keeps the reader source button as its bottom item', () {
+  test('desktop menu keeps settings as its bottom item', () {
     final DesktopLayoutPageState state = DesktopLayoutPageState();
 
-    expect(state.icons.last.name, TabBarIconNameEnum.readerSource);
+    expect(state.icons.last.name, TabBarIconNameEnum.setting);
+    expect(state.icons.map((icon) => icon.name), isNot(contains(TabBarIconNameEnum.readerSource)));
   });
 
   test('Komga credentials are represented by the synced setting payload', () {

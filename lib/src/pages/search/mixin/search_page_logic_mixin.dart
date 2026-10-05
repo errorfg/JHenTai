@@ -10,11 +10,13 @@ import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/extension/dio_exception_extension.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
 import 'package:jhentai/src/model/gallery_image_page_url.dart';
+import 'package:jhentai/src/model/content_scheme.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/model/search_history.dart';
 import 'package:jhentai/src/pages/base/base_page_logic.dart';
 import 'package:jhentai/src/pages/search/mixin/search_page_state_mixin.dart';
 import 'package:jhentai/src/service/search_history_service.dart';
+import 'package:jhentai/src/setting/scheme_setting.dart';
 import 'package:jhentai/src/utils/check_util.dart';
 import 'package:jhentai/src/utils/string_uril.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
@@ -98,6 +100,21 @@ mixin SearchPageLogicMixin on BasePageLogic {
     }
     await onInputChanged(state.searchConfig.keyword ?? '');
     updateSafely([searchFieldId]);
+  }
+
+  /// A search opened without explicit settings starts on the site of the
+  /// current scheme; under E-Hentai the saved choice is kept.
+  void applySchemeSite() {
+    final ContentScheme scheme = schemeSetting.site.value;
+    if (scheme == ContentScheme.ehentai || !scheme.isSite) {
+      return;
+    }
+    state.searchConfig.isNhSearch = scheme == ContentScheme.nhentai;
+    state.searchConfig.isWnacgSearch = scheme == ContentScheme.wnacg;
+    state.searchConfig.isJmSearch = scheme == ContentScheme.jm;
+    if (scheme == ContentScheme.nhentai) {
+      state.searchConfig.nhentaiSource = 'net';
+    }
   }
 
   Future<void> setSiteSearchMode(String site) async {

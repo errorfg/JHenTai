@@ -58,6 +58,39 @@ class JmChapterBundle {
   }
 }
 
+/// What a JM album list shows; [JmSource.list] pages through it.
+sealed class JmListQuery {
+  const JmListQuery();
+}
+
+/// The curated list behind a home section.
+class JmPromoteQuery extends JmListQuery {
+  const JmPromoteQuery(this.id);
+
+  final int id;
+}
+
+/// A category (slug, `0` for all), newest first or ranked; see
+/// [JmApi.filter] for [order] and [period].
+class JmFilterQuery extends JmListQuery {
+  const JmFilterQuery({this.category = '0', this.order = 'mr', this.period = 'a'});
+
+  final String category;
+  final String order;
+  final String period;
+}
+
+/// A weekly pick: one issue, one kind.
+class JmWeekQuery extends JmListQuery {
+  const JmWeekQuery({required this.issueId, required this.type});
+
+  final String issueId;
+  final String type;
+}
+
+/// A home section that lists comics, and the list its "more" opens.
+typedef JmHomeSection = ({String title, List<Gallery> gallerys, JmListQuery? more});
+
 /// Serves the app's gallery requests (list, detail, image page) from the
 /// JM API, in the shapes the E-Hentai parsers would produce.
 class JmSource {
@@ -76,6 +109,14 @@ class JmSource {
 
   /// E-Hentai category of albums seen in lists; album details lack it.
   final Map<int, String> _categories = <int, String>{};
+
+  /// Lookups that change rarely, requested once per run (key 0).
+  final Map<int, Future<JmCategories>> _categoryList = <int, Future<JmCategories>>{};
+  final Map<int, Future<JmWeeks>> _weeks = <int, Future<JmWeeks>>{};
+  final Map<int, Future<List<String>>> _hotTags = <int, Future<List<String>>>{};
+
+  /// Page size of each curated list, from its first page.
+  final Map<int, int> _promotePageSizes = <int, int>{};
 
   /// JM search takes MySQL boolean full-text syntax: words separated by
   /// spaces match any of them, `+word` must match, `-word` must not. Free
@@ -117,6 +158,10 @@ class JmSource {
       return GalleryPageInfo(gallerys: <Gallery>[_galleryOfAlbum(album)]);
     }
 
+    return _pageOf(result, page);
+  }
+
+  GalleryPageInfo _pageOf(JmSearchResult result, int page) {
     final List<Gallery> gallerys = result.albums.map(_galleryOfSummary).toList();
     final int pages = (result.total / JmApi.searchPageSize).ceil();
     final bool hasNext = result.total > 0
@@ -128,6 +173,82 @@ class JmSource {
       nextGid: hasNext ? '${page + 1}' : null,
     );
   }
+
+  /// A page of [query]; [pageToken] as returned in the previous page.
+  Future<GalleryPageInfo> list(JmListQuery query, {String? pageToken}) async {
+    switch (query) {
+      case JmPromoteQuery(:final int id):
+        final int page = (int.tryParse(pageToken ?? '') ?? 0).clamp(0, 1 << 30);
+        final JmListPage result = await api.promoteList(id, page: page);
+        if (page == 0) {
+          _promotePageSizes[id] = result.albums.length;
+        }
+        final int pageSize = _promotePageSizes[id] ?? result.albums.length;
+        final bool hasNext =
+            result.albums.isNotEmpty && page * pageSize + result.albums.length < result.total;
+        return GalleryPageInfo(
+          gallerys: result.albums.map(_galleryOfSummary).toList(),
+          prevGid: page > 0 ? '${page - 1}' : null,
+          nextGid: hasNext ? '${page + 1}' : null,
+        );
+      case JmFilterQuery(:final String category, :final String order, :final String period):
+        final int page = (int.tryParse(pageToken ?? '') ?? 1).clamp(1, 1 << 30);
+        return _pageOf(
+          await api.filter(category: category, order: order, period: period, page: page),
+          page,
+        );
+      case JmWeekQuery(:final String issueId, :final String type):
+        final JmListPage result = await api.weekFilter(issueId, type);
+        return GalleryPageInfo(gallerys: result.albums.map(_galleryOfSummary).toList());
+    }
+  }
+
+  /// The home sections that list comics; book and novel sections are left
+  /// out. [refresh] asks the server again for the categories.
+  Future<List<JmHomeSection>> home({bool refresh = false}) async {
+    if (refresh) {
+      _categoryList.clear();
+      _hotTags.clear();
+    }
+    final List<JmPromoteSection> sections = await api.promote();
+    final List<JmCategory> categories = (await categoryList()).categories;
+    return <JmHomeSection>[
+      for (final JmPromoteSection section in sections)
+        if (const <String>{'promote', 'category_id', 'not_in_category_id'}.contains(section.type))
+          (
+            title: section.title,
+            gallerys: section.albums.map(_galleryOfSummary).toList(),
+            more: _moreOf(section, categories),
+          ),
+    ];
+  }
+
+  JmListQuery? _moreOf(JmPromoteSection section, List<JmCategory> categories) {
+    switch (section.type) {
+      case 'promote':
+        return JmPromoteQuery(section.id);
+      case 'category_id':
+        final JmCategory? category = categories
+            .where((JmCategory c) => '${c.id}' == section.filterValue && c.slug.isNotEmpty)
+            .firstOrNull;
+        return category == null ? null : JmFilterQuery(category: category.slug);
+      default:
+        // A section such as 禁漫漢化組 shares its name with a category.
+        final JmCategory? category = categories
+            .where((JmCategory c) => c.name == section.title && c.slug.isNotEmpty)
+            .firstOrNull;
+        return category == null ? null : JmFilterQuery(category: category.slug);
+    }
+  }
+
+  /// Categories (the first, with an empty slug, is all of them) and theme
+  /// tags.
+  Future<JmCategories> categoryList() =>
+      sharedRequest(_categoryList, 0, api.categories);
+
+  Future<JmWeeks> weeks() => sharedRequest(_weeks, 0, api.weeks);
+
+  Future<List<String>> hotTags() => sharedRequest(_hotTags, 0, api.hotTags);
 
   /// [refresh] drops the cached chapter and album first, so a manual
   /// refresh shows newly added chapters.

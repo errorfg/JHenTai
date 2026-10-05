@@ -53,6 +53,10 @@ class SearchPageMobileV2Logic extends BasePageLogic with SearchPageLogicMixin {
       state.searchConfig = SearchConfig(keyword: keyword);
     }
 
+    if (rewriteSearchConfig == null) {
+      applySchemeSite();
+    }
+
     if (Get.arguments is NewSearchArgument) {
       handleClearAndRefresh();
     }

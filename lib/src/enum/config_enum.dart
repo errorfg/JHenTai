@@ -44,6 +44,7 @@ enum ConfigEnum {
   nhentaiApiSetting('nhentaiApiSetting'),
   eh2telegraphSetting('eh2telegraphSetting'),
   jmSetting('jmSetting'),
+  schemeSetting('schemeSetting'),
   komgaBrowseSetting('komgaBrowseSetting'),
   downloadSearchPageType('downloadSearchPageType'),
   windowFullScreen('windowFullScreen'),

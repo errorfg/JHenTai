@@ -12,7 +12,10 @@ import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/setting/preference_setting.dart';
 
 import '../../../mixin/double_tap_to_refresh_state_mixin.dart';
+import '../../../model/content_scheme.dart';
 import '../../../model/tab_bar_icon.dart';
+import '../../../setting/scheme_setting.dart';
+import '../site_scheme_icons.dart';
 import '../../favorite/favorite_page.dart';
 import '../../favorite/favorite_page_logic.dart';
 import '../../history/history_page_logic.dart';
@@ -24,7 +27,9 @@ import '../../search/desktop/desktop_search_page_logic.dart';
 import '../../watched/watched_page_logic.dart';
 
 class DesktopLayoutPageState with DoubleTapToRefreshStateMixin {
-  late final List<TabBarIcon> icons;
+  /// The navigation of the current site scheme, settings last; see
+  /// [buildIcons].
+  late List<TabBarIcon> icons;
 
   int selectedTabIndex = 0;
 
@@ -38,7 +43,28 @@ class DesktopLayoutPageState with DoubleTapToRefreshStateMixin {
   final ScrollController leftTabBarScrollController = ScrollController();
 
   DesktopLayoutPageState() {
-    icons = [
+    buildIcons();
+  }
+
+  /// Rebuilds the navigation for the saved site scheme and selects its
+  /// default tab.
+  void buildIcons() {
+    final ContentScheme scheme = schemeSetting.site.value;
+    icons = scheme == ContentScheme.ehentai
+        ? _ehIcons()
+        : siteSchemeIcons(
+            scheme,
+            mobile: false,
+            search: _searchIcon(),
+            shared: [_favoriteIcon(), _historyIcon(), _downloadIcon(), _settingIcon()],
+          );
+
+    selectedTabIndex = icons.firstIndexWhereOrNull((icon) => icon.name == preferenceSetting.defaultTab.value) ?? 0;
+    icons[selectedTabIndex].shouldRender = true;
+  }
+
+  List<TabBarIcon> _ehIcons() {
+    return [
       TabBarIcon(
         name: TabBarIconNameEnum.home,
         routeName: Routes.gallerys,
@@ -49,22 +75,7 @@ class DesktopLayoutPageState with DoubleTapToRefreshStateMixin {
             Get.find<GallerysPageLogic>().state.scrollController,
         shouldRender: false,
       ),
-      TabBarIcon(
-        name: TabBarIconNameEnum.search,
-        routeName: Routes.desktopSearch,
-        selectedIcon: const Icon(
-          Icons.search,
-          shadows: [Shadow(blurRadius: 2)],
-        ),
-        unselectedIcon: const Icon(Icons.search),
-        page: () => const DesktopSearchPage(),
-        scrollController: () => Get.find<DesktopSearchPageLogic>()
-            .state
-            .tabLogics[Get.find<DesktopSearchPageLogic>().state.currentTabIndex]
-            .state
-            .scrollController,
-        shouldRender: true,
-      ),
+      _searchIcon(),
       TabBarIcon(
         name: TabBarIconNameEnum.popular,
         routeName: Routes.popular,
@@ -88,16 +99,7 @@ class DesktopLayoutPageState with DoubleTapToRefreshStateMixin {
             Get.find<RanklistPageLogic>().state.scrollController,
         shouldRender: false,
       ),
-      TabBarIcon(
-        name: TabBarIconNameEnum.favorite,
-        routeName: Routes.favorite,
-        selectedIcon: const Icon(Icons.favorite),
-        unselectedIcon: const Icon(Icons.favorite_outline),
-        page: () => const FavoritePage(),
-        scrollController: () =>
-            Get.find<FavoritePageLogic>().state.scrollController,
-        shouldRender: false,
-      ),
+      _favoriteIcon(),
       TabBarIcon(
         name: TabBarIconNameEnum.watched,
         routeName: Routes.watched,
@@ -108,7 +110,41 @@ class DesktopLayoutPageState with DoubleTapToRefreshStateMixin {
             Get.find<WatchedPageLogic>().state.scrollController,
         shouldRender: false,
       ),
-      TabBarIcon(
+      _historyIcon(),
+      _downloadIcon(),
+      _settingIcon(),
+    ];
+  }
+
+  TabBarIcon _searchIcon() => TabBarIcon(
+        name: TabBarIconNameEnum.search,
+        routeName: Routes.desktopSearch,
+        selectedIcon: const Icon(
+          Icons.search,
+          shadows: [Shadow(blurRadius: 2)],
+        ),
+        unselectedIcon: const Icon(Icons.search),
+        page: () => const DesktopSearchPage(),
+        scrollController: () => Get.find<DesktopSearchPageLogic>()
+            .state
+            .tabLogics[Get.find<DesktopSearchPageLogic>().state.currentTabIndex]
+            .state
+            .scrollController,
+        shouldRender: true,
+      );
+
+  TabBarIcon _favoriteIcon() => TabBarIcon(
+        name: TabBarIconNameEnum.favorite,
+        routeName: Routes.favorite,
+        selectedIcon: const Icon(Icons.favorite),
+        unselectedIcon: const Icon(Icons.favorite_outline),
+        page: () => const FavoritePage(),
+        scrollController: () =>
+            Get.find<FavoritePageLogic>().state.scrollController,
+        shouldRender: false,
+      );
+
+  TabBarIcon _historyIcon() => TabBarIcon(
         name: TabBarIconNameEnum.history,
         routeName: Routes.history,
         selectedIcon: const Icon(
@@ -120,38 +156,24 @@ class DesktopLayoutPageState with DoubleTapToRefreshStateMixin {
         scrollController: () =>
             Get.find<HistoryPageLogic>().state.scrollController,
         shouldRender: false,
-      ),
-      TabBarIcon(
+      );
+
+  TabBarIcon _downloadIcon() => TabBarIcon(
         name: TabBarIconNameEnum.download,
         routeName: Routes.download,
         selectedIcon: const Icon(Icons.download),
         unselectedIcon: const Icon(Icons.download_outlined),
         page: () => const DownloadPage(),
         shouldRender: false,
-      ),
-      TabBarIcon(
+      );
+
+  TabBarIcon _settingIcon() => TabBarIcon(
         name: TabBarIconNameEnum.setting,
         routeName: Routes.setting,
         selectedIcon: const Icon(Icons.settings),
         unselectedIcon: const Icon(Icons.settings_outlined),
         page: () => const SettingPage(),
         shouldRender: true,
-      ),
-      TabBarIcon(
-        name: TabBarIconNameEnum.readerSource,
-        routeName: Routes.komga,
-        selectedIcon: const Icon(Icons.auto_stories),
-        unselectedIcon: const Icon(Icons.auto_stories_outlined),
-        page: () => const SizedBox.shrink(),
-        shouldRender: false,
-      ),
-    ];
-
-    selectedTabIndex =
-        icons.firstIndexWhereOrNull(
-          (icon) => icon.name == preferenceSetting.defaultTab.value,
-        ) ??
-        0;
-    icons[selectedTabIndex].shouldRender = true;
-  }
+      );
 }
+

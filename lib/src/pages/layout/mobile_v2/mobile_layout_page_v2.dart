@@ -1,27 +1,21 @@
 import 'package:flutter/rendering.dart';
 import 'package:collection/collection.dart';
-import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
+import 'package:jhentai/src/model/content_scheme.dart';
 import 'package:jhentai/src/pages/download/download_base_page.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2_logic.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2_state.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/notification/tap_menu_button_notification.dart';
 import 'package:jhentai/src/pages/search/quick_search/quick_search_page.dart';
 import 'package:jhentai/src/pages/setting/setting_page.dart';
-import 'package:jhentai/src/routes/routes.dart';
-import 'package:jhentai/src/model/reader_source.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
-import 'package:jhentai/src/setting/user_setting.dart';
-import 'package:jhentai/src/utils/route_util.dart';
 import 'package:jhentai/src/widget/will_pop_interceptor.dart';
 
-import '../../../network/eh_request.dart';
 import '../../../setting/preference_setting.dart';
-import '../../../widget/eh_alert_dialog.dart';
-import '../../../widget/reader_source_switcher.dart';
+import '../../../widget/scheme_header.dart';
 import 'notification/tap_tab_bat_button_notification.dart';
 
 class MobileLayoutPageV2 extends StatelessWidget {
@@ -49,11 +43,7 @@ class MobileLayoutPageV2 extends StatelessWidget {
   }
 
   Widget buildLeftDrawer(BuildContext context) {
-    return MobileLeftDrawer(
-      logic: logic,
-      state: state,
-      currentSource: ReaderSourceType.jhentai,
-    );
+    return MobileLeftDrawer(logic: logic, state: state);
   }
 
   Widget buildRightDrawer() {
@@ -110,6 +100,8 @@ class MobileLayoutPageV2 extends StatelessWidget {
           .where((icon) => icon.shouldRender)
           .mapIndexed(
             (index, icon) => Offstage(
+              // Pages of two schemes may share a type; keep their states apart.
+              key: ValueKey<String>(icon.routeName),
               offstage: state.selectedDrawerTabOrder != index,
               child: icon.page.call(),
             ),
@@ -123,7 +115,7 @@ class MobileLeftDrawer extends StatelessWidget {
   const MobileLeftDrawer({
     super.key,
     required this.state,
-    required this.currentSource,
+    this.currentScheme,
     this.logic,
     this.onBeforeSwitch,
     this.onDestinationSelected,
@@ -132,7 +124,10 @@ class MobileLeftDrawer extends StatelessWidget {
 
   final MobileLayoutPageV2State state;
   final MobileLayoutPageV2Logic? logic;
-  final ReaderSourceType currentSource;
+
+  /// The scheme on screen, for pages of their own (Komga); null for the
+  /// saved site.
+  final ContentScheme? currentScheme;
   final VoidCallback? onBeforeSwitch;
   final ValueChanged<int>? onDestinationSelected;
   final bool showSelectedDestination;
@@ -156,7 +151,10 @@ class MobileLeftDrawer extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const EHUserAvatar(),
+          SchemeHeader(
+            current: currentScheme,
+            onBeforeSwitch: onBeforeSwitch ?? () => MobileLayoutPageV2State.scaffoldKey.currentState?.closeDrawer(),
+          ),
           Expanded(
             child: ScrollConfiguration(
               behavior: UIConfig.leftDrawerPhysicsBehaviour,
@@ -201,47 +199,7 @@ class MobileLeftDrawer extends StatelessWidget {
               ),
             ),
           ),
-          ReaderSourceSwitcher(
-            currentSource: currentSource,
-            onBeforeSwitch: onBeforeSwitch,
-          ),
         ],
-      ),
-    );
-  }
-}
-
-class EHUserAvatar extends StatelessWidget {
-  const EHUserAvatar({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 120,
-      alignment: Alignment.center,
-      child: Obx(
-        () => ListTile(
-          leading: GestureDetector(
-            child: CircleAvatar(
-              radius: 32,
-              backgroundColor: UIConfig.loginAvatarBackGroundColor(context),
-              foregroundImage: userSetting.avatarImgUrl.value != null ? ExtendedNetworkImageProvider(userSetting.avatarImgUrl.value!, cache: true) : null,
-              child:
-                  Icon(userSetting.hasLoggedIn() ? Icons.face_retouching_natural : Icons.face, color: UIConfig.loginAvatarForeGroundColor(context), size: 32),
-            ),
-          ),
-          title: Text(userSetting.nickName.value ?? userSetting.userName.value ?? 'tap2Login'.tr),
-          onTap: () async {
-            if (!userSetting.hasLoggedIn()) {
-              toRoute(Routes.login);
-              return;
-            }
-            bool? result = await Get.dialog(const EHDialog(title: 'logout ?'));
-            if (result == true) {
-              await ehRequest.requestLogout();
-            }
-          },
-        ),
       ),
     );
   }
