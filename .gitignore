@@ -54,3 +54,5 @@ CLAUDE.md
 
 # Komga end-to-end test connection (copy from komga_e2e.example.json)
 /test/e2e/komga_e2e.json
+# JM end-to-end tests against the live JM API (copy from jm_e2e.example.json)
+/test/e2e/jm_e2e.json

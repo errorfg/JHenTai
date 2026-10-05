@@ -118,6 +118,9 @@ dependencies:
   integral_isolates: 0.5.1
   screen_brightness: 2.1.11
   crypto: 3.0.7
+  # JM: AES-ECB response decryption and descrambled image encoding
+  pointycastle: 3.9.1
+  image: 4.3.0
   csv: ^6.0.0
   dotted_border: ^2.1.0
   j_downloader:
