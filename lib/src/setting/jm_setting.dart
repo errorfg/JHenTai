@@ -3,32 +3,34 @@ import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/network/jm/jm_api.dart';
-import 'package:jhentai/src/network/jm/jm_models.dart';
 import 'package:jhentai/src/service/jh_service.dart';
 import 'package:jhentai/src/service/log.dart';
 
 JmSetting jmSetting = JmSetting();
 
-/// JM API and image lines, and the logged-in JM account. Kept apart from
-/// EHSetting, which is cleared on E-Hentai logout; stays on this device
-/// (not cloud-synced).
+/// JM API and image lines of this device: the lines known, the user's pick
+/// and how fast each line answered here. Not cloud-synced, as line speed
+/// depends on the device's network; the account is in `JmAccountSetting`.
 class JmSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBean {
   /// API domains last reported by the JM domain servers, and when.
   final RxList<String> apiDomains = <String>[...JmApi.builtInApiDomains].obs;
   DateTime? apiDomainsDiscoveredAt;
 
-  /// The API line the user picked; empty means "first that works".
+  /// The lines the user picked; empty means automatic, the fastest here.
   final RxString preferredApiDomain = ''.obs;
-  final RxString imageDomain = JmApi.imageDomains.first.obs;
+  final RxString preferredImageDomain = ''.obs;
 
-  /// The logged-in account; empty when logged out.
-  final RxString userName = ''.obs;
-  int userId = 0;
+  /// Response time of each line in milliseconds, -1 when it failed.
+  final RxMap<String, int> apiLatencies = <String, int>{}.obs;
+  final RxMap<String, int> imageLatencies = <String, int>{}.obs;
+  DateTime? linesMeasuredAt;
 
-  /// Cookie header of the account's session.
-  String accountCookie = '';
+  /// Image host the JM server recommended at the last measurement.
+  final RxString recommendedImageDomain = ''.obs;
 
-  bool get hasLoggedIn => userName.value.isNotEmpty && accountCookie.isNotEmpty;
+  /// What 8.0.30 and 8.0.31 stored here before the account moved to its
+  /// own, cloud-synced setting.
+  Map<String, dynamic>? legacyAccount;
 
   @override
   ConfigEnum get configEnum => ConfigEnum.jmSetting;
@@ -42,24 +44,32 @@ class JmSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBe
     }
     apiDomainsDiscoveredAt = DateTime.tryParse(map['apiDomainsDiscoveredAt']?.toString() ?? '');
     preferredApiDomain.value = map['preferredApiDomain']?.toString() ?? '';
-    final String image = map['imageDomain']?.toString() ?? '';
-    if (image.isNotEmpty) {
-      imageDomain.value = image;
-    }
-    userName.value = map['userName']?.toString() ?? '';
-    userId = int.tryParse('${map['userId'] ?? ''}') ?? 0;
-    accountCookie = map['accountCookie']?.toString() ?? '';
+    // 8.0.30 and 8.0.31 always stored an image line, chosen or not, under
+    // `imageDomain`; only an explicit pick is kept from now on.
+    preferredImageDomain.value = map['preferredImageDomain']?.toString() ?? '';
+    apiLatencies.value = _latencies(map['apiLatencies']);
+    imageLatencies.value = _latencies(map['imageLatencies']);
+    linesMeasuredAt = DateTime.tryParse(map['linesMeasuredAt']?.toString() ?? '');
+    recommendedImageDomain.value = map['recommendedImageDomain']?.toString() ?? '';
+    legacyAccount = (map['accountCookie']?.toString() ?? '').isNotEmpty
+        ? <String, dynamic>{'userName': map['userName'], 'userId': map['userId'], 'accountCookie': map['accountCookie']}
+        : null;
   }
+
+  static Map<String, int> _latencies(dynamic value) => value is Map
+      ? <String, int>{for (final MapEntry<dynamic, dynamic> e in value.entries) '${e.key}': int.tryParse('${e.value}') ?? -1}
+      : <String, int>{};
 
   @override
   String toConfigString() => jsonEncode({
         'apiDomains': apiDomains,
         'apiDomainsDiscoveredAt': apiDomainsDiscoveredAt?.toUtc().toIso8601String(),
         'preferredApiDomain': preferredApiDomain.value,
-        'imageDomain': imageDomain.value,
-        'userName': userName.value,
-        'userId': userId,
-        'accountCookie': accountCookie,
+        'preferredImageDomain': preferredImageDomain.value,
+        'apiLatencies': Map<String, int>.of(apiLatencies),
+        'imageLatencies': Map<String, int>.of(imageLatencies),
+        'linesMeasuredAt': linesMeasuredAt?.toUtc().toIso8601String(),
+        'recommendedImageDomain': recommendedImageDomain.value,
       });
 
   @override
@@ -68,13 +78,49 @@ class JmSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBe
   @override
   void doAfterBeanReady() {}
 
-  /// API domains to try, the user's choice first.
+  /// API domains to try: the user's pick, then the fastest here, then those
+  /// not measured, then those that failed.
   List<String> orderedApiDomains() {
     final String preferred = preferredApiDomain.value;
     return <String>[
       if (preferred.isNotEmpty) preferred,
-      ...apiDomains.where((String d) => d != preferred),
+      ..._bySpeed(apiDomains.where((String d) => d != preferred), apiLatencies),
     ];
+  }
+
+  /// Image lines that can be picked: the known ones and the one the server
+  /// recommended.
+  List<String> imageDomainChoices() => <String>{
+        ...JmApi.imageDomains,
+        if (recommendedImageDomain.value.isNotEmpty) recommendedImageDomain.value,
+      }.toList();
+
+  /// The image line in use: the user's pick, else [autoImageDomain].
+  String get imageDomain =>
+      preferredImageDomain.value.isNotEmpty ? preferredImageDomain.value : autoImageDomain;
+
+  /// The fastest image line here, else the server's recommendation.
+  String get autoImageDomain {
+    final List<String> fastest = _bySpeed(imageDomainChoices(), imageLatencies);
+    if (imageLatencies[fastest.first] != null && imageLatencies[fastest.first]! >= 0) {
+      return fastest.first;
+    }
+    return recommendedImageDomain.value.isNotEmpty ? recommendedImageDomain.value : JmApi.imageDomains.first;
+  }
+
+  static List<String> _bySpeed(Iterable<String> lines, Map<String, int> latencies) {
+    int rank(String line) {
+      final int? ms = latencies[line];
+      return ms == null ? 1 << 30 : (ms < 0 ? 1 << 31 : ms);
+    }
+
+    // Stable: equal ranks keep the order given.
+    final List<String> list = lines.toList();
+    final Map<String, int> index = {for (int i = 0; i < list.length; i++) list[i]: i};
+    return list..sort((String a, String b) {
+      final int byRank = rank(a).compareTo(rank(b));
+      return byRank != 0 ? byRank : index[a]!.compareTo(index[b]!);
+    });
   }
 
   Future<void> saveDiscoveredApiDomains(List<String> domains) async {
@@ -89,29 +135,33 @@ class JmSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBe
     await saveBeanConfig();
   }
 
+  Future<void> saveMeasurement(JmLineMeasurement measurement) async {
+    apiLatencies.value = _milliseconds(measurement.api);
+    imageLatencies.value = _milliseconds(measurement.image);
+    if (measurement.recommendedImageHost != null) {
+      recommendedImageDomain.value = measurement.recommendedImageHost!;
+    }
+    linesMeasuredAt = DateTime.now();
+    log.info('JM lines measured: api $apiLatencies, image $imageLatencies');
+    await saveBeanConfig();
+  }
+
+  static Map<String, int> _milliseconds(Map<String, Duration?> times) =>
+      <String, int>{for (final MapEntry<String, Duration?> e in times.entries) e.key: e.value?.inMilliseconds ?? -1};
+
   Future<void> savePreferredApiDomain(String domain) async {
     preferredApiDomain.value = domain;
     await saveBeanConfig();
   }
 
-  Future<void> saveAccount(JmUser user, String cookie) async {
-    log.info('JM login: ${user.username}');
-    userId = user.id;
-    accountCookie = cookie;
-    userName.value = user.username;
+  Future<void> savePreferredImageDomain(String domain) async {
+    preferredImageDomain.value = domain;
     await saveBeanConfig();
   }
 
-  Future<void> clearAccount() async {
-    log.info('JM logout');
-    userId = 0;
-    accountCookie = '';
-    userName.value = '';
-    await saveBeanConfig();
-  }
-
-  Future<void> saveImageDomain(String domain) async {
-    imageDomain.value = domain;
+  /// Forgets the account kept here before it moved; see [legacyAccount].
+  Future<void> dropLegacyAccount() async {
+    legacyAccount = null;
     await saveBeanConfig();
   }
 

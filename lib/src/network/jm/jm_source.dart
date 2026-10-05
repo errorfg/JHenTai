@@ -522,8 +522,8 @@ class JmSource {
             username: c.nickname,
             score: '',
             scoreDetails: const <String>[],
-            content: html_dom.Element.html('<div>${c.content}</div>'),
-            time: c.time,
+            content: commentContent(c.content),
+            time: commentDate(c.time),
             fromMe: false,
             votedUp: false,
             votedDown: false,
@@ -531,6 +531,66 @@ class JmSource {
           ),
         )
         .toList();
+  }
+
+  /// JM wraps comment text in styled `div`s; the comment view renders text,
+  /// line breaks, links and images, so the rest is reduced to those.
+  static html_dom.Element commentContent(String html) {
+    final html_dom.Element target = html_dom.Element.tag('div');
+    void lineBreak() {
+      final html_dom.Node? last = target.nodes.lastOrNull;
+      if (last != null && !(last is html_dom.Element && last.localName == 'br')) {
+        target.append(html_dom.Element.tag('br'));
+      }
+    }
+
+    void walk(html_dom.Node node) {
+      if (node is html_dom.Text) {
+        if (node.text.trim().isNotEmpty) {
+          target.append(html_dom.Text(node.text));
+        }
+        return;
+      }
+      if (node is! html_dom.Element) {
+        return;
+      }
+      switch (node.localName) {
+        case 'br':
+          target.append(html_dom.Element.tag('br'));
+        case 'img':
+          final String src = node.attributes['src'] ?? '';
+          if (src.startsWith('http')) {
+            target.append(html_dom.Element.tag('img')..attributes['src'] = src);
+          }
+        case 'a':
+          target.append(
+            html_dom.Element.tag('a')
+              ..attributes['href'] = node.attributes['href'] ?? node.text
+              ..append(html_dom.Text(node.text)),
+          );
+        default:
+          final bool block = const <String>{'div', 'p', 'li'}.contains(node.localName);
+          if (block) {
+            lineBreak();
+          }
+          node.nodes.toList().forEach(walk);
+      }
+    }
+
+    html_dom.Element.html('<div>$html</div>').nodes.toList().forEach(walk);
+    while (target.nodes.isNotEmpty && target.nodes.first is html_dom.Element && (target.nodes.first as html_dom.Element).localName == 'br') {
+      target.nodes.first.remove();
+    }
+    return target;
+  }
+
+  /// JM gives comment dates as `Sep 04, 2026`, without a time.
+  static String commentDate(String raw) {
+    try {
+      return DateFormat('yyyy-MM-dd').format(DateFormat('MMM dd, yyyy', 'en_US').parseStrict(raw.trim()));
+    } on FormatException {
+      return raw;
+    }
   }
 
   /// Comments are a nicety on the detail page; their failure must not

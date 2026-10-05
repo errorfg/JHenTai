@@ -13,7 +13,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/l18n/locale_text.dart';
+import 'package:jhentai/src/model/gallery_comment.dart';
+import 'package:jhentai/src/model/gallery_detail.dart';
+import 'package:jhentai/src/model/gallery_page.dart';
 import 'package:jhentai/src/model/jh_layout.dart';
+import 'package:jhentai/src/pages/details/comment/eh_comment.dart';
+import 'package:jhentai/src/utils/eh_spider_parser.dart';
 import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/network/jm/jm_api.dart';
 import 'package:jhentai/src/network/jm/jm_source.dart';
@@ -142,6 +147,41 @@ void main() {
     await waitFor(tester, () => ranking.state.gallerys.isNotEmpty && ranking.state.loadingState != LoadingState.loading);
     expect(ranking.state.filter.period, 't');
     expect(ranking.state.gallerys.map((g) => g.gid).toList(), isNot(weeklyViews));
+  });
+
+  testWidgets('JM comments render as text with their date', (WidgetTester tester) async {
+    late List<GalleryComment> comments;
+    await tester.runAsync(() async {
+      // A popular album has comments.
+      final GalleryPageInfo popular = await ehRequest.jmSource.list(const JmFilterQuery(order: 'mv', period: 'w'));
+      final ({GalleryDetail galleryDetails, String apikey}) detail = await ehRequest.jmSource.detailPage(
+        galleryUrl: popular.gallerys.first.galleryUrl,
+        thumbnailsPageIndex: 0,
+        parser: EHSpiderParser.detailPage2GalleryAndDetailAndApikey,
+      );
+      comments = detail.galleryDetails.comments;
+    });
+    expect(comments, isNotEmpty);
+    expect(comments.first.time, matches(RegExp(r'^\d{4}-\d{2}-\d{2}$')));
+
+    for (final bool inDetailPage in <bool>[true, false]) {
+      await pumpApp(
+        tester,
+        Scaffold(
+          body: ListView(
+            children: [
+              for (final GalleryComment comment in comments.take(5))
+                EHComment(comment: comment, inDetailPage: inDetailPage, disableButtons: true),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+      expect(find.text(comments.first.time), findsWidgets);
+      final String firstText = comments.first.content.text.trim();
+      expect(find.textContaining(firstText.substring(0, firstText.length.clamp(0, 4)), findRichText: true), findsWidgets);
+    }
   });
 
   testWidgets('weekly picks open on the newest issue and switch kinds', (WidgetTester tester) async {

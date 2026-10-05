@@ -20,7 +20,7 @@ import 'package:jhentai/src/pages/setting/account/login/login_page.dart';
 import 'package:jhentai/src/pages/setting/account/login/login_page_logic.dart';
 import 'package:jhentai/src/pages/setting/account/setting_account_page.dart';
 import 'package:jhentai/src/service/log.dart';
-import 'package:jhentai/src/setting/jm_setting.dart';
+import 'package:jhentai/src/setting/jm_account_setting.dart';
 import 'package:jhentai/src/widget/loading_state_indicator.dart';
 
 import 'support/e2e_app.dart';
@@ -53,14 +53,14 @@ void main() {
       ),
       apiDomains: () => domains,
       onApiDomainsDiscovered: (List<String> latest) => domains = latest,
-      accountCookie: () => jmSetting.accountCookie,
+      accountCookie: () => jmAccountSetting.accountCookie,
     );
     ehRequest.jmSource = JmSource(api: api, imageDomain: () => JmApi.imageDomains.first);
   });
 
   setUp(() {
     appDb = AppDb.forTesting(NativeDatabase.memory());
-    jmSetting.applyBeanConfig('{}');
+    jmAccountSetting.applyBeanConfig('{}');
   });
 
   tearDown(() async {
@@ -143,7 +143,7 @@ void main() {
 
     expect(find.text('loginFail'), findsOneWidget);
     expect(find.text(serverMessage!), findsOneWidget);
-    expect(jmSetting.hasLoggedIn, isFalse);
+    expect(jmAccountSetting.hasLoggedIn, isFalse);
   });
 
   testWidgets(
@@ -161,14 +161,14 @@ void main() {
       await tapAndWait(tester, find.text('login'), () => logic.state.loginState != LoadingState.loading && logic.state.loginState != LoadingState.idle);
 
       expect(logic.state.loginState, LoadingState.success);
-      expect(jmSetting.hasLoggedIn, isTrue);
-      expect(jmSetting.accountCookie, contains('AVS='));
+      expect(jmAccountSetting.hasLoggedIn, isTrue);
+      expect(jmAccountSetting.accountCookie, contains('AVS='));
     },
     skip: '${settings['username'] ?? ''}'.isEmpty || '${settings['password'] ?? ''}'.isEmpty,
   );
 
   testWidgets('the account page lists the JM account and logs it out', (WidgetTester tester) async {
-    await tester.runAsync(() => jmSetting.saveAccount(const JmUser(id: 7, username: 'reader'), 'AVS=session'));
+    await tester.runAsync(() => jmAccountSetting.saveAccount(const JmUser(id: 7, username: 'reader'), 'AVS=session'));
     await pumpPage(tester, const SettingAccountPage());
 
     // E-Hentai and nhentai still have no account, so the entry stays.
@@ -181,8 +181,8 @@ void main() {
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
 
-    expect(jmSetting.hasLoggedIn, isFalse);
-    expect(jmSetting.accountCookie, isEmpty);
+    expect(jmAccountSetting.hasLoggedIn, isFalse);
+    expect(jmAccountSetting.accountCookie, isEmpty);
     expect(find.text('JM'), findsNothing);
   });
 }

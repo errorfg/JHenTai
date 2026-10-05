@@ -53,6 +53,7 @@ import 'package:jhentai/src/setting/network_setting.dart';
 import 'package:jhentai/src/setting/nhentai_api_setting.dart';
 import 'package:jhentai/src/setting/jm_setting.dart';
 import 'package:jhentai/src/setting/scheme_setting.dart';
+import 'package:jhentai/src/setting/jm_account_setting.dart';
 import 'package:jhentai/src/setting/eh2telegraph_setting.dart';
 import 'package:jhentai/src/setting/performance_setting.dart';
 import 'package:jhentai/src/setting/preference_setting.dart';
@@ -118,6 +119,7 @@ List<JHLifeCircleBean> lifeCircleBeans = [
   nhentaiApiSetting,
   jmSetting,
   schemeSetting,
+  jmAccountSetting,
   eh2telegraphSetting,
   performanceSetting,
   preferenceSetting,

@@ -16,10 +16,9 @@ import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/network/jm/jm_models.dart';
 import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/service/path_service.dart';
-import 'package:jhentai/src/service/sync_service.dart';
-import 'package:jhentai/src/setting/jm_setting.dart';
+import 'package:jhentai/src/setting/jm_account_setting.dart';
+import 'package:jhentai/src/utils/account_util.dart';
 import 'package:jhentai/src/setting/nhentai_api_setting.dart';
-import 'package:jhentai/src/setting/sync_setting.dart';
 import 'package:jhentai/src/setting/user_setting.dart';
 import 'package:jhentai/src/utils/eh_spider_parser.dart';
 import 'package:jhentai/src/utils/string_uril.dart';
@@ -61,7 +60,7 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
     final List<LoginSite> sites = [
       if (!userSetting.hasLoggedIn()) LoginSite.eh,
       if (nhentaiApiSetting.apiKey.value.isEmpty) LoginSite.nh,
-      if (!jmSetting.hasLoggedIn) LoginSite.jm,
+      if (!jmAccountSetting.hasLoggedIn) LoginSite.jm,
     ];
     return sites.isEmpty ? LoginSite.values : sites;
   }
@@ -208,9 +207,7 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
     }
 
     await nhentaiApiSetting.saveApiKey(apiKey);
-    if (syncSetting.enableSync.value && syncSetting.autoSync.value) {
-      unawaited(syncService.syncAfterLocalChange(types: const [CloudConfigTypeEnum.nhentaiApiSetting]));
-    }
+    unawaited(syncAccountIfAuto(CloudConfigTypeEnum.nhentaiApiSetting));
 
     state.loginState = LoadingState.success;
     update([loadingStateId]);
@@ -254,7 +251,8 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
       return;
     }
 
-    await jmSetting.saveAccount(account.user, account.cookie);
+    await jmAccountSetting.saveAccount(account.user, account.cookie);
+    unawaited(syncAccountIfAuto(CloudConfigTypeEnum.jmAccount));
 
     state.loginState = LoadingState.success;
     update([loadingStateId]);

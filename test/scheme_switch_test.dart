@@ -20,7 +20,7 @@ import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2_logic.dart';
 import 'package:jhentai/src/service/jm_favorite_service.dart';
 import 'package:jhentai/src/service/log.dart';
-import 'package:jhentai/src/setting/jm_setting.dart';
+import 'package:jhentai/src/setting/jm_account_setting.dart';
 import 'package:jhentai/src/setting/scheme_setting.dart';
 
 class _SilentLogService extends LogService {
@@ -63,7 +63,7 @@ void main() {
     log = _SilentLogService();
     appDb = AppDb.forTesting(NativeDatabase.memory());
     schemeSetting.site.value = ContentScheme.ehentai;
-    jmSetting.applyBeanConfig('{}');
+    jmAccountSetting.applyBeanConfig('{}');
     jmFavoriteService.applyBeanConfig('[]');
     Get.testMode = true;
   });
@@ -103,6 +103,14 @@ void main() {
     expect(mobileTabs(), contains(TabBarIconNameEnum.watched));
     expect(find.text('E-Hentai'), findsOneWidget);
 
+    // The account line sits right under the picker, above the first entry.
+    final Rect picker = tester.getRect(find.byKey(const Key('schemePicker')));
+    final Rect account = tester.getRect(find.byKey(const Key('schemeAccount')));
+    final Rect firstEntry = tester.getRect(find.byKey(const ValueKey<String>('readerMenu:home')));
+    expect(account.top, moreOrLessEquals(picker.bottom, epsilon: 4));
+    expect(account.left, moreOrLessEquals(picker.left, epsilon: 1));
+    expect(account.bottom, lessThan(firstEntry.top));
+
     await pickScheme(tester, 'JM');
     expect(schemeSetting.site.value, ContentScheme.jm);
     expect(mobileTabs(), <TabBarIconNameEnum>[
@@ -119,7 +127,7 @@ void main() {
     // The drawer now lists JM's pages, and its header the JM account.
     expect(find.text('每周必看'), findsOneWidget);
     expect(find.text('点击登录'), findsOneWidget);
-    await tester.runAsync(() => jmSetting.saveAccount(const JmUser(id: 1, username: 'reader'), 'AVS=x'));
+    await tester.runAsync(() => jmAccountSetting.saveAccount(const JmUser(id: 1, username: 'reader'), 'AVS=x'));
     await tester.pumpAndSettle();
     expect(find.textContaining('reader'), findsOneWidget);
 

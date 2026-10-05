@@ -6,6 +6,7 @@ import 'package:jhentai/src/model/config.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/jm_favorite_service.dart';
+import 'package:jhentai/src/setting/jm_account_setting.dart';
 import 'package:jhentai/src/service/nhentai_favorite_service.dart';
 import 'package:jhentai/src/service/wnacg_favorite_service.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
@@ -41,6 +42,7 @@ class CloudConfigService
     CloudConfigTypeEnum.nhentaiApiSetting: '1.0.0',
     CloudConfigTypeEnum.eh2telegraphSetting: '1.0.0',
     CloudConfigTypeEnum.jmFavorite: '1.0.0',
+    CloudConfigTypeEnum.jmAccount: '1.0.0',
   };
 
   static const int localConfigId = -1;
@@ -213,6 +215,18 @@ class CloudConfigService
         await eh2telegraphSetting.refreshBean();
         log.info('  ✅ eh2telegraph setting imported and refreshed');
         break;
+      case CloudConfigTypeEnum.jmAccount:
+        await localConfigService.batchWrite([
+          LocalConfigCompanion(
+            configKey: Value(ConfigEnum.jmAccountSetting.key),
+            subConfigKey: const Value(LocalConfigService.defaultSubConfigKey),
+            value: Value(config.config),
+            utime: Value(SyncTimeUtil.format(config.ctime)),
+          ),
+        ]);
+        await jmAccountSetting.refreshBean();
+        log.info('  ✅ JM account imported and refreshed');
+        break;
     }
   }
 
@@ -309,6 +323,16 @@ class CloudConfigService
       case CloudConfigTypeEnum.nhentaiApiSetting:
         List<LocalConfig> records = await localConfigService.readWithAllSubKeys(
           configKey: ConfigEnum.nhentaiApiSetting,
+        );
+        if (records.isEmpty) {
+          return null;
+        }
+        configValue = records.first.value;
+        localConfigTime = SyncTimeUtil.tryParse(records.first.utime);
+        break;
+      case CloudConfigTypeEnum.jmAccount:
+        List<LocalConfig> records = await localConfigService.readWithAllSubKeys(
+          configKey: ConfigEnum.jmAccountSetting,
         );
         if (records.isEmpty) {
           return null;

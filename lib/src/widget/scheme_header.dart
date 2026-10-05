@@ -84,19 +84,50 @@ class SchemeHeader extends StatelessWidget {
         final String? avatarUrl = scheme == ContentScheme.ehentai ? userSetting.avatarImgUrl.value : null;
         final String? account = _accountText(scheme);
 
-        return ListTile(
-          leading: CircleAvatar(
-            radius: 28,
-            backgroundColor: UIConfig.loginAvatarBackGroundColor(context),
-            foregroundImage: avatarUrl != null ? ExtendedNetworkImageProvider(avatarUrl, cache: true) : null,
-            child: Icon(scheme.icon, color: UIConfig.loginAvatarForeGroundColor(context), size: 28),
+        final VoidCallback? onTapAccount = site == null ? null : () => handleTapAccount(site);
+
+        // One block: the picker, and the account of the picked site right
+        // below it.
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: onTapAccount,
+                child: CircleAvatar(
+                  radius: 28,
+                  backgroundColor: UIConfig.loginAvatarBackGroundColor(context),
+                  foregroundImage: avatarUrl != null ? ExtendedNetworkImageProvider(avatarUrl, cache: true) : null,
+                  child: Icon(scheme.icon, color: UIConfig.loginAvatarForeGroundColor(context), size: 28),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SchemePicker(current: scheme, onBeforeSwitch: onBeforeSwitch),
+                    if (account != null)
+                      InkWell(
+                        key: const Key('schemeAccount'),
+                        onTap: onTapAccount,
+                        borderRadius: BorderRadius.circular(4),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Text(
+                            account,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          title: Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: SchemePicker(current: scheme, onBeforeSwitch: onBeforeSwitch),
-          ),
-          subtitle: account == null ? null : Text(account, maxLines: 1, overflow: TextOverflow.ellipsis),
-          onTap: site == null ? null : () => handleTapAccount(site),
         );
       }),
     );

@@ -113,6 +113,32 @@ void main() {
     }
   });
 
+  test('the lines are measured on this network', () async {
+    final JmLineMeasurement measurement = await api.measureLines(
+      domains,
+      <String>[...JmApi.imageDomains],
+    );
+    expect(measurement.api.keys, domains);
+    expect(measurement.api.values.whereType<Duration>(), isNotEmpty);
+    expect(measurement.image.values.whereType<Duration>(), isNotEmpty);
+    expect(measurement.recommendedImageHost, isNotEmpty);
+  });
+
+  test('a first start waits for the first measurement', () async {
+    JmLineMeasurement? saved;
+    final JmApi measuring = JmApi(
+      dio: dio,
+      apiDomains: () => domains,
+      discoverDomains: false,
+      linesMeasuredAt: () => saved == null ? null : DateTime.now(),
+      imageDomainCandidates: () => JmApi.imageDomains.take(2).toList(),
+      onLinesMeasured: (JmLineMeasurement m) async => saved = m,
+    );
+    await measuring.latest();
+    expect(saved, isNotNull);
+    expect(saved!.image.keys, JmApi.imageDomains.take(2));
+  });
+
   test('a refused login reports the server message', () async {
     await expectLater(
       api.login('jhentai-e2e-no-such-user-7f3a', 'not-a-password'),

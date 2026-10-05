@@ -32,6 +32,16 @@ Future<V> sharedRequest<V>(
   return request;
 }
 
+/// How fast each line answered (null when it failed), and the image host
+/// the JM server recommended.
+class JmLineMeasurement {
+  const JmLineMeasurement({required this.api, required this.image, this.recommendedImageHost});
+
+  final Map<String, Duration?> api;
+  final Map<String, Duration?> image;
+  final String? recommendedImageHost;
+}
+
 /// Client of the JM mobile API.
 ///
 /// The domain list comes from [apiDomains] (preferred first); requests move
@@ -48,8 +58,17 @@ class JmApi {
     this.onApiDomainsDiscovered,
     this.accountCookie,
     this.domainsDiscoveredAt,
+    this.linesMeasuredAt,
+    this.imageDomainCandidates,
+    this.onLinesMeasured,
     this.discoverDomains = true,
   }) : _dio = dio;
+
+  /// The lines are measured at most this often.
+  static const Duration lineMeasureInterval = Duration(hours: 24);
+
+  /// A small file every image line serves, for measuring the lines.
+  static const String imageProbePath = '/media/logo/new_logo.png';
 
   /// The domain servers are asked at most this often.
   static const Duration domainDiscoveryInterval = Duration(hours: 24);
@@ -97,6 +116,12 @@ class JmApi {
 
   /// When the stored domain list was last updated from the domain servers.
   final DateTime? Function()? domainsDiscoveredAt;
+
+  /// When the lines were last measured; with [onLinesMeasured], the client
+  /// measures them when due (see [lineMeasureInterval]).
+  final DateTime? Function()? linesMeasuredAt;
+  final List<String> Function()? imageDomainCandidates;
+  final Future<void> Function(JmLineMeasurement measurement)? onLinesMeasured;
   final bool discoverDomains;
 
   Future<void>? _ready;
@@ -324,6 +349,82 @@ class JmApi {
     return servers;
   }
 
+  /// Measures the lines and hands the result to [save]; requests then follow
+  /// the new order instead of the line that last worked.
+  Future<void> measureAndSave(Future<void> Function(JmLineMeasurement) save) async {
+    try {
+      await save(await measureLines(apiDomains(), imageDomainCandidates?.call() ?? imageDomains));
+      _workingDomain = null;
+    } catch (_) {
+      // Measuring is an optimisation; requests work without it.
+    }
+  }
+
+  /// Times a `/setting` request on each of [apiDomains] and the small
+  /// [imageProbePath] on each of [imageHosts], all at once. A line that
+  /// fails, or takes longer than [timeout], is null.
+  Future<JmLineMeasurement> measureLines(
+    List<String> apiDomains,
+    List<String> imageHosts, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    String? recommended;
+
+    Future<Duration?> timeApi(String domain) async {
+      final Stopwatch watch = Stopwatch()..start();
+      try {
+        final int ts = _now();
+        final Response<List<int>> response = await _dio
+            .get<List<int>>(
+              'https://$domain/setting',
+              options: Options(
+                responseType: ResponseType.bytes,
+                headers: <String, dynamic>{'user-agent': userAgent, ...JmCrypto.tokenHeaders(ts)},
+              ),
+            )
+            .timeout(timeout);
+        final Map<String, dynamic> body = _map(jsonDecode(utf8.decode(response.data ?? const <int>[])));
+        if (_int(body['code']) != 200) {
+          return null;
+        }
+        final Duration elapsed = watch.elapsed;
+        // The fastest line's answer recommends an image host.
+        final String host = Uri.tryParse(
+              '${_map(jsonDecode(JmCrypto.decrypt('${body['data']}', '$ts')))['img_host'] ?? ''}',
+            )?.host ??
+            '';
+        if (host.isNotEmpty) {
+          recommended ??= host;
+        }
+        return elapsed;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    Future<Duration?> timeImage(String host) async {
+      final Stopwatch watch = Stopwatch()..start();
+      try {
+        final Response<List<int>> response = await _dio
+            .get<List<int>>('https://$host$imageProbePath', options: Options(responseType: ResponseType.bytes))
+            .timeout(timeout);
+        return (response.data?.isNotEmpty ?? false) ? watch.elapsed : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final List<Future<Duration?>> api = apiDomains.map(timeApi).toList();
+    final List<Future<Duration?>> image = imageHosts.map(timeImage).toList();
+    final List<Duration?> apiTimes = await Future.wait(api);
+    final List<Duration?> imageTimes = await Future.wait(image);
+    return JmLineMeasurement(
+      api: <String, Duration?>{for (int i = 0; i < apiDomains.length; i++) apiDomains[i]: apiTimes[i]},
+      image: <String, Duration?>{for (int i = 0; i < imageHosts.length; i++) imageHosts[i]: imageTimes[i]},
+      recommendedImageHost: recommended,
+    );
+  }
+
   /// Runs [_prepare] once. After a failure, requests within
   /// [prepareRetryDelay] fail with the same error without a request.
   Future<void> _ensureReady() {
@@ -355,6 +456,17 @@ class JmApi {
       final List<String>? latest = await fetchLatestApiDomains();
       if (latest != null) {
         onApiDomainsDiscovered?.call(latest);
+      }
+    }
+
+    final Future<void> Function(JmLineMeasurement)? save = onLinesMeasured;
+    if (save != null) {
+      final DateTime? measuredAt = linesMeasuredAt?.call();
+      if (measuredAt == null) {
+        // The first measurement picks the line this start already uses.
+        await measureAndSave(save);
+      } else if (DateTime.now().difference(measuredAt) >= lineMeasureInterval) {
+        unawaited(measureAndSave(save));
       }
     }
     final ({String body, Headers headers}) response = await _send(

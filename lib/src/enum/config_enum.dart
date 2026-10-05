@@ -45,6 +45,7 @@ enum ConfigEnum {
   eh2telegraphSetting('eh2telegraphSetting'),
   jmSetting('jmSetting'),
   schemeSetting('schemeSetting'),
+  jmAccountSetting('jmAccountSetting'),
   komgaBrowseSetting('komgaBrowseSetting'),
   downloadSearchPageType('downloadSearchPageType'),
   windowFullScreen('windowFullScreen'),

@@ -257,9 +257,8 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
       title: Text('jmSetting'.tr),
       subtitle: Obx(
         () => Text(
-          jmSetting.preferredApiDomain.value.isEmpty
-              ? '${'auto'.tr} · ${jmSetting.imageDomain.value}'
-              : '${jmSetting.preferredApiDomain.value} · ${jmSetting.imageDomain.value}',
+          '${jmSetting.preferredApiDomain.value.isEmpty ? 'auto'.tr : jmSetting.preferredApiDomain.value}'
+          ' · ${jmSetting.preferredImageDomain.value.isEmpty ? 'auto'.tr : jmSetting.preferredImageDomain.value}',
         ),
       ),
       trailing: const Icon(Icons.keyboard_arrow_right).marginOnly(right: 4),

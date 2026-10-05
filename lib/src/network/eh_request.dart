@@ -45,6 +45,7 @@ import 'package:jhentai/src/network/jm/jm_api.dart';
 import 'package:jhentai/src/network/jm/jm_image.dart';
 import 'package:jhentai/src/network/jm/jm_source.dart';
 import 'package:jhentai/src/setting/jm_setting.dart';
+import 'package:jhentai/src/setting/jm_account_setting.dart';
 import 'package:jhentai/src/utils/proxy_util.dart';
 import 'package:jhentai/src/utils/string_uril.dart';
 import 'package:http_parser/http_parser.dart' show MediaType;
@@ -92,6 +93,7 @@ class EHRequest with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       nhentaiApiSetting,
       nhentaiTagIdService,
       jmSetting,
+      jmAccountSetting,
     ]);
 
   /// JM requests; their own Dio, because the shared one caches responses and
@@ -123,10 +125,13 @@ class EHRequest with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         ),
         apiDomains: jmSetting.orderedApiDomains,
         onApiDomainsDiscovered: jmSetting.saveDiscoveredApiDomains,
-        accountCookie: () => jmSetting.accountCookie,
+        accountCookie: () => jmAccountSetting.accountCookie,
         domainsDiscoveredAt: () => jmSetting.apiDomainsDiscoveredAt,
+        linesMeasuredAt: () => jmSetting.linesMeasuredAt,
+        imageDomainCandidates: jmSetting.imageDomainChoices,
+        onLinesMeasured: jmSetting.saveMeasurement,
       ),
-      imageDomain: () => jmSetting.imageDomain.value,
+      imageDomain: () => jmSetting.imageDomain,
     );
 
     systemProxyAddress = await getSystemProxyAddress();
