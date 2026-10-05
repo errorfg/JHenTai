@@ -16,6 +16,7 @@ import 'package:j_downloader/j_downloader.dart';
 import 'package:jhentai/src/database/dao/archive_group_dao.dart';
 import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/exception/eh_site_exception.dart';
+import 'package:jhentai/src/extension/dio_exception_extension.dart';
 import 'package:jhentai/src/model/archive_bot_response/archive_bot_response.dart';
 import 'package:jhentai/src/model/archive_bot_response/archive_resolve_vo.dart';
 import 'package:jhentai/src/model/archive_unlock_result.dart';
@@ -1476,10 +1477,8 @@ class ArchiveDownloadService extends GetxController
             cancelToken: archiveDownloadInfo.cancelToken,
             parser: EHSpiderParser.downloadArchivePage2DownloadUrl,
           ),
-          retryIf: (e) =>
-              e is DioException && e.type != DioExceptionType.cancel,
-          onRetry: (e) => log.download(
-              'Parse archive download url: ${archive.title} failed, retry. Reason: ${(e as DioException).message}'),
+          retryIf: (e) => e is DioException && e.type != DioExceptionType.cancel,
+          onRetry: (e) => log.download('Parse archive download url: ${archive.title} failed, retry. Reason: ${(e as DioException).errorMsg}'),
           maxAttempts: _maxRetryTimes,
         );
       } on DioException catch (e) {

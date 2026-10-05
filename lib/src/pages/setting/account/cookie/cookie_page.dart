@@ -159,7 +159,7 @@ class _CookiePageState extends State<CookiePage> {
       });
       return;
     } on DioException catch (e) {
-      log.error('Refresh igneous failed: ${e.message}');
+      log.error('Refresh igneous failed: ${e.errorMsg}');
       snack('refreshIgneousFailed'.tr, e.errorMsg ?? '');
       setStateSafely(() {
         _refreshIgneousState = LoadingState.error;

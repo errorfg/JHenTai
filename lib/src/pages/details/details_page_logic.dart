@@ -4,6 +4,7 @@ import 'dart:collection';
 import 'package:clipboard/clipboard.dart';
 import 'package:collection/collection.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
@@ -78,6 +79,7 @@ import '../../utils/uuid_util.dart';
 import '../../widget/eh_download_dialog.dart';
 import '../../widget/eh_download_hh_dialog.dart';
 import '../../widget/eh_gallery_history_dialog.dart';
+import '../../widget/eh_tag_bottom_sheet.dart';
 import '../../widget/eh_tag_dialog.dart';
 import '../../widget/jump_page_dialog.dart';
 import '../../widget/re_unlock_dialog.dart';
@@ -1634,17 +1636,28 @@ class DetailsPageLogic extends GetxController
       return;
     }
 
-    Get.dialog(
-      EHTagDialog(
+    bool useDialog = GetPlatform.isDesktop ||
+        PlatformDispatcher.instance.views.first.physicalSize.width / PlatformDispatcher.instance.views.first.devicePixelRatio >= 600;
+
+    if (useDialog) {
+      Get.dialog(EHTagDialog(
         tagData: tag.tagData,
         gid: state.galleryDetails!.galleryUrl.gid,
         token: state.galleryDetails!.galleryUrl.token,
         apikey: state.apikey!,
         voteStatus: tag.voteStatus,
-        onTagVoted: (bool isVoted, bool isCancel) =>
-            onTagVoted(tag, isVoted, isCancel),
-      ),
-    );
+        onTagVoted: (bool isVoted, bool isCancel) => onTagVoted(tag, isVoted, isCancel),
+      ));
+    } else {
+      EHTagBottomSheet.show(
+        tagData: tag.tagData,
+        gid: state.galleryDetails!.galleryUrl.gid,
+        token: state.galleryDetails!.galleryUrl.token,
+        apikey: state.apikey!,
+        voteStatus: tag.voteStatus,
+        onTagVoted: (bool isVoted, bool isCancel) => onTagVoted(tag, isVoted, isCancel),
+      );
+    }
   }
 
   Future<void> toggleNhentaiBlacklistTag(GalleryTag tag) async {
@@ -2111,10 +2124,9 @@ class DetailsPageLogic extends GetxController
           continue;
         }
 
-        Color? backGroundColor =
-            tagInfo.tag.backgroundColor ?? tagInfo.tagSetBackGroundColor;
-        tag.backgroundColor =
-            backGroundColor ?? UIConfig.ehWatchedTagDefaultBackGroundColor;
+        Color? backGroundColor = tagInfo.tag.backgroundColor ?? tagInfo.tagSetBackGroundColor;
+        bool hidden = tagInfo.tag.hidden || tagInfo.tag.weight < 0;
+        tag.backgroundColor = backGroundColor ?? (hidden ? UIConfig.ehHiddenTagDefaultBackGroundColor : UIConfig.ehWatchedTagDefaultBackGroundColor);
         tag.color = backGroundColor == null
             ? const Color(0xFFF1F1F1)
             : ThemeData.estimateBrightnessForColor(backGroundColor) ==

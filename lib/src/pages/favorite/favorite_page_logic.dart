@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_navigation/get_navigation.dart';
 import 'package:get/get_utils/get_utils.dart';
+import 'package:jhentai/src/extension/dio_exception_extension.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
 import 'package:jhentai/src/model/gallery_page.dart';
 import 'package:jhentai/src/network/eh_request.dart';
@@ -165,8 +166,8 @@ class FavoritePageLogic extends BasePageLogic {
         return loadMore(checkLoadingState: false);
       }
 
-      log.error('change favorite sort order fail', e.message);
-      snack('failed'.tr, e.message ?? '');
+      log.error('change favorite sort order fail', e.errorMsg);
+      snack('failed'.tr, e.errorMsg ?? '');
       state.loadingState = LoadingState.error;
       updateSafely([loadingStateId]);
       return;

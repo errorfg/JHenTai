@@ -315,6 +315,10 @@ class pt_BR {
       'addLocalTags': 'Add Tags',
       'hidden': 'Escondido',
       'nope': 'Nope(Não)',
+      'status': 'Status',
+      'tagSetDefaultColor': 'Cor padrão do conjunto de tags',
+      'weight': 'Peso',
+      'color': 'Cor',
       'getTagSetFailed': 'Falha ao obter conjunto de tags',
       'updateTagSetFailed': 'Falha na atualização do conjunto de tags',
       'updateTagFailed': 'Falha na atualização do conjunto de tags',
@@ -399,7 +403,7 @@ class pt_BR {
       'enableDefaultFavorite': 'Enable Default Favorite',
       'enableDefaultFavoriteHint': 'Long press to re-select',
       'enableDefaultTagSet': 'Enable Default Tag Set',
-      'enableDefaultTagSetHint': 'Long press to re-select',
+      'enableDefaultTagSetHint': 'Add to your default tag set directly',
       'disableDefaultTagSetHint': 'Select manually',
       'launchInFullScreen': 'Launch In Full Screen',
       'launchInFullScreenHint': 'Switch manually by F11',
@@ -1125,6 +1129,19 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'pdfLibraryEmpty':
           'Nenhum PDF foi encontrado nos caminhos adicionais de galerias.',
       'pdfHasNoPages': 'Este PDF não tem páginas legíveis',
+
+      /// tag dialog actions
+      'tagActionAccurate': 'Accurate',
+      'tagActionInaccurate': 'Inaccurate',
+      'tagActionFollow': 'Follow',
+      'tagActionHide': 'Hide Tag',
+      'tagActionTagSets': 'Manage Tag Sets',
+      'tagActionVoteUpTooltip': 'Vote that this tag is correct for this gallery',
+      'tagActionVoteDownTooltip': 'Vote that this tag is wrong for this gallery',
+      'tagActionFollowHint': 'Add this tag to a watched tag set',
+      'tagActionHideHint': 'Add this tag to a hidden tag set',
+      'tagActionTagSetsHint': 'Open tag set management',
+      'currentTagSet': 'Current',
 
       /// tag namespace
       'language': 'Idioma',

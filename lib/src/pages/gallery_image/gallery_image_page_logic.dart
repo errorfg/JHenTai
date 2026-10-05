@@ -222,10 +222,9 @@ class GalleryImagePageLogic extends GetxController {
           continue;
         }
 
-        Color? backGroundColor =
-            tagInfo.tag.backgroundColor ?? tagInfo.tagSetBackGroundColor;
-        tag.backgroundColor =
-            backGroundColor ?? UIConfig.ehWatchedTagDefaultBackGroundColor;
+        Color? backGroundColor = tagInfo.tag.backgroundColor ?? tagInfo.tagSetBackGroundColor;
+        bool hidden = tagInfo.tag.hidden || tagInfo.tag.weight < 0;
+        tag.backgroundColor = backGroundColor ?? (hidden ? UIConfig.ehHiddenTagDefaultBackGroundColor : UIConfig.ehWatchedTagDefaultBackGroundColor);
         tag.color = backGroundColor == null
             ? const Color(0xFFF1F1F1)
             : ThemeData.estimateBrightnessForColor(backGroundColor) ==

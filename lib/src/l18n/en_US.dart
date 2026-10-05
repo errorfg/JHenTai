@@ -309,6 +309,10 @@ class en_US {
       'addLocalTags': 'Add Tags',
       'hidden': 'Hidden',
       'nope': 'Nope',
+      'status': 'Status',
+      'tagSetDefaultColor': 'Default color of tag set',
+      'weight': 'Weight',
+      'color': 'Color',
       'getTagSetFailed': 'Get Tag Set Failed',
       'updateTagSetFailed': 'Update Tag Set Failed',
       'updateTagFailed': 'Update Tag Failed',
@@ -390,7 +394,7 @@ class en_US {
       'enableDefaultFavorite': 'Enable Default Favorite',
       'enableDefaultFavoriteHint': 'Long press to re-select',
       'enableDefaultTagSet': 'Enable Default Tag Set',
-      'enableDefaultTagSetHint': 'Long press to re-select',
+      'enableDefaultTagSetHint': 'Add to your default tag set directly',
       'disableDefaultTagSetHint': 'Select manually',
       'launchInFullScreen': 'Launch In Full Screen',
       'launchInFullScreenHint': 'Switch manually by F11',
@@ -1236,6 +1240,19 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'pdfLibraryEmpty':
           'No PDFs were found in the additional gallery scan paths.',
       'pdfHasNoPages': 'This PDF has no readable pages',
+
+      /// tag dialog actions
+      'tagActionAccurate': 'Accurate',
+      'tagActionInaccurate': 'Inaccurate',
+      'tagActionFollow': 'Follow',
+      'tagActionHide': 'Hide Tag',
+      'tagActionTagSets': 'Manage Tag Sets',
+      'tagActionVoteUpTooltip': 'Vote that this tag is correct for this gallery',
+      'tagActionVoteDownTooltip': 'Vote that this tag is wrong for this gallery',
+      'tagActionFollowHint': 'Add this tag to a watched tag set',
+      'tagActionHideHint': 'Add this tag to a hidden tag set',
+      'tagActionTagSetsHint': 'Open tag set management',
+      'currentTagSet': 'Current',
 
       /// tag namespace
       'language': 'Language',

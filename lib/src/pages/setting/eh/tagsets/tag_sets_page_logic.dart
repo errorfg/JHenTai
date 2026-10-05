@@ -1,17 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/extension/dio_exception_extension.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
 import 'package:jhentai/src/network/eh_request.dart';
-import 'package:jhentai/src/pages/setting/eh/tagsets/tag_sets_page.dart';
 import 'package:jhentai/src/setting/my_tags_setting.dart';
 import 'package:jhentai/src/setting/user_setting.dart';
 import 'package:jhentai/src/utils/eh_spider_parser.dart';
-import 'package:jhentai/src/utils/search_util.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
-import 'package:jhentai/src/widget/eh_context_menu.dart';
 
 import '../../../../database/database.dart';
 import '../../../../exception/eh_site_exception.dart';
@@ -31,6 +27,7 @@ class TagSetsLogic extends GetxController with Scroll2TopLogicMixin {
   static const String loadingStateId = 'loadingStateId';
   static const String tagSetId = 'tagSetId';
   static const String tagId = 'tagId';
+  static const String searchId = 'searchId';
 
   final TagSetsState state = TagSetsState();
 
@@ -40,8 +37,68 @@ class TagSetsLogic extends GetxController with Scroll2TopLogicMixin {
   @override
   void onInit() {
     super.onInit();
-
     getCurrentTagSet();
+  }
+
+  @override
+  void onClose() {
+    state.searchController.dispose();
+    super.onClose();
+  }
+
+  List<WatchedTag> get filteredTags {
+    if (state.searchKeyword.isEmpty) {
+      return state.tags;
+    }
+    String keyword = state.searchKeyword.toLowerCase();
+    return state.tags.where((tag) => _matchTag(tag, keyword)).toList();
+  }
+
+  /// Suggestions complete the keyword to a full tag name from the current tag set.
+  List<WatchedTag> get autoCompleteSuggestions {
+    if (state.searchKeyword.isEmpty) {
+      return const [];
+    }
+    return filteredTags.take(8).toList();
+  }
+
+  bool _matchTag(WatchedTag tag, String keyword) {
+    TagData tagData = tag.tagData;
+    if ('${tagData.namespace}:${tagData.key}'.toLowerCase().contains(keyword)) {
+      return true;
+    }
+    if (tagData.key.toLowerCase().contains(keyword)) {
+      return true;
+    }
+    if (tagData.tagName?.toLowerCase().contains(keyword) ?? false) {
+      return true;
+    }
+    return tagData.translatedNamespace?.toLowerCase().contains(keyword) ?? false;
+  }
+
+  void enterSearchMode() {
+    state.searchMode = true;
+    updateSafely([searchId]);
+  }
+
+  void exitSearchMode() {
+    Get.focusScope?.unfocus();
+    state.searchMode = false;
+    state.searchKeyword = '';
+    state.searchController.clear();
+    updateSafely([searchId, bodyId]);
+  }
+
+  void updateSearchKeyword(String keyword) {
+    state.searchKeyword = keyword;
+    updateSafely([bodyId]);
+  }
+
+  void applySuggestion(WatchedTag tag) {
+    Get.focusScope?.unfocus();
+    String keyword = '${tag.tagData.namespace}:${tag.tagData.key}';
+    state.searchController.text = keyword;
+    updateSearchKeyword(keyword);
   }
 
   Future<void> getCurrentTagSet() async {
@@ -126,47 +183,14 @@ class TagSetsLogic extends GetxController with Scroll2TopLogicMixin {
     myTagsSetting.refreshOnlineTagSets(state.currentTagSetNo);
   }
 
-  Future<void> handleUpdateTagColor(int tagSetIndex, Color? newColor) async {
-    if (newColor == state.tags[tagSetIndex].backgroundColor) {
+  /// Pack all edited fields (status / weight / color) into one API call.
+  Future<void> handleUpdateTag(int tagSetIndex, WatchedTag newTag) async {
+    WatchedTag oldTag = state.tags[tagSetIndex];
+    if (newTag.watched == oldTag.watched && newTag.hidden == oldTag.hidden && newTag.weight == oldTag.weight && newTag.backgroundColor == oldTag.backgroundColor) {
       return;
     }
 
-    WatchedTag tagSet = state.tags[tagSetIndex].copyWith();
-    tagSet.backgroundColor = newColor;
-    await _updateTag(tagSet);
-
-    myTagsSetting.refreshOnlineTagSets(state.currentTagSetNo);
-  }
-
-  Future<void> handleUpdateTagWeight(int tagSetIndex, String value) async {
-    int? newValue = int.tryParse(value);
-    if (newValue == null || newValue == state.tags[tagSetIndex].weight) {
-      return;
-    }
-
-    WatchedTag tagSet = state.tags[tagSetIndex].copyWith(weight: newValue);
-    _updateTag(tagSet);
-  }
-
-  Future<void> handleUpdateTagStatus(int tagSetIndex, TagSetStatus newStatus) async {
-    TagSetStatus oldStatus = state.tags[tagSetIndex].watched
-        ? TagSetStatus.watched
-        : state.tags[tagSetIndex].hidden
-            ? TagSetStatus.hidden
-            : TagSetStatus.nope;
-
-    if (newStatus == oldStatus) {
-      return;
-    }
-
-    WatchedTag tagSet = state.tags[tagSetIndex].copyWith(
-      watched: newStatus == TagSetStatus.watched,
-      hidden: newStatus == TagSetStatus.hidden,
-    );
-
-    await _updateTag(tagSet);
-
-    myTagsSetting.refreshOnlineTagSets(state.currentTagSetNo);
+    await _updateTag(newTag);
   }
 
   Future<void> deleteTag(int tagSetIndex) async {
@@ -205,45 +229,6 @@ class TagSetsLogic extends GetxController with Scroll2TopLogicMixin {
     updateSafely([bodyId]);
 
     myTagsSetting.refreshOnlineTagSets(state.currentTagSetNo);
-  }
-
-  Future<void> showBottomSheet(int index, BuildContext context, {Offset? position}) async {
-    Get.focusScope?.unfocus();
-
-    WatchedTag tag = state.tags[index];
-
-    showEHContextMenu(
-      context,
-      position: position,
-      actions: [
-        EHContextMenuAction(
-          text: 'search'.tr,
-          icon: Icon(Icons.search),
-          onTap: () => newSearch(keyword: '${tag.tagData.namespace}:${tag.tagData.key}'),
-        ),
-        EHContextMenuAction(
-          text: 'favorite'.tr,
-          icon: Icon(Icons.favorite, color: UIConfig.tagSetsPageIconDefaultColor(context)),
-          onTap: () => handleUpdateTagStatus(index, TagSetStatus.watched),
-        ),
-        EHContextMenuAction(
-          text: 'hidden'.tr,
-          icon: Icon(Icons.not_interested, color: UIConfig.tagSetsPageIconDefaultColor(context)),
-          onTap: () => handleUpdateTagStatus(index, TagSetStatus.hidden),
-        ),
-        EHContextMenuAction(
-          text: 'nope'.tr,
-          icon: Icon(Icons.question_mark, color: UIConfig.tagSetsPageIconDefaultColor(context)),
-          onTap: () => handleUpdateTagStatus(index, TagSetStatus.nope),
-        ),
-        EHContextMenuAction(
-          text: 'delete'.tr,
-          icon: Icon(Icons.delete, color: UIConfig.alertColor(context)),
-          color: UIConfig.alertColor(context),
-          onTap: () => deleteTag(index),
-        ),
-      ],
-    );
   }
 
   Future<void> _updateTag(WatchedTag tag) async {
