@@ -111,7 +111,6 @@ void main() {
       expect(alpha.language, 'ja');
       expect(alpha.genres, <String>['action']);
       expect(alpha.tags, <String>['tag-a']);
-      expect(alpha.readingDirection, 'RIGHT_TO_LEFT');
       expect(alpha.authors.map((KomgaAuthor a) => a.name), <String>['Author A']);
     });
   });

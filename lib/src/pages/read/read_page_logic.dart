@@ -826,11 +826,6 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   }
 
   ReadDirection get effectiveReadDirection {
-    final ReadDirection user = _userReadDirection;
-    return state.readPageInfo.readDirectionFor?.call(user) ?? user;
-  }
-
-  ReadDirection get _userReadDirection {
     if (readSetting.enableOrientationSpecificReadDirection.isFalse ||
         !GetPlatform.isMobile) {
       return readSetting.readDirection.value;

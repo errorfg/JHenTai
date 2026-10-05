@@ -79,7 +79,6 @@ class KomgaSeries {
     this.publisher = '',
     this.language = '',
     this.genres = const <String>[],
-    this.readingDirection = '',
     this.ageRating,
     this.releaseDate,
   });
@@ -104,9 +103,6 @@ class KomgaSeries {
   final String publisher;
   final String language;
   final List<String> genres;
-
-  /// LEFT_TO_RIGHT, RIGHT_TO_LEFT, VERTICAL, WEBTOON, or empty when unset.
-  final String readingDirection;
   final int? ageRating;
   final DateTime? releaseDate;
 
@@ -145,7 +141,6 @@ class KomgaSeries {
       publisher: metadata['publisher'] as String? ?? '',
       language: metadata['language'] as String? ?? '',
       genres: _parseStringList(metadata['genres']),
-      readingDirection: metadata['readingDirection'] as String? ?? '',
       ageRating: (metadata['ageRating'] as num?)?.toInt(),
       releaseDate: _parseKomgaDate(booksMetadata['releaseDate']),
     );

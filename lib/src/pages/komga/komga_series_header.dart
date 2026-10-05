@@ -62,8 +62,6 @@ class _KomgaSeriesHeaderState extends State<KomgaSeriesHeader> {
     final List<String> facts = <String>[
       if (series.status.isNotEmpty && series.status != 'ONGOING')
         _statusLabel(series.status),
-      if (series.readingDirection.isNotEmpty)
-        _directionLabel(series.readingDirection),
       if (series.releaseDate != null) series.releaseDate!.year.toString(),
       if (series.ageRating != null) '${series.ageRating}+',
     ];
@@ -191,13 +189,5 @@ class _KomgaSeriesHeaderState extends State<KomgaSeriesHeader> {
     'ABANDONED' => 'komgaStatusAbandoned'.tr,
     'HIATUS' => 'komgaStatusHiatus'.tr,
     _ => status,
-  };
-
-  static String _directionLabel(String direction) => switch (direction) {
-    'LEFT_TO_RIGHT' => 'komgaDirectionLeftToRight'.tr,
-    'RIGHT_TO_LEFT' => 'komgaDirectionRightToLeft'.tr,
-    'VERTICAL' => 'komgaDirectionVertical'.tr,
-    'WEBTOON' => 'komgaDirectionWebtoon'.tr,
-    _ => direction,
   };
 }

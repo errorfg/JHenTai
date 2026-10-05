@@ -7,7 +7,6 @@ import 'package:jhentai/src/service/gallery_download_service.dart';
 import 'package:jhentai/src/service/komga_download_service.dart';
 import 'package:jhentai/src/service/komga_progress_sync_service.dart';
 import 'package:jhentai/src/service/log.dart';
-import 'package:jhentai/src/setting/read_setting.dart';
 
 /// A book that cannot be opened, with a message for the user.
 class KomgaOpenException implements Exception {
@@ -19,35 +18,6 @@ class KomgaOpenException implements Exception {
   String toString() => message;
 }
 
-/// Map a Komga series reading direction onto the user's read direction:
-/// keep the user's layout (single page, fit width, double page, list) and
-/// change only the direction. Vertical and webtoon series use the vertical
-/// list. An unset direction keeps the user's choice.
-ReadDirection komgaReadDirection(String komga, ReadDirection user) {
-  const Map<ReadDirection, ReadDirection> toRightToLeft = {
-    ReadDirection.top2bottomList: ReadDirection.right2leftSinglePage,
-    ReadDirection.left2rightSinglePage: ReadDirection.right2leftSinglePage,
-    ReadDirection.left2rightSinglePageFitWidth:
-        ReadDirection.right2leftSinglePageFitWidth,
-    ReadDirection.left2rightDoubleColumn: ReadDirection.right2leftDoubleColumn,
-    ReadDirection.left2rightList: ReadDirection.right2leftList,
-  };
-  const Map<ReadDirection, ReadDirection> toLeftToRight = {
-    ReadDirection.top2bottomList: ReadDirection.left2rightSinglePage,
-    ReadDirection.right2leftSinglePage: ReadDirection.left2rightSinglePage,
-    ReadDirection.right2leftSinglePageFitWidth:
-        ReadDirection.left2rightSinglePageFitWidth,
-    ReadDirection.right2leftDoubleColumn: ReadDirection.left2rightDoubleColumn,
-    ReadDirection.right2leftList: ReadDirection.left2rightList,
-  };
-  return switch (komga) {
-    'RIGHT_TO_LEFT' => toRightToLeft[user] ?? user,
-    'LEFT_TO_RIGHT' => toLeftToRight[user] ?? user,
-    'VERTICAL' || 'WEBTOON' => ReadDirection.top2bottomList,
-    _ => user,
-  };
-}
-
 /// Prepares reader sessions for Komga books, from the server or from a
 /// download.
 class KomgaReaderLauncher {
@@ -55,17 +25,12 @@ class KomgaReaderLauncher {
 
   final KomgaClient client;
 
-  /// [seriesReadingDirection] avoids a series lookup when the caller knows
-  /// it; null means "look it up".
-  Future<ReadPageInfo> prepare(
-    KomgaBook book, {
-    String? seriesReadingDirection,
-  }) async {
+  Future<ReadPageInfo> prepare(KomgaBook book) async {
     final KomgaDownloadedBook? downloaded = komgaDownloadService.downloaded(
       client.progressRecordKey(book.id),
     );
     if (downloaded != null) {
-      return _prepareDownloaded(downloaded, seriesReadingDirection);
+      return _prepareDownloaded(downloaded);
     }
     if (book.isTextEpub) {
       throw KomgaOpenException('komgaBookTextEpub'.tr);
@@ -75,12 +40,12 @@ class KomgaReaderLauncher {
     }
 
     final List<KomgaBookPage> pages = (await client.getBookPages(book.id))
-      ..sort((KomgaBookPage a, KomgaBookPage b) => a.number.compareTo(b.number));
+      ..sort(
+        (KomgaBookPage a, KomgaBookPage b) => a.number.compareTo(b.number),
+      );
     if (pages.isEmpty) {
       throw KomgaOpenException('komgaBookHasNoPages'.tr);
     }
-    final String direction =
-        seriesReadingDirection ?? await _seriesDirection(book.seriesId);
     final int start = await komgaProgressSyncService.reconcileBeforeOpen(
       client,
       book,
@@ -95,20 +60,12 @@ class KomgaReaderLauncher {
       mode: ReadMode.remote,
       images: images,
       initialIndex: start.clamp(0, images.length - 1),
-      direction: direction,
     );
   }
 
   Future<ReadPageInfo> _prepareDownloaded(
     KomgaDownloadedBook downloaded,
-    String? seriesReadingDirection,
   ) async {
-    // Downloads made before the direction was recorded have none; ask the
-    // server when it is reachable.
-    final String direction = downloaded.readingDirection.isNotEmpty
-        ? downloaded.readingDirection
-        : seriesReadingDirection ??
-              await _seriesDirection(downloaded.book.seriesId);
     // Reconciles with the server when it is reachable, local progress
     // otherwise.
     final int start = await komgaProgressSyncService.reconcileBeforeOpen(
@@ -129,7 +86,6 @@ class KomgaReaderLauncher {
       mode: ReadMode.local,
       images: images,
       initialIndex: start.clamp(0, images.length - 1),
-      direction: direction,
     );
   }
 
@@ -138,7 +94,6 @@ class KomgaReaderLauncher {
     required ReadMode mode,
     required List<GalleryImage> images,
     required int initialIndex,
-    required String direction,
   }) {
     return ReadPageInfo(
       mode: mode,
@@ -151,10 +106,7 @@ class KomgaReaderLauncher {
       reportReadProgress: (int imageIndex) =>
           komgaProgressSyncService.report(client, book, imageIndex),
       loadSiblingBook: ({required bool next}) =>
-          _prepareSibling(book, next: next, direction: direction),
-      readDirectionFor: direction.isEmpty
-          ? null
-          : (ReadDirection user) => komgaReadDirection(direction, user),
+          _prepareSibling(book, next: next),
     );
   }
 
@@ -181,7 +133,6 @@ class KomgaReaderLauncher {
   Future<ReadPageInfo?> _prepareSibling(
     KomgaBook book, {
     required bool next,
-    required String direction,
   }) async {
     KomgaBook? sibling;
     try {
@@ -193,7 +144,7 @@ class KomgaReaderLauncher {
     if (sibling == null) {
       return null;
     }
-    return prepare(sibling, seriesReadingDirection: direction);
+    return prepare(sibling);
   }
 
   /// The neighbouring downloaded volume of the same series.
@@ -205,16 +156,9 @@ class KomgaReaderLauncher {
         .toList();
     final Iterable<KomgaBook> candidates = next
         ? volumes.where((KomgaBook b) => b.numberSort > book.numberSort)
-        : volumes.reversed.where((KomgaBook b) => b.numberSort < book.numberSort);
+        : volumes.reversed.where(
+            (KomgaBook b) => b.numberSort < book.numberSort,
+          );
     return candidates.isEmpty ? null : candidates.first;
-  }
-
-  Future<String> _seriesDirection(String seriesId) async {
-    try {
-      return (await client.getSeries(seriesId)).readingDirection;
-    } catch (e) {
-      log.warning('Komga series lookup failed; using the user direction', e);
-      return '';
-    }
   }
 }

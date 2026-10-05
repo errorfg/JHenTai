@@ -291,14 +291,9 @@ class _KomgaPageState extends State<KomgaPage> {
     }
     setState(() => _openingBookId = book.id);
     try {
-      final String? direction = switch (controller.current) {
-        final KomgaSeriesLevel level when level.series.id == book.seriesId =>
-          level.series.readingDirection,
-        _ => null,
-      };
       final ReadPageInfo info = await KomgaReaderLauncher(
         controller.client,
-      ).prepare(book, seriesReadingDirection: direction);
+      ).prepare(book);
       if (!mounted || !identical(controller, _controller)) {
         return;
       }

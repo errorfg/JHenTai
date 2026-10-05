@@ -13,7 +13,6 @@ import 'package:jhentai/src/service/komga_download_service.dart';
 import 'package:jhentai/src/service/komga_progress_sync_service.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
-import 'package:jhentai/src/setting/read_setting.dart';
 
 import 'support/e2e_app.dart';
 import 'support/local_komga.dart';
@@ -252,19 +251,11 @@ void main() {
   });
 
   group('reader sessions', () {
-    test('online books stream pages and follow the series direction', () async {
+    test('online books stream pages and open their neighbours', () async {
       final ReadPageInfo info = await KomgaReaderLauncher(client).prepare(alpha[1]);
       expect(info.mode, ReadMode.remote);
       expect(info.pageCount, 4);
       expect(info.images!.first.thumbnailUrl, contains('/pages/1/thumbnail'));
-      expect(
-        info.readDirectionFor!(ReadDirection.left2rightSinglePage),
-        ReadDirection.right2leftSinglePage,
-      );
-      expect(
-        info.readDirectionFor!(ReadDirection.left2rightDoubleColumn),
-        ReadDirection.right2leftDoubleColumn,
-      );
 
       final ReadPageInfo next = (await info.loadSiblingBook!(next: true))!;
       expect(next.galleryTitle, '${TestLibrary.alpha} vol 3');
@@ -296,13 +287,6 @@ void main() {
       final ReadPageInfo info = await offline.prepare(alpha[0]);
       expect(info.mode, ReadMode.local);
       expect(info.images!.every((dynamic image) => File(image.path as String).existsSync()), isTrue);
-      // The series reads right to left; the download recorded it, so the
-      // direction applies offline too.
-      expect(
-        komgaDownloadService.downloaded(client.progressRecordKey(alpha[0].id))!.readingDirection,
-        'RIGHT_TO_LEFT',
-      );
-      expect(info.readDirectionFor!(ReadDirection.left2rightSinglePage), ReadDirection.right2leftSinglePage);
 
       final ReadPageInfo next = (await info.loadSiblingBook!(next: true))!;
       expect(next.mode, ReadMode.local);

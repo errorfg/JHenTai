@@ -58,7 +58,7 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - dedicated PDF library for scanned local PDF files (including Windows rendering via pdfx).
   - Komga browsing with server-side paging, sorting and filters, full-text search, a home page (continue reading, on deck, recently added/updated series, downloads), series details with clickable metadata, and card/list/detail layouts.
   - two-way Komga read-progress sync that tolerates clock skew between devices and the server, with retry of failed reports; mark books or whole series read/unread.
-  - Komga reader integration: previous/next book, the series reading direction, page thumbnails, and PNG conversion for formats Flutter cannot decode.
+  - Komga reader integration: previous/next book, page thumbnails, and PNG conversion for formats Flutter cannot decode; the layout always follows the reader's own settings, not the server's series reading direction.
   - offline Komga downloads of single books or whole series, readable without the server, with progress reported once back online.
   - Komga source pages reuse the complete JHenTai navigation drawer and consistent light/dark app surfaces.
 - Framework:

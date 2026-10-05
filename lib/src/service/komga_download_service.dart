@@ -22,7 +22,6 @@ class KomgaDownloadedBook {
     required this.connectionId,
     required this.book,
     required this.bookJson,
-    required this.readingDirection,
     required this.imagePaths,
     required this.downloadedAt,
   });
@@ -30,9 +29,6 @@ class KomgaDownloadedBook {
   final String connectionId;
   final KomgaBook book;
   final Map<String, dynamic> bookJson;
-
-  /// Komga series reading direction at download time; empty when unset.
-  final String readingDirection;
   final List<String> imagePaths;
   final DateTime downloadedAt;
 
@@ -41,7 +37,6 @@ class KomgaDownloadedBook {
   Map<String, dynamic> toJson() => <String, dynamic>{
     'connectionId': connectionId,
     'book': bookJson,
-    'readingDirection': readingDirection,
     'images': imagePaths
         .map((String path) => path.split(Platform.pathSeparator).last)
         .toList(),
@@ -55,7 +50,6 @@ class KomgaDownloadedBook {
       connectionId: json['connectionId'] as String,
       book: KomgaBook.fromJson(bookJson),
       bookJson: bookJson,
-      readingDirection: json['readingDirection'] as String? ?? '',
       imagePaths: (json['images'] as List<dynamic>)
           .map((dynamic name) => '${dir.path}${Platform.pathSeparator}$name')
           .toList(),
@@ -67,10 +61,9 @@ class KomgaDownloadedBook {
 enum KomgaDownloadState { queued, downloading, extracting, failed }
 
 class KomgaDownloadTask {
-  KomgaDownloadTask(this.book, this.readingDirection);
+  KomgaDownloadTask(this.book);
 
   final KomgaBook book;
-  final String readingDirection;
   KomgaDownloadState state = KomgaDownloadState.queued;
 
   /// Download progress in [0, 1]; null when the size is unknown.
@@ -155,18 +148,14 @@ class KomgaDownloadService extends ChangeNotifier
   }
 
   /// Queue [book]; already downloaded or queued books are skipped.
-  void enqueue(
-    KomgaClient client,
-    KomgaBook book, {
-    String readingDirection = '',
-  }) {
+  void enqueue(KomgaClient client, KomgaBook book) {
     final String key = client.progressRecordKey(book.id);
     final KomgaDownloadTask? existing = _tasks[key];
     if (_downloaded.containsKey(key) ||
         (existing != null && existing.state != KomgaDownloadState.failed)) {
       return;
     }
-    _tasks[key] = KomgaDownloadTask(book, readingDirection);
+    _tasks[key] = KomgaDownloadTask(book);
     _queue.add((client, key));
     notifyListeners();
     unawaited(_drain());
@@ -187,7 +176,7 @@ class KomgaDownloadService extends ChangeNotifier
     for (final KomgaBook book in books.content.where(
       (KomgaBook b) => b.isReadable,
     )) {
-      enqueue(client, book, readingDirection: series.readingDirection);
+      enqueue(client, book);
     }
   }
 
@@ -249,17 +238,6 @@ class KomgaDownloadService extends ChangeNotifier
       throw StateError('Book has no image pages');
     }
     final Map<String, dynamic> bookJson = await client.getBookJson(book.id);
-    // Offline reading needs the series direction; single-book downloads from
-    // a book list do not know it.
-    String readingDirection = task.readingDirection;
-    if (readingDirection.isEmpty) {
-      try {
-        readingDirection = (await client.getSeries(book.seriesId))
-            .readingDirection;
-      } catch (e) {
-        log.warning('Komga series direction lookup failed', e);
-      }
-    }
 
     final Directory dir = _bookDir(client.connectionId, book.id);
     if (await dir.exists()) {
@@ -306,7 +284,6 @@ class KomgaDownloadService extends ChangeNotifier
       connectionId: client.connectionId,
       book: KomgaBook.fromJson(bookJson),
       bookJson: bookJson,
-      readingDirection: readingDirection,
       imagePaths: images,
       downloadedAt: DateTime.now(),
     );
