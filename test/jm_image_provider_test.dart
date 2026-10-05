@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:jhentai/src/network/jm/jm_image.dart';
@@ -73,6 +72,39 @@ void main() {
       );
       expect((thumbnail.width, thumbnail.height), (60, 500));
       await _expectBands(thumbnail);
+    });
+  });
+
+  testWidgets('a halftone screen like the ones in manga shrinks without coarse dots', (WidgetTester tester) async {
+    // Round dots on a grid at 45 degrees, 8 pixels apart: about the screen
+    // of a scanned tankōbon page at JM's resolution.
+    const double pitch = 8;
+    final img.Image tone = img.Image(width: 1200, height: 1700);
+    for (int y = 0; y < 1700; y++) {
+      for (int x = 0; x < 1200; x++) {
+        final double u = (x + y) / math.sqrt2 / pitch;
+        final double v = (x - y) / math.sqrt2 / pitch;
+        final double du = u - u.roundToDouble();
+        final double dv = v - v.roundToDouble();
+        final int value = du * du + dv * dv < 0.12 ? 0 : 255;
+        tone.setPixelRgb(x, y, value, value, value);
+      }
+    }
+    final Uint8List png = img.encodePng(tone);
+
+    await tester.runAsync(() async {
+      final ui.Image thumbnail = await _decode(
+        JmNetworkImageProvider('https://cdn.example.test/media/photos/1/00001.webp#jmStrips=2', strips: 2, maxBytes: 128 * 1024),
+        png,
+      );
+      final ByteData pixels = (await thumbnail.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+      final List<int> grey = <int>[for (int i = 0; i < thumbnail.width * thumbnail.height; i++) pixels.getUint8(i * 4)];
+      final double mean = grey.reduce((int a, int b) => a + b) / grey.length;
+      final double deviation = math.sqrt(
+        grey.map((int v) => (v - mean) * (v - mean)).reduce((double a, double b) => a + b) / grey.length,
+      );
+      // Coarse dots would show as a large spread around the mean grey.
+      expect(deviation, lessThan(6), reason: 'mean $mean');
     });
   });
 

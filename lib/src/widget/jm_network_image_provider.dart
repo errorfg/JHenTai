@@ -9,8 +9,9 @@ import 'package:jhentai/src/network/jm/jm_image.dart';
 /// Loads a JM page image and puts its strips back in order before display.
 ///
 /// Resizing happens here too, for thumbnails ([maxBytes]): JM pages are
-/// large and full of screentones, which need an averaging downscale. [maxBytes] is part
-/// of equality so a thumbnail never serves a full-size request.
+/// large and full of screentones, which need a filtered downscale.
+/// [maxBytes] is part of equality so a thumbnail never serves a full-size
+/// request.
 class JmNetworkImageProvider extends network_image_io.ExtendedNetworkImageProvider {
   JmNetworkImageProvider(
     String url, {
@@ -52,14 +53,24 @@ class JmNetworkImageProvider extends network_image_io.ExtendedNetworkImageProvid
     });
     image.dispose();
 
-    // Thumbnails: halve while at least twice the target. Bilinear sampling
-    // at exactly half size averages each 2x2 block, so fine screentones
-    // turn grey instead of into moiré, whatever the renderer does with
-    // mipmaps. The last step is under 2x.
-    while (current.width >= targetWidth * 2 && current.height >= targetHeight * 2) {
-      current = await _resize(current, current.width ~/ 2, current.height ~/ 2);
-    }
-    if (current.width != targetWidth || current.height != targetHeight) {
+    // Thumbnails: screentones are dot grids finer than a thumbnail can
+    // show; shrunk as they are, they fold into coarse dots (moiré). A
+    // Gaussian blur scaled to the shrink factor first averages them into
+    // grey, as a proper resampling filter does; the blur is drawn by the
+    // renderer, so the result does not depend on whether it smooths when
+    // scaling. 0.4 per unit of shrink came closest to a Lanczos reference
+    // on real JM pages.
+    if (scale < 1) {
+      final double sigma = 0.4 / scale;
+      final ui.Image source = current;
+      current = await _paint(source.width, source.height, (Canvas canvas) {
+        canvas.drawImage(
+          source,
+          Offset.zero,
+          Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma, tileMode: TileMode.clamp),
+        );
+      });
+      source.dispose();
       current = await _resize(current, targetWidth, targetHeight);
     }
 
