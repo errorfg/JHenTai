@@ -81,6 +81,7 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
             _buildNhentaiDomains(),
             _buildEh2Telegraph(),
             if (GetPlatform.isAndroid) _buildVerifyAppLinks(),
+            if (GetPlatform.isAndroid) _buildRefreshRate(),
             _buildInNoImageMode(),
             _buildImportData(context),
             _buildExportData(context),
@@ -246,6 +247,14 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
       subtitle: Obx(() => Text(ehSetting.nhentaiDomains.join(', '))),
       trailing: const Icon(Icons.keyboard_arrow_right).marginOnly(right: 4),
       onTap: () => toRoute(Routes.nhentaiDomains),
+    );
+  }
+
+  Widget _buildRefreshRate() {
+    return ListTile(
+      title: Text('refreshRate'.tr),
+      trailing: const Icon(Icons.keyboard_arrow_right).marginOnly(right: 4),
+      onTap: () => toRoute(Routes.settingFrameRate),
     );
   }
 

@@ -50,6 +50,7 @@ enum ConfigEnum {
   windowWidth('windowWidth'),
   windowHeight('windowHeight'),
   leftColumnWidthRatio('leftColumnWidthRatio'),
+  frameRateMode('frameRateMode'),
 
   /// config
   ehCookie('eh_cookies'),
