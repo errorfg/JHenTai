@@ -34,6 +34,8 @@ class ko_KR {
       'receiveDataTimeoutHint': 'Network receive data timeout',
       'archiveError': 'Download Archive Error',
       'edit': 'Edit',
+      'confirmDestructiveActions': '파괴적 작업 확인',
+      'confirmDestructiveActionsHint': '켜면 다운로드 페이지에서 작업 삭제, 다시 다운로드 등 파괴적 작업 전에 확인 대화상자가 표시됩니다',
 
       'home': "홈",
       'gallery': "갤러리",
@@ -597,6 +599,7 @@ class ko_KR {
       /// preference setting page
       'showR18GImageDirectly': 'R18G 이미지 표시',
       'defaultTab': 'Default Tab',
+      'defaultDownloadTab': 'Default Download Tab',
       'showUtcTime': 'Show UTC Time for Gallery',
       'showDawnInfo': 'Show new dawn event',
       'showEncounterMonster': 'Show hentaiVerse monster encounter event',
@@ -768,6 +771,7 @@ class ko_KR {
       'originalImage': '원본',
       'resampleImage': '압축',
       'defaultGalleryGroup': 'Default Gallery Group',
+      'prioritizeRecentGalleryGroups': '최근 사용한 갤러리 그룹 우선',
       'defaultArchiveGroup': 'Default Archive Group',
       'never': '영원히 안 함',
       'manual': '수동',

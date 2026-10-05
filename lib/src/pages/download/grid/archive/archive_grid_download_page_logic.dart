@@ -61,9 +61,11 @@ class ArchiveGridDownloadPageLogic extends GetxController
 
   @override
   Future<void> handleRemoveItem(ArchiveDownloadedData archive) async {
-    await archiveDownloadService
-        .deleteArchive(archive.gid)
-        .then((_) => super.handleRemoveItem(archive));
+    bool confirmed = await confirmDestructiveAction(title: 'delete'.tr + '?');
+    if (!confirmed) {
+      return;
+    }
+    await archiveDownloadService.deleteArchive(archive.gid).then((_) => super.handleRemoveItem(archive));
     updateGlobalGalleryStatus();
   }
 

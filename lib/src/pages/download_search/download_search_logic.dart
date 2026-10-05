@@ -395,6 +395,11 @@ class DownloadSearchLogic extends GetxController with UpdateGlobalGalleryStatusL
       if (result == null || !result) {
         return;
       }
+    } else if (preferenceSetting.confirmDestructiveActions.isTrue) {
+      bool? result = await Get.dialog(EHDialog(title: 'delete'.tr + '?'));
+      if (result == null || !result) {
+        return;
+      }
     }
 
     state.gallerys.remove(gallery);
@@ -428,6 +433,12 @@ class DownloadSearchLogic extends GetxController with UpdateGlobalGalleryStatusL
   }
 
   Future<void> handleRemoveArchive(ArchiveSearchVO archive) async {
+    if (preferenceSetting.confirmDestructiveActions.isTrue) {
+      bool? result = await Get.dialog(EHDialog(title: 'delete'.tr + '?'));
+      if (result == null || !result) {
+        return;
+      }
+    }
     state.archives.remove(archive);
     await archiveDownloadService.deleteArchive(archive.gid);
     update([bodyId]);

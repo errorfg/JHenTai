@@ -420,8 +420,8 @@ class DetailsPageLogic extends GetxController
           currentGroup: downloadSetting.defaultGalleryGroup.value,
           candidates: galleryDownloadService.allGroups,
           showDownloadOriginalImageCheckBox: userSetting.hasLoggedIn(),
-          downloadOriginalImage:
-              downloadSetting.downloadOriginalImageByDefault.value,
+          downloadOriginalImage: downloadSetting.downloadOriginalImageByDefault.value,
+          preferredGroups: downloadSetting.preferredGalleryGroups,
         ),
       );
 
@@ -432,6 +432,8 @@ class DetailsPageLogic extends GetxController
       if (state.gallery == null && state.galleryDetails == null) {
         return;
       }
+
+      unawaited(downloadSetting.saveRecentGalleryGroup(result.group));
 
       GalleryDownloadedData galleryDownloadedData = GalleryDownloadedData(
         gid:
