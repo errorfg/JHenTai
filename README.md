@@ -61,8 +61,10 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - Komga reader integration: previous/next book, page thumbnails, and PNG conversion for formats Flutter cannot decode; the layout always follows the reader's own settings, not the server's series reading direction.
   - offline Komga downloads of single books or whole series, readable without the server, with progress reported once back online.
   - Komga source pages reuse the complete JHenTai navigation drawer and consistent light/dark app surfaces.
+  - Komga book and series menus also open with a right click, at the pointer on desktop layouts.
 - Framework:
-  - Flutter upgraded to 3.44.4, fixing dialogs auto-dismissing on iPadOS 26.1+ (flutter/flutter#177992).
+  - Flutter upgraded to 3.44.8, fixing dialogs auto-dismissing on iPadOS 26.1+ (flutter/flutter#177992).
+  - in-app update check, update dialog, About page, AltStore source and Linux package homepage point to this fork; the update check compares build numbers, so build-only fix releases are offered too.
 - CI/workflow updates in this fork:
   - branch checks for non-master branches with Android APK artifact uploads.
   - branch check focus on Android release APK artifact.
