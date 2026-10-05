@@ -204,7 +204,10 @@ class pt_BR {
       'addTagFailed': 'Add Tag Failed',
       'parentGallery': 'Parent',
       'blockUploaderLocally': 'Block user locally',
-      'block': 'Block',
+      'blockTitleLocally': 'Bloquear título selecionado localmente',
+      'blockRuleAlreadyExists': 'Esta regra já existe',
+      'blockThisGallery': 'Block this gallery',
+      'blockGallerySuccess': 'Gallery blocked. You can modify it in Preference - Block Rules',
 
       /// detail dialog
       'galleryUrl': 'Gallery Url',

@@ -47,6 +47,7 @@ import 'details_page_state.dart';
 
 class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
   final String tag = newUUID();
+  final bool enableLocalTitleBlocking;
 
   late final DetailsPageLogic logic;
   late final DetailsPageState state;
@@ -57,12 +58,12 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
   @override
   Scroll2TopStateMixin get scroll2TopState => state;
 
-  DetailsPage({super.key}) {
+  DetailsPage({super.key}) : enableLocalTitleBlocking = true {
     logic = Get.put(DetailsPageLogic(), tag: tag);
     state = logic.state;
   }
 
-  DetailsPage.preview({super.key});
+  DetailsPage.preview({super.key}) : enableLocalTitleBlocking = false;
 
   @override
   Widget build(BuildContext context) {
@@ -177,7 +178,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                         value: 5,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [Text('block'.tr), const Icon(Icons.block)],
+                          children: [Text('blockThisGallery'.tr), const Icon(Icons.block)],
                         ),
                       ),
                     PopupMenuItem(
@@ -370,13 +371,13 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
             letterSpacing: UIConfig.detailsPageTitleLetterSpacing,
             height: UIConfig.detailsPageTitleTextHeight,
           ),
-          contextMenuBuilder:
-              (BuildContext context, EditableTextState editableTextState) {
-                AdaptiveTextSelectionToolbar toolbar =
-                    AdaptiveTextSelectionToolbar.buttonItems(
-                      buttonItems: editableTextState.contextMenuButtonItems,
-                      anchors: editableTextState.contextMenuAnchors,
-                    );
+          contextMenuBuilder: (BuildContext context, EditableTextState editableTextState) {
+            AdaptiveTextSelectionToolbar toolbar = AdaptiveTextSelectionToolbar.buttonItems(
+              buttonItems: editableTextState.contextMenuButtonItems,
+              anchors: editableTextState.contextMenuAnchors,
+            );
+
+            _appendTitleContextMenuItems(toolbar, editableTextState);
 
                 if (!editableTextState
                     .currentTextEditingValue
@@ -463,17 +464,13 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                 minLines: 1,
                 maxLines: 2,
                 style: UIConfig.detailsPageSubTitleTextStyle(context),
-                contextMenuBuilder:
-                    (
-                      BuildContext context,
-                      EditableTextState editableTextState,
-                    ) {
-                      AdaptiveTextSelectionToolbar toolbar =
-                          AdaptiveTextSelectionToolbar.buttonItems(
-                            buttonItems:
-                                editableTextState.contextMenuButtonItems,
-                            anchors: editableTextState.contextMenuAnchors,
-                          );
+                contextMenuBuilder: (BuildContext context, EditableTextState editableTextState) {
+                  AdaptiveTextSelectionToolbar toolbar = AdaptiveTextSelectionToolbar.buttonItems(
+                    buttonItems: editableTextState.contextMenuButtonItems,
+                    anchors: editableTextState.contextMenuAnchors,
+                  );
+
+                  _appendTitleContextMenuItems(toolbar, editableTextState);
 
                       if (!editableTextState
                           .currentTextEditingValue
@@ -506,6 +503,42 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
             );
           },
         ),
+      ),
+    );
+  }
+
+  void _appendTitleContextMenuItems(
+    AdaptiveTextSelectionToolbar toolbar,
+    EditableTextState editableTextState,
+  ) {
+    TextEditingValue editingValue = editableTextState.currentTextEditingValue;
+    if (editingValue.selection.isCollapsed) {
+      return;
+    }
+
+    String rawSelectedText = editingValue.selection.textInside(editingValue.text);
+    toolbar.buttonItems?.add(
+      ContextMenuButtonItem(
+        label: 'search'.tr,
+        onPressed: () {
+          ContextMenuController.removeAny();
+          newSearch(keyword: rawSelectedText, forceNewRoute: true);
+        },
+      ),
+    );
+
+    String selectedText = rawSelectedText.trim();
+    if (!enableLocalTitleBlocking || selectedText.isEmpty) {
+      return;
+    }
+
+    toolbar.buttonItems?.add(
+      ContextMenuButtonItem(
+        label: 'blockTitleLocally'.tr,
+        onPressed: () {
+          ContextMenuController.removeAny();
+          logic.blockTitle(selectedText);
+        },
       ),
     );
   }

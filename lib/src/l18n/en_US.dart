@@ -199,7 +199,10 @@ class en_US {
       'addTagFailed': 'Add Tag Failed',
       'parentGallery': 'Parent',
       'blockUploaderLocally': 'Block user locally',
-      'block': 'Block',
+      'blockTitleLocally': 'Block selected title locally',
+      'blockRuleAlreadyExists': 'This rule already exists',
+      'blockThisGallery': 'Block this gallery',
+      'blockGallerySuccess': 'Gallery blocked. You can modify it in Preference - Block Rules',
 
       /// detail dialog
       'galleryUrl': 'Gallery Url',

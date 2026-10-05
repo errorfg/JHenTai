@@ -189,7 +189,10 @@ class zh_CN {
       'addTagFailed': '添加标签失败',
       'parentGallery': '父画廊',
       'blockUploaderLocally': '本地屏蔽上传者',
-      'block': '屏蔽',
+      'blockTitleLocally': '本地屏蔽已选中标题',
+      'blockRuleAlreadyExists': '该规则已存在',
+      'blockThisGallery': '屏蔽该画廊',
+      'blockGallerySuccess': '已屏蔽该画廊，可在 偏好设置-屏蔽规则 中修改',
 
       /// detail dialog
       'galleryUrl': '画廊链接',

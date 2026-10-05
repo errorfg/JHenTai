@@ -1795,6 +1795,35 @@ class DetailsPageLogic extends GetxController
     toast('success'.tr);
   }
 
+  Future<void> blockTitle(String title) async {
+    String expression = title.trim();
+    if (expression.isEmpty) {
+      return;
+    }
+
+    LocalBlockRule rule = LocalBlockRule(
+      groupId: newUUID(),
+      target: LocalBlockTargetEnum.gallery,
+      attribute: LocalBlockAttributeEnum.title,
+      pattern: LocalBlockPatternEnum.like,
+      expression: expression,
+    );
+
+    try {
+      ({bool success, bool inserted, String? msg}) result = await localBlockRuleService.insertBlockRuleIfAbsent(rule);
+      if (!result.success) {
+        snack('configureBlockRuleFailed'.tr, result.msg ?? '');
+      } else if (result.inserted) {
+        toast('success'.tr);
+      } else {
+        toast('blockRuleAlreadyExists'.tr);
+      }
+    } catch (e, stack) {
+      log.error('Block title failed, expression:$expression', e, stack);
+      snack('configureBlockRuleFailed'.tr, e.toString());
+    }
+  }
+
   Future<void> handleResetReadProgress() async {
     await readProgressService.deleteReadProgress(
       state.galleryUrl.gid.toString(),
@@ -1813,7 +1842,7 @@ class DetailsPageLogic extends GetxController
         expression: state.galleryUrl.gid.toString(),
       ),
     );
-    toast('success'.tr);
+    toast('blockGallerySuccess'.tr);
   }
 
   Future<void> goToReadPage([int? forceIndex]) async {

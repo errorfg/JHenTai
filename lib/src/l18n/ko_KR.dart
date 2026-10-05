@@ -193,7 +193,10 @@ class ko_KR {
       'addTagFailed': 'Add Tag Failed',
       'parentGallery': 'Parent',
       'blockUploaderLocally': 'Block user locally',
-      'block': 'Block',
+      'blockTitleLocally': '선택한 제목을 로컬에서 차단',
+      'blockRuleAlreadyExists': '이 규칙은 이미 존재합니다',
+      'blockThisGallery': 'Block this gallery',
+      'blockGallerySuccess': 'Gallery blocked. You can modify it in Preference - Block Rules',
 
       /// detail dialog
       'galleryUrl': '갤러리 주소',

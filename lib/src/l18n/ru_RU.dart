@@ -205,7 +205,10 @@ class ru_RU {
       'addTagFailed': 'Не удалось добавить тег',
       'parentGallery': 'Родительская галерея',
       'blockUploaderLocally': 'Заблокировать пользователя локально',
-      'block': 'Block',
+      'blockTitleLocally': 'Заблокировать выбранное название локально',
+      'blockRuleAlreadyExists': 'Это правило уже существует',
+      'blockThisGallery': 'Заблокировать эту галерею',
+      'blockGallerySuccess': 'Галерея заблокирована. Изменить можно в Настройках — Правила блокировки',
 
       /// detail dialog
       'galleryUrl': 'URL Галереи',
