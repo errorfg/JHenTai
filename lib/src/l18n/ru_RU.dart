@@ -575,8 +575,8 @@ class ru_RU {
       'right2leftDoubleColumn': 'Справа налево (Две колонки)',
       'left2rightList': 'Слева направо (Непрерывно)',
       'right2leftList': 'Справа налево (Непрерывно)',
-      'enablePageTurnByVolumeKeys':
-          'Использовать клавиши громкости для перелистывания',
+      'enablePageTurnByVolumeKeys': 'Использовать клавиши громкости для перелистывания',
+      'enablePageTurnByVolumeKeysHint': 'В iOS, если громкость равна 0 или 100%, при входе в режим чтения она будет автоматически изменена для поддержки перелистывания и восстановлена при выходе',
       'enablePageTurnAnime': 'Включить анимацию перелистывания',
       'enableDoubleTapToScaleUp': 'Включить двойной тап для увеличения',
       'enableTapDragToScaleUp': 'Включить тап с перетаскиванием для увеличения',

@@ -44,8 +44,8 @@ import '../../utils/toast_util.dart';
 import '../../widget/auto_mode_interval_dialog.dart';
 import '../../widget/loading_state_indicator.dart';
 import '../home_page.dart';
-import '../setting/read/setting_read_page.dart';
 import '../setting/keyboard_shortcuts/setting_keyboard_shortcuts_page.dart';
+import '../setting/read/setting_read_page.dart';
 
 /// Whether a scrolling layout shows the end of the book: the last image is
 /// visible down to its trailing edge. The tolerance absorbs rounding when the
@@ -239,8 +239,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
   ReadPageState state = ReadPageState();
 
-  BaseLayoutLogic get layoutLogic =>
-      effectiveReadDirection == ReadDirection.top2bottomList
+  BaseLayoutLogic get layoutLogic => effectiveReadDirection == ReadDirection.top2bottomList
       ? Get.find<VerticalListLayoutLogic>()
       : isInListReadDirection
       ? Get.find<HorizontalListLayoutLogic>()
@@ -487,6 +486,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
     state.focusNode.dispose();
     refreshCurrentTimeAndBatteryLevelTimer.cancel();
+    toggleTurnPageByVolumeKeyLister.dispose();
     toggleCurrentImmersiveModeLister.dispose();
     readDirectionLister.dispose();
     imageSpaceLister.dispose();
@@ -675,6 +675,11 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   }
 
   void listen2VolumeKeys() {
+    if (readSetting.enablePageTurnByVolumeKeys.isFalse) {
+      volumeService.cancelListen();
+      return;
+    }
+
     volumeService.listen((VolumeEventType type) {
       if (type == VolumeEventType.volumeUp) {
         layoutLogic.toPrev();
@@ -682,14 +687,10 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
         layoutLogic.toNext();
       }
     });
-    volumeService.setInterceptVolumeEvent(
-      readSetting.enablePageTurnByVolumeKeys.value,
-    );
   }
 
   void restoreVolumeListener() {
     volumeService.cancelListen();
-    volumeService.setInterceptVolumeEvent(false);
   }
 
   /// If [immersiveMode], switch to [SystemUiMode.immersiveSticky], otherwise reset to [SystemUiMode.edgeToEdge]
@@ -889,9 +890,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
         readSetting.enableOrientationSpecificReadDirection.isFalse) {
       return readSetting.imageRegionWidthRatio.value;
     }
-    return isPortrait
-        ? readSetting.portraitImageRegionWidthRatio.value
-        : readSetting.landscapeImageRegionWidthRatio.value;
+    return isPortrait ? readSetting.portraitImageRegionWidthRatio.value : readSetting.landscapeImageRegionWidthRatio.value;
   }
 
   bool get effectiveDisplayFirstPageAlone {
@@ -899,9 +898,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
         readSetting.enableOrientationSpecificReadDirection.isFalse) {
       return readSetting.displayFirstPageAlone.value;
     }
-    return isPortrait
-        ? readSetting.portraitDisplayFirstPageAlone.value
-        : readSetting.landscapeDisplayFirstPageAlone.value;
+    return isPortrait ? readSetting.portraitDisplayFirstPageAlone.value : readSetting.landscapeDisplayFirstPageAlone.value;
   }
 
   bool get isInListReadDirection =>
