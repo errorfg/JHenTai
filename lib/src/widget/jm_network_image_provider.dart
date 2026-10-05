@@ -8,9 +8,9 @@ import 'package:jhentai/src/network/jm/jm_image.dart';
 
 /// Loads a JM page image and puts its strips back in order before display.
 ///
-/// Resizing happens here too, while the strips are drawn, because a resize
-/// after restoring could not reuse the decode-time size hint. [maxBytes]
-/// is part of equality so a thumbnail never serves a full-size request.
+/// Resizing happens here too: the image is decoded at the size [maxBytes]
+/// allows, then its strips are drawn in order. [maxBytes] is part of
+/// equality so a thumbnail never serves a full-size request.
 class JmNetworkImageProvider extends network_image_io.ExtendedNetworkImageProvider {
   JmNetworkImageProvider(
     String url, {
@@ -27,17 +27,29 @@ class JmNetworkImageProvider extends network_image_io.ExtendedNetworkImageProvid
 
   @override
   Future<ui.Codec> instantiateImageCodec(Uint8List data, ImageDecoderCallback decode) async {
-    final ui.Codec source = await ui.instantiateImageCodec(data);
-    final ui.Image image = (await source.getNextFrame()).image;
-    source.dispose();
-
-    final int width = image.width;
-    final int height = image.height;
+    final ui.ImmutableBuffer encoded = await ui.ImmutableBuffer.fromUint8List(data);
+    final ui.ImageDescriptor source = await ui.ImageDescriptor.encoded(encoded);
+    final int width = source.width;
+    final int height = source.height;
     final int? limit = maxBytes;
     final double scale = limit != null && width * height * 4 > limit ? math.sqrt(limit / (width * height * 4)) : 1;
     final int targetWidth = math.max(1, (width * scale).floor());
     final int targetHeight = math.max(1, (height * scale).floor());
 
+    // A thumbnail is decoded at its own size: a JM page can be several
+    // megapixels, and decoding it in full for a thumbnail is most of the
+    // work.
+    final ui.Codec codec = scale < 1
+        ? await source.instantiateCodec(targetWidth: targetWidth, targetHeight: targetHeight)
+        : await source.instantiateCodec();
+    final ui.Image image = (await codec.getNextFrame()).image;
+    codec.dispose();
+    source.dispose();
+    encoded.dispose();
+
+    // Strip edges are computed on the stored height, then scaled to the
+    // decoded image.
+    final double sourceScale = image.height / height;
     final ui.PictureRecorder recorder = ui.PictureRecorder();
     final Canvas canvas = Canvas(recorder);
     final Paint paint = Paint()
@@ -49,7 +61,7 @@ class JmNetworkImageProvider extends network_image_io.ExtendedNetworkImageProvid
       final double bottom = ((strip.dstY + strip.height) * scale).roundToDouble();
       canvas.drawImageRect(
         image,
-        Rect.fromLTWH(0, strip.srcY.toDouble(), width.toDouble(), strip.height.toDouble()),
+        Rect.fromLTWH(0, strip.srcY * sourceScale, image.width.toDouble(), strip.height * sourceScale),
         Rect.fromLTRB(0, top, targetWidth.toDouble(), bottom),
         paint,
       );

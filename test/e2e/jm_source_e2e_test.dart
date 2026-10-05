@@ -204,14 +204,64 @@ void main() {
     expect(identical(source.weeks(), source.weeks()), isTrue);
   });
 
+  test('details of an album from a list come in one round of requests', () async {
+    final Map<String, DateTime> started = <String, DateTime>{};
+    final Map<String, DateTime> finished = <String, DateTime>{};
+    final Dio timed = Dio(dio.options)
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (RequestOptions options, RequestInterceptorHandler handler) {
+            started[options.uri.path] = DateTime.now();
+            handler.next(options);
+          },
+          onResponse: (Response<dynamic> response, ResponseInterceptorHandler handler) {
+            finished[response.requestOptions.uri.path] = DateTime.now();
+            handler.next(response);
+          },
+        ),
+      );
+    final JmSource fresh = JmSource(
+      api: JmApi(dio: timed, apiDomains: () => domains, discoverDomains: false),
+      imageDomain: () => JmApi.imageDomains.first,
+    );
+    final GalleryPageInfo list = await fresh.galleryPage(keyword: 'MANA');
+    started.clear();
+    finished.clear();
+
+    await fresh.detailPage(
+      galleryUrl: list.gallerys.first.galleryUrl,
+      thumbnailsPageIndex: 0,
+      parser: EHSpiderParser.detailPage2GalleryAndDetailAndApikey,
+    );
+
+    const List<String> paths = <String>['/chapter', '/album', '/chapter_view_template', '/forum'];
+    expect(started.keys, containsAll(paths));
+    // Every request went out before any of them came back.
+    final DateTime firstBack = paths.map((String p) => finished[p]!).reduce((DateTime a, DateTime b) => a.isBefore(b) ? a : b);
+    for (final String path in paths) {
+      expect(started[path]!.isBefore(firstBack), isTrue, reason: '$path started after a response');
+    }
+  });
+
   test('concurrent first requests for a chapter share one request each', () async {
     final Map<String, int> requests = <String, int>{};
+    // Answers with data; a domain answering with a server error is retried
+    // on the next one, which is a second attempt but not a second request.
+    final Map<String, int> answered = <String, int>{};
     final Dio counting = Dio(dio.options)
       ..interceptors.add(
         InterceptorsWrapper(
           onRequest: (RequestOptions options, RequestInterceptorHandler handler) {
             requests[options.uri.path] = (requests[options.uri.path] ?? 0) + 1;
             handler.next(options);
+          },
+          onResponse: (Response<dynamic> response, ResponseInterceptorHandler handler) {
+            final String body = utf8.decode(response.data as List<int>, allowMalformed: true);
+            final String path = response.requestOptions.uri.path;
+            if (path == '/chapter_view_template' || body.trimLeft().startsWith('{')) {
+              answered[path] = (answered[path] ?? 0) + 1;
+            }
+            handler.next(response);
           },
         ),
       );
@@ -230,12 +280,11 @@ void main() {
       ),
     ]);
 
-    expect(requests['/chapter'], 1);
-    expect(requests['/album'], 1);
-    expect(requests['/chapter_view_template'], 1);
-    // One session start; a domain answering with a server error moves it
-    // on to the next domain.
-    expect(requests['/setting'], inInclusiveRange(1, domains.length));
+    expect(answered['/chapter'], 1);
+    expect(answered['/album'], 1);
+    expect(answered['/chapter_view_template'], 1);
+    expect(answered['/setting'], 1);
+    expect(requests['/chapter']! + requests['/album']! + requests['/chapter_view_template']!, lessThanOrEqualTo(3 * domains.length));
   });
 
   test('chapters of a multi-chapter album are galleries of their own', () async {

@@ -105,7 +105,13 @@ class JmSource {
   /// parses many pages of a chapter at once) share one request.
   final Map<int, Future<JmAlbum>> _albums = <int, Future<JmAlbum>>{};
   final Map<int, Future<JmChapter>> _chapters = <int, Future<JmChapter>>{};
+  /// Album of each chapter seen, and ids known to be albums (from lists):
+  /// with these a detail page requests chapter and album at once.
   final Map<int, int> _albumIdOfChapter = <int, int>{};
+  final Set<int> _albumIds = <int>{};
+
+  int? _knownAlbumOf(int chapterId) =>
+      _albumIdOfChapter[chapterId] ?? (_albumIds.contains(chapterId) ? chapterId : null);
 
   /// E-Hentai category of albums seen in lists; album details lack it.
   final Map<int, String> _categories = <int, String>{};
@@ -257,14 +263,23 @@ class JmSource {
       _chapters.remove(chapterId);
       _albums.remove(_albumIdOfChapter[chapterId]);
     }
-    final JmChapter chapter = await _chapter(chapterId);
+    // Requested together; the album waits for the chapter only when it is
+    // not known which album the chapter belongs to.
+    final Future<JmChapter> chapterRequest = _chapter(chapterId);
+    final Future<int> scrambleRequest = api.scrambleId(chapterId);
+    final int? knownAlbum = _knownAlbumOf(chapterId);
+    final Future<JmAlbum>? albumRequest = knownAlbum == null ? null : _album(knownAlbum);
+
+    final JmChapter chapter = await chapterRequest;
     _albumIdOfChapter[chapter.id] = chapter.albumId;
-    final JmAlbum album = await _album(chapter.albumId);
-    final int scrambleId = await api.scrambleId(chapter.id);
+    final JmAlbum album = await (knownAlbum == chapter.albumId ? albumRequest! : _album(chapter.albumId));
+    for (final JmChapterRef ref in album.chapters) {
+      _albumIdOfChapter[ref.id] = album.id;
+    }
     return JmChapterBundle(
       album: album,
       chapter: chapter,
-      scrambleId: scrambleId,
+      scrambleId: await scrambleRequest,
     );
   }
 
@@ -274,12 +289,20 @@ class JmSource {
     required HtmlParser<T> parser,
     bool useCache = true,
   }) async {
+    // Comments go out with the rest when the album is known.
+    final int? knownAlbum = _knownAlbumOf(galleryUrl.jmChapterId);
+    final Future<List<GalleryComment>>? commentsRequest =
+        parser == EHSpiderParser.detailPage2GalleryAndDetailAndApikey && knownAlbum != null
+        ? _commentsOrEmpty(knownAlbum)
+        : null;
     final JmChapterBundle b = await bundle(
       galleryUrl.jmChapterId,
       refresh: !useCache,
     );
     if (parser == EHSpiderParser.detailPage2GalleryAndDetailAndApikey) {
-      final List<GalleryComment> comments = await _commentsOrEmpty(b.album.id);
+      final List<GalleryComment> comments = await (knownAlbum == b.album.id && commentsRequest != null
+          ? commentsRequest
+          : _commentsOrEmpty(b.album.id));
       return (galleryDetails: _detail(b, comments), apikey: '') as T;
     }
     if (parser == EHSpiderParser.detailPage2Thumbnails) {
@@ -384,6 +407,7 @@ class JmSource {
 
 
   Gallery _galleryOfSummary(JmAlbumSummary summary) {
+    _albumIds.add(summary.id);
     final String category = JmSource.category(
       summary.categoryTitle,
       summary.subCategoryTitle,
@@ -413,24 +437,27 @@ class JmSource {
     );
   }
 
-  Gallery _galleryOfAlbum(JmAlbum album) => Gallery(
-    galleryUrl: GalleryUrl.jm(album.id),
-    title: album.name,
-    category: _categories[album.id] ?? 'Manga',
-    cover: GalleryImage(
-      url: JmImage.coverUrl(imageDomain: imageDomain(), albumId: album.id),
-    ),
-    pageCount: album.totalPhotos,
-    rating: 0,
-    hasRated: false,
-    favoriteTagIndex: null,
-    favoriteTagName: null,
-    language: language(album.tags),
-    uploader: album.authors.isEmpty ? null : album.authors.first,
-    publishTime: _format(album.addTime),
-    isExpunged: false,
-    tags: _albumTags(album),
-  );
+  Gallery _galleryOfAlbum(JmAlbum album) {
+    _albumIds.add(album.id);
+    return Gallery(
+      galleryUrl: GalleryUrl.jm(album.id),
+      title: album.name,
+      category: _categories[album.id] ?? 'Manga',
+      cover: GalleryImage(
+        url: JmImage.coverUrl(imageDomain: imageDomain(), albumId: album.id),
+      ),
+      pageCount: album.totalPhotos,
+      rating: 0,
+      hasRated: false,
+      favoriteTagIndex: null,
+      favoriteTagName: null,
+      language: language(album.tags),
+      uploader: album.authors.isEmpty ? null : album.authors.first,
+      publishTime: _format(album.addTime),
+      isExpunged: false,
+      tags: _albumTags(album),
+    );
+  }
 
   GalleryDetail _detail(JmChapterBundle b, List<GalleryComment> comments) {
     final JmAlbum album = b.album;

@@ -159,10 +159,9 @@ class DetailsPageLogic extends GetxController
     DetailsPageArgument argument = Get.arguments;
 
     state.galleryUrl = argument.galleryUrl;
-    state.gallery =
-        argument.galleryUrl.isNH ||
-            argument.galleryUrl.isWN ||
-            argument.galleryUrl.isJM
+    // A JM list entry has the album's title and cover, shown until the
+    // details arrive.
+    state.gallery = argument.galleryUrl.isNH || argument.galleryUrl.isWN
         ? null
         : argument.gallery;
     state.galleryDetails = argument.detailsPageInfo?.galleryDetails;
@@ -277,6 +276,10 @@ class DetailsPageLogic extends GetxController
       state.jmChapterBundle = await ehRequest.jmSource.bundle(
         state.galleryUrl.jmChapterId,
       );
+      // The list entry describes the album; from here on the chapter's own
+      // details (its title, pages) are what the page, the reader and
+      // downloads use.
+      state.gallery = null;
     }
 
     _syncNhFavoriteStatus();
