@@ -545,10 +545,10 @@ class ru_RU {
       'landscape': 'Альбомная',
       'portrait': 'Портретная',
       'readDirection': 'Направление чтения',
-      'enableOrientationSpecificReadDirection':
-          'Направление чтения по ориентации',
-      'enableOrientationSpecificReadDirectionHint':
-          'Установить разное направление чтения для портретной и альбомной ориентации',
+      'enableOrientationSpecificReadDirection': 'Направление чтения по ориентации',
+      'enableOrientationSpecificReadDirectionHint': 'Установить разное направление чтения для портретной и альбомной ориентации',
+      'autoDetectWebtoon': 'Автоопределение вебтунов',
+      'autoDetectWebtoonHint': 'Автоматически использовать режим непрерывного чтения сверху вниз для галерей с тегом webtoon',
       'portraitReadDirection': 'Направление чтения (портрет)',
       'landscapeReadDirection': 'Направление чтения (альбом)',
       'autoSwitchedReadDirection': 'Авто-смена направления чтения',

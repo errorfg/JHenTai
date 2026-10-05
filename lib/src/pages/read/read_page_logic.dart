@@ -268,6 +268,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   late Worker landscapeImageRegionWidthRatioLister;
   late Worker portraitDisplayFirstPageAloneListener;
   late Worker landscapeDisplayFirstPageAloneListener;
+  late Worker autoDetectWebtoonListener;
 
   /// Tracks the last known portrait state for orientation-specific read direction
   bool? _lastIsPortrait;
@@ -396,24 +397,17 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
         onEffectiveSettingChanged();
       }
     });
-    portraitImageRegionWidthRatioLister = ever(
-      readSetting.portraitImageRegionWidthRatio,
-      (_) {
-        if (readSetting.enableOrientationSpecificReadDirection.isTrue &&
-            isPortrait) {
-          updateSafely([layoutId]);
-        }
-      },
-    );
-    landscapeImageRegionWidthRatioLister = ever(
-      readSetting.landscapeImageRegionWidthRatio,
-      (_) {
-        if (readSetting.enableOrientationSpecificReadDirection.isTrue &&
-            !isPortrait) {
-          updateSafely([layoutId]);
-        }
-      },
-    );
+    autoDetectWebtoonListener = ever(readSetting.autoDetectWebtoon, (_) => onEffectiveSettingChanged());
+    portraitImageRegionWidthRatioLister = ever(readSetting.portraitImageRegionWidthRatio, (_) {
+      if (readSetting.enableOrientationSpecificReadDirection.isTrue && isPortrait) {
+        updateSafely([layoutId]);
+      }
+    });
+    landscapeImageRegionWidthRatioLister = ever(readSetting.landscapeImageRegionWidthRatio, (_) {
+      if (readSetting.enableOrientationSpecificReadDirection.isTrue && !isPortrait) {
+        updateSafely([layoutId]);
+      }
+    });
 
     if (!GetPlatform.isDesktop) {
       state.battery.batteryLevel.then((value) => state.batteryLevel = value);
@@ -504,6 +498,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     landscapeImageRegionWidthRatioLister.dispose();
     portraitDisplayFirstPageAloneListener.dispose();
     landscapeDisplayFirstPageAloneListener.dispose();
+    autoDetectWebtoonListener.dispose();
 
     restoreVolumeListener();
 
@@ -830,8 +825,10 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   }
 
   ReadDirection get effectiveReadDirection {
-    if (readSetting.enableOrientationSpecificReadDirection.isFalse ||
-        !GetPlatform.isMobile) {
+    if (readSetting.autoDetectWebtoon.isTrue && state.readPageInfo.readDirection != null) {
+      return state.readPageInfo.readDirection!;
+    }
+    if (readSetting.enableOrientationSpecificReadDirection.isFalse || !GetPlatform.isMobile) {
       return readSetting.readDirection.value;
     }
     if (isPortrait) {
@@ -876,8 +873,9 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   bool get openingSibling => _openingSibling;
 
   void saveReadDirection(ReadDirection value) {
-    if (readSetting.enableOrientationSpecificReadDirection.isTrue &&
-        GetPlatform.isMobile) {
+    state.readPageInfo.readDirection = null;
+  
+    if (readSetting.enableOrientationSpecificReadDirection.isTrue && GetPlatform.isMobile) {
       if (isPortrait) {
         readSetting.savePortraitReadDirection(value);
       } else {

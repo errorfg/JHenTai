@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../setting/read_setting.dart';
 import 'gallery_image.dart';
 
 enum ReadMode { downloaded, online, archive, local, remote }
@@ -53,6 +54,10 @@ class ReadPageInfo {
   /// completes with null at either end of the series.
   Future<ReadPageInfo?> Function({required bool next})? loadSiblingBook;
 
+  /// Read direction applied instead of the user's setting, for example a
+  /// webtoon detected from gallery tags when auto detection is enabled.
+  ReadDirection? readDirection;
+
   ReadPageInfo({
     required this.mode,
     this.gid,
@@ -67,5 +72,6 @@ class ReadPageInfo {
     required this.useSuperResolution,
     this.reportReadProgress,
     this.loadSiblingBook,
+    this.readDirection,
   }) : currentImageIndex = initialIndex;
 }

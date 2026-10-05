@@ -17,6 +17,7 @@ import '../../../../setting/preference_setting.dart';
 import '../../../../utils/process_util.dart';
 import '../../../../utils/route_util.dart';
 import '../../../../utils/toast_util.dart';
+import '../../../../utils/convert_util.dart';
 import '../../../../widget/eh_alert_dialog.dart';
 import '../../../../widget/eh_download_dialog.dart';
 import '../basic/multi_select/multi_select_download_page_logic_mixin.dart';
@@ -153,6 +154,9 @@ mixin GalleryDownloadPageLogicMixin on GetxController
     } else {
       int readIndexRecord = await readProgressService.getReadProgress(gallery.gid);
 
+
+      ReadDirection? readDirection = isWebtoonGalleryFromTagString(gallery.tags) ? ReadDirection.top2bottomList : null;
+
       toRoute(
         Routes.read,
         arguments: ReadPageInfo(
@@ -165,6 +169,7 @@ mixin GalleryDownloadPageLogicMixin on GetxController
           readProgressRecordStorageKey: gallery.gid.toString(),
           pageCount: gallery.pageCount,
           useSuperResolution: superResolutionService.get(gallery.gid, SuperResolutionType.gallery) != null,
+          readDirection: readDirection,
         ),
       );
     }

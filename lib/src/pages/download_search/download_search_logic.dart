@@ -254,6 +254,8 @@ class DownloadSearchLogic extends GetxController with UpdateGlobalGalleryStatusL
       String? string = await localConfigService.read(configKey: ConfigEnum.readIndexRecord, subConfigKey: gallery.gid.toString());
       int readIndexRecord = (string == null ? 0 : (int.tryParse(string) ?? 0));
 
+      ReadDirection? readDirection = isWebtoonGalleryFromTagDataList(gallery.tags) ? ReadDirection.top2bottomList : null;
+
       toRoute(
         Routes.read,
         arguments: ReadPageInfo(
@@ -266,6 +268,7 @@ class DownloadSearchLogic extends GetxController with UpdateGlobalGalleryStatusL
           readProgressRecordStorageKey: gallery.gid.toString(),
           pageCount: gallery.pageCount,
           useSuperResolution: superResolutionService.get(gallery.gid, SuperResolutionType.gallery) != null,
+          readDirection: readDirection,
         ),
       );
     }
@@ -285,6 +288,8 @@ class DownloadSearchLogic extends GetxController with UpdateGlobalGalleryStatusL
 
       List<GalleryImage> images = await archiveDownloadService.getUnpackedImages(archive.gid);
 
+      ReadDirection? readDirection = isWebtoonGalleryFromTagDataList(archive.tags) ? ReadDirection.top2bottomList : null;
+
       toRoute(
         Routes.read,
         arguments: ReadPageInfo(
@@ -298,6 +303,7 @@ class DownloadSearchLogic extends GetxController with UpdateGlobalGalleryStatusL
           readProgressRecordStorageKey: archive.gid.toString(),
           images: images,
           useSuperResolution: superResolutionService.get(archive.gid, SuperResolutionType.archive) != null,
+          readDirection: readDirection,
         ),
       );
     }

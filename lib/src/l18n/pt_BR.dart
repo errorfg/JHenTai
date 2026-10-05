@@ -546,10 +546,10 @@ class pt_BR {
       'landscape': 'Landscape',
       'portrait': 'Portrait',
       'readDirection': 'Direção da leitura',
-      'enableOrientationSpecificReadDirection':
-          'Direção de leitura por orientação',
-      'enableOrientationSpecificReadDirectionHint':
-          'Definir direções de leitura diferentes para orientações retrato e paisagem',
+      'enableOrientationSpecificReadDirection': 'Direção de leitura por orientação',
+      'enableOrientationSpecificReadDirectionHint': 'Definir direções de leitura diferentes para orientações retrato e paisagem',
+      'autoDetectWebtoon': 'Detectar webtoon automaticamente',
+      'autoDetectWebtoonHint': 'Usar automaticamente o modo de leitura contínua de cima para baixo para galerias com a tag webtoon',
       'portraitReadDirection': 'Direção de leitura (retrato)',
       'landscapeReadDirection': 'Direção de leitura (paisagem)',
       'autoSwitchedReadDirection':
