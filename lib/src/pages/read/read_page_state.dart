@@ -29,6 +29,7 @@ class ReadPageState with ScrollStatusListerState {
 
   bool autoMode = false;
   bool isMenuOpen = false;
+  bool showTapZoneGuide = false;
   Battery battery = Battery();
   int batteryLevel = 100;
   bool useSuperResolution = false;

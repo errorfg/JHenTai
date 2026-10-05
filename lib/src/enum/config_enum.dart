@@ -19,6 +19,8 @@ enum ConfigEnum {
   komgaProgressBase('komgaProgressBase'),
   komgaProgressPending('komgaProgressPending'),
 
+  tapZoneGuideShown('tapZoneGuideShown'),
+
   /// settings
   favoriteSetting('favoriteSetting'),
   advancedSetting('advancedSetting'),
