@@ -281,7 +281,7 @@ class _SettingKeyboardShortcutsPageState extends State<SettingKeyboardShortcutsP
     if (keyboardShortcutSetting.isBindingConflictingWithSlot(newBinding, action, slot)) {
       final ReadAction? conflicting = keyboardShortcutSetting.getActionForBinding(newBinding, action);
       toast(
-        '${'keyConflict'.tr}: ${key.debugName} → ${conflicting != null ? _actionLabel(conflicting) : ''}',
+        '${'keyConflict'.tr}: ${key.keyLabel == ' ' ? 'Space' : key.keyLabel} → ${conflicting != null ? _actionLabel(conflicting) : ''}',
         isShort: false,
       );
       return;
@@ -331,12 +331,19 @@ class _SettingKeyboardShortcutsPageState extends State<SettingKeyboardShortcutsP
 
   String _bindingLabel(ReadActionBinding binding) {
     if (binding.isKeyboard) {
-      return binding.logicalKey?.debugName ?? '';
+      // debugName is null in release builds; keyLabel is the user-facing name.
+      if (binding.logicalKey!.keyLabel == ' ') {
+        return 'Space';
+      }
+      return binding.logicalKey!.keyLabel;
     }
     if (binding.isMouseButton4) {
       return 'mouseButton4Name'.tr;
     }
-    return 'mouseButton5Name'.tr;
+    if (binding.isMouseButton5) {
+      return 'mouseButton5Name'.tr;
+    }
+    return '?';
   }
 
   String _actionLabel(ReadAction action) {
