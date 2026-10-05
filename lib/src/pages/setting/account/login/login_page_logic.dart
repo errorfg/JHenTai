@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -9,9 +10,16 @@ import 'package:get/get.dart';
 import 'package:jhentai/src/consts/eh_consts.dart';
 import 'package:jhentai/src/extension/dio_exception_extension.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
+import 'package:jhentai/src/enum/config_type_enum.dart';
+import 'package:jhentai/src/model/nhentai_api_models.dart';
 import 'package:jhentai/src/network/eh_request.dart';
+import 'package:jhentai/src/network/jm/jm_models.dart';
 import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/service/path_service.dart';
+import 'package:jhentai/src/service/sync_service.dart';
+import 'package:jhentai/src/setting/jm_setting.dart';
+import 'package:jhentai/src/setting/nhentai_api_setting.dart';
+import 'package:jhentai/src/setting/sync_setting.dart';
 import 'package:jhentai/src/setting/user_setting.dart';
 import 'package:jhentai/src/utils/eh_spider_parser.dart';
 import 'package:jhentai/src/utils/string_uril.dart';
@@ -42,6 +50,32 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
     super.onInit();
     tabController = TabController(length: 3, vsync: this);
     tabController.addListener(_onTabChanged);
+
+    // A caller may ask for a site; otherwise the first one not logged in.
+    final List<LoginSite> sites = availableSites;
+    state.site = Get.arguments is LoginSite && sites.contains(Get.arguments) ? Get.arguments : sites.first;
+  }
+
+  /// Sites without an account yet; all of them once every site has one.
+  List<LoginSite> get availableSites {
+    final List<LoginSite> sites = [
+      if (!userSetting.hasLoggedIn()) LoginSite.eh,
+      if (nhentaiApiSetting.apiKey.value.isEmpty) LoginSite.nh,
+      if (!jmSetting.hasLoggedIn) LoginSite.jm,
+    ];
+    return sites.isEmpty ? LoginSite.values : sites;
+  }
+
+  void switchSite(LoginSite site) {
+    if (state.site == site || state.loginState == LoadingState.loading) {
+      return;
+    }
+    state.site = site;
+    // E-Hentai and JM share the username and password fields.
+    state.userName = null;
+    state.password = null;
+    state.loginState = LoadingState.idle;
+    update();
   }
 
   @override
@@ -66,6 +100,9 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
   }
 
   Future<void> _autoDetectClipboard() async {
+    if (state.site != LoginSite.eh) {
+      return;
+    }
     String? cookie = (await Clipboard.getData('text/plain'))?.text?.toString();
     if (isEmptyOrNull(cookie)) {
       return;
@@ -124,7 +161,11 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
       return;
     }
 
-    if (state.loginType == LoginType.password) {
+    if (state.site == LoginSite.nh) {
+      _handleNhApiKeyLogin();
+    } else if (state.site == LoginSite.jm) {
+      _handleJmLogin();
+    } else if (state.loginType == LoginType.password) {
       _handlePasswordLogin();
     } else if (state.loginType == LoginType.cookie && state.cookieVerificationType == CookieVerificationType.normal) {
       _handleCookieLoginNormal();
@@ -133,6 +174,93 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
     } else if (state.loginType == LoginType.cookie && state.cookieVerificationType == CookieVerificationType.skip) {
       _handleCookieLoginWithoutVerification();
     }
+  }
+
+  /// nhentai has no password login for apps; an account is an API key
+  /// generated in the nhentai.net account settings. The key is kept only
+  /// once the account behind it answers.
+  Future<void> _handleNhApiKeyLogin() async {
+    final String apiKey = state.nhApiKey?.trim() ?? '';
+    if (apiKey.isEmpty) {
+      toast('nhentaiApiKeyEmpty'.tr);
+      return;
+    }
+
+    Get.focusScope?.unfocus();
+    state.loginState = LoadingState.loading;
+    update([loadingStateId]);
+
+    NHentaiUserProfile profile;
+    try {
+      profile = await ehRequest.requestNhUserProfile(apiKey: apiKey);
+    } on DioException catch (e) {
+      log.error('nhentai API key verification failed', e.errorMsg);
+      snack('loginFail'.tr, e.errorMsg ?? 'nhentaiApiKeyValidationFailed'.tr);
+      state.loginState = LoadingState.error;
+      update([loadingStateId]);
+      return;
+    } catch (e) {
+      log.error('nhentai API key verification failed', e);
+      snack('loginFail'.tr, 'nhentaiApiKeyValidationFailed'.tr);
+      state.loginState = LoadingState.error;
+      update([loadingStateId]);
+      return;
+    }
+
+    await nhentaiApiSetting.saveApiKey(apiKey);
+    if (syncSetting.enableSync.value && syncSetting.autoSync.value) {
+      unawaited(syncService.syncAfterLocalChange(types: const [CloudConfigTypeEnum.nhentaiApiSetting]));
+    }
+
+    state.loginState = LoadingState.success;
+    update([loadingStateId]);
+
+    toast('nhentaiApiKeyVerified'.trParams({'username': profile.username}));
+    backRoute(currentRoute: Routes.login);
+  }
+
+  Future<void> _handleJmLogin() async {
+    final String userName = state.userName?.trim() ?? '';
+    final String password = state.password ?? '';
+    if (userName.isEmpty || password.isEmpty) {
+      toast('userNameOrPasswordMismatch'.tr);
+      return;
+    }
+
+    Get.focusScope?.unfocus();
+    state.loginState = LoadingState.loading;
+    update([loadingStateId]);
+
+    ({JmUser user, String cookie}) account;
+    try {
+      account = await ehRequest.jmSource.api.login(userName, password);
+    } on JmApiException catch (e) {
+      log.info('JM login refused: ${e.message}');
+      snack('loginFail'.tr, e.message);
+      state.loginState = LoadingState.error;
+      update([loadingStateId]);
+      return;
+    } on DioException catch (e) {
+      log.error('JM login failed', e.errorMsg);
+      snack('loginFail'.tr, e.errorMsg ?? '');
+      state.loginState = LoadingState.error;
+      update([loadingStateId]);
+      return;
+    } catch (e) {
+      log.error('JM login failed', e);
+      snack('loginFail'.tr, e.toString());
+      state.loginState = LoadingState.error;
+      update([loadingStateId]);
+      return;
+    }
+
+    await jmSetting.saveAccount(account.user, account.cookie);
+
+    state.loginState = LoadingState.success;
+    update([loadingStateId]);
+
+    toast('loginSuccess'.tr);
+    backRoute(currentRoute: Routes.login);
   }
 
   Future<void> _handlePasswordLogin() async {

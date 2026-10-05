@@ -105,16 +105,19 @@ mixin SearchPageLogicMixin on BasePageLogic {
 
     bool newNh = site == 'NH_NET' || site == 'NH_TO';
     bool newWn = site == 'WN';
+    bool newJm = site == 'JM';
     String newNhSource = site == 'NH_TO' ? 'to' : 'net';
 
     if (state.searchConfig.isNhSearch == newNh &&
         state.searchConfig.isWnacgSearch == newWn &&
+        state.searchConfig.isJmSearch == newJm &&
         state.searchConfig.nhentaiSource == newNhSource) {
       return;
     }
 
     state.searchConfig.isNhSearch = newNh;
     state.searchConfig.isWnacgSearch = newWn;
+    state.searchConfig.isJmSearch = newJm;
     if (newNh) {
       state.searchConfig.nhentaiSource = newNhSource;
     }
@@ -252,7 +255,8 @@ mixin SearchPageLogicMixin on BasePageLogic {
     }
 
     if (state.searchConfig.isNhSearch || keyword.trimLeft().toLowerCase().startsWith('nh:') ||
-        state.searchConfig.isWnacgSearch || keyword.trimLeft().toLowerCase().startsWith('wn:')) {
+        state.searchConfig.isWnacgSearch || keyword.trimLeft().toLowerCase().startsWith('wn:') ||
+        state.searchConfig.isJmSearch || keyword.trimLeft().toLowerCase().startsWith('jm:')) {
       state.suggestions = [];
       if (state.bodyType == SearchPageBodyType.suggestionAndHistory) {
         updateSafely([suggestionBodyId]);

@@ -18,6 +18,9 @@ import 'dart:io' as io;
 
 import 'dart:ui' as ui;
 
+import 'package:jhentai/src/network/jm/jm_image.dart';
+import 'package:jhentai/src/widget/jm_network_image_provider.dart';
+
 import '../service/gallery_download_service.dart';
 
 typedef LoadingProgressWidgetBuilder = Widget Function(double);
@@ -204,9 +207,22 @@ class _EHImageState extends State<EHImage> {
   Widget buildNetworkImage(BuildContext context) {
     final String url = _replaceEXUrl(widget.galleryImage.url);
     final bool useGate = widget.animateOnlyWhenVisible && !widget.disableAnimation;
+    final int jmStrips = JmImage.stripsOf(url);
 
     return ExtendedImage(
-      image: ExtendedResizeImage.resizeIfNeeded(
+      // JM pages are stored in shuffled strips; that provider restores them
+      // and applies maxBytes itself.
+      image: jmStrips > 0
+          ? JmNetworkImageProvider(
+              url,
+              strips: jmStrips,
+              maxBytes: widget.maxBytes,
+              headers: widget.galleryImage.headers,
+              cacheKey: widget.galleryImage.cacheKey,
+              cache: true,
+              printError: kDebugMode,
+            )
+          : ExtendedResizeImage.resizeIfNeeded(
         provider: useGate
             ? _GateExtendedNetworkImageProvider(
                 url,

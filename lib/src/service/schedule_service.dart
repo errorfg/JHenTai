@@ -12,6 +12,7 @@ import 'package:get/get_utils/get_utils.dart';
 import 'package:jhentai/src/database/dao/archive_dao.dart';
 import 'package:jhentai/src/database/dao/gallery_dao.dart';
 import 'package:jhentai/src/extension/dio_exception_extension.dart';
+import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/setting/archive_bot_setting.dart';
 import 'package:jhentai/src/setting/network_setting.dart';
@@ -100,8 +101,16 @@ class ScheduleService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBea
 
   Future<void> refreshGalleryTags() async {
     int pageNo = 1;
-    List<GalleryDownloadedData> gallerys = await GalleryDao.selectGallerysForTagRefresh(pageNo, 25);
-    while (gallerys.isNotEmpty) {
+    List<GalleryDownloadedData> page = await GalleryDao.selectGallerysForTagRefresh(pageNo, 25);
+    while (page.isNotEmpty) {
+      // The E-Hentai API answers galleries of other sources with an error
+      // entry, which fails the whole batch.
+      List<GalleryDownloadedData> gallerys = page.where(_isEHGallery).toList();
+      if (gallerys.isEmpty) {
+        pageNo++;
+        page = await GalleryDao.selectGallerysForTagRefresh(pageNo, 25);
+        continue;
+      }
       try {
         List<GalleryMetadata> metadatas = await ehRequest.requestGalleryMetadatas<List<GalleryMetadata>>(
           list: gallerys.map((a) => (gid: a.gid, token: a.token)).toList(),
@@ -125,8 +134,13 @@ class ScheduleService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBea
       }
 
       pageNo++;
-      gallerys = await GalleryDao.selectGallerysForTagRefresh(pageNo, 25);
+      page = await GalleryDao.selectGallerysForTagRefresh(pageNo, 25);
     }
+  }
+
+  bool _isEHGallery(GalleryDownloadedData gallery) {
+    GalleryUrl? url = GalleryUrl.tryParse(gallery.galleryUrl);
+    return url != null && !url.isNH && !url.isWN && !url.isJM;
   }
 
   Future<void> refreshArchiveTags() async {

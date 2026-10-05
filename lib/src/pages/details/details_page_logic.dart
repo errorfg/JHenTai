@@ -23,9 +23,12 @@ import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/model/read_page_info.dart';
 import 'package:jhentai/src/network/eh2telegraph_client.dart';
 import 'package:jhentai/src/network/eh_request.dart';
+import 'package:jhentai/src/network/jm/jm_models.dart';
+import 'package:jhentai/src/network/jm/jm_source.dart';
 import 'package:jhentai/src/network/nhentai_api_support.dart';
 import 'package:jhentai/src/pages/download/download_base_page.dart';
 import 'package:jhentai/src/pages/favorite/favorite_page_logic.dart';
+import 'package:jhentai/src/pages/read/read_page_logic.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/service/super_resolution_service.dart';
 import 'package:jhentai/src/setting/download_setting.dart';
@@ -66,6 +69,8 @@ import '../../service/history_service.dart';
 import '../../service/gallery_download_service.dart';
 import '../../service/local_block_rule_service.dart';
 import '../../service/nhentai_favorite_service.dart';
+import '../../service/jm_favorite_service.dart';
+import '../../service/local_source_favorite_service.dart';
 import '../../service/wnacg_favorite_service.dart';
 import '../../setting/eh_setting.dart';
 import '../../setting/preference_setting.dart';
@@ -154,14 +159,17 @@ class DetailsPageLogic extends GetxController
     DetailsPageArgument argument = Get.arguments;
 
     state.galleryUrl = argument.galleryUrl;
-    state.gallery = argument.galleryUrl.isNH || argument.galleryUrl.isWN
+    state.gallery =
+        argument.galleryUrl.isNH ||
+            argument.galleryUrl.isWN ||
+            argument.galleryUrl.isJM
         ? null
         : argument.gallery;
     state.galleryDetails = argument.detailsPageInfo?.galleryDetails;
     state.apikey = argument.detailsPageInfo?.apikey;
 
     _syncNhFavoriteStatus();
-    _syncWnFavoriteStatus();
+    _syncLocalSourceFavoriteStatus();
   }
 
   @override
@@ -264,9 +272,15 @@ class DetailsPageLogic extends GetxController
     state.galleryDetails = detailPageInfo.galleryDetails;
     state.apikey = detailPageInfo.apikey;
     state.nextPageIndexToLoadThumbnails = 1;
+    if (state.galleryUrl.isJM) {
+      // Served from the cache the detail request just filled.
+      state.jmChapterBundle = await ehRequest.jmSource.bundle(
+        state.galleryUrl.jmChapterId,
+      );
+    }
 
     _syncNhFavoriteStatus();
-    _syncWnFavoriteStatus();
+    _syncLocalSourceFavoriteStatus();
 
     await tagTranslationService.translateTagsIfNeeded(
       state.galleryDetails!.tags,
@@ -499,8 +513,8 @@ class DetailsPageLogic extends GetxController
     if (state.galleryUrl.isNH) {
       return _handleTapNhentaiFavorite(useDefault: useDefault);
     }
-    if (state.galleryUrl.isWN) {
-      return _handleTapWnacgFavorite(useDefault: useDefault);
+    if (_localSourceFavoriteService != null) {
+      return _handleTapLocalSourceFavorite(useDefault: useDefault);
     }
 
     if (!checkLogin()) {
@@ -882,19 +896,30 @@ class DetailsPageLogic extends GetxController
     );
   }
 
-  void _syncWnFavoriteStatus() {
-    if (!state.galleryUrl.isWN) {
+  /// Favorites of wnacg and JM galleries live on the device.
+  LocalSourceFavoriteService? get _localSourceFavoriteService =>
+      state.galleryUrl.isWN
+      ? wnacgFavoriteService
+      : state.galleryUrl.isJM
+      ? jmFavoriteService
+      : null;
+
+  void _syncLocalSourceFavoriteStatus() {
+    LocalSourceFavoriteService? service = _localSourceFavoriteService;
+    if (service == null) {
       return;
     }
 
     _applyLocalFavoriteStatus(
-      favoriteCategoryIndex: wnacgFavoriteService.getFavoriteCategoryIndex(
+      favoriteCategoryIndex: service.getFavoriteCategoryIndex(
         state.galleryUrl.gid,
       ),
     );
   }
 
-  Future<void> _handleTapWnacgFavorite({required bool useDefault}) async {
+  Future<void> _handleTapLocalSourceFavorite({required bool useDefault}) async {
+    LocalSourceFavoriteService service = _localSourceFavoriteService!;
+
     if (state.favoriteState == LoadingState.loading) {
       return;
     }
@@ -904,7 +929,7 @@ class DetailsPageLogic extends GetxController
       return;
     }
 
-    int? currentFavIndex = wnacgFavoriteService.getFavoriteCategoryIndex(
+    int? currentFavIndex = service.getFavoriteCategoryIndex(
       state.galleryUrl.gid,
     );
     ({bool isDelete, int favIndex, String note, bool remember}) operation;
@@ -939,10 +964,10 @@ class DetailsPageLogic extends GetxController
 
     try {
       if (operation.isDelete) {
-        await wnacgFavoriteService.removeFavorite(state.galleryUrl.gid);
+        await service.removeFavorite(state.galleryUrl.gid);
         _applyLocalFavoriteStatus(favoriteCategoryIndex: null);
       } else {
-        await wnacgFavoriteService.addFavorite(
+        await service.addFavorite(
           gallerySnapshot,
           favoriteCategoryIndex: operation.favIndex,
         );
@@ -969,7 +994,7 @@ class DetailsPageLogic extends GetxController
     }
 
     if (Get.isRegistered<FavoritePageLogic>()) {
-      await Get.find<FavoritePageLogic>().reloadWnacgFavoriteGallerys();
+      await Get.find<FavoritePageLogic>().reloadLocalSourceFavoriteGallerys();
     }
 
     state.favoriteState = LoadingState.idle;
@@ -1030,7 +1055,9 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleTapRating() async {
-    if (state.galleryUrl.isNH || state.galleryUrl.isWN) {
+    if (state.galleryUrl.isNH ||
+        state.galleryUrl.isWN ||
+        state.galleryUrl.isJM) {
       return;
     }
 
@@ -1115,6 +1142,7 @@ class DetailsPageLogic extends GetxController
 
   Future<void> handleTapArchive(BuildContext context) async {
     if (state.galleryUrl.isWN ||
+        state.galleryUrl.isJM ||
         (state.galleryUrl.isNH && !hasNhentaiOfficialApi)) {
       return;
     }
@@ -1291,7 +1319,9 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleTapHH() async {
-    if (state.galleryUrl.isNH || state.galleryUrl.isWN) {
+    if (state.galleryUrl.isNH ||
+        state.galleryUrl.isWN ||
+        state.galleryUrl.isJM) {
       return;
     }
 
@@ -1334,8 +1364,8 @@ class DetailsPageLogic extends GetxController
   }
 
   void searchSimilar() {
-    if (state.galleryUrl.isNH &&
-        hasNhentaiOfficialApi &&
+    if ((state.galleryUrl.isJM ||
+            (state.galleryUrl.isNH && hasNhentaiOfficialApi)) &&
         (state.galleryDetails?.relatedGallerys.isNotEmpty ?? false)) {
       Get.dialog(
         NHentaiRelatedDialog(
@@ -1375,13 +1405,20 @@ class DetailsPageLogic extends GetxController
         ),
         forceNewRoute: true,
       );
+    } else if (state.galleryUrl.isJM) {
+      newSearch(
+        rewriteSearchConfig: SearchConfig(keyword: keyword, isJmSearch: true),
+        forceNewRoute: true,
+      );
     } else {
       newSearch(keyword: keyword, forceNewRoute: true);
     }
   }
 
   void searchInEhByNhTitle() {
-    if (!state.galleryUrl.isNH && !state.galleryUrl.isWN) {
+    if (!state.galleryUrl.isNH &&
+        !state.galleryUrl.isWN &&
+        !state.galleryUrl.isJM) {
       return;
     }
 
@@ -1414,6 +1451,11 @@ class DetailsPageLogic extends GetxController
         ),
         forceNewRoute: true,
       );
+    } else if (state.galleryUrl.isJM) {
+      newSearch(
+        rewriteSearchConfig: SearchConfig(keyword: keyword, isJmSearch: true),
+        forceNewRoute: true,
+      );
     } else {
       newSearch(keyword: keyword, forceNewRoute: true);
     }
@@ -1440,7 +1482,7 @@ class DetailsPageLogic extends GetxController
       return;
     }
 
-    if (state.galleryUrl.isWN) {
+    if (state.galleryUrl.isWN || state.galleryUrl.isJM) {
       return;
     }
 
@@ -1454,7 +1496,7 @@ class DetailsPageLogic extends GetxController
 
   /// 发送到 eh2telegraph 机器人：POST 同步接口，202 即成功，结果稍后由 Telegram 通知。
   Future<void> handleTapSendToTelegraph() async {
-    if (state.galleryUrl.isWN) {
+    if (state.galleryUrl.isWN || state.galleryUrl.isJM) {
       return;
     }
     final String galleryUrl = state.galleryUrl.url;
@@ -1477,7 +1519,9 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleTapStatistic() async {
-    if (state.galleryUrl.isNH || state.galleryUrl.isWN) {
+    if (state.galleryUrl.isNH ||
+        state.galleryUrl.isWN ||
+        state.galleryUrl.isJM) {
       return;
     }
 
@@ -1632,6 +1676,7 @@ class DetailsPageLogic extends GetxController
   void showTagDialog(GalleryTag tag) {
     if (state.galleryUrl.isNH ||
         state.galleryUrl.isWN ||
+        state.galleryUrl.isJM ||
         state.apikey == null) {
       return;
     }
@@ -1693,7 +1738,9 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleAddTag(BuildContext context) async {
-    if (state.galleryUrl.isNH || state.galleryUrl.isWN) {
+    if (state.galleryUrl.isNH ||
+        state.galleryUrl.isWN ||
+        state.galleryUrl.isJM) {
       return;
     }
 
@@ -1866,21 +1913,22 @@ class DetailsPageLogic extends GetxController
             .galleryDownloadInfos[state.galleryUrl.gid]
             ?.downloadProgress ==
         null) {
-      toRoute(
-        Routes.read,
-        arguments: ReadPageInfo(
-          mode: ReadMode.online,
-          gid: state.galleryUrl.gid,
-          token: state.galleryUrl.token,
-          galleryTitle: mainTitleText,
-          galleryUrl: state.galleryUrl.url,
-          initialIndex: forceIndex ?? await getReadIndexRecord(),
-          readProgressRecordStorageKey: state.galleryUrl.gid.toString(),
-          pageCount: state.galleryDetails?.pageCount ?? state.gallery?.pageCount ?? state.galleryMetadata!.pageCount,
-          useSuperResolution: false,
-          readDirection: webtoonReadDirection,
+      unawaited(
+        _openReader(
+          ReadPageInfo(
+            mode: ReadMode.online,
+            gid: state.galleryUrl.gid,
+            token: state.galleryUrl.token,
+            galleryTitle: mainTitleText,
+            galleryUrl: state.galleryUrl.url,
+            initialIndex: forceIndex ?? await getReadIndexRecord(),
+            readProgressRecordStorageKey: state.galleryUrl.gid.toString(),
+            pageCount: state.galleryDetails?.pageCount ?? state.gallery?.pageCount ?? state.galleryMetadata!.pageCount,
+            useSuperResolution: false,
+            readDirection: webtoonReadDirection,
+          ),
         ),
-      )?.whenComplete(() => Future.delayed(const Duration(milliseconds: 800))).whenComplete(() => updateSafely([readButtonId]));
+      );
       return;
     }
 
@@ -1897,21 +1945,188 @@ class DetailsPageLogic extends GetxController
       return;
     }
 
-    toRoute(
-      Routes.read,
-      arguments: ReadPageInfo(
-        mode: ReadMode.downloaded,
-        gid: gallery.gid,
-        token: gallery.token,
-        galleryTitle: gallery.title,
-        galleryUrl: gallery.galleryUrl,
-        initialIndex: forceIndex ?? await getReadIndexRecord(),
-        readProgressRecordStorageKey: state.galleryUrl.gid.toString(),
-        pageCount: gallery.pageCount,
-        useSuperResolution: superResolutionService.get(state.galleryUrl.gid, SuperResolutionType.gallery) != null,
-        readDirection: webtoonReadDirection,
+    unawaited(
+      _openReader(
+        ReadPageInfo(
+          mode: ReadMode.downloaded,
+          gid: gallery.gid,
+          token: gallery.token,
+          galleryTitle: gallery.title,
+          galleryUrl: gallery.galleryUrl,
+          initialIndex: forceIndex ?? await getReadIndexRecord(),
+          readProgressRecordStorageKey: state.galleryUrl.gid.toString(),
+          pageCount: gallery.pageCount,
+          useSuperResolution: superResolutionService.get(state.galleryUrl.gid, SuperResolutionType.gallery) != null,
+          readDirection: webtoonReadDirection,
+        ),
       ),
-    )?.whenComplete(() => Future.delayed(const Duration(milliseconds: 800))).whenComplete(() => updateSafely([readButtonId]));
+    );
+  }
+
+  /// Opens the reader. In a multi-chapter JM album the reader can close
+  /// with the previous or next chapter as its result, which then opens in
+  /// turn, the way Komga moves between books of a series.
+  Future<void> _openReader(ReadPageInfo info) async {
+    JmChapterBundle? jmChapter = state.jmChapterBundle;
+    if (jmChapter != null && jmChapter.isMultiChapter) {
+      info
+        ..loadSiblingBook = _jmSiblingLoader(jmChapter.chapter.id)
+        ..siblingsAreChapters = true;
+    }
+
+    ReadPageInfo? session = info;
+    while (session != null) {
+      final dynamic result = await toRoute<dynamic>(
+        Routes.read,
+        arguments: session,
+      );
+      session = result is ReadPageInfo ? result : null;
+      if (session != null) {
+        await waitForReaderDisposed();
+      }
+    }
+
+    await Future.delayed(const Duration(milliseconds: 800));
+    updateSafely([readButtonId]);
+  }
+
+  Future<ReadPageInfo?> Function({required bool next}) _jmSiblingLoader(
+    int chapterId,
+  ) {
+    return ({required bool next}) async {
+      JmChapterBundle current = await ehRequest.jmSource.bundle(chapterId);
+      int index = current.chapterIndex + (next ? 1 : -1);
+      if (current.chapterIndex < 0 ||
+          index < 0 ||
+          index >= current.album.chapters.length) {
+        return null;
+      }
+      return _jmChapterSession(
+        await ehRequest.jmSource.bundle(current.album.chapters[index].id),
+      );
+    };
+  }
+
+  /// A reader session for a JM chapter: the downloaded copy when there is
+  /// one, online otherwise.
+  Future<ReadPageInfo> _jmChapterSession(JmChapterBundle chapter) async {
+    GalleryUrl url = chapter.galleryUrl;
+    GalleryDownloadedData? downloaded =
+        galleryDownloadService.galleryDownloadInfos[url.gid]?.downloadProgress ==
+            null
+        ? null
+        : galleryDownloadService.gallerys.firstWhereOrNull(
+            (g) => g.gid == url.gid,
+          );
+    return ReadPageInfo(
+      mode: downloaded == null ? ReadMode.online : ReadMode.downloaded,
+      gid: url.gid,
+      token: url.token,
+      galleryTitle: downloaded?.title ?? chapter.title,
+      galleryUrl: url.url,
+      initialIndex: await readProgressService.getReadProgress(url.gid),
+      readProgressRecordStorageKey: url.gid.toString(),
+      pageCount: downloaded?.pageCount ?? chapter.pageCount,
+      useSuperResolution:
+          downloaded != null &&
+          superResolutionService.get(url.gid, SuperResolutionType.gallery) !=
+              null,
+      readDirection: _detectWebtoonReadDirection(),
+      loadSiblingBook: _jmSiblingLoader(chapter.chapter.id),
+      siblingsAreChapters: true,
+    );
+  }
+
+  void openJmChapter(JmChapterRef chapter) {
+    if (chapter.id == state.galleryUrl.jmChapterId) {
+      return;
+    }
+    toRoute(
+      Routes.details,
+      arguments: DetailsPageArgument(galleryUrl: GalleryUrl.jm(chapter.id)),
+      offAllBefore: false,
+      preventDuplicates: false,
+    );
+  }
+
+  /// Queues every chapter of the album that is not downloaded yet, in a
+  /// group named after the album unless the user picks another.
+  Future<void> handleDownloadAllJmChapters() async {
+    JmChapterBundle? current = state.jmChapterBundle;
+    if (current == null) {
+      return;
+    }
+    JmAlbum album = current.album;
+
+    ({String group, bool downloadOriginalImage})? result = await Get.dialog(
+      EHDownloadDialog(
+        title: 'downloadAllChapters'.tr,
+        currentGroup: album.name,
+        candidates: galleryDownloadService.allGroups,
+        showDownloadOriginalImageCheckBox: false,
+        downloadOriginalImage: false,
+        preferredGroups: downloadSetting.preferredGalleryGroups,
+      ),
+    );
+    if (result == null) {
+      return;
+    }
+
+    List<int> pending = [
+      for (int i = 0; i < album.chapters.length; i++)
+        if (!galleryDownloadService.containGallery(
+          GalleryUrl.jm(album.chapters[i].id).gid,
+        ))
+          i,
+    ];
+    if (pending.isEmpty) {
+      toast('allChaptersDownloaded'.tr);
+      return;
+    }
+    toast('${'beginToDownload'.tr}： ${pending.length}', isCenter: false);
+
+    int failed = 0;
+    for (int index in pending) {
+      GalleryUrl url = GalleryUrl.jm(album.chapters[index].id);
+      int pageCount;
+      try {
+        pageCount = await ehRequest.jmSource.chapterPageCount(url.jmChapterId);
+      } catch (e) {
+        log.error('Get JM chapter failed: ${url.jmChapterId}', e);
+        failed++;
+        continue;
+      }
+      if (galleryDownloadService.containGallery(url.gid)) {
+        continue;
+      }
+      await galleryDownloadService.downloadGallery(
+        GalleryDownloadedData(
+          gid: url.gid,
+          token: url.token,
+          title: JmSource.chapterTitle(album, index),
+          category: state.galleryDetails?.category ?? 'Manga',
+          pageCount: pageCount,
+          galleryUrl: url.url,
+          uploader: album.authors.firstOrNull,
+          publishTime: state.galleryDetails?.publishTime ?? '',
+          downloadStatusIndex: DownloadStatus.downloading.index,
+          downloadOriginalImage: false,
+          sortOrder: 0,
+          groupName: result.group,
+          insertTime: DateTime.now().toString(),
+          priority: GalleryDownloadService.defaultDownloadGalleryPriority,
+          tags: state.galleryDetails == null
+              ? ''
+              : tagMap2TagString(state.galleryDetails!.tags),
+          tagRefreshTime: DateTime.now().toString(),
+        ),
+      );
+    }
+
+    updateGlobalGalleryStatus();
+    if (failed > 0) {
+      snack('failed'.tr, '${'downloadAllChaptersFailed'.tr}: $failed', isShort: true);
+    }
   }
 
   ReadDirection? _detectWebtoonReadDirection() {
@@ -1942,7 +2157,9 @@ class DetailsPageLogic extends GetxController
 
   Future<({GalleryDetail galleryDetails, String apikey})>
   _getDetailsWithRedirectAndFallback({bool useCache = true}) async {
-    if (state.galleryUrl.isNH || state.galleryUrl.isWN) {
+    if (state.galleryUrl.isNH ||
+        state.galleryUrl.isWN ||
+        state.galleryUrl.isJM) {
       return ehRequest
           .requestDetailPage<({GalleryDetail galleryDetails, String apikey})>(
             galleryUrl: state.galleryUrl.url,
@@ -2172,6 +2389,9 @@ class DetailsPageLogic extends GetxController
     }
     if (state.galleryUrl.isWN) {
       searchConfig.isWnacgSearch = true;
+    }
+    if (state.galleryUrl.isJM) {
+      searchConfig.isJmSearch = true;
     }
 
     newSearch(rewriteSearchConfig: searchConfig, forceNewRoute: true);

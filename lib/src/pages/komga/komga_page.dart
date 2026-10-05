@@ -311,7 +311,7 @@ class _KomgaPageState extends State<KomgaPage> {
         // "Next/previous book" closes the reader with the sibling session.
         session = result is ReadPageInfo ? result : null;
         if (session != null) {
-          await _waitForReaderDisposed();
+          await waitForReaderDisposed();
         }
       }
     } catch (e) {
@@ -322,16 +322,6 @@ class _KomgaPageState extends State<KomgaPage> {
       if (mounted && _openingBookId == book.id) {
         setState(() => _openingBookId = null);
       }
-    }
-  }
-
-  /// The reader's controllers are registered by type; the next reader must
-  /// not start until the previous one has released them.
-  Future<void> _waitForReaderDisposed() async {
-    final DateTime deadline = DateTime.now().add(const Duration(seconds: 5));
-    while (Get.isRegistered<ReadPageLogic>() &&
-        DateTime.now().isBefore(deadline)) {
-      await Future<void>.delayed(const Duration(milliseconds: 50));
     }
   }
 

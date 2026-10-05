@@ -71,17 +71,21 @@ mixin SearchPageMixin<L extends SearchPageLogicMixin,
               ? Get.theme.colorScheme.primary
               : state.searchConfig.isWnacgSearch
                   ? Colors.orange
-                  : null),
+                  : state.searchConfig.isJmSearch
+                      ? Colors.teal
+                      : null),
         tooltip: state.searchConfig.isNhSearch
             ? 'NH-${state.searchConfig.nhentaiSource}'
             : state.searchConfig.isWnacgSearch
                 ? 'WN'
-                : 'EH',
+                : state.searchConfig.isJmSearch
+                    ? 'JM'
+                    : 'EH',
         onSelected: (value) => logic.setSiteSearchMode(value),
         itemBuilder: (context) => [
           PopupMenuItem(
             value: 'EH',
-            enabled: state.searchConfig.isNhSearch || state.searchConfig.isWnacgSearch,
+            enabled: state.searchConfig.isNhSearch || state.searchConfig.isWnacgSearch || state.searchConfig.isJmSearch,
             child: const Text('EH'),
           ),
           PopupMenuItem(
@@ -100,6 +104,11 @@ mixin SearchPageMixin<L extends SearchPageLogicMixin,
             value: 'WN',
             enabled: !state.searchConfig.isWnacgSearch,
             child: const Text('WN'),
+          ),
+          PopupMenuItem(
+            value: 'JM',
+            enabled: !state.searchConfig.isJmSearch,
+            child: const Text('JM'),
           ),
         ],
       ),

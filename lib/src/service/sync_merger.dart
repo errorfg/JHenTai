@@ -201,7 +201,8 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       case CloudConfigTypeEnum.nhentaiFavorite:
         return await _mergeNhentaiFavorite(local, remote);
       case CloudConfigTypeEnum.wnacgFavorite:
-        return await _mergeWnacgFavorite(local, remote);
+      case CloudConfigTypeEnum.jmFavorite:
+        return await _mergeLocalSourceFavorite(type, local, remote);
       case CloudConfigTypeEnum.komgaSetting:
         return _mergeLatestConfig(local, remote);
       case CloudConfigTypeEnum.nhentaiApiSetting:
@@ -676,7 +677,9 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     return MergeConfigResult(mergedConfig, stats);
   }
 
-  Future<MergeConfigResult> _mergeWnacgFavorite(
+  /// Merges wnacg or JM favorites, keeping the newest entry of each gallery.
+  Future<MergeConfigResult> _mergeLocalSourceFavorite(
+    CloudConfigTypeEnum type,
     CloudConfig local,
     CloudConfig remote,
   ) async {
@@ -721,9 +724,8 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       id: CloudConfigService.localConfigId,
       shareCode: CloudConfigService.localConfigCode,
       identificationCode: CloudConfigService.localConfigCode,
-      type: CloudConfigTypeEnum.wnacgFavorite,
-      version: CloudConfigService
-          .configTypeVersionMap[CloudConfigTypeEnum.wnacgFavorite]!,
+      type: type,
+      version: CloudConfigService.configTypeVersionMap[type]!,
       config: mergedJson,
       ctime: DateTime.now(),
     );

@@ -313,12 +313,12 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
             actions: [
               if (logic.hasSiblingBooks) ...[
                 IconButton(
-                  tooltip: 'previousBook'.tr,
+                  tooltip: logic.previousSiblingLabel,
                   icon: const Icon(Icons.skip_previous, color: UIConfig.readPageButtonColor),
                   onPressed: logic.openingSibling ? null : () => logic.openSiblingBook(next: false),
                 ),
                 IconButton(
-                  tooltip: 'nextBook'.tr,
+                  tooltip: logic.nextSiblingLabel,
                   icon: const Icon(Icons.skip_next, color: UIConfig.readPageButtonColor),
                   onPressed: logic.openingSibling ? null : () => logic.openSiblingBook(next: true),
                 ),
@@ -540,7 +540,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
               icon: logic.openingSibling
                   ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.skip_next),
-              label: Text('nextBook'.tr),
+              label: Text(logic.nextSiblingLabel),
             ),
           ),
         );

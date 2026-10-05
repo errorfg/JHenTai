@@ -54,6 +54,10 @@ class ReadPageInfo {
   /// completes with null at either end of the series.
   Future<ReadPageInfo?> Function({required bool next})? loadSiblingBook;
 
+  /// The siblings are chapters of one work rather than books of a series;
+  /// only changes the reader's wording.
+  bool siblingsAreChapters;
+
   /// Read direction applied instead of the user's setting, for example a
   /// webtoon detected from gallery tags when auto detection is enabled.
   ReadDirection? readDirection;
@@ -72,6 +76,7 @@ class ReadPageInfo {
     required this.useSuperResolution,
     this.reportReadProgress,
     this.loadSiblingBook,
+    this.siblingsAreChapters = false,
     this.readDirection,
   }) : currentImageIndex = initialIndex;
 }

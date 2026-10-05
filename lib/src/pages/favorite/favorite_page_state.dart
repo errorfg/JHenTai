@@ -12,5 +12,6 @@ class FavoritePageState extends BasePageState {
 
   bool showNhFavorites = false;
   bool showWnFavorites = false;
+  bool showJmFavorites = false;
   bool mixedMode = false;
 }

@@ -55,8 +55,8 @@ class _EHFavoriteSortOrderDialogState extends State<EHFavoriteSortOrderDialog> {
             ),
             const Divider(),
             SwitchListTile(
-              title: Text('mixNhFavorites'.tr),
-              subtitle: Text('mixWnFavorites'.tr),
+              title: Text('mixLocalFavorites'.tr),
+              subtitle: Text('mixLocalFavoritesHint'.tr),
               value: _mixedMode,
               onChanged: (value) => setState(() => _mixedMode = value),
             ),

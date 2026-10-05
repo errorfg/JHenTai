@@ -3,6 +3,7 @@ import 'package:jhentai/src/model/gallery.dart';
 import 'package:jhentai/src/model/gallery_detail.dart';
 import 'package:jhentai/src/model/gallery_tag.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
+import 'package:jhentai/src/network/jm/jm_source.dart';
 import 'package:jhentai/src/widget/loading_state_indicator.dart';
 
 import '../../model/gallery_metadata.dart';
@@ -17,6 +18,10 @@ class DetailsPageState with Scroll2TopStateMixin {
   Gallery? gallery;
 
   GalleryDetail? galleryDetails;
+
+  /// The JM album and chapter shown, once details are loaded; carries the
+  /// chapter list of multi-chapter albums.
+  JmChapterBundle? jmChapterBundle;
 
   /// used for rating
   String? apikey;

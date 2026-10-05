@@ -19,6 +19,8 @@ import '../../model/gallery.dart';
 import '../../model/search_config.dart';
 import '../../service/local_config_service.dart';
 import '../../service/nhentai_favorite_service.dart';
+import '../../service/jm_favorite_service.dart';
+import '../../service/local_source_favorite_service.dart';
 import '../../service/wnacg_favorite_service.dart';
 import '../../service/tag_translation_service.dart';
 import '../../utils/eh_spider_parser.dart';
@@ -48,8 +50,8 @@ class FavoritePageLogic extends BasePageLogic {
       }
       return;
     }
-    if (state.showWnFavorites) {
-      _loadWnFavorites();
+    if (_shownLocalSourceService != null) {
+      _loadLocalSourceFavorites();
       return;
     }
     await super.handleRefresh(updateId: updateId);
@@ -66,7 +68,7 @@ class FavoritePageLogic extends BasePageLogic {
       }
       return;
     }
-    if (state.showWnFavorites) return;
+    if (_shownLocalSourceService != null) return;
     await super.loadBefore();
     if (state.mixedMode) {
       _mergeLocalFavoritesForDisplay();
@@ -81,7 +83,7 @@ class FavoritePageLogic extends BasePageLogic {
       }
       return;
     }
-    if (state.showWnFavorites) return;
+    if (_shownLocalSourceService != null) return;
     await super.loadMore(checkLoadingState: checkLoadingState);
     if (state.mixedMode) {
       _mergeLocalFavoritesForDisplay();
@@ -90,7 +92,7 @@ class FavoritePageLogic extends BasePageLogic {
 
   @override
   Future<void> jumpPage(DateTime dateTime) async {
-    if (state.showNhFavorites || state.showWnFavorites) return;
+    if (state.showNhFavorites || _shownLocalSourceService != null) return;
     await super.jumpPage(dateTime);
     if (state.mixedMode) {
       _mergeLocalFavoritesForDisplay();
@@ -126,15 +128,16 @@ class FavoritePageLogic extends BasePageLogic {
       return;
     }
 
-    if (state.showWnFavorites) {
+    if (_shownLocalSourceService != null) {
       if (state.mixedMode) {
         state.showWnFavorites = false;
+        state.showJmFavorites = false;
         state.favoriteSortOrder = result.sortOrder;
         handleRefresh();
         return;
       }
       state.favoriteSortOrder = result.sortOrder;
-      _loadWnFavorites();
+      _loadLocalSourceFavorites();
       return;
     }
 
@@ -198,10 +201,11 @@ class FavoritePageLogic extends BasePageLogic {
     }
     state.showNhFavorites = source == 'NH';
     state.showWnFavorites = source == 'WN';
+    state.showJmFavorites = source == 'JM';
     if (state.showNhFavorites) {
       _loadNhFavorites();
-    } else if (state.showWnFavorites) {
-      _loadWnFavorites();
+    } else if (_shownLocalSourceService != null) {
+      _loadLocalSourceFavorites();
     } else {
       handleRefresh();
     }
@@ -216,9 +220,10 @@ class FavoritePageLogic extends BasePageLogic {
     }
   }
 
-  Future<void> reloadWnacgFavoriteGallerys() async {
-    if (state.showWnFavorites) {
-      _loadWnFavorites();
+  /// Reloads after a wnacg or JM favorite changed elsewhere.
+  Future<void> reloadLocalSourceFavoriteGallerys() async {
+    if (_shownLocalSourceService != null) {
+      _loadLocalSourceFavorites();
     } else if (state.mixedMode) {
       _mergeLocalFavoritesForDisplay();
       updateSafely();
@@ -296,24 +301,30 @@ class FavoritePageLogic extends BasePageLogic {
     return super.getGalleryPage(prevGid: prevGid, nextGid: nextGid, seek: seek);
   }
 
-  Future<void> _loadWnFavorites() async {
-    List<Gallery> wnFavorites = wnacgFavoriteService.getDisplayFavorites(
+  LocalSourceFavoriteService? get _shownLocalSourceService => state.showWnFavorites
+      ? wnacgFavoriteService
+      : state.showJmFavorites
+          ? jmFavoriteService
+          : null;
+
+  Future<void> _loadLocalSourceFavorites() async {
+    List<Gallery> favorites = _shownLocalSourceService!.getDisplayFavorites(
       sortOrder: state.favoriteSortOrder,
       searchConfig: state.searchConfig,
     );
 
     await Future.wait(
-      wnFavorites.map(
+      favorites.map(
         (g) => tagTranslationService.translateTagsIfNeeded(g.tags),
       ),
     );
 
-    state.gallerys = wnFavorites;
+    state.gallerys = favorites;
     state.prevGid = null;
     state.nextGid = null;
     state.galleryCollectionKey = Key(newUUID());
 
-    if (wnFavorites.isEmpty) {
+    if (favorites.isEmpty) {
       state.loadingState = LoadingState.noData;
     } else {
       state.loadingState = LoadingState.noMore;
@@ -343,8 +354,12 @@ class FavoritePageLogic extends BasePageLogic {
       sortOrder: state.favoriteSortOrder,
       searchConfig: state.searchConfig,
     );
+    List<Gallery> jmFavorites = jmFavoriteService.getDisplayFavorites(
+      sortOrder: state.favoriteSortOrder,
+      searchConfig: state.searchConfig,
+    );
 
-    List<Gallery> localFavorites = [...nhFavorites, ...wnFavorites];
+    List<Gallery> localFavorites = [...nhFavorites, ...wnFavorites, ...jmFavorites];
     if (localFavorites.isEmpty) {
       return;
     }
@@ -355,8 +370,8 @@ class FavoritePageLogic extends BasePageLogic {
       ),
     );
 
-    // Remove any previously merged local favorites (identified by NH/WN URL)
-    state.gallerys.removeWhere((g) => g.galleryUrl.isNH || g.galleryUrl.isWN);
+    // Remove any previously merged local favorites (identified by NH/WN/JM URL)
+    state.gallerys.removeWhere((g) => g.galleryUrl.isNH || g.galleryUrl.isWN || g.galleryUrl.isJM);
 
     // Combine and sort descending by the time matching current sort order
     bool sortByPublishTime =

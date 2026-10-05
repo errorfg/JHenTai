@@ -29,6 +29,7 @@ import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/model/jh_response/fetch_image_hashes_vo.dart';
 import 'package:jhentai/src/model/jh_response/jh_response.dart';
 import 'package:jhentai/src/network/jh_request.dart';
+import 'package:jhentai/src/network/jm/jm_image.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/super_resolution_service.dart';
@@ -850,13 +851,25 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
   }
 
   String _computeImageDownloadAbsolutePath(GalleryDownloadedData gallery, String imageUrl, int serialNo) {
-    /// original image's url doesn't has an ext
-    String? ext = imageUrl.contains('fullimg.php') ? 'jpg' : imageUrl.split('.').last;
+    /// original image's url doesn't has an ext; JM pages are stored restored as JPEG
+    String? ext = imageUrl.contains('fullimg.php') || JmImage.stripsOf(imageUrl) > 0 ? 'jpg' : JmImage.requestUrl(imageUrl).split('.').last;
 
     return path.join(
       computeGalleryDownloadAbsolutePath(gallery),
       '$serialNo.$ext',
     );
+  }
+
+  /// JM pages arrive cut into shuffled strips; keep them restored on disk so
+  /// they read correctly anywhere.
+  Future<void> _restoreJmImageIfNeeded(String imageUrl, String path) async {
+    final int strips = JmImage.stripsOf(imageUrl);
+    if (strips <= 0) {
+      return;
+    }
+    final io.File file = io.File(path);
+    final Uint8List restored = await restoreJmImageInBackground(await file.readAsBytes(), strips);
+    await file.writeAsBytes(restored, flush: true);
   }
 
   String _computeImageDownloadRelativePath(GalleryDownloadedData gallery, String imageUrl, int serialNo) {
@@ -1274,6 +1287,13 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
         }
       }
 
+      try {
+        await _restoreJmImageIfNeeded(image.url, path);
+      } catch (e) {
+        log.download('Restore JM image ${gallery.title}: $serialNo failed, try re-parse. Reason: $e');
+        return _reParseImageUrlAndDownload(gallery, serialNo);
+      }
+
       log.download('Download ${gallery.title} image: $serialNo success');
 
       await _updateImageStatus(gallery, image, serialNo, DownloadStatus.downloaded);
@@ -1424,6 +1444,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
     if (cachedImageFile != null && cachedImageFile.existsSync()) {
       log.debug('download image from cache, gallery: ${gallery.gid}, serialNo:$serialNo');
       await cachedImageFile.copy(path);
+      await _restoreJmImageIfNeeded(image.url, path);
       await _updateImageStatus(gallery, image, serialNo, DownloadStatus.downloaded);
       await _updateProgressAfterImageDownloaded(gallery, serialNo);
     }

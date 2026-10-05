@@ -27,10 +27,16 @@ class CommentPage extends StatefulWidget {
 class _CommentPageState extends State<CommentPage> with LoginRequiredMixin {
   late List<GalleryComment> comments = Get.arguments;
   late bool disableButtons =
-      _isNhentaiReadOnly || comments.any((comment) => comment.fromMe);
+      _isReadOnly || comments.any((comment) => comment.fromMe);
 
   bool get _isNhentaiReadOnly =>
       DetailsPageLogic.current?.state.galleryUrl.isNH == true;
+
+  /// JM comments are shown without a JM login, so they cannot be posted to.
+  bool get _isJmReadOnly =>
+      DetailsPageLogic.current?.state.galleryUrl.isJM == true;
+
+  bool get _isReadOnly => _isNhentaiReadOnly || _isJmReadOnly;
 
   final ScrollController _scrollController = ScrollController();
 
@@ -44,7 +50,7 @@ class _CommentPageState extends State<CommentPage> with LoginRequiredMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('allComments'.tr)),
-      floatingActionButton: _isNhentaiReadOnly
+      floatingActionButton: _isReadOnly
           ? null
           : FloatingActionButton(onPressed: _handleTapAddCommentButton, child: const Icon(Icons.add)),
       body: EHWheelSpeedController(
@@ -53,10 +59,10 @@ class _CommentPageState extends State<CommentPage> with LoginRequiredMixin {
           padding: const EdgeInsets.only(top: 6, left: 8, right: 8, bottom: 200),
           controller: _scrollController,
           children: [
-            if (_isNhentaiReadOnly)
+            if (_isReadOnly)
               ListTile(
                 leading: const Icon(Icons.visibility_outlined),
-                title: Text('nhentaiCommentsReadOnly'.tr),
+                title: Text((_isJmReadOnly ? 'jmCommentsReadOnly' : 'nhentaiCommentsReadOnly').tr),
               ),
             ...comments.map(
                 (comment) => EHComment(

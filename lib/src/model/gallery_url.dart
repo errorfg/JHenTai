@@ -5,6 +5,7 @@ class GalleryUrl {
   final bool isEH;
   final bool isNH;
   final bool isWN;
+  final bool isJM;
   final String? sourceHost;
 
   final int gid;
@@ -17,8 +18,23 @@ class GalleryUrl {
     required this.token,
     this.isNH = false,
     this.isWN = false,
+    this.isJM = false,
     this.sourceHost,
-  }) : assert(isWN || isNH || token.length == 10);
+  }) : assert(isWN || isNH || isJM || token.length == 10);
+
+  /// JM ids share their range with E-Hentai gids; tables keyed by gid
+  /// (downloads, history) would mix them up, so JM gids are shifted.
+  static const int jmGidOffset = 9000000000;
+
+  /// A JM chapter; an album's first chapter has the album's id.
+  factory GalleryUrl.jm(int chapterId) => GalleryUrl(
+        isEH: true,
+        isJM: true,
+        gid: jmGidOffset + chapterId,
+        token: 'jmcomic',
+      );
+
+  int get jmChapterId => gid - jmGidOffset;
 
   static GalleryUrl? tryParse(String url) {
     RegExp regExp =
@@ -65,8 +81,17 @@ class GalleryUrl {
       }
     }
 
+    if (wnUri != null && _isJmHost(wnUri.host)) {
+      Match? jmMatch = RegExp(r'^/(?:album|photo)/(\d+)').firstMatch(wnUri.path);
+      if (jmMatch != null) {
+        return GalleryUrl.jm(int.parse(jmMatch.group(1)!));
+      }
+    }
+
     return null;
   }
+
+  static bool _isJmHost(String host) => host.contains('18comic') || host.contains('jmcomic');
 
   static GalleryUrl parse(String url) {
     GalleryUrl? galleryUrl = tryParse(url);
@@ -78,6 +103,9 @@ class GalleryUrl {
   }
 
   String get url {
+    if (isJM) {
+      return 'https://18comic.vip/photo/$jmChapterId';
+    }
     if (isWN) {
       return 'https://${ehSetting.wnacgDomain.value}/photos-index-aid-$gid.html';
     }
@@ -93,6 +121,7 @@ class GalleryUrl {
     bool? isEH,
     bool? isNH,
     bool? isWN,
+    bool? isJM,
     String? sourceHost,
     int? gid,
     String? token,
@@ -101,6 +130,7 @@ class GalleryUrl {
       isEH: isEH ?? this.isEH,
       isNH: isNH ?? this.isNH,
       isWN: isWN ?? this.isWN,
+      isJM: isJM ?? this.isJM,
       sourceHost: sourceHost ?? this.sourceHost,
       gid: gid ?? this.gid,
       token: token ?? this.token,
@@ -109,6 +139,6 @@ class GalleryUrl {
 
   @override
   String toString() {
-    return 'GalleryUrl{isEH: $isEH, isNH: $isNH, isWN: $isWN, sourceHost: $sourceHost, gid: $gid, token: $token}';
+    return 'GalleryUrl{isEH: $isEH, isNH: $isNH, isWN: $isWN, isJM: $isJM, sourceHost: $sourceHost, gid: $gid, token: $token}';
   }
 }

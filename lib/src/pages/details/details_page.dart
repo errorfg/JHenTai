@@ -29,11 +29,13 @@ import 'package:jhentai/src/widget/eh_tag.dart';
 import 'package:jhentai/src/widget/eh_thumbnail.dart';
 import 'package:jhentai/src/widget/eh_wheel_speed_controller.dart';
 import 'package:jhentai/src/widget/icon_text_button.dart';
+import 'package:jhentai/src/widget/jm_chapter_dialog.dart';
 import 'package:jhentai/src/widget/loading_state_indicator.dart';
 
 import '../../database/database.dart';
 import '../../mixin/scroll_to_top_logic_mixin.dart';
 import '../../mixin/scroll_to_top_state_mixin.dart';
+import '../../network/jm/jm_source.dart';
 import '../../service/gallery_download_service.dart';
 import '../../setting/preference_setting.dart';
 import '../../setting/style_setting.dart';
@@ -135,7 +137,8 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                     ),
                     if (state.galleryDetails != null &&
                         !state.galleryUrl.isNH &&
-                        !state.galleryUrl.isWN)
+                        !state.galleryUrl.isWN &&
+                        !state.galleryUrl.isJM)
                       PopupMenuItem(
                         value: 2,
                         child: Row(
@@ -263,6 +266,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
             buildDivider(),
             buildNewVersionHint(),
             buildActions(context),
+            buildJmChapters(context),
             buildCopyRightRemovedHint(),
             buildLoadingDetailsIndicator(),
             buildTags(),
@@ -1159,11 +1163,15 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
               _buildFavoriteButton(context),
             ];
 
-            if (state.galleryUrl.isNH || state.galleryUrl.isWN) {
+            if (state.galleryUrl.isNH ||
+                state.galleryUrl.isWN ||
+                state.galleryUrl.isJM) {
               actions.add(_buildSearchInEHButton(context));
             }
 
-            if (!state.galleryUrl.isNH && !state.galleryUrl.isWN) {
+            if (!state.galleryUrl.isNH &&
+                !state.galleryUrl.isWN &&
+                !state.galleryUrl.isJM) {
               actions.addAll([
                 _buildRatingButton(context),
                 _buildArchiveButton(context),
@@ -1178,7 +1186,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
               ]);
             }
 
-            if (!state.galleryUrl.isWN) {
+            if (!state.galleryUrl.isWN && !state.galleryUrl.isJM) {
               actions.add(_buildTelegraphButton(context));
             }
 
@@ -1197,6 +1205,65 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
             ).enableMouseDrag(withScrollBar: false);
           },
         ),
+      ),
+    );
+  }
+
+  /// Chapter row of a multi-chapter JM album: opens the chapter list, and
+  /// queues every chapter for download.
+  Widget buildJmChapters(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: GetBuilder<DetailsPageLogic>(
+        id: DetailsPageLogic.detailsId,
+        global: false,
+        init: logic,
+        builder: (_) {
+          final bundle = state.jmChapterBundle;
+          if (bundle == null || !bundle.isMultiChapter) {
+            return const SizedBox();
+          }
+
+          return Container(
+            margin: const EdgeInsets.only(
+              bottom: 8,
+              left: UIConfig.detailPagePadding,
+              right: UIConfig.detailPagePadding,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ListTile(
+                    dense: true,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    leading: const Icon(Icons.format_list_numbered),
+                    title: Text(
+                      '${'chapters'.tr} ${bundle.chapterIndex + 1}/${bundle.album.chapters.length}',
+                    ),
+                    subtitle: Text(
+                      JmSource.chapterName(bundle.album.chapters[bundle.chapterIndex]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    onTap: () => Get.dialog(
+                      JmChapterDialog(
+                        chapters: bundle.album.chapters,
+                        currentChapterId: bundle.chapter.id,
+                        onTap: logic.openJmChapter,
+                      ),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'downloadAllChapters'.tr,
+                  icon: const Icon(Icons.download_for_offline_outlined),
+                  onPressed: logic.handleDownloadAllJmChapters,
+                ),
+              ],
+            ),
+          ).fadeIn();
+        },
       ),
     );
   }
@@ -1815,6 +1882,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                   keyword: '${tag.tagData.namespace}:"${tag.tagData.key}\$"',
                   isNhSearch: state.galleryUrl.isNH,
                   isWnacgSearch: state.galleryUrl.isWN,
+                  isJmSearch: state.galleryUrl.isJM,
                 ),
                 forceNewRoute: true,
               ),
@@ -1822,14 +1890,14 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
             ? (logic.hasNhentaiOfficialApi
                   ? logic.toggleNhentaiBlacklistTag
                   : null)
-            : state.galleryUrl.isWN
+            : state.galleryUrl.isWN || state.galleryUrl.isJM
             ? null
             : logic.showTagDialog,
         onLongPress: state.galleryUrl.isNH
             ? (logic.hasNhentaiOfficialApi
                   ? logic.toggleNhentaiBlacklistTag
                   : null)
-            : state.galleryUrl.isWN
+            : state.galleryUrl.isWN || state.galleryUrl.isJM
             ? null
             : logic.showTagDialog,
         showTagStatus: preferenceSetting.showGalleryTagVoteStatus.isTrue,
@@ -1887,6 +1955,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
 
           bool disableButtons =
               state.galleryUrl.isNH ||
+              state.galleryUrl.isJM ||
               state.galleryDetails!.comments.any((comment) => comment.fromMe);
 
           return Column(
@@ -1900,7 +1969,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                     child: Text(
                       state.galleryDetails!.comments.isEmpty
                           ? 'noComments'.tr
-                          : state.galleryUrl.isNH
+                          : state.galleryUrl.isNH || state.galleryUrl.isJM
                           ? '${'allComments'.tr} (${state.galleryDetails!.commentCount})'
                           : 'allComments'.tr,
                     ),

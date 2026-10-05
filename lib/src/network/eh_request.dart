@@ -41,6 +41,10 @@ import 'package:jhentai/src/setting/user_setting.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/nhentai_tag_id_service.dart';
 import 'package:jhentai/src/utils/eh_spider_parser.dart';
+import 'package:jhentai/src/network/jm/jm_api.dart';
+import 'package:jhentai/src/network/jm/jm_image.dart';
+import 'package:jhentai/src/network/jm/jm_source.dart';
+import 'package:jhentai/src/setting/jm_setting.dart';
 import 'package:jhentai/src/utils/proxy_util.dart';
 import 'package:jhentai/src/utils/string_uril.dart';
 import 'package:http_parser/http_parser.dart' show MediaType;
@@ -87,7 +91,12 @@ class EHRequest with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       ehSetting,
       nhentaiApiSetting,
       nhentaiTagIdService,
+      jmSetting,
     ]);
+
+  /// JM requests; their own Dio, because the shared one caches responses and
+  /// JM responses are encrypted per request time.
+  late final JmSource jmSource;
 
   @override
   Future<void> doInitBean() async {
@@ -103,6 +112,21 @@ class EHRequest with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     );
 
     await _initNhUserAgent();
+
+    jmSource = JmSource(
+      api: JmApi(
+        dio: Dio(
+          BaseOptions(
+            connectTimeout: Duration(milliseconds: networkSetting.connectTimeout.value),
+            receiveTimeout: Duration(milliseconds: networkSetting.receiveTimeout.value),
+          ),
+        ),
+        apiDomains: jmSetting.orderedApiDomains,
+        onApiDomainsDiscovered: jmSetting.saveDiscoveredApiDomains,
+        accountCookie: () => jmSetting.accountCookie,
+      ),
+      imageDomain: () => jmSetting.imageDomain.value,
+    );
 
     systemProxyAddress = await getSystemProxyAddress();
     await _initProxy();
@@ -150,10 +174,12 @@ class EHRequest with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         );
   }
 
-  Future<NHentaiUserProfile> requestNhUserProfile() async {
+  /// The account of [apiKey], the saved key by default.
+  Future<NHentaiUserProfile> requestNhUserProfile({String? apiKey}) async {
     Map<String, dynamic> body = await _requestNhApiJson(
       NHentaiApiSupport.officialHost,
       '/user',
+      apiKey: apiKey,
     );
     return NHentaiUserProfile.fromJson(body);
   }
@@ -571,6 +597,14 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     SearchConfig? searchConfig,
     required HtmlParser<T> parser,
   }) async {
+    if (_shouldUseJmSearch(searchConfig: searchConfig)) {
+      return await jmSource.galleryPage(
+            keyword: searchConfig!.computeFullKeywords(),
+            pageToken: nextGid ?? prevGid,
+          )
+          as T;
+    }
+
     if (_shouldUseWnSearch(url: url, searchConfig: searchConfig)) {
       return _requestWnGalleryPage(
         url: url,
@@ -608,6 +642,16 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     CancelToken? cancelToken,
     required HtmlParser<T> parser,
   }) async {
+    final GalleryUrl? jmUrl = GalleryUrl.tryParse(galleryUrl);
+    if (jmUrl != null && jmUrl.isJM) {
+      return jmSource.detailPage(
+        galleryUrl: jmUrl,
+        thumbnailsPageIndex: thumbnailsPageIndex,
+        parser: parser,
+        useCache: useCacheIfAvailable,
+      );
+    }
+
     if (GalleryUrl.tryParse(galleryUrl)?.isWN == true ||
         _isWnacgUrl(galleryUrl)) {
       return _requestWnDetailPage(
@@ -815,6 +859,10 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     bool useCacheIfAvailable = true,
     required HtmlParser<T> parser,
   }) async {
+    if (href.startsWith('jm://')) {
+      return jmSource.imagePage(href: href, parser: parser);
+    }
+
     if (href.startsWith('wn://') || _isWnacgUrl(href)) {
       return _requestWnImagePage(href: href, parser: parser);
     }
@@ -1034,7 +1082,8 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     HtmlParser<T>? parser,
   }) async {
     Response response = await _dio.download(
-      url,
+      // JM image urls carry their strip count as a fragment.
+      JmImage.requestUrl(url),
       path,
       onReceiveProgress: onReceiveProgress,
       shouldAppendFile: appendMode,
@@ -1681,6 +1730,7 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     String path, {
     Map<String, dynamic>? queryParameters,
     bool ensureCdnConfig = false,
+    String? apiKey,
   }) async {
     final String normalizedHost = _nhNormalizeHost(host);
     if (ensureCdnConfig && NHentaiApiSupport.isOfficialHost(normalizedHost)) {
@@ -1690,17 +1740,17 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     Response response = await _getWithErrorHandler(
       'https://$normalizedHost/api/v2$path',
       queryParameters: queryParameters,
-      options: Options(headers: _nhApiHeaders(normalizedHost)),
+      options: Options(headers: _nhApiHeaders(normalizedHost, apiKey: apiKey)),
     );
 
     return _decodeNhApiResponse(response);
   }
 
-  Map<String, String> _nhApiHeaders(String host) {
+  Map<String, String> _nhApiHeaders(String host, {String? apiKey}) {
     return NHentaiApiSupport.requestHeaders(
       host: host,
       userAgent: _nhUserAgent,
-      apiKey: nhentaiApiSetting.apiKey.value,
+      apiKey: apiKey ?? nhentaiApiSetting.apiKey.value,
     );
   }
 
@@ -3247,6 +3297,17 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     String host = uri.host.toLowerCase();
     String wnHost = ehSetting.wnacgDomain.value.toLowerCase();
     return host == wnHost || host.endsWith('.$wnHost');
+  }
+
+  bool _shouldUseJmSearch({SearchConfig? searchConfig}) {
+    if (searchConfig == null) {
+      return false;
+    }
+    if (searchConfig.isJmSearch) {
+      return true;
+    }
+    return searchConfig.searchType == SearchType.gallery &&
+        (searchConfig.keyword ?? '').trimLeft().toLowerCase().startsWith('jm:');
   }
 
   bool _shouldUseWnSearch({String? url, SearchConfig? searchConfig}) {

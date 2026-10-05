@@ -30,7 +30,7 @@ class FavoritePage extends BasePage {
   @override
   List<Widget> buildAppBarActions() {
     return [
-      if (state.gallerys.isNotEmpty && !state.showNhFavorites && !state.showWnFavorites)
+      if (state.gallerys.isNotEmpty && !state.showNhFavorites && !state.showWnFavorites && !state.showJmFavorites)
         IconButton(icon: Icon(Icons.send, size: 20), onPressed: logic.handleTapJumpButton),
       if (state.gallerys.isNotEmpty)
         IconButton(icon: const Icon(Icons.sort), onPressed: logic.handleChangeSortOrder),
@@ -41,7 +41,7 @@ class FavoritePage extends BasePage {
           itemBuilder: (context) => [
             PopupMenuItem(
               value: 'EH',
-              enabled: state.showNhFavorites || state.showWnFavorites,
+              enabled: state.showNhFavorites || state.showWnFavorites || state.showJmFavorites,
               child: Text('EH ${'favorite'.tr}'),
             ),
             PopupMenuItem(
@@ -53,6 +53,11 @@ class FavoritePage extends BasePage {
               value: 'WN',
               enabled: !state.showWnFavorites,
               child: Text('wnacgFavorite'.tr),
+            ),
+            PopupMenuItem(
+              value: 'JM',
+              enabled: !state.showJmFavorites,
+              child: Text('jmFavorite'.tr),
             ),
           ],
         ),

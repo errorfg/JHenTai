@@ -43,6 +43,7 @@ enum ConfigEnum {
   komgaSetting('komgaSetting'),
   nhentaiApiSetting('nhentaiApiSetting'),
   eh2telegraphSetting('eh2telegraphSetting'),
+  jmSetting('jmSetting'),
   komgaBrowseSetting('komgaBrowseSetting'),
   downloadSearchPageType('downloadSearchPageType'),
   windowFullScreen('windowFullScreen'),
@@ -62,6 +63,7 @@ enum ConfigEnum {
   searchHistory('searchHistory'),
   nhentaiFavorite('nhentaiFavorite'),
   wnacgFavorite('wnacgFavorite'),
+  jmFavorite('jmFavorite'),
   myTagsSetting('MyTagsSetting'),
   builtInBlockedUser('builtInBlockedUser'),
 

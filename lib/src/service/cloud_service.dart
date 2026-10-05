@@ -5,6 +5,7 @@ import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/model/config.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
+import 'package:jhentai/src/service/jm_favorite_service.dart';
 import 'package:jhentai/src/service/nhentai_favorite_service.dart';
 import 'package:jhentai/src/service/wnacg_favorite_service.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
@@ -39,6 +40,7 @@ class CloudConfigService
     CloudConfigTypeEnum.komgaSetting: '1.0.0',
     CloudConfigTypeEnum.nhentaiApiSetting: '1.0.0',
     CloudConfigTypeEnum.eh2telegraphSetting: '1.0.0',
+    CloudConfigTypeEnum.jmFavorite: '1.0.0',
   };
 
   static const int localConfigId = -1;
@@ -167,6 +169,14 @@ class CloudConfigService
         await wnacgFavoriteService.refreshBean();
         log.info('  ✅ wnacg favorites imported and refreshed');
         break;
+      case CloudConfigTypeEnum.jmFavorite:
+        await localConfigService.write(
+          configKey: ConfigEnum.jmFavorite,
+          value: config.config,
+        );
+        await jmFavoriteService.refreshBean();
+        log.info('  ✅ JM favorites imported and refreshed');
+        break;
       case CloudConfigTypeEnum.komgaSetting:
         await localConfigService.batchWrite([
           LocalConfigCompanion(
@@ -276,6 +286,15 @@ class CloudConfigService
           return null;
         }
         configValue = wnacgFavoriteConfig;
+        break;
+      case CloudConfigTypeEnum.jmFavorite:
+        String? jmFavoriteConfig = await localConfigService.read(
+          configKey: ConfigEnum.jmFavorite,
+        );
+        if (jmFavoriteConfig == null) {
+          return null;
+        }
+        configValue = jmFavoriteConfig;
         break;
       case CloudConfigTypeEnum.komgaSetting:
         List<LocalConfig> records = await localConfigService.readWithAllSubKeys(

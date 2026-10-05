@@ -24,10 +24,48 @@ class LoginPage extends StatelessWidget {
         body: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Center(child: Text('EHenTai', style: TextStyle(color: UIConfig.loginPageForegroundColor(context), fontSize: 60))),
-            _buildTabBar(context).marginOnly(top: 24),
-            Expanded(child: _buildTabBarView(context).marginOnly(top: 8)),
+            Center(child: _buildSiteSelector(context)),
+            if (state.site == LoginSite.eh) ...[
+              _buildTabBar(context).marginOnly(top: 24),
+              Expanded(child: _buildTabBarView(context).marginOnly(top: 8)),
+            ],
+            if (state.site == LoginSite.nh) Expanded(child: _NhApiKeyBody(logic: logic, state: state).marginOnly(top: 32)),
+            if (state.site == LoginSite.jm)
+              Expanded(
+                child: _PasswordTabBody(key: const ValueKey(LoginSite.jm), logic: logic, state: state).marginOnly(top: 8),
+              ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// The site to log in to, in place of a fixed title.
+  Widget _buildSiteSelector(BuildContext context) {
+    final Color color = UIConfig.loginPageForegroundColor(context);
+    final List<LoginSite> sites = logic.availableSites;
+    // As wide as the forms below; a long title shrinks instead of overflowing.
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 320),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<LoginSite>(
+          key: const Key('loginSite'),
+          value: state.site,
+          isExpanded: true,
+          items: sites.map((site) => DropdownMenuItem(value: site, child: Text(site.title))).toList(),
+          selectedItemBuilder: (_) => sites
+              .map((site) => Center(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(site.title, style: TextStyle(color: color, fontSize: 48)),
+                    ),
+                  ))
+              .toList(),
+          onChanged: (site) => logic.switchSite(site!),
+          iconEnabledColor: color,
+          iconSize: 36,
+          dropdownColor: UIConfig.loginPageBackgroundColor(context),
+          style: TextStyle(color: color, fontSize: 18),
         ),
       ),
     );
@@ -158,6 +196,84 @@ class _PasswordTabBody extends StatelessWidget {
             successWidgetBuilder: () => const Icon(Icons.check),
             errorWidgetSameWithIdle: true,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// nhentai accounts are API keys from the nhentai.net account settings.
+class _NhApiKeyBody extends StatelessWidget {
+  final LoginPageLogic logic;
+  final LoginPageState state;
+
+  const _NhApiKeyBody({required this.logic, required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Container(
+        width: 320,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: UIConfig.loginPageForegroundColor(context), width: 2),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            GetBuilder<LoginPageLogic>(
+              builder: (_) => TextFormField(
+                key: const Key('nhApiKey'),
+                obscureText: state.obscureText,
+                autocorrect: false,
+                enableSuggestions: false,
+                onChanged: (apiKey) => state.nhApiKey = apiKey,
+                onFieldSubmitted: (_) => logic.handleLogin(),
+                decoration: InputDecoration(
+                  hintText: 'nhentaiApiKey'.tr,
+                  hintStyle: TextStyle(color: UIConfig.loginPageTextHintColor(context), fontSize: UIConfig.loginPageTextHintSize, height: 1),
+                  prefixIcon: Icon(Icons.key, size: 22, color: UIConfig.loginPagePrefixIconColor(context)),
+                  suffixIcon: InkWell(
+                    child: Icon(state.obscureText ? Icons.visibility : Icons.visibility_off, size: 22, color: UIConfig.loginPagePrefixIconColor(context)),
+                    onTap: () {
+                      state.obscureText = !state.obscureText;
+                      logic.update();
+                    },
+                  ),
+                ),
+              ),
+            ),
+            Text(
+              'nhentaiApiKeyHint'.tr,
+              style: TextStyle(color: UIConfig.loginPageFormHintColor(context), fontSize: 12),
+            ).marginOnly(top: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: ElevatedButton(
+                onPressed: logic.handleLogin,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: UIConfig.loginPageFormIconColor(context),
+                  foregroundColor: UIConfig.loginPageBackgroundColor(context),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),
+                ),
+                child: GetBuilder<LoginPageLogic>(
+                  id: LoginPageLogic.loadingStateId,
+                  builder: (_) => LoadingStateIndicator(
+                    useCupertinoIndicator: true,
+                    loadingState: state.loginState,
+                    indicatorRadius: 10,
+                    indicatorColor: UIConfig.loginPageIndicatorColor(context),
+                    idleWidgetBuilder: () => Text('verifyAndLogin'.tr, style: TextStyle(color: UIConfig.loginPageBackgroundColor(context), fontSize: 16)),
+                    successWidgetBuilder: () => const Icon(Icons.check),
+                    errorWidgetSameWithIdle: true,
+                  ),
+                ),
+              ),
+            ).marginOnly(top: 24),
+          ],
         ),
       ),
     );

@@ -225,6 +225,16 @@ class ReadProgressFlushCoordinator {
   }
 }
 
+/// The reader's controllers are registered by type; a reader opened right
+/// after another must not start until the previous one has released them.
+Future<void> waitForReaderDisposed() async {
+  final DateTime deadline = DateTime.now().add(const Duration(seconds: 5));
+  while (Get.isRegistered<ReadPageLogic>() &&
+      DateTime.now().isBefore(deadline)) {
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+  }
+}
+
 class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   final String pageId = 'pageId';
   final String layoutId = 'layoutId';
@@ -884,7 +894,10 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     try {
       final ReadPageInfo? sibling = await load(next: next);
       if (sibling == null) {
-        toast((next ? 'noNextBook' : 'noPreviousBook').tr);
+        final String key = state.readPageInfo.siblingsAreChapters
+            ? (next ? 'noNextChapter' : 'noPreviousChapter')
+            : (next ? 'noNextBook' : 'noPreviousBook');
+        toast(key.tr);
         return;
       }
       backRoute(currentRoute: Routes.read, result: sibling);
@@ -898,6 +911,12 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   }
 
   bool get openingSibling => _openingSibling;
+
+  String get previousSiblingLabel =>
+      (state.readPageInfo.siblingsAreChapters ? 'previousChapter' : 'previousBook').tr;
+
+  String get nextSiblingLabel =>
+      (state.readPageInfo.siblingsAreChapters ? 'nextChapter' : 'nextBook').tr;
 
   void saveReadDirection(ReadDirection value) {
     state.readPageInfo.readDirection = null;

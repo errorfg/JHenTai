@@ -22,6 +22,7 @@ import 'package:path/path.dart';
 import '../../../config/ui_config.dart';
 import '../../../setting/eh_setting.dart';
 import '../../../setting/eh2telegraph_setting.dart';
+import '../../../setting/jm_setting.dart';
 import '../../../enum/config_type_enum.dart';
 import '../../../routes/routes.dart';
 import '../../../service/isolate_service.dart';
@@ -79,6 +80,7 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
             _buildCheckUpdate(),
             _buildCheckClipboard(),
             _buildNhentaiDomains(),
+            _buildJmSetting(),
             _buildEh2Telegraph(),
             if (GetPlatform.isAndroid) _buildVerifyAppLinks(),
             if (GetPlatform.isAndroid) _buildRefreshRate(),
@@ -247,6 +249,21 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
       subtitle: Obx(() => Text(ehSetting.nhentaiDomains.join(', '))),
       trailing: const Icon(Icons.keyboard_arrow_right).marginOnly(right: 4),
       onTap: () => toRoute(Routes.nhentaiDomains),
+    );
+  }
+
+  Widget _buildJmSetting() {
+    return ListTile(
+      title: Text('jmSetting'.tr),
+      subtitle: Obx(
+        () => Text(
+          jmSetting.preferredApiDomain.value.isEmpty
+              ? '${'auto'.tr} · ${jmSetting.imageDomain.value}'
+              : '${jmSetting.preferredApiDomain.value} · ${jmSetting.imageDomain.value}',
+        ),
+      ),
+      trailing: const Icon(Icons.keyboard_arrow_right).marginOnly(right: 4),
+      onTap: () => toRoute(Routes.jmSetting),
     );
   }
 
