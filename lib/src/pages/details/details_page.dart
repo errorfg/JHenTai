@@ -1607,7 +1607,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
     );
   }
 
-  /// 把当前画廊链接交给 eh2telegraph 机器人（经 Tailscale 内网接口），结果由 Telegram 通知。
+  /// 把当前画廊链接交给 eh2telegraph 机器人（经其同步接口），结果由 Telegram 通知。
   Widget _buildTelegraphButton(BuildContext context) {
     return GetBuilder<DetailsPageLogic>(
       id: DetailsPageLogic.detailsId,

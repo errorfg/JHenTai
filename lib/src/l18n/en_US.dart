@@ -465,7 +465,7 @@ class en_US {
       'nhentaiApiSetting': 'nhentai API Key',
       'eh2telegraph': 'Telegraph bot (eh2telegraph)',
       'eh2telegraphEndpoint': 'Server address',
-      'eh2telegraphEndpointHint': 'e.g. http://100.64.0.1:8788 (Tailscale)',
+      'eh2telegraphEndpointHint': 'Address of your own eh2telegraph deployment, e.g. https://eh2telegraph.example.com',
       'eh2telegraphToken': 'Access token',
       'eh2telegraphNotConfigured': 'Not configured',
       'eh2telegraphConfigured': 'Configured',

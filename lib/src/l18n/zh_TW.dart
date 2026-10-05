@@ -436,7 +436,7 @@ class zh_TW {
       'nhentaiApiSetting': 'nhentai API 金鑰',
       'eh2telegraph': 'Telegraph 機器人（eh2telegraph）',
       'eh2telegraphEndpoint': '服務位址',
-      'eh2telegraphEndpointHint': '例如 http://100.64.0.1:8788（Tailscale 位址）',
+      'eh2telegraphEndpointHint': '自行部署的 eh2telegraph 服務位址，例如 https://eh2telegraph.example.com',
       'eh2telegraphToken': '存取權杖',
       'eh2telegraphNotConfigured': '未設定',
       'eh2telegraphConfigured': '已設定',

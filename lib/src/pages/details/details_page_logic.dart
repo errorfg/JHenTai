@@ -1449,7 +1449,7 @@ class DetailsPageLogic extends GetxController
     );
   }
 
-  /// 发送到 eh2telegraph 机器人：POST 内网接口，202 即成功，结果稍后由 Telegram 通知。
+  /// 发送到 eh2telegraph 机器人：POST 同步接口，202 即成功，结果稍后由 Telegram 通知。
   Future<void> handleTapSendToTelegraph() async {
     if (state.galleryUrl.isWN) {
       return;

@@ -935,7 +935,7 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'switchReaderSource': '읽기 소스 전환',
       'eh2telegraph': 'Telegraph 봇 (eh2telegraph)',
       'eh2telegraphEndpoint': '서버 주소',
-      'eh2telegraphEndpointHint': '예: http://100.64.0.1:8788 (Tailscale 주소)',
+      'eh2telegraphEndpointHint': '직접 배포한 eh2telegraph 서비스 주소, 예: https://eh2telegraph.example.com',
       'eh2telegraphToken': '액세스 토큰',
       'eh2telegraphNotConfigured': '설정되지 않음',
       'eh2telegraphConfigured': '설정됨',

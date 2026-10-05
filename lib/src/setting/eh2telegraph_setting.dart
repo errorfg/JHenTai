@@ -7,11 +7,11 @@ import 'package:jhentai/src/service/log.dart';
 
 Eh2TelegraphSetting eh2telegraphSetting = Eh2TelegraphSetting();
 
-/// eh2telegraph 机器人的内网同步接口（经 Tailscale 直连）。
+/// 用户自行部署的 eh2telegraph 服务的同步接口。
 class Eh2TelegraphSetting
     with JHLifeCircleBeanWithConfigStorage
     implements JHLifeCircleBean {
-  /// 例如 http://100.64.0.1:8788
+  /// 例如 https://eh2telegraph.example.com
   final RxString endpoint = ''.obs;
   final RxString token = ''.obs;
 
@@ -48,7 +48,7 @@ class Eh2TelegraphSetting
     await saveBeanConfig();
   }
 
-  /// 去掉首尾空白与结尾斜杠；缺少协议时默认 http（Tailscale 内网）。
+  /// 去掉首尾空白与结尾斜杠；缺少协议时默认 http。
   static String normalizeEndpoint(String raw) {
     String value = raw.trim();
     if (value.isEmpty) {

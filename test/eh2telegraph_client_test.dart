@@ -67,8 +67,8 @@ void main() {
   group('Eh2TelegraphSetting.normalizeEndpoint', () {
     test('adds http scheme and strips trailing slashes', () {
       expect(
-        Eh2TelegraphSetting.normalizeEndpoint(' 100.64.0.1:8788/ '),
-        'http://100.64.0.1:8788',
+        Eh2TelegraphSetting.normalizeEndpoint(' eh2telegraph.example.com/ '),
+        'http://eh2telegraph.example.com',
       );
       expect(
         Eh2TelegraphSetting.normalizeEndpoint('https://bot.example//'),

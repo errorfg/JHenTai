@@ -982,7 +982,7 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'switchReaderSource': 'Trocar fonte de leitura',
       'eh2telegraph': 'Bot do Telegraph (eh2telegraph)',
       'eh2telegraphEndpoint': 'Endereço do servidor',
-      'eh2telegraphEndpointHint': 'ex.: http://100.64.0.1:8788 (Tailscale)',
+      'eh2telegraphEndpointHint': 'Endereço da sua própria implantação do eh2telegraph, ex.: https://eh2telegraph.example.com',
       'eh2telegraphToken': 'Token de acesso',
       'eh2telegraphNotConfigured': 'Não configurado',
       'eh2telegraphConfigured': 'Configurado',

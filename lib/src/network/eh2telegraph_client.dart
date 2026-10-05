@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:jhentai/src/setting/eh2telegraph_setting.dart';
 
-/// eh2telegraph 内网同步接口客户端：`GET /health`、`POST /sync {url}`。
+/// eh2telegraph 同步接口客户端：`GET /health`、`POST /sync {url}`。
 class Eh2TelegraphClient {
   Eh2TelegraphClient({
     required String endpoint,

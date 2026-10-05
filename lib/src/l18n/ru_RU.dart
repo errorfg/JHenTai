@@ -986,7 +986,7 @@ class ru_RU {
       'switchReaderSource': 'Сменить источник чтения',
       'eh2telegraph': 'Бот Telegraph (eh2telegraph)',
       'eh2telegraphEndpoint': 'Адрес сервера',
-      'eh2telegraphEndpointHint': 'например, http://100.64.0.1:8788 (Tailscale)',
+      'eh2telegraphEndpointHint': 'Адрес вашего собственного развёртывания eh2telegraph, например https://eh2telegraph.example.com',
       'eh2telegraphToken': 'Токен доступа',
       'eh2telegraphNotConfigured': 'Не настроено',
       'eh2telegraphConfigured': 'Настроено',

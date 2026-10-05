@@ -58,7 +58,7 @@ void main() {
 
     test('exports and imports endpoint and token as one record', () async {
       const String localPayload =
-          '{"endpoint":"http://100.64.0.1:8788","token":"local-token"}';
+          '{"endpoint":"https://eh2telegraph.example.com","token":"local-token"}';
       await localConfigService.write(
         configKey: ConfigEnum.eh2telegraphSetting,
         value: localPayload,
@@ -72,7 +72,7 @@ void main() {
       expect(exported.type, CloudConfigTypeEnum.eh2telegraphSetting);
 
       const String remotePayload =
-          '{"endpoint":"http://100.64.0.1:8788","token":"remote-token"}';
+          '{"endpoint":"https://eh2telegraph.example.com","token":"remote-token"}';
       final DateTime remoteTime = DateTime.utc(2026, 8, 25, 12);
       await CloudConfigService().importConfig(
         CloudConfig(
@@ -86,7 +86,7 @@ void main() {
         ),
       );
 
-      expect(eh2telegraphSetting.endpoint.value, 'http://100.64.0.1:8788');
+      expect(eh2telegraphSetting.endpoint.value, 'https://eh2telegraph.example.com');
       expect(eh2telegraphSetting.token.value, 'remote-token');
       expect(eh2telegraphSetting.isConfigured, isTrue);
       expect(
@@ -100,7 +100,7 @@ void main() {
       );
       expect(reexported?.ctime, remoteTime);
       expect(jsonDecode(reexported!.config), <String, dynamic>{
-        'endpoint': 'http://100.64.0.1:8788',
+        'endpoint': 'https://eh2telegraph.example.com',
         'token': 'remote-token',
       });
     });

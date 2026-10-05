@@ -6,7 +6,7 @@ import 'package:jhentai/src/service/sync_service.dart';
 import 'package:jhentai/src/setting/eh2telegraph_setting.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
 
-/// eh2telegraph 内网同步接口的设置：服务地址与访问令牌。
+/// eh2telegraph 同步接口的设置：服务地址与访问令牌。
 class Eh2TelegraphPage extends StatelessWidget {
   const Eh2TelegraphPage({Key? key}) : super(key: key);
 
