@@ -1180,15 +1180,16 @@ class DetailsPageLogic extends GetxController
         return;
       }
 
-      ({bool useBot, bool isOriginal, int size, String group})? result =
-          await Get.dialog(
-            EHArchiveDialog(
-              title: 'chooseArchive'.tr,
-              archivePageUrl: state.galleryDetails!.archivePageUrl,
-              currentGroup: downloadSetting.defaultArchiveGroup.value,
-              candidates: archiveDownloadService.allGroups,
-            ),
-          );
+      ({bool useBot, bool isOriginal, int size, String group})? result = await Get.dialog(
+        EHArchiveDialog(
+          title: 'chooseArchive'.tr,
+          gid: state.galleryDetails!.galleryUrl.gid,
+          token: state.galleryDetails!.galleryUrl.token,
+          archivePageUrl: state.galleryDetails!.archivePageUrl,
+          currentGroup: downloadSetting.defaultArchiveGroup.value,
+          candidates: archiveDownloadService.allGroups,
+        ),
+      );
       if (result == null) {
         return;
       }
