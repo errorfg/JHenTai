@@ -535,7 +535,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
             containerWidth: constraints.maxWidth,
             borderRadius: BorderRadius.circular(8),
             maxBytes: 1024 * 50,
-            disableGifAnimation: true,
+            disableAnimation: true,
           ),
         );
       },

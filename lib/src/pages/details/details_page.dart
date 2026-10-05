@@ -256,7 +256,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
           ),
           scrollBehavior: UIConfig.scrollBehaviourWithScrollBarWithMouse,
           controller: state.scrollController,
-          cacheExtent: 5000,
+          cacheExtent: 250,
           slivers: [
             CupertinoSliverRefreshControl(onRefresh: logic.handleRefresh),
             if (preferenceSetting.showAllGalleryTitles.isTrue)
@@ -1961,6 +1961,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                                         containerWidth: constraints.maxWidth,
                                         borderRadius: BorderRadius.circular(8),
                                         maxBytes: 128 * 1024,
+                                        disableAnimation: true,
                                       )
                                     : EHThumbnail(
                                         thumbnail: state
