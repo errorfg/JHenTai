@@ -1,6 +1,6 @@
+import 'package:flutter/rendering.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/pages/base/base_page.dart';
@@ -41,7 +41,7 @@ class DashboardPage extends BasePage {
   AppBar? buildAppBar(BuildContext context) {
     return AppBar(
       leading: IconButton(
-        icon: Icon(FontAwesomeIcons.bars.data, size: 20),
+        icon: Icon(Icons.menu, size: 20),
         onPressed: () => TapMenuButtonNotification().dispatch(context),
       ),
       title: GestureDetector(
@@ -154,7 +154,7 @@ class DashboardPage extends BasePage {
                   gallery: state.ranklistGallerys[index],
                   badge: _getRanklistBadge(index)),
               separatorBuilder: (_, __) => const VerticalDivider(),
-              cacheExtent: 2000,
+              scrollCacheExtent: ScrollCacheExtent.pixels(2000),
             ).enableMouseDrag(withScrollBar: false).fadeIn(),
           ),
         ),
@@ -187,7 +187,7 @@ class DashboardPage extends BasePage {
               itemBuilder: (_, index) =>
                   EHDashboardCard(gallery: state.popularGallerys[index]),
               separatorBuilder: (_, __) => const VerticalDivider(),
-              cacheExtent: 2000,
+              scrollCacheExtent: ScrollCacheExtent.pixels(2000),
             ).enableMouseDrag(withScrollBar: false).fadeIn(),
           ),
         ),

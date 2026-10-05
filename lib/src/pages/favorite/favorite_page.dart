@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:get/get.dart';
 
 import '../base/base_page.dart';
@@ -32,7 +31,7 @@ class FavoritePage extends BasePage {
   List<Widget> buildAppBarActions() {
     return [
       if (state.gallerys.isNotEmpty && !state.showNhFavorites && !state.showWnFavorites)
-        IconButton(icon: Icon(FontAwesomeIcons.paperPlane.data, size: 20), onPressed: logic.handleTapJumpButton),
+        IconButton(icon: Icon(Icons.send, size: 20), onPressed: logic.handleTapJumpButton),
       if (state.gallerys.isNotEmpty)
         IconButton(icon: const Icon(Icons.sort), onPressed: logic.handleChangeSortOrder),
       if (!state.mixedMode)

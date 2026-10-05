@@ -29,17 +29,24 @@ mixin SearchPageMixin<L extends SearchPageLogicMixin,
   @override
   S get state;
 
-  List<Widget> buildActionButtons({VisualDensity? visualDensity}) {
-    return [
+  List<Widget> buildActionButtons({VisualDensity? visualDensity, double? compactSize, double? spacing}) {
+    final BoxConstraints? buttonConstraints = compactSize == null ? null : BoxConstraints.tightFor(width: compactSize, height: compactSize);
+    final EdgeInsetsGeometry? buttonPadding = compactSize == null ? null : EdgeInsets.zero;
+
+    final List<Widget> buttons = [
       IconButton(
         icon: const Icon(Icons.attach_file),
         onPressed: logic.handleFileSearch,
         visualDensity: visualDensity,
+        constraints: buttonConstraints,
+        padding: buttonPadding,
       ),
       IconButton(
         icon: const Icon(Icons.restore),
         onPressed: logic.handleTapJumpButton,
         visualDensity: visualDensity,
+        constraints: buttonConstraints,
+        padding: buttonPadding,
       ),
       IconButton(
         icon: Icon(state.bodyType == SearchPageBodyType.gallerys
@@ -47,12 +54,16 @@ mixin SearchPageMixin<L extends SearchPageLogicMixin,
             : Icons.image_outlined),
         onPressed: logic.toggleBodyType,
         visualDensity: visualDensity,
+        constraints: buttonConstraints,
+        padding: buttonPadding,
       ),
       IconButton(
         icon: const Icon(Icons.filter_alt_outlined),
         onPressed: () =>
             logic.handleTapFilterButton(EHSearchConfigDialogType.filter),
         visualDensity: visualDensity,
+        constraints: buttonConstraints,
+        padding: buttonPadding,
       ),
       PopupMenuButton<String>(
         icon: Icon(Icons.travel_explore,
@@ -96,7 +107,20 @@ mixin SearchPageMixin<L extends SearchPageLogicMixin,
         icon: const Icon(Icons.more_vert),
         onPressed: () => toRoute(Routes.quickSearch),
         visualDensity: visualDensity,
+        constraints: buttonConstraints,
+        padding: buttonPadding,
       ),
+    ];
+
+    if (spacing == null) {
+      return buttons;
+    }
+
+    return [
+      for (var i = 0; i < buttons.length; i++) ...[
+        if (i > 0) SizedBox(width: spacing),
+        buttons[i],
+      ],
     ];
   }
 

@@ -30,6 +30,7 @@ import '../../../../utils/route_util.dart';
 import '../../../../utils/toast_util.dart';
 import '../../../../utils/convert_util.dart';
 import '../../../../widget/eh_alert_dialog.dart';
+import '../../../../widget/eh_action_sheet_text.dart';
 import '../../../../widget/eh_download_dialog.dart';
 import '../../../../widget/re_unlock_dialog.dart';
 import '../basic/multi_select/multi_select_download_page_logic_mixin.dart';
@@ -439,7 +440,7 @@ mixin ArchiveDownloadPageLogicMixin on GetxController
                           ?.status ==
                       SuperResolutionStatus.paused))
             CupertinoActionSheetAction(
-              child: Text('superResolution'.tr),
+              child: ehActionSheetText('superResolution'.tr),
               onPressed: () async {
                 backRoute();
 
@@ -464,7 +465,7 @@ mixin ArchiveDownloadPageLogicMixin on GetxController
                   ?.status ==
               SuperResolutionStatus.running)
             CupertinoActionSheetAction(
-              child: Text('stopSuperResolution'.tr),
+              child: ehActionSheetText('stopSuperResolution'.tr),
               onPressed: () async {
                 backRoute();
 
@@ -482,7 +483,7 @@ mixin ArchiveDownloadPageLogicMixin on GetxController
                       ?.status ==
                   SuperResolutionStatus.success)
             CupertinoActionSheetAction(
-              child: Text('deleteSuperResolvedImage'.tr),
+              child: ehActionSheetText('deleteSuperResolvedImage'.tr),
               onPressed: () async {
                 backRoute();
 
@@ -497,7 +498,7 @@ mixin ArchiveDownloadPageLogicMixin on GetxController
                   ArchiveStatus.downloaded.code &&
               archiveDownloadInfo.parseSource == ArchiveParseSource.bot.code)
             CupertinoActionSheetAction(
-              child: Text('changeParseSource2Official'.tr),
+              child: ehActionSheetText('changeParseSource2Official'.tr),
               onPressed: () {
                 backRoute();
                 changeParseSource(archive.gid, ArchiveParseSource.official);
@@ -510,22 +511,21 @@ mixin ArchiveDownloadPageLogicMixin on GetxController
               archiveDownloadInfo.parseSource ==
                   ArchiveParseSource.official.code)
             CupertinoActionSheetAction(
-              child: Text('changeParseSource2Bot'.tr),
+              child: ehActionSheetText('changeParseSource2Bot'.tr),
               onPressed: () {
                 backRoute();
                 changeParseSource(archive.gid, ArchiveParseSource.bot);
               },
             ),
           CupertinoActionSheetAction(
-            child: Text('changeGroup'.tr),
+            child: ehActionSheetText('changeGroup'.tr),
             onPressed: () {
               backRoute();
               handleChangeArchiveGroup(archive);
             },
           ),
           CupertinoActionSheetAction(
-            child: Text('delete'.tr,
-                style: TextStyle(color: UIConfig.alertColor(context))),
+            child: ehActionSheetText('delete'.tr, color: UIConfig.alertColor(context)),
             onPressed: () {
               backRoute();
               handleRemoveItem(archive);
@@ -533,7 +533,7 @@ mixin ArchiveDownloadPageLogicMixin on GetxController
           ),
         ],
         cancelButton: CupertinoActionSheetAction(
-          child: Text('cancel'.tr),
+          child: ehActionSheetText('cancel'.tr),
           onPressed: backRoute,
         ),
       ),

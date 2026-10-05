@@ -1,3 +1,4 @@
+import 'package:flutter/rendering.dart';
 import 'package:animate_do/animate_do.dart' hide FadeInExtension, FadeOutExtension;
 import 'package:collection/collection.dart';
 import 'package:dio/dio.dart';
@@ -140,7 +141,7 @@ class _EHSearchConfigDialogState extends State<EHSearchConfigDialog> {
       controller: _bodyScrollController,
       child: ListView(
         controller: _bodyScrollController,
-        cacheExtent: 3000,
+        scrollCacheExtent: ScrollCacheExtent.pixels(3000),
         padding: const EdgeInsets.symmetric(horizontal: 10),
         children: [
           if (widget.type != EHSearchConfigDialogType.filter) _buildSearchConfigName(),
