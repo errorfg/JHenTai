@@ -82,7 +82,10 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
   static const int _maxRetryTimes4FetchImageHashes = 1;
   static const String metadataFileName = 'metadata';
   static const int defaultDownloadGalleryPriority = 4;
-  static const int _priorityBase = 100000000;
+  /// One priority level occupies this many scheduler-priority units, so the
+  /// insert-time term (epoch seconds * 2000) plus the per-image serialNo slot
+  /// always stays within one level and the user-assigned priority dominates.
+  static const int _priorityBase = 1000000000000000;
 
   final Completer<bool> _completer = Completer();
 
@@ -819,9 +822,10 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
       return groupPriority;
     }
 
-    /// priority is same, order by insert time
+    /// priority is same, order by insert time; epoch seconds keep the order
+    /// monotonic across year boundaries
     DateTime insertTime = DateFormat('yyyy-MM-dd HH:mm:ss').parse(gallery.insertTime);
-    int timePriority = int.parse(DateFormat('MMddHHmmss').format(insertTime)) * 2000;
+    int timePriority = insertTime.millisecondsSinceEpoch ~/ 1000 * 2000;
 
     return groupPriority + timePriority;
   }
