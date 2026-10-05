@@ -214,14 +214,8 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
     int currentImageIndex = 0;
     int currentPageIndex = 0;
     bool hasLeftColumn = false;
-
-    if (readPageState.displayFirstPageAlone) {
-      if (pageIndex == 0) {
-        return [0];
-      }
-      currentImageIndex++;
-      currentPageIndex++;
-    }
+    /// Extends displayFirstPageAlone to apply after each spread, not just the cover.
+    bool nextIsAlone = readPageState.displayFirstPageAlone;
 
     while (currentPageIndex < pageIndex) {
       bool isSpreadPage = state.isSpreadPage[currentImageIndex];
@@ -229,6 +223,7 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
       if (isSpreadPage && !hasLeftColumn) {
         currentImageIndex++;
         currentPageIndex++;
+        nextIsAlone = readPageState.displayFirstPageAlone;
         continue;
       }
 
@@ -236,6 +231,14 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
         currentImageIndex++;
         currentPageIndex += 2;
         hasLeftColumn = false;
+        nextIsAlone = readPageState.displayFirstPageAlone;
+        continue;
+      }
+
+      if (nextIsAlone && !hasLeftColumn) {
+        currentImageIndex++;
+        currentPageIndex++;
+        nextIsAlone = false;
         continue;
       }
 
@@ -266,43 +269,53 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
       return [currentImageIndex];
     }
 
+    if (nextIsAlone && !hasLeftColumn) {
+      return [currentImageIndex];
+    }
+
     return [currentImageIndex, currentImageIndex + 1];
   }
 
   /// provide a image index, compute we should display this image in which page
   int computePageIndexOfImage(int imageIndex) {
-    int beginImageIndex = 0;
+    int currentImageIndex = 0;
     int pageIndex = 0;
     bool hasLeftColumn = false;
+    bool nextIsAlone = readPageState.displayFirstPageAlone;
 
-    if (readPageState.displayFirstPageAlone) {
-      if (imageIndex == 0) {
-        return 0;
-      }
-      beginImageIndex++;
-      pageIndex++;
-    }
-
-    for (int i = beginImageIndex; i < imageIndex; i++) {
-      bool isSpreadPage = state.isSpreadPage[i];
+    while (currentImageIndex < imageIndex) {
+      bool isSpreadPage = state.isSpreadPage[currentImageIndex];
 
       if (isSpreadPage && !hasLeftColumn) {
+        currentImageIndex++;
         pageIndex++;
+        nextIsAlone = readPageState.displayFirstPageAlone;
         continue;
       }
 
       if (isSpreadPage && hasLeftColumn) {
+        currentImageIndex++;
         pageIndex += 2;
         hasLeftColumn = false;
+        nextIsAlone = readPageState.displayFirstPageAlone;
+        continue;
+      }
+
+      if (nextIsAlone && !hasLeftColumn) {
+        currentImageIndex++;
+        pageIndex++;
+        nextIsAlone = false;
         continue;
       }
 
       if (hasLeftColumn) {
+        currentImageIndex++;
         pageIndex++;
         hasLeftColumn = false;
         continue;
       }
 
+      currentImageIndex++;
       hasLeftColumn = true;
     }
 
