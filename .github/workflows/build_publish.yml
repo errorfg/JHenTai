@@ -64,7 +64,7 @@ jobs:
       arch: ${{ steps.get_version.outputs.arch}}
     runs-on: ${{ matrix.os }}
     env:
-      FLUTTER_VERSION: 3.44.4
+      FLUTTER_VERSION: 3.44.8
       # pdfx downloads pdfium via a legacy CMake project incompatible with CMake 4
       CMAKE_POLICY_VERSION_MINIMUM: 3.5
       # New MSVC rejects <experimental/coroutine> (local_auth/permission_handler plugins)
