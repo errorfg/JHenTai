@@ -7,5 +7,5 @@ Architecture: amd64
 Essential: no
 Installed-Size: 34648
 Description: A cross-platform app made for e-hentai & exhentai by Flutter.
-Homepage: https://github.com/jiangtian616/JHenTai
+Homepage: https://github.com/errorfg/JHenTai
 Depends: libwebkit2gtk-4.1-0

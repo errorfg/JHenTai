@@ -18,7 +18,7 @@ class _SettingAboutPageState extends State<SettingAboutPage> {
   String buildNumber = '';
   String author = '酱天小禽兽(JTMonster)';
   String telegram = 'https://t.me/+PindoE9yvIpmOWI9';
-  String gitRepo = 'https://github.com/jiangtian616/JHenTai';
+  String gitRepo = 'https://github.com/errorfg/JHenTai';
   String helpPage = 'https://github.com/jiangtian616/JHenTai/wiki';
 
   @override

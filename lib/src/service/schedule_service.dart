@@ -64,7 +64,7 @@ class ScheduleService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBea
       return;
     }
 
-    String url = 'https://api.github.com/repos/jiangtian616/JHenTai/releases';
+    String url = 'https://api.github.com/repos/errorfg/JHenTai/releases';
     String latestVersion;
 
     try {
@@ -72,8 +72,7 @@ class ScheduleService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBea
         () => ehRequest.get(url: url, parser: EHSpiderParser.githubReleasePage2LatestVersion),
         maxAttempts: 3,
       ))
-          .trim()
-          .split('+')[0];
+          .trim();
     } on Exception catch (_) {
       log.info('check update failed');
       return;
@@ -85,7 +84,7 @@ class ScheduleService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBea
     }
 
     PackageInfo packageInfo = await PackageInfo.fromPlatform();
-    String currentVersion = 'v${packageInfo.version}'.trim();
+    String currentVersion = packageInfo.buildNumber.isEmpty ? 'v${packageInfo.version}'.trim() : 'v${packageInfo.version}+${packageInfo.buildNumber}'.trim();
     log.info('Latest version:[$latestVersion], current version: [$currentVersion], current build: [${packageInfo.buildNumber}]');
 
     if (compareVersion(currentVersion, latestVersion) >= 0) {

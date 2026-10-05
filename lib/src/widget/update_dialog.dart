@@ -45,7 +45,7 @@ class UpdateDialog extends StatelessWidget {
           child: Text('check'.tr + ' ->'),
           onPressed: () {
             backRoute();
-            launchUrlString('https://github.com/jiangtian616/JHenTai/releases', mode: LaunchMode.externalApplication);
+            launchUrlString('https://github.com/errorfg/JHenTai/releases', mode: LaunchMode.externalApplication);
           },
         )
       ],
