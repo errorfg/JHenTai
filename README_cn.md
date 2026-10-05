@@ -3,23 +3,41 @@
 [![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/total)](https://github.com/errorfg/JHenTai/releases)
 [![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/latest/total)](https://github.com/errorfg/JHenTai/releases)
 ![star](https://img.shields.io/github/stars/errorfg/JHenTai)
-[![issue](https://img.shields.io/badge/chat-issue-brightgreen)](https://github.com/jiangtian616/JHenTai/issues/new)
-[![telegram](https://img.shields.io/badge/chat-telegram(Chinese_Mainly)-brightgreen)](https://t.me/+PindoE9yvIpmOWI9)
+[![issue](https://img.shields.io/badge/chat-issue-brightgreen)](https://github.com/errorfg/JHenTai/issues/new)
 
 # JHenTai
 
-[English](./README.md) | 简体中文
-| [한국어](./README_kr.md)
+[English](./README.md) | 简体中文 | [한국어](./README_kr.md)
 
-[常见问题，提问前必看](https://github.com/jiangtian616/JHenTai/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98)
+基于 [JHenTai](https://github.com/jiangtian616/JHenTai) 的多来源漫画阅读器，支持 Android、iOS、Windows、macOS 和 Linux。以 E-Hentai 为中心，nhentai、wnacg、JM、Komga 服务器和本地书籍都使用同一套阅读器、下载、收藏、历史与云同步。
 
-## 定位
+E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jiangtian616/JHenTai/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98)。
 
-E-hentai 的一个多端app，现支持Android、iOS、Windows、MacOS和Linux系统。
+## 缘起
 
-仍在发展阶段，十分欢迎提交各种bug反馈或Feature Request。
+搜图机器人给出的结果大多是 nhentai 的页面，而我主要使用 E-Hentai，所以最初做的是一个跳转功能：从 nhentai 画廊找到 E-Hentai 上的同一画廊。之后开始直接阅读其他站点的内容；又发现 JHenTai 的阅读器很好用，于是陆续加入了其他漫画站点、Komga 服务器和本地书籍的阅读，全部共用这一个阅读器。
 
-## Fork版本新增功能
+## 支持的来源
+
+| 来源 | 支持的功能 |
+| --- | --- |
+| E-Hentai / ExHentai | 上游的全部功能：浏览、热门、排行榜、关注、搜索、详情、评分、标签投票、评论、收藏、种子、归档、H@H、下载，以及密码、Cookie、网页三种登录方式。 |
+| nhentai | 搜索、详情、在线阅读、下载和本地收藏，支持 nhentai.net 与可配置的镜像域名。在 nhentai.net 账户设置中生成 API 密钥并登录后（官方 API v2），另有更完整的元数据、评论、相关画廊、标签建议、云端收藏、标签黑名单，以及 ZIP/CBZ 与种子下载。 |
+| wnacg | 搜索、浏览、详情、在线阅读、下载和本地收藏，可配置域名并支持链接跳转。 |
+| JM（禁漫天堂） | 首页推荐、按分类浏览（含韩漫）、日/周/月/总排行、每周必看、搜索、车号跳转、带章节列表的详情、只读评论和相关本子、在线阅读（图片自动还原）、阅读器内切换上一章与下一章、下载（单章或全部章节）、本地收藏、账号登录，可选择接口线路与图片线路。 |
+| Komga | 书库、系列与书的服务器端分页、排序和筛选，全文搜索，首页，离线下载，以及阅读进度双向同步。 |
+| 本地 | 已下载的画廊与归档（支持归档预览）、本地图片文件夹、PDF 书库。 |
+
+跨来源的功能：
+
+- 侧边栏顶部（桌面布局为侧栏顶部）的来源下拉菜单在 E-Hentai、nhentai、wnacg、JM、Komga、PDF 之间切换整个应用，并显示所选站点的账号；搜索页内单独切换站点的功能保留；
+- nhentai、wnacg、JM 的详情页有 `EH` 按钮，用标题在 E-Hentai 上搜索同一画廊；
+- 统一的登录页，可在 E-Hentai、nhentai、JM 之间选择；
+- 各来源的收藏可以与 E-Hentai 收藏混合显示，也可以分开显示；
+- 设置、本地收藏、历史和阅读进度通过 WebDAV 或 S3 兼容存储云同步；
+- 「发送到 Telegraph 机器人」按钮，配合自行部署的 eh2telegraph 服务。
+
+## 相对上游的改动
 
 以下内容基于当前 `upstream/master..master` 提交历史整理：
 
@@ -33,6 +51,11 @@ E-hentai 的一个多端app，现支持Android、iOS、Windows、MacOS和Linux�
   - 导出配置时可包含同步设置。
   - 首页增加同步进度指示，桌面端可通过标题区域查看同步进度。
   - 修复搜索历史同步合并与云同步后阅读进度一致性问题。
+  - 历史记录与阅读进度改为增量日志同步：日常同步只传输变化，不受多设备并发覆盖与时钟偏差影响。
+  - Komga 服务器配置与凭据纳入配置同步，新设备自动完成设置。
+  - `nhentai` API 密钥纳入配置同步，并自动迁移旧版保存在 EH 设置中的密钥。
+  - JM 本地收藏纳入配置同步。
+  - 配置同步原样保留无法识别的远端条目（由更新版本写入）以及本次未同步的类型；远端文件无法读取时中止同步，不再上传。
 - 画廊与检索体验：
   - 详情页支持多 Tag 选择搜索。
   - Popular / Ranklist 页支持客户端过滤。
@@ -40,12 +63,30 @@ E-hentai 的一个多端app，现支持Android、iOS、Windows、MacOS和Linux�
   - `nhentai` 搜索支持 EH/NH 模式切换（NH 模式下可直接非 `nh:` 前缀输入），并兼容 `nh:` 关键词前缀与 NH 标签翻译。
   - `nhentai` 详情页新增 `EH` 按钮，可提取标题并回搜 E-Hentai。
   - `nhentai` 详情页支持收藏动作，收藏流程与 EH 对齐。
+  - 可选的 `nhentai` 官方 API v2 模式：更完整的画廊元数据、评论、相关画廊、标签建议、云端收藏与标签黑名单管理；未配置 API 密钥时仍使用原有解析方式。
+  - `nhentai` 官方 ZIP/CBZ 与种子下载、签名地址、动态 CDN 配置，以及更多分类、语言、页数范围搜索筛选。
   - 增加 `wnacg` 站点集成：搜索、浏览、详情、下载、本地收藏、云同步，支持自定义域名。
   - 搜索页三选一切换（EH/NH/WN）及 `wn:` 关键词前缀。
-  - EH / NH / WN 收藏同时支持混合插入与分菜单切换显示。
+  - 接入 JM（禁漫天堂）：站点切换或 `jm:` 前缀搜索、最新列表、车号跳转、带章节列表与只读评论的详情、图片还原后的在线阅读与下载、阅读器内上一章与下一章、全部章节下载，可选择接口线路与图片线路。
+  - EH / NH / WN / JM 收藏同时支持混合插入与分菜单切换显示。
+  - 统一的登录页可选择站点（E-Hentai、`nhentai`、JM）；账号设置页分别显示并登出各站点，`nhentai` API 密钥在登录页填写，验证成功后才保存。
   - 支持 wnacg 链接跳转，自动域名重写。
+  - E-Hentai / ExHentai / `nhentai` 详情页的「发送到 Telegraph 机器人」按钮，把画廊提交给自行部署的 eh2telegraph 服务；服务地址与令牌纳入配置同步。
 - 折叠屏设备支持：
   - 移动端布局新增全局悬浮按钮，可一键切换竖屏 / 横屏方向。
+- 本地书库与下载：
+  - 归档预览页，可浏览已下载归档中的图片。
+  - JHenTai、Komga、PDF 三种阅读来源可切换，共用同一阅读器。
+  - 独立的 PDF 书库，扫描本地 PDF 文件（Windows 通过 pdfx 渲染）。
+  - Komga 浏览：服务器端分页、排序与筛选，全文搜索，首页（继续阅读、待读、最近新增与更新的系列、已下载），可点击元数据的系列详情，卡片、列表、详情三种布局。
+  - Komga 阅读进度双向同步，容忍设备与服务器之间的时钟偏差，上报失败时重试；可将单本书或整个系列标记为已读或未读。
+  - Komga 阅读器集成：上一本、下一本，页面缩略图，Flutter 无法解码的格式转换为 PNG；阅读布局始终按阅读器自身设置，不采用服务器上的系列阅读方向。
+  - Komga 离线下载单本书或整个系列，无需服务器即可阅读，联网后补报阅读进度。
+  - Komga 来源页面使用完整的 JHenTai 侧边导航，并统一浅色与深色界面。
+  - Komga 的书与系列菜单也可通过右键打开，桌面布局下在鼠标位置弹出。
+- 框架：
+  - Flutter 升级到 3.44.8，修复 iPadOS 26.1 及以上弹窗自动消失的问题（flutter/flutter#177992）。
+  - 应用内检查更新、更新弹窗、关于页、AltStore 安装源和 Linux 安装包主页指向本仓库；检查更新时比较构建号，只升构建号的修复版也会提示更新。
 - CI 流程（fork 自定义）：
   - 非 master 分支增加构建检查并上传 Android APK artifact。
   - 分支检查聚焦 Android release APK artifact 产出。
@@ -118,44 +159,6 @@ MacOS更新（不维护）： 直接删除旧包后，下载最新的包使用�
 
 Linux更新（不维护）： 直接删除旧包后，下载最新的包使用即可。
 
-## 开发动机
-
-学习flutter的第一个练手项目，用来熟悉flutter的开发流程和模式。
-
-我自己的使用设备包括安卓手机、iPad、Windows主机，之前用的E站其他App Bug较多，没接触过原生开发也改不动源码，就刚好选JHenTai来作为第一个项目。
-
-2022.08.20 经过五个月的开发，现在JHenTai已经初具雏形，也逐渐对初期编写的不成熟的画廊页、阅读页、下载等代码进行了完全的重构，
-尽力增内聚降耦合，方便新功能的开发。如果有同学能够对代码风格、设计模式、代码目录等Flutter开发相关进行指点，或者参与到JHenTai的开发中，我都会十分感谢。
-
-2022.10.29 目前对于Flutter项目的基础开发已经较为熟悉，之后学习的主要精力会转向其他方向，JHenTai进入低频率更新时期，但仍会对bug或issue进行及时处理。
-
-## 借鉴与感谢
-
-布局样式参考:
-
-- [FEhviewer](https://github.com/honjow/FEhViewer) : 主要
-- [EHPanda](https://github.com/tatsuz0u/EhPanda)
-- [EHViewer](https://gitlab.com/NekoInverter/EhViewer)
-
-标签翻译数据库:
-
-- [EhTagTranslation](https://github.com/EhTagTranslation/Database)
-
-标签排序:
-
-- [e-hentai-db](https://github.com/ccloli/e-hentai-db)
-- [e-hentai-tag-count](https://github.com/mokurin000/e-hentai-tag-count)
-- [EhSyringe](https://github.com/EhTagTranslation/EhSyringe)
-
-App翻译：
-
-- [andyching168](https://github.com/andyching168) [kenny03211](https://github.com/kenny03211) [NeKoOuO](https://github.com/NeKoOuO) 繁體中文(台灣)
-- [lucas-04](https://github.com/lucas-04) 葡萄牙语 Português brasileiro
-- [qlife1146](https://github.com/qlife1146) 韩语
-- [bropines](https://github.com/bropines) Russian
-
-十分感谢以上项目与人员🙇‍
-
 ## 截图
 
 ### 手机模式
@@ -186,7 +189,7 @@ App翻译：
 
 <img width="250" src="screenshot/read.jpg" /><img src="screenshot/read_double_column.png" /><img  src="screenshot/read_continuous_scroll.png" />
 
-## 主要功能
+## E-Hentai 功能（来自上游）
 
 - [x] 支持手机、平板、桌面三端布局
 - [x] 支持上下、左右、双列等共四种阅读布局
@@ -232,3 +235,43 @@ App翻译：
 - [dio](https://pub.flutter-io.cn/packages?q=dio): 网络
 - [extendedImage](https://pub.flutter-io.cn/packages/extended_image): 图片
 - [drift](https://pub.flutter-io.cn/packages/drift): 数据库
+
+## 致谢
+
+本项目基于 [jiangtian616](https://github.com/jiangtian616) 的 [JHenTai](https://github.com/jiangtian616/JHenTai)：阅读器、E-Hentai 功能、界面布局和下载系统都来自上游。
+
+本项目参考过的程序（研究其做法后在 JHenTai 中重新实现）：
+
+- [JMComic-Crawler-Python](https://github.com/hect0x7/JMComic-Crawler-Python)：JM 移动端接口规则、响应解密与图片还原。
+- [jasmine](https://github.com/ComicSparks/jasmine)：促成 JM 接入的 JM 阅读器。
+- [NClientV3](https://github.com/maxwai/NClientV3)（[NClientV2](https://github.com/Dar9586/NClientV2) 的分支）与 [Kuron (nhasixapp)](https://github.com/shirokun20/nhasixapp)：nhentai 客户端。
+- [wnacg-downloader](https://github.com/lanyeeee/wnacg-downloader)：wnacg。
+- [Komga](https://github.com/gotson/komga)：Komga 来源所对接的媒体服务器。
+- [eh2telegraph](https://github.com/qini7-sese/eh2telegraph)：「发送到 Telegraph 机器人」所对接的机器人。
+
+上游 JHenTai 的参考项目与贡献者：
+
+布局样式参考:
+
+- [FEhviewer](https://github.com/honjow/FEhViewer) : 主要
+- [EHPanda](https://github.com/tatsuz0u/EhPanda)
+- [EHViewer](https://gitlab.com/NekoInverter/EhViewer)
+
+标签翻译数据库:
+
+- [EhTagTranslation](https://github.com/EhTagTranslation/Database)
+
+标签排序:
+
+- [e-hentai-db](https://github.com/ccloli/e-hentai-db)
+- [e-hentai-tag-count](https://github.com/mokurin000/e-hentai-tag-count)
+- [EhSyringe](https://github.com/EhTagTranslation/EhSyringe)
+
+App翻译：
+
+- [andyching168](https://github.com/andyching168) [kenny03211](https://github.com/kenny03211) [NeKoOuO](https://github.com/NeKoOuO) 繁體中文(台灣)
+- [lucas-04](https://github.com/lucas-04) 葡萄牙语 Português brasileiro
+- [qlife1146](https://github.com/qlife1146) 韩语
+- [bropines](https://github.com/bropines) Russian
+
+十分感谢以上项目与人员。

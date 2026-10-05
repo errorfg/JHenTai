@@ -1,42 +1,63 @@
 ![platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Windows%20%7C%20MacOS%20%7C%20Linux-brightgreen)
-![last-commit](https://img.shields.io/github/last-commit/jiangtian616/JHenTai)
-[![downloads](https://img.shields.io/github/downloads/jiangtian616/JHenTai/total)](https://github.com/jiangtian616/JHenTai/releases)
-[![downloads](https://img.shields.io/github/downloads/jiangtian616/JHenTai/latest/total)](https://github.com/jiangtian616/JHenTai/releases)
-![star](https://img.shields.io/github/stars/jiangtian616/JHenTai)
-[![issue](https://img.shields.io/badge/chat-issue-brightgreen)](https://github.com/jiangtian616/JHenTai/issues/new)
-[![telegram](https://img.shields.io/badge/chat-telegram(Chinese_Mainly)-brightgreen)](https://t.me/+PindoE9yvIpmOWI9)
+![last-commit](https://img.shields.io/github/last-commit/errorfg/JHenTai)
+[![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/total)](https://github.com/errorfg/JHenTai/releases)
+[![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/latest/total)](https://github.com/errorfg/JHenTai/releases)
+![star](https://img.shields.io/github/stars/errorfg/JHenTai)
+[![issue](https://img.shields.io/badge/chat-issue-brightgreen)](https://github.com/errorfg/JHenTai/issues/new)
 
 # JHenTai
 
-English | [简体中文](./README_cn.md) | [한국어](./README_kr.md)
+[English](./README.md) | [简体中文](./README_cn.md) | 한국어
 
-[Q&A](https://github.com/jiangtian616/JHenTai/wiki/Common-Questions)
+[JHenTai](https://github.com/jiangtian616/JHenTai)를 바탕으로 한 다중 소스 만화 뷰어로, Android, iOS, Windows, macOS, Linux를 지원합니다. E-Hentai를 중심으로 nhentai, wnacg, JM, Komga 서버와 로컬 도서를 같은 뷰어, 다운로드, 즐겨찾기, 기록, 클라우드 동기화로 읽습니다.
 
-## 개요
+E-Hentai 관련 질문은 업스트림의 [Q&A](https://github.com/jiangtian616/JHenTai/wiki/Common-Questions)를 참고하세요.
 
-Android & iOS & Windows & MacOS & Linux를 지원하는 E-Hentai 애플리케이션.
+## 시작하게 된 이유
 
-아직 개발 중입니다. 오류 제보나 기능 요청은 언제나 환영합니다.
+이미지 검색 봇은 대부분 nhentai 페이지를 알려 주지만, 저는 주로 E-Hentai를 사용합니다. 그래서 처음에는 nhentai 갤러리에서 E-Hentai의 같은 갤러리로 넘어가는 기능을 만들었습니다. 이후 다른 사이트를 직접 읽게 되었고, JHenTai 뷰어가 쓰기 좋다는 것을 알게 되어 다른 만화 사이트, Komga 서버, 로컬 도서도 같은 뷰어로 읽을 수 있게 했습니다.
+
+## 지원 소스
+
+| 소스 | 지원 기능 |
+| --- | --- |
+| E-Hentai / ExHentai | 업스트림의 모든 기능: 둘러보기, 인기, 랭킹, 구독, 검색, 상세, 평가, 태그 투표, 댓글, 즐겨찾기, 토렌트, 아카이브, H@H, 다운로드, 암호·쿠키·웹 로그인. |
+| nhentai | nhentai.net과 설정 가능한 미러 도메인에서 검색, 상세, 온라인 보기, 다운로드, 로컬 즐겨찾기. nhentai.net 계정 설정에서 만든 API 키로 로그인하면(공식 API v2) 더 자세한 메타데이터, 댓글, 관련 갤러리, 태그 제안, 클라우드 즐겨찾기, 태그 차단 목록, ZIP/CBZ와 토렌트 다운로드. |
+| wnacg | 검색, 둘러보기, 상세, 온라인 보기, 다운로드, 로컬 즐겨찾기. 도메인 설정과 링크 이동 지원. |
+| JM (18comic) | 홈 추천, 카테고리별 둘러보기(한국 웹툰 포함), 일·주·월·전체 랭킹, 주간 추천, 검색, 작품 번호 이동, 챕터 목록이 있는 상세, 읽기 전용 댓글과 관련 작품, 이미지 복원 온라인 보기, 뷰어에서 이전·다음 챕터, 다운로드(챕터 하나 또는 전체), 로컬 즐겨찾기, 계정 로그인, API·이미지 회선 선택. |
+| Komga | 라이브러리·시리즈·책의 서버 측 페이지 나눔, 정렬, 필터, 전문 검색, 홈, 오프라인 다운로드, 읽기 진행 상황 양방향 동기화. |
+| 로컬 | 다운로드한 갤러리와 아카이브(아카이브 미리보기), 로컬 이미지 폴더, PDF 서재. |
+
+소스 공통 기능:
+
+- 내비게이션 서랍 맨 위(데스크톱은 사이드바 맨 위)의 소스 선택 메뉴로 E-Hentai, nhentai, wnacg, JM, Komga, PDF 사이에서 앱 전체를 전환하고, 선택한 사이트의 계정을 표시합니다. 검색 페이지의 사이트 전환은 그대로 유지됩니다.
+- nhentai, wnacg, JM 상세 페이지의 `EH` 버튼으로 같은 제목을 E-Hentai에서 검색합니다.
+- 하나의 로그인 페이지에서 E-Hentai, nhentai, JM 중 사이트를 고릅니다.
+- 모든 소스의 즐겨찾기를 E-Hentai 즐겨찾기와 섞어서 또는 따로 표시할 수 있습니다.
+- 설정, 로컬 즐겨찾기, 기록, 읽기 진행 상황을 WebDAV 또는 S3 호환 저장소로 클라우드 동기화합니다.
+- 직접 배포한 eh2telegraph 서비스로 보내는 "Telegraph 봇으로 보내기" 버튼.
+
+업스트림 대비 자세한 변경 사항은 [English README](./README.md#changes-compared-with-upstream)를 참고하세요.
 
 ## 다운로드 & 설치
 
-[<img src="https://raw.githubusercontent.com/jiangtian616/JHenTai/master/badges/download_from_github.png" 
+[<img src="https://raw.githubusercontent.com/errorfg/JHenTai/master/badges/download_from_github.png" 
       alt="Download from GitHub" 
-      height="60">](https://github.com/jiangtian616/JHenTai/releases)
-[<img src="https://raw.githubusercontent.com/jiangtian616/JHenTai/master/badges/get_it_on_obtainium.png" 
+      height="60">](https://github.com/errorfg/JHenTai/releases)
+[<img src="https://raw.githubusercontent.com/errorfg/JHenTai/master/badges/get_it_on_obtainium.png" 
       alt="Get it on Obtainium" 
-      height="60">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22top.jtmonster.jhentai%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fjiangtian616%2FJHenTai%22%2C%22author%22%3A%22jiangtian616%22%2C%22name%22%3A%22JHenTai%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22filterReleaseNotesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22verifyLatestTag%5C%22%3Afalse%2C%5C%22sortMethodChoice%5C%22%3A%5C%22date%5C%22%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22v(.*)%5C%22%2C%5C%22matchGroupToUse%5C%22%3A%5C%22%241%5C%22%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Afalse%2C%5C%22useVersionCodeAsOSVersion%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22invertAPKFilter%5C%22%3Afalse%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%2C%5C%22appName%5C%22%3A%5C%22JHenTai%5C%22%2C%5C%22appAuthor%5C%22%3A%5C%22JTMonster%5C%22%2C%5C%22shizukuPretendToBeGooglePlay%5C%22%3Afalse%2C%5C%22allowInsecure%5C%22%3Afalse%2C%5C%22exemptFromBackgroundUpdates%5C%22%3Afalse%2C%5C%22skipUpdateNotifications%5C%22%3Afalse%2C%5C%22about%5C%22%3A%5C%22https%3A%2F%2Fgithub.com%2Fjiangtian616%2FJHenTai%2Fblob%2Fmaster%2FREADME.md%5C%22%2C%5C%22refreshBeforeDownload%5C%22%3Afalse%7D%22%2C%22overrideSource%22%3Anull%7D)
+      height="60">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22top.jtmonster.jhentai%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Ferrorfg%2FJHenTai%22%2C%22author%22%3A%22jiangtian616%22%2C%22name%22%3A%22JHenTai%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22filterReleaseNotesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22verifyLatestTag%5C%22%3Afalse%2C%5C%22sortMethodChoice%5C%22%3A%5C%22date%5C%22%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22v(.*)%5C%22%2C%5C%22matchGroupToUse%5C%22%3A%5C%22%241%5C%22%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Afalse%2C%5C%22useVersionCodeAsOSVersion%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22invertAPKFilter%5C%22%3Afalse%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%2C%5C%22appName%5C%22%3A%5C%22JHenTai%5C%22%2C%5C%22appAuthor%5C%22%3A%5C%22JTMonster%5C%22%2C%5C%22shizukuPretendToBeGooglePlay%5C%22%3Afalse%2C%5C%22allowInsecure%5C%22%3Afalse%2C%5C%22exemptFromBackgroundUpdates%5C%22%3Afalse%2C%5C%22skipUpdateNotifications%5C%22%3Afalse%2C%5C%22about%5C%22%3A%5C%22https%3A%2F%2Fgithub.com%2Ferrorfg%2FJHenTai%2Fblob%2Fmaster%2FREADME.md%5C%22%2C%5C%22refreshBeforeDownload%5C%22%3Afalse%7D%22%2C%22overrideSource%22%3Anull%7D)
 
 
-[<img src="https://raw.githubusercontent.com/jiangtian616/JHenTai/master/badges/add_to_altstore.png" 
+[<img src="https://raw.githubusercontent.com/errorfg/JHenTai/master/badges/add_to_altstore.png" 
       alt="Add to AltStore" 
-      height="60">](https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/jiangtian616/JHenTai/refs/heads/master/altsource/AltSource.json)
-[<img src="https://raw.githubusercontent.com/jiangtian616/JHenTai/master/badges/add_to_sidestore.png" 
+      height="60">](https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/altsource/AltSource.json)
+[<img src="https://raw.githubusercontent.com/errorfg/JHenTai/master/badges/add_to_sidestore.png" 
       alt="Add to SideStore" 
-      height="60">](https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/jiangtian616/JHenTai/refs/heads/master/altsource/AltSource.json)
-[<img src="https://raw.githubusercontent.com/jiangtian616/JHenTai/master/badges/add_to_feather.png" 
+      height="60">](https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/altsource/AltSource.json)
+[<img src="https://raw.githubusercontent.com/errorfg/JHenTai/master/badges/add_to_feather.png" 
       alt="Add to Feather" 
-      height="60">](https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://raw.githubusercontent.com/jiangtian616/JHenTai/refs/heads/master/altsource/AltSource.json)
+      height="60">](https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/altsource/AltSource.json)
 
 Android 설치: 사용자의 디바이스 아키텍처에 맞는 .apk 파일을 다운로드 후 설치하세요.
 
@@ -60,44 +81,6 @@ sudo rpm --import https://meeks233.github.io/Jhentai-rpm/fedora/RPM-GPG-KEY-jhen
 sudo curl -fsSL -o /etc/yum.repos.d/jhentai.repo https://meeks233.github.io/Jhentai-rpm/fedora/jhentai.repo
 sudo dnf install -y jhentai
 ```
-
-## 개발 동기
-
-저의 첫 Flutter 프로젝트입니다. 저는 개발 중에 Flutter에 익숙해지는 것을 목표로 합니다. 제가 사용하는 기기는 Android 폰, iPad, Windows 컴퓨터입니다. 기존 E-hentai 앱들은
-버그가 있고, Android, iOS의 개발 경험이 없어서 소스 코드를 이해할 수도 없어서 JHenTia를 제 첫 Flutter 프로젝트로 정했습니다.
-
-2022.08.20 JHenTai는 5개월의 개발 기간을 거치며 점점 견고해졌고 초기 단계에서 작성된 갤러리 페이지, 보기 페이지, 다운로드 등의 일부 코드를 완전히 리팩토링했습니다. 새로운 기능 개발에 도움이
-되도록 서로 다른 페이지와 스타일 간의 공통점을 추출해 결합을 줄이도록 노력했습니다. 코딩 스타일, 디자인 패턴 등 Flutter 개발에 관한 조언을 해주시거나 JHenTai 개발에 참여해 주시면 정말
-감사하겠습니다.
-
-2022.10.29 저는 이제 기본적인 Flutter 개발에 더 익숙해졌고 앞으로는 다른 영역에 집중할 것입니다. 그래서 JHenTai의 업데이트는 전보다는 줄어들겠지만 버그나 오류는 제때 처리하겠습니다.
-
-## 참조 & 감사의 말씀
-
-레이아웃과 스타일 참조:
-
-- [FEhviewer](https://github.com/honjow/FEhViewer) : 메인
-- [EHPanda](https://github.com/tatsuz0u/EhPanda)
-- [EHViewer](https://gitlab.com/NekoInverter/EhViewer)
-
-태그 번역:
-
-- [EhTagTranslation](https://github.com/EhTagTranslation/Database)
-
-Tag order optimization:
-
-- [e-hentai-db](https://github.com/ccloli/e-hentai-db)
-- [e-hentai-tag-count](https://github.com/mokurin000/e-hentai-tag-count)
-- [EhSyringe](https://github.com/EhTagTranslation/EhSyringe)
-
-앱 번역:
-
-- [andyching168](https://github.com/andyching168) [kenny03211](https://github.com/kenny03211) [NeKoOuO](https://github.com/NeKoOuO) 繁體中文(台灣)
-- [lucas-04](https://github.com/lucas-04) Português brasileiro
-- [qlife1146](https://github.com/qlife1146) 한국어
-- [bropines](https://github.com/bropines) Russian
-
-위의 프로젝트와 인원에게 감사드립니다🙇‍
 
 ## 스크린샷
 
@@ -129,7 +112,7 @@ Tag order optimization:
 
 <img width="250" src="screenshot/read.jpg" /><img src="screenshot/read_double_column.png" /><img  src="screenshot/read_continuous_scroll.png" />
 
-## 주 기능
+## E-Hentai 기능 (업스트림)
 
 - [x] 모바일, 태블릿, 데스크톱 레이아웃(세 종류)
 - [x] 가로, 세로 각각 두 쪽 레이아웃(네 종류)
@@ -174,3 +157,43 @@ Tag order optimization:
 - [dio](https://pub.flutter-io.cn/packages?q=dio): 네트워크
 - [extendedImage](https://pub.flutter-io.cn/packages/extended_image): 이미지
 - [drift](https://pub.flutter-io.cn/packages/drift): 데이터베이스
+
+## 감사의 말씀
+
+이 프로젝트는 [jiangtian616](https://github.com/jiangtian616)의 [JHenTai](https://github.com/jiangtian616/JHenTai)를 바탕으로 합니다. 뷰어, E-Hentai 기능, 레이아웃, 다운로드 시스템은 업스트림에서 왔습니다.
+
+이 프로젝트가 참고한 프로그램(방식을 연구한 뒤 JHenTai에서 다시 구현):
+
+- [JMComic-Crawler-Python](https://github.com/hect0x7/JMComic-Crawler-Python): JM 모바일 API 규칙, 응답 복호화, 이미지 복원.
+- [jasmine](https://github.com/ComicSparks/jasmine): JM 연동의 계기가 된 JM 뷰어.
+- [NClientV3](https://github.com/maxwai/NClientV3) ([NClientV2](https://github.com/Dar9586/NClientV2)의 포크)와 [Kuron (nhasixapp)](https://github.com/shirokun20/nhasixapp): nhentai 클라이언트.
+- [wnacg-downloader](https://github.com/lanyeeee/wnacg-downloader): wnacg.
+- [Komga](https://github.com/gotson/komga): Komga 소스가 연결하는 미디어 서버.
+- [eh2telegraph](https://github.com/qini7-sese/eh2telegraph): "Telegraph 봇으로 보내기"가 연결하는 봇.
+
+업스트림 JHenTai의 참조 프로젝트와 기여자:
+
+레이아웃과 스타일 참조:
+
+- [FEhviewer](https://github.com/honjow/FEhViewer) : 메인
+- [EHPanda](https://github.com/tatsuz0u/EhPanda)
+- [EHViewer](https://gitlab.com/NekoInverter/EhViewer)
+
+태그 번역:
+
+- [EhTagTranslation](https://github.com/EhTagTranslation/Database)
+
+Tag order optimization:
+
+- [e-hentai-db](https://github.com/ccloli/e-hentai-db)
+- [e-hentai-tag-count](https://github.com/mokurin000/e-hentai-tag-count)
+- [EhSyringe](https://github.com/EhTagTranslation/EhSyringe)
+
+앱 번역:
+
+- [andyching168](https://github.com/andyching168) [kenny03211](https://github.com/kenny03211) [NeKoOuO](https://github.com/NeKoOuO) 繁體中文(台灣)
+- [lucas-04](https://github.com/lucas-04) Português brasileiro
+- [qlife1146](https://github.com/qlife1146) 한국어
+- [bropines](https://github.com/bropines) Russian
+
+위의 프로젝트와 여러분께 감사드립니다.

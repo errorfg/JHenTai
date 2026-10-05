@@ -3,22 +3,41 @@
 [![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/total)](https://github.com/errorfg/JHenTai/releases)
 [![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/latest/total)](https://github.com/errorfg/JHenTai/releases)
 ![star](https://img.shields.io/github/stars/errorfg/JHenTai)
-[![issue](https://img.shields.io/badge/chat-issue-brightgreen)](https://github.com/jiangtian616/JHenTai/issues/new)
-[![telegram](https://img.shields.io/badge/chat-telegram(Chinese_Mainly)-brightgreen)](https://t.me/+PindoE9yvIpmOWI9)
+[![issue](https://img.shields.io/badge/chat-issue-brightgreen)](https://github.com/errorfg/JHenTai/issues/new)
 
 # JHenTai
 
 English | [简体中文](./README_cn.md) | [한국어](./README_kr.md)
 
-[Q&A](https://github.com/jiangtian616/JHenTai/wiki/Common-Questions)
+A multi-source manga reader for Android, iOS, Windows, macOS and Linux, built on [JHenTai](https://github.com/jiangtian616/JHenTai). E-Hentai stays at its center; nhentai, wnacg, JM, Komga servers and local books are read with the same reader, downloads, favorites, history and cloud sync.
 
-## Description
+For E-Hentai questions, the upstream [Q&A](https://github.com/jiangtian616/JHenTai/wiki/Common-Questions) still applies.
 
-A manga app for E-Hentai, supporting Android & iOS & Windows & MacOS & Linux.
+## Why This Fork
 
-Still in development stage, welcome to submit issues or feature requests.
+Image-search bots mostly answer with nhentai pages, while I mainly use E-Hentai. The fork began with a jump from an nhentai gallery to the same gallery on E-Hentai. That led to reading the other sites directly, and once the JHenTai reader proved good, other manga sources, Komga servers and local books followed, all through the same reader.
 
-## Fork Highlights
+## Supported Sources
+
+| Source | What works |
+| --- | --- |
+| E-Hentai / ExHentai | Everything from upstream: browsing, popular, ranklist, watched, search, details, rating, tag voting, comments, favorites, torrents, archives, H@H, downloads, password/cookie/web login. |
+| nhentai | Search, details, online reading, downloads and local favorites, on nhentai.net and configurable mirror domains. With an API key from the nhentai.net account settings (official API v2): richer metadata, comments, related galleries, tag suggestions, remote favorites, tag blacklist, ZIP/CBZ and torrent downloads. |
+| wnacg | Search, browsing, details, online reading, downloads and local favorites, with a configurable domain and link jumping. |
+| JM (18comic) | Home sections, category browsing (including Korean webtoons), rankings by day/week/month/all time, weekly picks, search, album-number jump, details with chapter list, read-only comments and related albums, online reading with image descrambling, previous/next chapter in the reader, downloads (single chapters or all chapters), local favorites, account login, selectable API and image lines. |
+| Komga | Libraries, series and books with server-side paging, sorting and filters, full-text search, a home page, offline downloads and two-way read-progress sync. |
+| Local | Downloaded galleries and archives (with archive preview), local image folders, and a PDF library. |
+
+Across sources:
+
+- a source picker at the top of the navigation drawer (the top of the side bar on desktop) switches the whole app between E-Hentai, nhentai, wnacg, JM, Komga and PDF, and shows the account of the chosen site; search keeps its own per-search site switch;
+- an `EH` button on nhentai, wnacg and JM details searches the same title on E-Hentai;
+- one login page with a site picker (E-Hentai, nhentai, JM);
+- favorites of all sources can be shown mixed with E-Hentai favorites or separately;
+- cloud sync (WebDAV or S3-compatible) of settings, local favorites, history and reading progress;
+- a "Send to Telegraph bot" button for a self-hosted eh2telegraph service.
+
+## Changes Compared With Upstream
 
 Compared with `upstream/master` (based on current `upstream/master..master` commit history), this fork currently contains additional work in these areas:
 
@@ -147,51 +166,6 @@ Please submit a PR if you want to help with translation.
 
 [steps](https://github.com/errorfg/JHenTai#Translation)
 
-## Develop Motivation
-
-My first project With Flutter. I aim at getting familiar with Flutter during development. Devices I use include Android
-phone, Ipad and Windows computer. E-hentai apps I used before have several bugs, and I don't understand source code
-because I have no development
-experience with Android or ios, so I choose JHenTai to become my first Flutter Project.
-
-2022.08.20 After five months of development, JHenTai has gradually become more and more strong, and I have completely
-refactored some codes for gallery page, reading page, download, etc.
-which are written at the beginning stage. I tried my best to extract the commonality between different page and style to
-reduce coupling,
-in order to benefit the development of new features. I would be very grateful if any kind of you could give me some
-advice on coding style,
-design patterns and anything related to Flutter development or participate in the development of JHenTai.
-
-2022.10.29 I have been more familiar with basic Flutter development, and I'll focus on another area from now on.
-So updates for JHenTai will be less than previous, but I'll still handle bugs or issues in time。
-
-## References & Thanks
-
-Layout and style references:
-
-- [FEhviewer](https://github.com/honjow/FEhViewer) : Mainly
-- [EHPanda](https://github.com/tatsuz0u/EhPanda)
-- [EHViewer](https://gitlab.com/NekoInverter/EhViewer)
-
-Tag translation:
-
-- [EhTagTranslation](https://github.com/EhTagTranslation/Database)
-
-Tag order optimization:
-
-- [e-hentai-db](https://github.com/ccloli/e-hentai-db)
-- [e-hentai-tag-count](https://github.com/mokurin000/e-hentai-tag-count)
-- [EhSyringe](https://github.com/EhTagTranslation/EhSyringe)
-
-App translation：
-
-- [andyching168](https://github.com/andyching168) [kenny03211](https://github.com/kenny03211) [NeKoOuO](https://github.com/NeKoOuO) 繁體中文(台灣)
-- [lucas-04](https://github.com/lucas-04) Português brasileiro
-- [qlife1146](https://github.com/qlife1146) 한국어
-- [bropines](https://github.com/bropines) Russian
-
-mush thanks to these projects and people🙇‍
-
 ## Screenshots
 
 ### Mobile Layout
@@ -222,7 +196,7 @@ mush thanks to these projects and people🙇‍
 
 <img width="250" src="screenshot/read.jpg" /><img src="screenshot/read_double_column.png" /><img src="screenshot/read_continuous_scroll.png" />
 
-## Main Features
+## E-Hentai Features (from upstream)
 
 -   [x] Mobile, tablet, desktop layout(3 kinds)
 -   [x] Vertical, horizontal, double column read page layout(4 kinds)
@@ -271,3 +245,43 @@ Now you can submit your PR, I'll do the remaining things. Or you can go on with:
 - [dio](https://pub.flutter-io.cn/packages?q=dio): network
 - [extendedImage](https://pub.flutter-io.cn/packages/extended_image): image
 - [drift](https://pub.flutter-io.cn/packages/drift): database
+
+## Acknowledgements
+
+This fork is built on [JHenTai](https://github.com/jiangtian616/JHenTai) by [jiangtian616](https://github.com/jiangtian616): the reader, the E-Hentai features, the layouts and the download system come from it.
+
+Projects this fork learned from (approaches were studied and reimplemented in JHenTai):
+
+- [JMComic-Crawler-Python](https://github.com/hect0x7/JMComic-Crawler-Python): JM mobile API rules, response decryption and image descrambling.
+- [jasmine](https://github.com/ComicSparks/jasmine): the JM reader that prompted the JM integration.
+- [NClientV3](https://github.com/maxwai/NClientV3) (a fork of [NClientV2](https://github.com/Dar9586/NClientV2)) and [Kuron (nhasixapp)](https://github.com/shirokun20/nhasixapp): nhentai clients.
+- [wnacg-downloader](https://github.com/lanyeeee/wnacg-downloader): wnacg.
+- [Komga](https://github.com/gotson/komga): the media server behind the Komga source.
+- [eh2telegraph](https://github.com/qini7-sese/eh2telegraph): the bot behind "Send to Telegraph".
+
+Upstream JHenTai's references and contributors:
+
+Layout and style references:
+
+- [FEhviewer](https://github.com/honjow/FEhViewer) : Mainly
+- [EHPanda](https://github.com/tatsuz0u/EhPanda)
+- [EHViewer](https://gitlab.com/NekoInverter/EhViewer)
+
+Tag translation:
+
+- [EhTagTranslation](https://github.com/EhTagTranslation/Database)
+
+Tag order optimization:
+
+- [e-hentai-db](https://github.com/ccloli/e-hentai-db)
+- [e-hentai-tag-count](https://github.com/mokurin000/e-hentai-tag-count)
+- [EhSyringe](https://github.com/EhTagTranslation/EhSyringe)
+
+App translation：
+
+- [andyching168](https://github.com/andyching168) [kenny03211](https://github.com/kenny03211) [NeKoOuO](https://github.com/NeKoOuO) 繁體中文(台灣)
+- [lucas-04](https://github.com/lucas-04) Português brasileiro
+- [qlife1146](https://github.com/qlife1146) 한국어
+- [bropines](https://github.com/bropines) Russian
+
+Many thanks to these projects and people.
