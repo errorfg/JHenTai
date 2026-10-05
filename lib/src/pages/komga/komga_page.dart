@@ -29,6 +29,7 @@ import 'package:jhentai/src/setting/komga_setting.dart';
 import 'package:jhentai/src/setting/style_setting.dart';
 import 'package:jhentai/src/utils/route_util.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
+import 'package:jhentai/src/widget/eh_context_menu.dart';
 
 class KomgaPage extends StatefulWidget {
   const KomgaPage({super.key, this.clientFactory = KomgaClient.fromSetting});
@@ -216,8 +217,7 @@ class _KomgaPageState extends State<KomgaPage> {
       openBook: _openBook,
       openSeries: controller.openSeries,
       showBookMenu: _showBookMenu,
-      showSeriesMenu: (BuildContext context, KomgaSeries series) =>
-          _showSeriesMenu(series),
+      showSeriesMenu: _showSeriesMenu,
       openingBookId: _openingBookId,
     );
     final KomgaLevel level = controller.current;
@@ -335,47 +335,32 @@ class _KomgaPageState extends State<KomgaPage> {
     }
   }
 
-  Future<void> _showBookMenu(BuildContext context, KomgaBook book) async {
+  Future<void> _showBookMenu(
+    BuildContext context,
+    KomgaBook book, {
+    Offset? position,
+  }) async {
     final KomgaBrowseController controller = _controller!;
     final String key = controller.client.progressRecordKey(book.id);
     final bool downloaded = komgaDownloadService.downloaded(key) != null;
     final KomgaDownloadTask? task = komgaDownloadService.task(key);
-    final String? choice = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (BuildContext context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            ListTile(title: Text(book.title, maxLines: 2)),
-            ListTile(
-              leading: const Icon(Icons.check_circle_outline),
-              title: Text('komgaMarkRead'.tr),
-              onTap: () => Navigator.of(context).pop('read'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.radio_button_unchecked),
-              title: Text('komgaMarkUnread'.tr),
-              onTap: () => Navigator.of(context).pop('unread'),
-            ),
-            if (downloaded)
-              ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: Text('komgaDeleteDownload'.tr),
-                onTap: () => Navigator.of(context).pop('delete'),
-              )
-            else if (book.isReadable &&
-                (task == null || task.state == KomgaDownloadState.failed))
-              ListTile(
-                leading: const Icon(Icons.download_outlined),
-                title: Text(
-                  task == null ? 'komgaDownload'.tr : 'komgaRetryDownload'.tr,
-                ),
-                onTap: () => Navigator.of(context).pop('download'),
-              ),
-          ],
-        ),
-      ),
+    final String? choice = await _chooseFromMenu<String>(
+      context,
+      title: book.title,
+      position: position,
+      entries: <_MenuEntry<String>>[
+        _MenuEntry('read', Icons.check_circle_outline, 'komgaMarkRead'.tr),
+        _MenuEntry('unread', Icons.radio_button_unchecked, 'komgaMarkUnread'.tr),
+        if (downloaded)
+          _MenuEntry('delete', Icons.delete_outline, 'komgaDeleteDownload'.tr)
+        else if (book.isReadable &&
+            (task == null || task.state == KomgaDownloadState.failed))
+          _MenuEntry(
+            'download',
+            Icons.download_outlined,
+            task == null ? 'komgaDownload'.tr : 'komgaRetryDownload'.tr,
+          ),
+      ],
     );
     try {
       switch (choice) {
@@ -393,41 +378,80 @@ class _KomgaPageState extends State<KomgaPage> {
     }
   }
 
-  Future<void> _showSeriesMenu(KomgaSeries series) async {
-    final KomgaSeriesAction? action =
-        await showModalBottomSheet<KomgaSeriesAction>(
-          context: context,
-          showDragHandle: true,
-          builder: (BuildContext context) => SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                ListTile(title: Text(series.title, maxLines: 2)),
-                ListTile(
-                  leading: const Icon(Icons.check_circle_outline),
-                  title: Text('komgaMarkSeriesRead'.tr),
-                  onTap: () =>
-                      Navigator.of(context).pop(KomgaSeriesAction.markRead),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.radio_button_unchecked),
-                  title: Text('komgaMarkSeriesUnread'.tr),
-                  onTap: () =>
-                      Navigator.of(context).pop(KomgaSeriesAction.markUnread),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.download_outlined),
-                  title: Text('komgaDownloadSeries'.tr),
-                  onTap: () =>
-                      Navigator.of(context).pop(KomgaSeriesAction.download),
-                ),
-              ],
-            ),
-          ),
-        );
+  Future<void> _showSeriesMenu(
+    BuildContext context,
+    KomgaSeries series, {
+    Offset? position,
+  }) async {
+    final KomgaSeriesAction? action = await _chooseFromMenu<KomgaSeriesAction>(
+      context,
+      title: series.title,
+      position: position,
+      entries: <_MenuEntry<KomgaSeriesAction>>[
+        _MenuEntry(
+          KomgaSeriesAction.markRead,
+          Icons.check_circle_outline,
+          'komgaMarkSeriesRead'.tr,
+        ),
+        _MenuEntry(
+          KomgaSeriesAction.markUnread,
+          Icons.radio_button_unchecked,
+          'komgaMarkSeriesUnread'.tr,
+        ),
+        _MenuEntry(
+          KomgaSeriesAction.download,
+          Icons.download_outlined,
+          'komgaDownloadSeries'.tr,
+        ),
+      ],
+    );
     if (action != null) {
       await _runSeriesAction(series, action);
     }
+  }
+
+  /// A menu at the pointer on desktop layouts, a bottom sheet with the item
+  /// title otherwise. Completes with the chosen value, or null.
+  Future<T?> _chooseFromMenu<T>(
+    BuildContext context, {
+    required String title,
+    required List<_MenuEntry<T>> entries,
+    Offset? position,
+  }) async {
+    if (styleSetting.isInDesktopLayout) {
+      T? chosen;
+      await showEHContextMenu(
+        context,
+        position: position,
+        actions: <EHContextMenuAction>[
+          for (final _MenuEntry<T> entry in entries)
+            EHContextMenuAction(
+              text: entry.label,
+              icon: Icon(entry.icon, size: 20),
+              onTap: () => chosen = entry.value,
+            ),
+        ],
+      );
+      return chosen;
+    }
+    return showModalBottomSheet<T>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(title: Text(title, maxLines: 2)),
+            for (final _MenuEntry<T> entry in entries)
+              ListTile(
+                leading: Icon(entry.icon),
+                title: Text(entry.label),
+                onTap: () => Navigator.of(context).pop(entry.value),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _runSeriesAction(
@@ -608,4 +632,12 @@ class _KomgaPageState extends State<KomgaPage> {
       }
     });
   }
+}
+
+class _MenuEntry<T> {
+  const _MenuEntry(this.value, this.icon, this.label);
+
+  final T value;
+  final IconData icon;
+  final String label;
 }

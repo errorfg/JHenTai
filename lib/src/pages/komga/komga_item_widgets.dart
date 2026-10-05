@@ -20,8 +20,15 @@ class KomgaItemActions {
 
   final void Function(KomgaBook book) openBook;
   final void Function(KomgaSeries series) openSeries;
-  final void Function(BuildContext context, KomgaBook book) showBookMenu;
-  final void Function(BuildContext context, KomgaSeries series) showSeriesMenu;
+  /// [position] places the menu at the pointer on desktop layouts.
+  final void Function(BuildContext context, KomgaBook book, {Offset? position})
+  showBookMenu;
+  final void Function(
+    BuildContext context,
+    KomgaSeries series, {
+    Offset? position,
+  })
+  showSeriesMenu;
   final String? openingBookId;
 }
 
@@ -75,6 +82,8 @@ class KomgaItemViews {
       child: InkWell(
         onTap: () => actions.openSeries(item.series),
         onLongPress: () => actions.showSeriesMenu(context, item.series),
+        onSecondaryTapDown: (TapDownDetails details) =>
+            actions.showSeriesMenu(context, item.series, position: details.globalPosition),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
@@ -99,20 +108,26 @@ class KomgaItemViews {
 
   Widget _seriesTile(KomgaSeriesBrowseItem item) {
     final String url = client.seriesThumbnailUrl(item.series.id);
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      leading: _thumbnail(url, 54, 76),
-      title: Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-      subtitle: Text(_seriesProgressText(item)),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (item.isNew) newBadge(),
-          const Icon(Icons.chevron_right),
-        ],
+    // ListTile has no secondary-tap callback; right click opens the menu
+    // at the pointer on desktop layouts.
+    return GestureDetector(
+      onSecondaryTapDown: (TapDownDetails details) =>
+          actions.showSeriesMenu(context, item.series, position: details.globalPosition),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        leading: _thumbnail(url, 54, 76),
+        title: Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+        subtitle: Text(_seriesProgressText(item)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (item.isNew) newBadge(),
+            const Icon(Icons.chevron_right),
+          ],
+        ),
+        onTap: () => actions.openSeries(item.series),
+        onLongPress: () => actions.showSeriesMenu(context, item.series),
       ),
-      onTap: () => actions.openSeries(item.series),
-      onLongPress: () => actions.showSeriesMenu(context, item.series),
     );
   }
 
@@ -130,6 +145,8 @@ class KomgaItemViews {
       child: InkWell(
         onTap: () => actions.openSeries(series),
         onLongPress: () => actions.showSeriesMenu(context, series),
+        onSecondaryTapDown: (TapDownDetails details) =>
+            actions.showSeriesMenu(context, series, position: details.globalPosition),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
@@ -195,6 +212,8 @@ class KomgaItemViews {
       child: InkWell(
         onTap: () => actions.openBook(book),
         onLongPress: () => actions.showBookMenu(context, book),
+        onSecondaryTapDown: (TapDownDetails details) =>
+            actions.showBookMenu(context, book, position: details.globalPosition),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
@@ -230,33 +249,39 @@ class KomgaItemViews {
   Widget _bookTile(KomgaBookBrowseItem item) {
     final KomgaBook book = item.book;
     final String url = client.bookThumbnailUrl(book.id);
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      leading: _thumbnail(url, 54, 76),
-      title: Text(book.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-      subtitle: Text(
-        <String>[
-          if (book.seriesTitle.isNotEmpty) book.seriesTitle,
-          bookStatusText(item),
-        ].join(' · '),
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
+    // ListTile has no secondary-tap callback; right click opens the menu
+    // at the pointer on desktop layouts.
+    return GestureDetector(
+      onSecondaryTapDown: (TapDownDetails details) =>
+          actions.showBookMenu(context, book, position: details.globalPosition),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        leading: _thumbnail(url, 54, 76),
+        title: Text(book.title, maxLines: 2, overflow: TextOverflow.ellipsis),
+        subtitle: Text(
+          <String>[
+            if (book.seriesTitle.isNotEmpty) book.seriesTitle,
+            bookStatusText(item),
+          ].join(' · '),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: actions.openingBookId == book.id
+            ? const SizedBox.square(
+                dimension: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  if (item.isNew) newBadge(),
+                  _downloadIcon(book),
+                  _statusIcon(item.readingStatus),
+                ],
+              ),
+        onTap: () => actions.openBook(book),
+        onLongPress: () => actions.showBookMenu(context, book),
       ),
-      trailing: actions.openingBookId == book.id
-          ? const SizedBox.square(
-              dimension: 22,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                if (item.isNew) newBadge(),
-                _downloadIcon(book),
-                _statusIcon(item.readingStatus),
-              ],
-            ),
-      onTap: () => actions.openBook(book),
-      onLongPress: () => actions.showBookMenu(context, book),
     );
   }
 
@@ -269,6 +294,8 @@ class KomgaItemViews {
       child: InkWell(
         onTap: () => actions.openBook(book),
         onLongPress: () => actions.showBookMenu(context, book),
+        onSecondaryTapDown: (TapDownDetails details) =>
+            actions.showBookMenu(context, book, position: details.globalPosition),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
