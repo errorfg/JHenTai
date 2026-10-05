@@ -125,8 +125,8 @@ class LocalGalleryGridPage extends StatelessWidget
       isOriginal: false,
       onTapWidget: () => logic.goToReadPage(gallery),
       onTapTitle: () => logic.goToReadPage(gallery),
-      onLongPress: () => logic.showBottomSheet(gallery, context),
-      onSecondTap: () => logic.showBottomSheet(gallery, context),
+      onLongPress: (position) => logic.showBottomSheet(gallery, context, position: position),
+      onSecondTap: (position) => logic.showBottomSheet(gallery, context, position: position),
       onTertiaryTap: () => logic.goToReadPage(gallery),
     );
   }
