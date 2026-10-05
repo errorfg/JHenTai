@@ -35,6 +35,7 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - incremental oplog sync for history and read progress: routine syncs transfer only changes, immune to concurrent-device overwrites and clock skew.
   - Komga server configuration and credentials included in config sync for automatic cross-device setup.
   - `nhentai` API key included in config sync, with automatic migration from the legacy EH setting payload.
+  - JM local favorites included in config sync.
   - config sync keeps remote entries it does not understand (written by newer versions) and the types it is not syncing, and aborts instead of uploading when the remote file cannot be read.
 - Gallery and search UX:
   - multi-tag selection in detail page.
@@ -47,7 +48,9 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - official `nhentai` ZIP/CBZ and torrent downloads, signed URLs, dynamic CDN configuration, and expanded category/language/page-range search filters.
   - `wnacg` site integration: search, browse, detail, download, local favorites, cloud sync with configurable domain.
   - three-way EH/NH/WN search toggle and `wn:` keyword-prefix support.
-  - EH/NH/WN favorites support both mixed insertion and split display with menu switching.
+  - JM (18comic) source integration: search via the site toggle or `jm:` prefix, latest list, album-number jump, details with chapter list and read-only comments, descrambled online reading and downloads, previous/next chapter in the reader, download of all chapters, and selectable API and image lines.
+  - EH/NH/WN/JM favorites support both mixed insertion and split display with menu switching.
+  - single login page with a site picker (E-Hentai, `nhentai`, JM); the account page shows and logs out each site separately, and the `nhentai` API key is entered there and verified before it is saved.
   - wnacg URL link jumping with automatic domain rewriting.
   - "Send to Telegraph bot" button on E-Hentai/ExHentai/`nhentai` details, posting the gallery to a self-hosted eh2telegraph service; its address and token are included in config sync.
 - Foldable device support:
