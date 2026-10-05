@@ -122,6 +122,8 @@ void main() {
     await waitFor(tester, () => home.state.loadingState == LoadingState.success);
 
     expect(find.byType(EHDashboardCard), findsWidgets);
+    // Like every site's home, its title starts a sync.
+    expect(find.byKey(const Key('homeSyncTitle')), findsOneWidget);
     final String firstTitle = JmHomePageState.sectionTitle(home.state.sections.first.title);
     expect(find.text(firstTitle), findsOneWidget);
 

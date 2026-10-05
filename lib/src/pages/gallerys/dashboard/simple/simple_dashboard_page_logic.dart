@@ -1,9 +1,10 @@
 import 'package:jhentai/src/pages/base/base_page_logic.dart';
+import 'package:jhentai/src/mixin/home_sync_mixin.dart';
 import 'package:jhentai/src/pages/gallerys/dashboard/simple/simple_dashboard_page_state.dart';
 
 import '../../../../mixin/scroll_to_top_state_mixin.dart';
 
-class SimpleDashboardPageLogic extends BasePageLogic {
+class SimpleDashboardPageLogic extends BasePageLogic with HomeSyncLogicMixin {
   @override
   bool get useSearchConfig => true;
 

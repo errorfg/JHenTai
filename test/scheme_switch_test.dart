@@ -12,7 +12,9 @@ import 'package:jhentai/src/model/gallery.dart';
 import 'package:jhentai/src/model/gallery_image.dart';
 import 'package:jhentai/src/model/gallery_tag.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
+import 'package:jhentai/src/mixin/home_sync_mixin.dart';
 import 'package:jhentai/src/model/tab_bar_icon.dart';
+import 'package:jhentai/src/pages/site/site_gallerys_page.dart';
 import 'package:jhentai/src/network/jm/jm_models.dart';
 import 'package:jhentai/src/pages/favorite/favorite_page_logic.dart';
 import 'package:jhentai/src/pages/layout/desktop/desktop_layout_page_state.dart';
@@ -145,6 +147,12 @@ void main() {
     await pickScheme(tester, 'E-Hentai');
     expect(schemeSetting.site.value, ContentScheme.ehentai);
     expect(mobileTabs(), contains(TabBarIconNameEnum.watched));
+  });
+
+  test('a site home syncs from its title, its popular page does not', () {
+    expect(SiteGallerysPageLogic(scheme: ContentScheme.nhentai, popular: false).homeSyncEnabled, isTrue);
+    expect(SiteGallerysPageLogic(scheme: ContentScheme.nhentai, popular: true).homeSyncEnabled, isFalse);
+    expect(SiteGallerysPageLogic(scheme: ContentScheme.wnacg, popular: false), isA<HomeSyncLogicMixin>());
   });
 
   test('the desktop side bar follows the scheme, settings last', () {

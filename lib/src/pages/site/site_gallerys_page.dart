@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/model/content_scheme.dart';
+import 'package:jhentai/src/mixin/home_sync_mixin.dart';
 import 'package:jhentai/src/model/search_config.dart';
 
 import '../base/base_page.dart';
@@ -33,9 +34,15 @@ class SiteGallerysPage extends BasePage<SiteGallerysPageLogic, SiteGallerysPageS
   SiteGallerysPageState get state => logic.state;
 }
 
-class SiteGallerysPageLogic extends BasePageLogic {
-  SiteGallerysPageLogic({required ContentScheme scheme, required bool popular})
+class SiteGallerysPageLogic extends BasePageLogic with HomeSyncLogicMixin {
+  SiteGallerysPageLogic({required ContentScheme scheme, required this.popular})
       : state = SiteGallerysPageState(scheme: scheme, popular: popular);
+
+  final bool popular;
+
+  /// The site's home syncs from its title; its popular page does not.
+  @override
+  bool get homeSyncEnabled => !popular;
 
   @override
   final SiteGallerysPageState state;

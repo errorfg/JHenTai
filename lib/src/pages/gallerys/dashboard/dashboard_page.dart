@@ -53,27 +53,6 @@ class DashboardPage extends BasePage {
     );
   }
 
-  Widget _buildSyncProgressBar() {
-    return GetBuilder<DashboardPageLogic>(
-      id: logic.syncProgressId,
-      global: false,
-      init: logic,
-      builder: (_) {
-        if (!state.syncInProgress) {
-          return const SizedBox(height: 2);
-        }
-
-        return SizedBox(
-          height: 2,
-          child: LinearProgressIndicator(
-            minHeight: 2,
-            value: state.syncProgress.clamp(0.03, 1).toDouble(),
-          ),
-        );
-      },
-    );
-  }
-
   @override
   List<Widget> buildAppBarActions() {
     return [
@@ -105,7 +84,6 @@ class DashboardPage extends BasePage {
             scrollBehavior: UIConfig.scrollBehaviourWithScrollBarWithMouse,
             slivers: [
               buildPullDownIndicator(),
-              SliverToBoxAdapter(child: _buildSyncProgressBar()),
               _buildRanklistDesc(),
               _buildRanklist(),
               _buildPopularListDesc(),

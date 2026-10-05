@@ -40,27 +40,6 @@ class GallerysPage extends BasePage {
     );
   }
 
-  Widget _buildSyncProgressBar() {
-    return GetBuilder<GallerysPageLogic>(
-      id: logic.syncProgressId,
-      global: false,
-      init: logic,
-      builder: (_) {
-        if (!state.syncInProgress) {
-          return const SizedBox(height: 2);
-        }
-
-        return SizedBox(
-          height: 2,
-          child: LinearProgressIndicator(
-            minHeight: 2,
-            value: state.syncProgress.clamp(0.03, 1).toDouble(),
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget buildBody(BuildContext context) {
     return GetBuilder<GallerysPageLogic>(
@@ -83,7 +62,6 @@ class GallerysPage extends BasePage {
                           UIConfig.scrollBehaviourWithScrollBarWithMouse,
                       slivers: <Widget>[
                         buildPullDownIndicator(),
-                        SliverToBoxAdapter(child: _buildSyncProgressBar()),
                         buildGalleryCollection(context),
                         buildLoadMoreIndicator(),
                       ],

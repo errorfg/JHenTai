@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
+import 'package:jhentai/src/mixin/home_sync_mixin.dart';
 import 'package:jhentai/src/mixin/scroll_to_top_logic_mixin.dart';
 import 'package:jhentai/src/mixin/scroll_to_top_state_mixin.dart';
 import 'package:jhentai/src/model/search_config.dart';
@@ -46,10 +47,17 @@ class JmHomePage extends StatelessWidget {
                   onPressed: () => TapMenuButtonNotification().dispatch(context),
                 )
               : null,
-          title: Text('home'.tr),
+          title: HomeSyncTitle(logic: logic, title: 'home'.tr),
           centerTitle: true,
         ),
-        body: SafeArea(child: _buildBody(context)),
+        body: SafeArea(
+          child: Column(
+            children: [
+              HomeSyncProgressBar(logic: logic),
+              Expanded(child: _buildBody(context)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -158,7 +166,7 @@ class JmHomePage extends StatelessWidget {
   }
 }
 
-class JmHomePageLogic extends GetxController with Scroll2TopLogicMixin {
+class JmHomePageLogic extends GetxController with Scroll2TopLogicMixin, HomeSyncLogicMixin {
   final JmHomePageState state = JmHomePageState();
 
   @override

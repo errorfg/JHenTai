@@ -7,6 +7,7 @@ import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/widget/eh_wheel_speed_controller.dart';
 
 import '../../config/ui_config.dart';
+import '../../mixin/home_sync_mixin.dart';
 import '../../mixin/scroll_to_top_logic_mixin.dart';
 import '../../mixin/scroll_to_top_page_mixin.dart';
 import '../../mixin/scroll_to_top_state_mixin.dart';
@@ -52,16 +53,35 @@ abstract class BasePage<L extends BasePageLogic, S extends BasePageState> extend
       builder: (_) => Scaffold(
         backgroundColor: UIConfig.backGroundColor(context),
         appBar: showFilterButton || showJumpButton || showMenuButton || showTitle ? buildAppBar(context) : null,
-        body: SafeArea(child: buildBody(context)),
+        body: SafeArea(
+          child: _homeSync == null
+              ? buildBody(context)
+              : Column(
+                  children: [
+                    HomeSyncProgressBar(logic: _homeSync!),
+                    Expanded(child: buildBody(context)),
+                  ],
+                ),
+        ),
         floatingActionButton: showScroll2TopButton ? buildFloatingActionButton() : null,
       ),
     );
   }
 
+  /// The page's logic when it is a site's home: its title syncs.
+  HomeSyncLogicMixin? get _homeSync {
+    final Object pageLogic = logic;
+    return pageLogic is HomeSyncLogicMixin && pageLogic.homeSyncEnabled ? pageLogic : null;
+  }
+
   AppBar? buildAppBar(BuildContext context) {
     return AppBar(
       leading: showMenuButton ? buildAppBarMenuButton(context) : null,
-      title: showTitle ? Text(name!) : null,
+      title: !showTitle
+          ? null
+          : _homeSync == null
+          ? Text(name!)
+          : HomeSyncTitle(logic: _homeSync!, title: name!),
       centerTitle: true,
       actions: buildAppBarActions(),
     );
