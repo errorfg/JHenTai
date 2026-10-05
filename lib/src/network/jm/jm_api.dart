@@ -8,6 +8,30 @@ import 'jm_crypto.dart';
 import 'jm_image.dart';
 import 'jm_models.dart';
 
+/// The request for [key] in [cache], started by [load] when there is
+/// none. A failed request is dropped so that it can be tried again.
+Future<V> sharedRequest<V>(
+  Map<int, Future<V>> cache,
+  int key,
+  Future<V> Function() load,
+) {
+  final Future<V>? existing = cache[key];
+  if (existing != null) {
+    return existing;
+  }
+  final Future<V> request = load();
+  cache[key] = request;
+  request.then<void>(
+    (_) {},
+    onError: (Object _) {
+      if (identical(cache[key], request)) {
+        cache.remove(key);
+      }
+    },
+  );
+  return request;
+}
+
 /// Client of the JM mobile API.
 ///
 /// The domain list comes from [apiDomains] (preferred first); requests move
@@ -23,8 +47,16 @@ class JmApi {
     required this.apiDomains,
     this.onApiDomainsDiscovered,
     this.accountCookie,
+    this.domainsDiscoveredAt,
     this.discoverDomains = true,
   }) : _dio = dio;
+
+  /// The domain servers are asked at most this often.
+  static const Duration domainDiscoveryInterval = Duration(hours: 24);
+
+  /// After a failed start (domain list and session cookies), requests fail
+  /// at once for this long instead of starting over each time.
+  static const Duration prepareRetryDelay = Duration(seconds: 30);
 
   static const List<String> builtInApiDomains = <String>[
     'www.cdnhjk.net',
@@ -62,12 +94,17 @@ class JmApi {
   /// Cookie header of the logged-in account, as returned by [login]; empty
   /// when logged out.
   final String Function()? accountCookie;
+
+  /// When the stored domain list was last updated from the domain servers.
+  final DateTime? Function()? domainsDiscoveredAt;
   final bool discoverDomains;
 
   Future<void>? _ready;
+  Object? _prepareError;
+  DateTime? _prepareFailedAt;
   Map<String, String> _sessionCookies = <String, String>{};
   String? _workingDomain;
-  final Map<int, int> _scrambleIds = <int, int>{};
+  final Map<int, Future<int>> _scrambleIds = <int, Future<int>>{};
 
   /// Headers for image requests.
   static Map<String, String> imageHeaders(String apiDomain) => <String, String>{
@@ -84,6 +121,7 @@ class JmApi {
   void resetApiDomain() {
     _workingDomain = null;
     _ready = null;
+    _prepareFailedAt = null;
   }
 
   Future<JmSearchResult> search(
@@ -154,11 +192,10 @@ class JmApi {
   }
 
   /// Threshold below which chapters are stored unscrambled.
-  Future<int> scrambleId(int chapterId) async {
-    final int? cached = _scrambleIds[chapterId];
-    if (cached != null) {
-      return cached;
-    }
+  Future<int> scrambleId(int chapterId) =>
+      sharedRequest(_scrambleIds, chapterId, () => _scrambleId(chapterId));
+
+  Future<int> _scrambleId(int chapterId) async {
     final String html =
         await _getText('/chapter_view_template', <String, dynamic>{
           'id': chapterId,
@@ -171,11 +208,9 @@ class JmApi {
     final RegExpMatch? match = RegExp(
       r'var scramble_id = (\d+);',
     ).firstMatch(html);
-    final int id = match == null
+    return match == null
         ? JmImage.defaultScrambleId
         : int.parse(match.group(1)!);
-    _scrambleIds[chapterId] = id;
-    return id;
   }
 
   Future<List<JmComment>> comments(int albumId, {int page = 1}) async {
@@ -193,29 +228,19 @@ class JmApi {
   }
 
   /// The current API domains according to the JM domain servers, or null
-  /// when none answered.
-  Future<List<String>?> fetchLatestApiDomains() {
-    // The first server that answers wins; failures only count down.
-    final Completer<List<String>?> result = Completer<List<String>?>();
-    int pending = _domainServers.length;
+  /// when none answered. The servers are asked in turn, up to the first
+  /// that answers.
+  Future<List<String>?> fetchLatestApiDomains() async {
     for (final String url in _domainServers) {
-      _fetchDomainList(url).then(
-        (List<String> domains) {
-          if (!result.isCompleted) {
-            result.complete(domains);
-          }
-        },
-        onError: (Object _) {
-          if (--pending == 0 && !result.isCompleted) {
-            result.complete(null);
-          }
-        },
-      );
+      try {
+        return await _fetchDomainList(
+          url,
+        ).timeout(const Duration(seconds: 10));
+      } catch (_) {
+        continue;
+      }
     }
-    return result.future.timeout(
-      const Duration(seconds: 10),
-      onTimeout: () => null,
-    );
+    return null;
   }
 
   Future<List<String>> _fetchDomainList(String url) async {
@@ -246,18 +271,34 @@ class JmApi {
     return servers;
   }
 
-  /// Runs [_prepare] once; a failed attempt is retried on the next request.
-  Future<void> _ensureReady() => _ready ??= () async {
-    try {
-      await _prepare();
-    } catch (_) {
-      _ready = null;
-      rethrow;
+  /// Runs [_prepare] once. After a failure, requests within
+  /// [prepareRetryDelay] fail with the same error without a request.
+  Future<void> _ensureReady() {
+    final DateTime? failedAt = _prepareFailedAt;
+    if (_ready == null &&
+        failedAt != null &&
+        DateTime.now().difference(failedAt) < prepareRetryDelay) {
+      return Future<void>.error(_prepareError!);
     }
-  }();
+    return _ready ??= () async {
+      try {
+        await _prepare();
+        _prepareFailedAt = null;
+      } catch (e) {
+        _ready = null;
+        _prepareError = e;
+        _prepareFailedAt = DateTime.now();
+        rethrow;
+      }
+    }();
+  }
 
   Future<void> _prepare() async {
-    if (discoverDomains) {
+    final DateTime? discoveredAt = domainsDiscoveredAt?.call();
+    if (discoverDomains &&
+        (discoveredAt == null ||
+            DateTime.now().difference(discoveredAt) >=
+                domainDiscoveryInterval)) {
       final List<String>? latest = await fetchLatestApiDomains();
       if (latest != null) {
         onApiDomainsDiscovered?.call(latest);
@@ -306,7 +347,7 @@ class JmApi {
     required String secret,
   }) async {
     await _ensureReady();
-    return (await _send(path, query, secret: secret)).body;
+    return (await _send(path, query, secret: secret, expectJson: false)).body;
   }
 
   /// Tries each API domain in turn, starting with the one that last worked.
@@ -320,6 +361,7 @@ class JmApi {
     int? ts,
     String secret = JmCrypto.tokenSecret,
     Map<String, dynamic>? form,
+    bool expectJson = true,
   }) async {
     final String cookie = _cookieHeader(<String, String>{
       ..._sessionCookies,
@@ -350,14 +392,21 @@ class JmApi {
                 data: form,
                 options: options,
               );
-        _workingDomain = domain;
-        return (
-          body: utf8.decode(
-            response.data ?? const <int>[],
-            allowMalformed: true,
-          ),
-          headers: response.headers,
+        final String body = utf8.decode(
+          response.data ?? const <int>[],
+          allowMalformed: true,
         );
+        // The servers sometimes answer with a plain-text error of their
+        // own (e.g. "Could not connect to mysql!"); another domain may
+        // reach a working backend.
+        if (expectJson && !body.trimLeft().startsWith('{')) {
+          lastError = JmApiException(
+            body.length > 120 ? body.substring(0, 120) : body,
+          );
+          continue;
+        }
+        _workingDomain = domain;
+        return (body: body, headers: response.headers);
       } on DioException catch (e) {
         final int? status = e.response?.statusCode;
         // A 4xx other than 403 is about the request, not the domain; the

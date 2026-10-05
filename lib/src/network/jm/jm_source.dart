@@ -68,8 +68,11 @@ class JmSource {
   final JmApi api;
   final String Function() imageDomain;
 
-  final Map<int, JmAlbum> _albums = <int, JmAlbum>{};
-  final Map<int, JmChapter> _chapters = <int, JmChapter>{};
+  /// Requests in flight or done, so concurrent callers (the downloader
+  /// parses many pages of a chapter at once) share one request.
+  final Map<int, Future<JmAlbum>> _albums = <int, Future<JmAlbum>>{};
+  final Map<int, Future<JmChapter>> _chapters = <int, Future<JmChapter>>{};
+  final Map<int, int> _albumIdOfChapter = <int, int>{};
 
   /// E-Hentai category of albums seen in lists; album details lack it.
   final Map<int, String> _categories = <int, String>{};
@@ -130,9 +133,11 @@ class JmSource {
   /// refresh shows newly added chapters.
   Future<JmChapterBundle> bundle(int chapterId, {bool refresh = false}) async {
     if (refresh) {
-      _albums.remove(_chapters.remove(chapterId)?.albumId);
+      _chapters.remove(chapterId);
+      _albums.remove(_albumIdOfChapter[chapterId]);
     }
     final JmChapter chapter = await _chapter(chapterId);
+    _albumIdOfChapter[chapter.id] = chapter.albumId;
     final JmAlbum album = await _album(chapter.albumId);
     final int scrambleId = await api.scrambleId(chapter.id);
     return JmChapterBundle(
@@ -250,11 +255,12 @@ class JmSource {
     return 'N/A';
   }
 
-  Future<JmAlbum> _album(int id) async =>
-      _albums[id] ??= await api.album(id);
+  Future<JmAlbum> _album(int id) =>
+      sharedRequest(_albums, id, () => api.album(id));
 
-  Future<JmChapter> _chapter(int id) async =>
-      _chapters[id] ??= await api.chapter(id);
+  Future<JmChapter> _chapter(int id) =>
+      sharedRequest(_chapters, id, () => api.chapter(id));
+
 
   Gallery _galleryOfSummary(JmAlbumSummary summary) {
     final String category = JmSource.category(

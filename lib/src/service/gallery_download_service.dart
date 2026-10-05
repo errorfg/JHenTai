@@ -80,6 +80,10 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
   List<GalleryDownloadedData> gallerysWithGroup(String group) => gallerys.where((g) => galleryDownloadInfos[g.gid]!.group == group).toList();
 
   static const int _maxRetryTimes = 3;
+
+  /// Rounds of failure an image may go through before its gallery is
+  /// paused; see [_retryImageStepLater].
+  static const int _maxImageFailureRounds = 5;
   static const int _maxRetryTimes4FetchImageHashes = 1;
   static const String metadataFileName = 'metadata';
   static const int defaultDownloadGalleryPriority = 4;
@@ -242,6 +246,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
     /// can't reuse
     galleryDownloadInfo.cancelToken = CancelToken();
     galleryDownloadInfo.speedComputer.start();
+    galleryDownloadInfo.failureRounds.clear();
 
     for (GalleryImage? image in galleryDownloadInfo.images) {
       /// no need to update db
@@ -781,6 +786,39 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
     executor.close();
   }
 
+  /// Submits a failed image step again after a growing delay (2, 4, 8, 16
+  /// and 32 seconds); after [_maxImageFailureRounds] rounds the gallery is
+  /// paused instead. Some sources answer a re-parse with the same address,
+  /// so retrying at once would request a broken resource in a loop.
+  void _retryImageStepLater(GalleryDownloadedData gallery, int serialNo, AsyncTask<void> task, String reason) {
+    GalleryDownloadInfo? galleryDownloadInfo = galleryDownloadInfos[gallery.gid];
+    if (galleryDownloadInfo == null) {
+      return;
+    }
+
+    int round = (galleryDownloadInfo.failureRounds[serialNo] ?? 0) + 1;
+    galleryDownloadInfo.failureRounds[serialNo] = round;
+    if (round > _maxImageFailureRounds) {
+      log.download('Download ${gallery.title} image: $serialNo failed $_maxImageFailureRounds times, pause. Reason: $reason');
+      snack('error'.tr, '${'downloadFailed'.tr}: ${gallery.title} P${serialNo + 1}', isShort: true);
+      pauseDownloadGallery(gallery);
+      return;
+    }
+
+    Duration delay = Duration(seconds: 1 << round);
+    log.download('Download ${gallery.title} image: $serialNo failed, round $round, retry in ${delay.inSeconds}s. Reason: $reason');
+
+    /// A pause and resume in between replaces the cancel token; the resumed
+    /// download submits its own tasks.
+    CancelToken cancelToken = galleryDownloadInfo.cancelToken;
+    Future.delayed(delay, () {
+      if (_taskHasBeenPausedOrRemoved(gallery) || !identical(cancelToken, galleryDownloadInfos[gallery.gid]?.cancelToken)) {
+        return;
+      }
+      _submitTask(gid: gallery.gid, priority: _computeImageTaskPriority(gallery, serialNo), task: task);
+    });
+  }
+
   void _submitTask({
     required int gid,
     required int priority,
@@ -1061,11 +1099,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
         if (e.type == DioExceptionType.cancel) {
           return;
         }
-        return _submitTask(
-          gid: gallery.gid,
-          priority: _computeImageTaskPriority(gallery, serialNo),
-          task: _parseImageHrefTask(gallery, serialNo),
-        );
+        return _retryImageStepLater(gallery, serialNo, _parseImageHrefTask(gallery, serialNo), e.errorMsg ?? e.toString());
       } on EHSiteException catch (e) {
         log.download('Parse image href error, reason: ${e.message}, gallery url: ${gallery.galleryUrl}');
         snack('error'.tr, e.message, isShort: true);
@@ -1146,11 +1180,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
         if (e.type == DioExceptionType.cancel) {
           return;
         }
-        return _submitTask(
-          gid: gallery.gid,
-          priority: _computeImageTaskPriority(gallery, serialNo),
-          task: _parseImageUrlTask(gallery, serialNo, reParse: true),
-        );
+        return _retryImageStepLater(gallery, serialNo, _parseImageUrlTask(gallery, serialNo, reParse: true), e.errorMsg ?? e.toString());
       } on EHParseException catch (e) {
         log.download('Parse image url error, reason: ${e.message.tr}');
         snack('error'.tr, e.message.tr, isShort: true);
@@ -1251,7 +1281,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
           return;
         }
         log.download('Download ${gallery.title} image: $serialNo failed, try re-parse. Reason: ${e.errorMsg}. Url:${image.url}');
-        return _reParseImageUrlAndDownload(gallery, serialNo);
+        return _reParseImageUrlAndDownload(gallery, serialNo, failure: e.errorMsg ?? e.toString());
       } on EHSiteException catch (e) {
         log.download('Download Error, reason: ${e.message}');
         snack('error'.tr, e.message, isShort: true);
@@ -1279,7 +1309,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
             snack('error'.tr, exception.message, isShort: true);
             return pauseAllDownloadGallery();
           } else if (exception.operation == EHImageExceptionAfterOperation.reParse) {
-            return _reParseImageUrlAndDownload(gallery, serialNo);
+            return _reParseImageUrlAndDownload(gallery, serialNo, failure: exception.message);
           }
         } else {
           snack('error'.tr, 'downloadFailed'.tr, isShort: true);
@@ -1291,10 +1321,11 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
         await _restoreJmImageIfNeeded(image.url, path);
       } catch (e) {
         log.download('Restore JM image ${gallery.title}: $serialNo failed, try re-parse. Reason: $e');
-        return _reParseImageUrlAndDownload(gallery, serialNo);
+        return _reParseImageUrlAndDownload(gallery, serialNo, failure: e.toString());
       }
 
       log.download('Download ${gallery.title} image: $serialNo success');
+      galleryDownloadInfo.failureRounds.remove(serialNo);
 
       await _updateImageStatus(gallery, image, serialNo, DownloadStatus.downloaded);
 
@@ -1303,7 +1334,11 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
   }
 
   /// the image's url may be invalid, try re-parse and then download
-  Future<void> _reParseImageUrlAndDownload(GalleryDownloadedData gallery, int serialNo) async {
+  /// Parses the image again and downloads it. [failure] says why, when this
+  /// follows a failure: the next attempt then waits and counts towards the
+  /// limit of [_retryImageStepLater]. A re-download the user asked for runs
+  /// at once.
+  Future<void> _reParseImageUrlAndDownload(GalleryDownloadedData gallery, int serialNo, {String? failure}) async {
     if (_taskHasBeenPausedOrRemoved(gallery)) {
       return;
     }
@@ -1314,20 +1349,18 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
     galleryDownloadInfo.images[serialNo] = null;
     await GalleryImageDao.deleteImage(gallery.gid, serialNo);
 
-    /// has parsed href => parse url
-    if (galleryDownloadInfo.imageHrefs[serialNo] != null) {
-      return _submitTask(
-        gid: gallery.gid,
-        priority: _computeImageTaskPriority(gallery, serialNo),
-        task: _parseImageUrlTask(gallery, serialNo, reParse: true, reloadKey: reloadKey),
-      );
-    }
+    /// has parsed href => parse url; has not parsed href => parse href
+    AsyncTask<void> task = galleryDownloadInfo.imageHrefs[serialNo] != null
+        ? _parseImageUrlTask(gallery, serialNo, reParse: true, reloadKey: reloadKey)
+        : _parseImageHrefTask(gallery, serialNo);
 
-    /// has not parsed href => parse href
+    if (failure != null) {
+      return _retryImageStepLater(gallery, serialNo, task, failure);
+    }
     return _submitTask(
       gid: gallery.gid,
       priority: _computeImageTaskPriority(gallery, serialNo),
-      task: _parseImageHrefTask(gallery, serialNo),
+      task: task,
     );
   }
 
@@ -1440,11 +1473,18 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
   }
 
   Future<void> _tryLoadFromCacheInsteadDownload(GalleryDownloadedData gallery, GalleryImage image, int serialNo, String path) async {
-    io.File? cachedImageFile = await getCachedImageFile(image.url);
+    /// The image cache keys JM pages by their url without the strip count.
+    io.File? cachedImageFile = await getCachedImageFile(JmImage.requestUrl(image.url));
     if (cachedImageFile != null && cachedImageFile.existsSync()) {
       log.debug('download image from cache, gallery: ${gallery.gid}, serialNo:$serialNo');
       await cachedImageFile.copy(path);
-      await _restoreJmImageIfNeeded(image.url, path);
+      try {
+        await _restoreJmImageIfNeeded(image.url, path);
+      } catch (e) {
+        log.download('Restore cached JM image ${gallery.title}: $serialNo failed, download it instead. Reason: $e');
+        await io.File(path).delete().catchError((_) => io.File(path));
+        return;
+      }
       await _updateImageStatus(gallery, image, serialNo, DownloadStatus.downloaded);
       await _updateProgressAfterImageDownloaded(gallery, serialNo);
     }
@@ -1804,6 +1844,9 @@ class GalleryDownloadInfo {
   int sortOrder;
 
   String group;
+
+  /// Failed rounds of each image since the download started or resumed.
+  final Map<int, int> failureRounds = <int, int>{};
 
   GalleryDownloadInfo({
     required this.thumbnailsCountPerPage,

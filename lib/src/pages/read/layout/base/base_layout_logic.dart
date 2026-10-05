@@ -7,6 +7,7 @@ import 'package:extended_image/extended_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:jhentai/src/network/jm/jm_image.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_instance/get_instance.dart';
@@ -439,23 +440,43 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
     }
   }
 
+  /// An online image as shown, with its file extension. JM pages are read
+  /// from the cache under their url without the strip count and put back
+  /// in order.
+  Future<({Uint8List data, String ext})?> _onlineImageData(int index) async {
+    String url = readPageState.images[index]!.url;
+    String requestUrl = JmImage.requestUrl(url);
+    Uint8List? data = await getNetworkImageData(requestUrl);
+    if (data == null) {
+      return null;
+    }
+
+    int strips = JmImage.stripsOf(url);
+    if (strips > 0) {
+      return (data: await restoreJmImageInBackground(data, strips), ext: '.jpg');
+    }
+
+    // deal with .webp/.jpg which has not basename
+    String ext = extension(requestUrl);
+    if (isEmptyOrNull(ext)) {
+      ext = basename(requestUrl);
+    }
+    return (data: data, ext: ext);
+  }
+
   /// Share an online image via the system share sheet.
   Future<void> shareOnlineImage(int index) async {
     if (readPageState.images[index] == null) {
       return;
     }
 
-    Uint8List? data = await getNetworkImageData(readPageState.images[index]!.url);
-    if (data == null) {
+    ({Uint8List data, String ext})? image = await _onlineImageData(index);
+    if (image == null) {
       return;
     }
+    Uint8List data = image.data;
 
-    String ext = extension(readPageState.images[index]!.url);
-    if (isEmptyOrNull(ext)) {
-      ext = basename(readPageState.images[index]!.url);
-    }
-
-    String fileName = '${readPageState.readPageInfo.gid!}_${readPageState.readPageInfo.token!}_$index$ext';
+    String fileName = '${readPageState.readPageInfo.gid!}_${readPageState.readPageInfo.token!}_$index${image.ext}';
 
     Share.shareXFiles(
       [XFile.fromData(data)],
@@ -488,17 +509,14 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
       return;
     }
 
-    Uint8List? data = await getNetworkImageData(readPageState.images[index]!.url);
-    if (data == null) {
+    ({Uint8List data, String ext})? image = await _onlineImageData(index);
+    if (image == null) {
       return;
     }
+    Uint8List data = image.data;
 
     if (GetPlatform.isDesktop) {
-      String ext = extension(readPageState.images[index]!.url);
-      if (isEmptyOrNull(ext)) {
-        ext = basename(readPageState.images[index]!.url);
-      }
-      String fileName = '${readPageState.readPageInfo.gid!}_${readPageState.readPageInfo.token!}_$index$ext';
+      String fileName = '${readPageState.readPageInfo.gid!}_${readPageState.readPageInfo.token!}_$index${image.ext}';
       String filePath = join(downloadSetting.tempDownloadPath.value, fileName);
       File file = File(filePath);
       try {
@@ -540,18 +558,13 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
       return;
     }
 
-    Uint8List? data = await getNetworkImageData(readPageState.images[index]!.url);
-    if (data == null) {
+    ({Uint8List data, String ext})? image = await _onlineImageData(index);
+    if (image == null) {
       return;
     }
+    Uint8List data = image.data;
 
-    // deal with .webp/.jpg which has not basename
-    String ext = extension(readPageState.images[index]!.url);
-    if (isEmptyOrNull(ext)) {
-      ext = basename(readPageState.images[index]!.url);
-    }
-
-    String fileName = '${readPageState.readPageInfo.gid!}_${readPageState.readPageInfo.token!}_$index$ext';
+    String fileName = '${readPageState.readPageInfo.gid!}_${readPageState.readPageInfo.token!}_$index${image.ext}';
 
     if (GetPlatform.isDesktop) {
       File file = File(join(downloadSetting.singleImageSavePath.value, fileName));

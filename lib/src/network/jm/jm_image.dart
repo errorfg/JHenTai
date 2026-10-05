@@ -20,13 +20,14 @@ abstract final class JmImage {
   static const int _eightStripsFrom = 421926;
 
   /// Strip count of page [fileName] (with or without extension) of
-  /// chapter [chapterId]; 0 means the image is stored as is.
+  /// chapter [chapterId]; 0 means the image is stored as is. GIF pages are
+  /// never cut.
   static int stripCount({
     required int scrambleId,
     required int chapterId,
     required String fileName,
   }) {
-    if (chapterId < scrambleId) {
+    if (chapterId < scrambleId || fileName.toLowerCase().endsWith('.gif')) {
       return 0;
     }
     if (chapterId < _fixedTenStripsBelow) {

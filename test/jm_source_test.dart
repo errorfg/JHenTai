@@ -1,6 +1,7 @@
 import 'dart:collection';
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jhentai/src/database/database.dart';
@@ -12,6 +13,7 @@ import 'package:jhentai/src/model/gallery_image.dart';
 import 'package:jhentai/src/model/gallery_tag.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/model/search_config.dart';
+import 'package:jhentai/src/network/jm/jm_api.dart';
 import 'package:jhentai/src/network/jm/jm_image.dart';
 import 'package:jhentai/src/network/jm/jm_source.dart';
 import 'package:jhentai/src/service/cloud_service.dart';
@@ -107,6 +109,8 @@ void main() {
       expect(strips(500000, '00001.webp'), 12);
       expect(strips(500000, '00007.jpg'), 6);
       expect(strips(1234567, '00010.webp'), 8);
+      // GIF pages are stored as is.
+      expect(strips(1234567, '00011.gif'), 0);
     });
 
     test('strip layout tiles the whole image, remainder in the first strip', () {
@@ -138,6 +142,34 @@ void main() {
         'https://cdn.example.test/media/photos/300000/00001.webp',
       );
       expect(JmImage.stripsOf(JmImage.requestUrl(url)), 0);
+    });
+  });
+
+  group('JM request budget', () {
+    test('a failed start is not repeated on every call', () async {
+      final Map<String, int> requests = <String, int>{};
+      final Dio dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 2)))
+        ..interceptors.add(
+          InterceptorsWrapper(
+            onRequest: (RequestOptions options, RequestInterceptorHandler handler) {
+              requests[options.uri.path] = (requests[options.uri.path] ?? 0) + 1;
+              handler.next(options);
+            },
+          ),
+        );
+      // Nothing listens on these ports: every connection is refused.
+      final JmApi api = JmApi(
+        dio: dio,
+        apiDomains: () => <String>['127.0.0.1:9', '127.0.0.1:19'],
+        discoverDomains: false,
+      );
+
+      for (int i = 0; i < 3; i++) {
+        await expectLater(api.album(1), throwsA(anything));
+      }
+      // One attempt per domain for the first call; the next calls fail
+      // without a request until the retry delay has passed.
+      expect(requests, <String, int>{'/setting': 2});
     });
   });
 

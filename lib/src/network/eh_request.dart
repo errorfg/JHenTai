@@ -124,6 +124,7 @@ class EHRequest with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         apiDomains: jmSetting.orderedApiDomains,
         onApiDomainsDiscovered: jmSetting.saveDiscoveredApiDomains,
         accountCookie: () => jmSetting.accountCookie,
+        domainsDiscoveredAt: () => jmSetting.apiDomainsDiscoveredAt,
       ),
       imageDomain: () => jmSetting.imageDomain.value,
     );

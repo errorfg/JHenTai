@@ -13,8 +13,9 @@ JmSetting jmSetting = JmSetting();
 /// EHSetting, which is cleared on E-Hentai logout; stays on this device
 /// (not cloud-synced).
 class JmSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBean {
-  /// API domains last reported by the JM domain servers.
+  /// API domains last reported by the JM domain servers, and when.
   final RxList<String> apiDomains = <String>[...JmApi.builtInApiDomains].obs;
+  DateTime? apiDomainsDiscoveredAt;
 
   /// The API line the user picked; empty means "first that works".
   final RxString preferredApiDomain = ''.obs;
@@ -39,6 +40,7 @@ class JmSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBe
     if (domains.isNotEmpty) {
       apiDomains.value = domains;
     }
+    apiDomainsDiscoveredAt = DateTime.tryParse(map['apiDomainsDiscoveredAt']?.toString() ?? '');
     preferredApiDomain.value = map['preferredApiDomain']?.toString() ?? '';
     final String image = map['imageDomain']?.toString() ?? '';
     if (image.isNotEmpty) {
@@ -52,6 +54,7 @@ class JmSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBe
   @override
   String toConfigString() => jsonEncode({
         'apiDomains': apiDomains,
+        'apiDomainsDiscoveredAt': apiDomainsDiscoveredAt?.toUtc().toIso8601String(),
         'preferredApiDomain': preferredApiDomain.value,
         'imageDomain': imageDomain.value,
         'userName': userName.value,
@@ -75,11 +78,14 @@ class JmSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBe
   }
 
   Future<void> saveDiscoveredApiDomains(List<String> domains) async {
-    if (domains.isEmpty || listEquals(domains, apiDomains)) {
+    if (domains.isEmpty) {
       return;
     }
-    log.info('JM API domains updated: $domains');
-    apiDomains.value = domains;
+    if (!listEquals(domains, apiDomains)) {
+      log.info('JM API domains updated: $domains');
+      apiDomains.value = domains;
+    }
+    apiDomainsDiscoveredAt = DateTime.now();
     await saveBeanConfig();
   }
 

@@ -143,6 +143,40 @@ void main() {
     expect(restored.height, stored.height);
   });
 
+  test('concurrent first requests for a chapter share one request each', () async {
+    final Map<String, int> requests = <String, int>{};
+    final Dio counting = Dio(dio.options)
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (RequestOptions options, RequestInterceptorHandler handler) {
+            requests[options.uri.path] = (requests[options.uri.path] ?? 0) + 1;
+            handler.next(options);
+          },
+        ),
+      );
+    final JmApi fresh = JmApi(dio: counting, apiDomains: () => domains, discoverDomains: false);
+    final JmSource cold = JmSource(api: fresh, imageDomain: () => JmApi.imageDomains.first);
+    final int chapterId = first.galleryUrl.jmChapterId;
+
+    // The downloader parses many pages of a chapter at once.
+    await Future.wait(<Future<Object?>>[
+      for (int page = 1; page <= 6; page++)
+        cold.imagePage(href: 'jm://$chapterId/$page', parser: EHSpiderParser.imagePage2GalleryImage),
+      cold.detailPage(
+        galleryUrl: first.galleryUrl,
+        thumbnailsPageIndex: 0,
+        parser: EHSpiderParser.detailPage2RangeAndThumbnails,
+      ),
+    ]);
+
+    expect(requests, <String, int>{
+      '/setting': 1,
+      '/chapter': 1,
+      '/album': 1,
+      '/chapter_view_template': 1,
+    });
+  });
+
   test('chapters of a multi-chapter album are galleries of their own', () async {
     // Most viewed albums are often serialised.
     final JmSearchResult result = await api.search('原神', order: 'mv');
