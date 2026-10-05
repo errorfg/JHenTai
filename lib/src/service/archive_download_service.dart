@@ -77,6 +77,9 @@ class ArchiveDownloadService extends GetxController
   late Worker timeoutListener;
 
   @override
+  List<JHLifeCircleBean> get initDependencies => super.initDependencies..addAll([downloadSetting, networkSetting]);
+
+  @override
   Future<void> doInitBean() async {
     Get.put(this, permanent: true);
 
