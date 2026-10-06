@@ -11,6 +11,7 @@ import 'package:jhentai/src/model/gallery_detail.dart';
 import 'package:jhentai/src/model/gallery_image.dart';
 import 'package:jhentai/src/model/gallery_page.dart';
 import 'package:jhentai/src/model/gallery_tag.dart';
+import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'package:jhentai/src/model/gallery_thumbnail.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/utils/eh_spider_parser.dart';
@@ -407,6 +408,45 @@ class JmSource {
 
   Future<JmAlbum> _album(int id) =>
       sharedRequest(_albums, id, () => api.album(id));
+
+  /// The album [chapterId] is a chapter of (the album itself when it is an
+  /// album's id): the chapter is requested to learn its album, then the
+  /// album; neither again once known.
+  Future<JmAlbum> albumOfChapter(int chapterId) async {
+    int? albumId = _knownAlbumOf(chapterId);
+    if (albumId == null) {
+      final JmChapter chapter = await _chapter(chapterId);
+      albumId = chapter.albumId;
+      _albumIdOfChapter[chapter.id] = albumId;
+    }
+    final JmAlbum album = await _album(albumId);
+    for (final JmChapterRef ref in album.chapters) {
+      _albumIdOfChapter[ref.id] = album.id;
+    }
+    return album;
+  }
+
+  /// The history entry of [album] as a whole, as its details page records
+  /// it for a multi-chapter album.
+  GalleryHistoryModel historyModelOfAlbum(JmAlbum album) {
+    final Gallery gallery = _galleryOfAlbum(album);
+    return GalleryHistoryModel(
+      galleryUrl: gallery.galleryUrl,
+      title: gallery.title,
+      category: gallery.category,
+      coverUrl: gallery.cover.url,
+      pageCount: gallery.pageCount ?? 0,
+      rating: 0,
+      language: gallery.language ?? '',
+      uploader: gallery.uploader ?? '',
+      publishTime: gallery.publishTime,
+      isExpunged: false,
+      tags: <String>[
+        for (final List<GalleryTag> tags in gallery.tags.values)
+          for (final GalleryTag tag in tags) '${tag.tagData.namespace}:${tag.tagData.key}',
+      ],
+    );
+  }
 
   Future<JmChapter> _chapter(int id) =>
       sharedRequest(_chapters, id, () => api.chapter(id));

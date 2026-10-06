@@ -135,24 +135,42 @@ class JmReadingService {
     return null;
   }
 
-  /// Gids of the chapters of every known multi-chapter album, the album's
-  /// own (its first chapter's) left out: history entries made per chapter
-  /// by earlier versions, now shown as their album's one entry.
-  Future<Set<int>> chapterGidsOfKnownAlbums() async {
+  /// What is known about JM albums: [albumOf] gives the album of every
+  /// chapter of a multi-chapter album (the album's own id included);
+  /// [resolved] holds every id looked up, single-chapter albums too.
+  Future<({Map<int, int> albumOf, Set<int> resolved})> knownAlbums() async {
     final List<LocalConfig> rows = await localConfigService.readBySubKeyPrefix(
       configKey: ConfigEnum.readIndexRecord,
       prefix: _chaptersKeyPrefix,
     );
-    final Set<int> gids = <int>{};
+    final Map<int, int> albumOf = <int, int>{};
+    final Set<int> resolved = <int>{};
     for (final LocalConfig row in rows) {
       final int? albumId = int.tryParse(row.subConfigKey.substring(_chaptersKeyPrefix.length));
-      for (final int chapterId in _chapterIds(row.value)) {
-        if (chapterId != albumId) {
-          gids.add(GalleryUrl.jm(chapterId).gid);
+      final List<int> chapterIds = _chapterIds(row.value);
+      if (albumId == null) {
+        continue;
+      }
+      resolved
+        ..add(albumId)
+        ..addAll(chapterIds);
+      if (chapterIds.length > 1) {
+        for (final int chapterId in chapterIds) {
+          albumOf[chapterId] = albumId;
         }
+        albumOf[albumId] = albumId;
       }
     }
-    return gids;
+    return (albumOf: albumOf, resolved: resolved);
+  }
+
+  /// Keeps that [albumId] has one chapter only, so it is not looked up
+  /// again.
+  Future<void> rememberSingle(int albumId) async {
+    final String key = chaptersKey(albumId);
+    if ((await readProgressService.getProgressRecords(<String>{key}))[key] == null) {
+      await readProgressService.writeProgressValues(<String, String>{key: '$albumId'});
+    }
   }
 
   Future<Map<int, JmChapterProgress>> progressOf(List<int> chapterIds) async {
