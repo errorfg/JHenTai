@@ -231,7 +231,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
   Widget _buildPageNoInfo() {
     return GetBuilder<ReadPageLogic>(
       id: logic.pageNoId,
-      builder: (_) => Text('${state.readPageInfo.currentImageIndex + 1}/${state.readPageInfo.pageCount}'),
+      builder: (_) => Text('${logic.pageNumberOf(state.readPageInfo.currentImageIndex)}/${logic.currentSegment.pageCount}'),
     );
   }
 
@@ -308,7 +308,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
           width: fullScreenWidth,
           child: AppBar(
             backgroundColor: UIConfig.readPageMenuColor,
-            title: Text(state.readPageInfo.galleryTitle, style: const TextStyle(color: UIConfig.readPageButtonColor)),
+            title: Text(logic.currentSegment.info.galleryTitle, style: const TextStyle(color: UIConfig.readPageButtonColor)),
             leading: const BackButton(color: UIConfig.readPageButtonColor),
             actions: [
               if (logic.hasSiblingBooks) ...[
@@ -478,7 +478,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                         ),
                         alignment: Alignment.center,
                         child: Text(
-                          (index + 1).toString(),
+                          logic.pageNumberOf(index).toString(),
                           style: TextStyle(
                             fontSize: 9,
                             color: state.readPageInfo.currentImageIndex == index ? UIConfig.readPageBottomCurrentImageHighlightForegroundColor(context) : null,
@@ -527,7 +527,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
     return GetBuilder<ReadPageLogic>(
       id: logic.endOfBookId,
       builder: (_) {
-        if (!logic.hasSiblingBooks || !logic.reachedEnd) {
+        if (!logic.showsNextBookButton) {
           return const SizedBox();
         }
         return Positioned(
@@ -586,7 +586,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(logic.isInRight2LeftDirection ? state.readPageInfo.pageCount.toString() : (state.readPageInfo.currentImageIndex + 1).toString())
+            Text(logic.isInRight2LeftDirection ? logic.currentSegment.pageCount.toString() : logic.pageNumberOf(state.readPageInfo.currentImageIndex).toString())
                 .marginOnly(left: 36, right: 4),
             Expanded(
               child: Column(
@@ -599,8 +599,8 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                         quarterTurns: logic.isInRight2LeftDirection ? 2 : 0,
                         child: Slider(
                           min: 1,
-                          max: state.readPageInfo.pageCount.toDouble(),
-                          value: state.readPageInfo.currentImageIndex + 1.0,
+                          max: logic.currentSegment.pageCount.toDouble(),
+                          value: logic.pageNumberOf(state.readPageInfo.currentImageIndex).toDouble(),
                           thumbColor: UIConfig.readPageForeGroundColor,
                           onChanged: logic.handleSlide,
                           onChangeEnd: logic.handleSlideEnd,
@@ -611,7 +611,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                 ],
               ),
             ),
-            Text(logic.isInRight2LeftDirection ? (state.readPageInfo.currentImageIndex + 1).toString() : state.readPageInfo.pageCount.toString())
+            Text(logic.isInRight2LeftDirection ? logic.pageNumberOf(state.readPageInfo.currentImageIndex).toString() : logic.currentSegment.pageCount.toString())
                 .marginOnly(right: 36, left: 4),
           ],
         ),

@@ -73,6 +73,11 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
     super.onClose();
   }
 
+  /// Pages of another book were added after the last page.
+  void onPagesAppended() {
+    updateSafely([pageId]);
+  }
+
   /// Tap left region or click right arrow key. If read direction is right-to-left, we should call [toNext], otherwise [toPrev]
   void toLeft();
 

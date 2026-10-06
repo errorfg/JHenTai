@@ -52,14 +52,25 @@ import '../setting/read/tap_zone/setting_tap_zone_page.dart';
 import '../setting/keyboard_shortcuts/setting_keyboard_shortcuts_page.dart';
 import '../setting/read/setting_read_page.dart';
 
-/// Whether a scrolling layout shows the end of the book: the last image is
-/// visible down to its trailing edge. The tolerance absorbs rounding when the
-/// list is scrolled exactly to its end.
+/// Whether a scrolling layout shows the end of the book: at least half of
+/// the last image is on screen, or its trailing edge is (an image over twice
+/// the screen's size never shows half of itself at once). Requiring the
+/// trailing edge alone left the book one page short whenever the last screen
+/// showed several pages and the list was not pulled all the way to its end.
+/// The tolerance absorbs rounding when the list is scrolled exactly to its
+/// end.
 bool listShowsEnd(Iterable<ItemPosition> visible, int pageCount) {
-  return visible.any(
-    (ItemPosition item) =>
-        item.index == pageCount - 1 && item.itemTrailingEdge <= 1.005,
-  );
+  return visible.any((ItemPosition item) {
+    if (item.index != pageCount - 1) {
+      return false;
+    }
+    if (item.itemTrailingEdge <= 1.005) {
+      return true;
+    }
+    final double extent = item.itemTrailingEdge - item.itemLeadingEdge;
+    final double shown = min(item.itemTrailingEdge, 1) - max(item.itemLeadingEdge, 0);
+    return extent > 0 && shown >= extent / 2;
+  });
 }
 
 /// The index persisted as read progress: the last page once the end of the
@@ -305,23 +316,36 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   bool _reachedEnd = false;
   bool _openingSibling = false;
   Completer<void> delayInitCompleter = Completer<void>();
-  late final ReadProgressFlushCoordinator _progressFlushCoordinator;
 
-  @override
-  void onInit() {
-    super.onInit();
-    _progressFlushCoordinator = ReadProgressFlushCoordinator(
-      persist: (int imageIndex) => readProgressService.updateReadProgress(
-        state.readPageInfo.readProgressRecordStorageKey,
-        imageIndex,
+  /// The book being read, of [ReadPageState.segments].
+  late ReadSegment _currentSegment = state.segments.first;
+
+  /// Whether no book follows the last one appended.
+  bool _noNextSegment = false;
+
+  /// Progress writes of each book, by its progress key.
+  final Map<String, ReadProgressFlushCoordinator> _progressFlushCoordinators = {};
+
+  /// Pages left below the last visible one when the next book is fetched.
+  static const int _appendAhead = 3;
+
+  ReadProgressFlushCoordinator _flushCoordinatorOf(ReadSegment segment) {
+    final ReadPageInfo info = segment.info;
+    return _progressFlushCoordinators.putIfAbsent(
+      info.readProgressRecordStorageKey,
+      () => ReadProgressFlushCoordinator(
+        persist: (int imageIndex) => readProgressService.updateReadProgress(
+          info.readProgressRecordStorageKey,
+          imageIndex,
+        ),
+        report: info.reportReadProgress,
+        onPersistError: (Object error, StackTrace stack) {
+          log.error('Flush read progress failed', error, stack);
+        },
+        onReportError: (Object error, StackTrace stack) {
+          log.error('Report read progress failed', error, stack);
+        },
       ),
-      report: state.readPageInfo.reportReadProgress,
-      onPersistError: (Object error, StackTrace stack) {
-        log.error('Flush read progress failed', error, stack);
-      },
-      onReportError: (Object error, StackTrace stack) {
-        log.error('Report read progress failed', error, stack);
-      },
     );
   }
 
@@ -488,6 +512,8 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
     _maybeShowTapZoneGuide();
 
+    unawaited(_notifyShown(state.segments.first));
+
     inited = true;
     if (!delayInitCompleter.isCompleted) {
       delayInitCompleter.complete();
@@ -578,13 +604,16 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       'Begin to load Thumbnail $index with page size: ${state.thumbnailsCountPerPage}',
     );
 
-    int requestPageIndex = index ~/ state.thumbnailsCountPerPage;
+    // Pages are numbered within their own book.
+    final ReadSegment segment = state.segmentAt(index);
+    final int pageInBook = index - segment.start;
+    int requestPageIndex = pageInBook ~/ state.thumbnailsCountPerPage;
 
     DetailPageInfo detailPageInfo;
     try {
       detailPageInfo = await retry(
         () => ehRequest.requestDetailPage(
-          galleryUrl: state.readPageInfo.galleryUrl!,
+          galleryUrl: segment.info.galleryUrl!,
           thumbnailsPageIndex: requestPageIndex,
           parser: EHSpiderParser.detailPage2RangeAndThumbnails,
         ),
@@ -615,10 +644,10 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
     for (
       int i = detailPageInfo.imageNoFrom;
-      i <= detailPageInfo.imageNoTo;
+      i <= detailPageInfo.imageNoTo && i < segment.pageCount;
       i++
     ) {
-      state.thumbnails[i] =
+      state.thumbnails[segment.start + i] =
           detailPageInfo.thumbnails[i - detailPageInfo.imageNoFrom];
     }
 
@@ -628,7 +657,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
         'Parse image hrefs error, thumbnails count per page is not equal to default setting, parse again. Thumbnails count per page: ${detailPageInfo.thumbnailsCountPerPage}, changed: $thumbnailsCountPerPageChanged',
       );
       await ehRequest.removeCacheByGalleryUrlAndPage(
-        state.readPageInfo.galleryUrl!,
+        segment.info.galleryUrl!,
         requestPageIndex,
       );
       return beginToParseImageHref(index);
@@ -691,7 +720,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     String? reloadKey,
   ) {
     return ehRequest.requestImagePage(
-      state.thumbnails[index]!.replacedMPVHref(index + 1),
+      state.thumbnails[index]!.replacedMPVHref(pageNumberOf(index)),
       reloadKey: reloadKey,
       parser: EHSpiderParser.imagePage2GalleryImage,
       useCacheIfAvailable: !reParse,
@@ -878,14 +907,102 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
   bool get hasSiblingBooks => state.readPageInfo.loadSiblingBook != null;
 
-  /// Close this reader with the previous or next book as the result; the
-  /// page that opened the reader opens it once this reader is disposed.
-  /// Replacing the route in place would let the new page bind to this
-  /// reader's still-registered controllers, so the new book's page events
-  /// would be recorded as the old book's progress.
-  Future<void> openSiblingBook({required bool next}) async {
+  /// The book being read.
+  ReadSegment get currentSegment => _currentSegment;
+
+  /// Page number of [index] within its book, from 1.
+  int pageNumberOf(int index) => index - state.segmentAt(index).start + 1;
+
+  /// Whether the next book is appended below the last as reading goes on,
+  /// instead of reopening the reader: in the scrolling layouts.
+  bool get readsBooksInARow =>
+      hasSiblingBooks &&
+      (effectiveReadDirection == ReadDirection.top2bottomList ||
+          isInListReadDirection);
+
+  /// The button to the next book: at the end of a book with nothing
+  /// appended after it.
+  bool get showsNextBookButton =>
+      hasSiblingBooks &&
+      _reachedEnd &&
+      identical(_currentSegment, state.segments.last) &&
+      !(readsBooksInARow && _noNextSegment);
+
+  /// Appends the book after the last one, once.
+  Future<ReadSegment?> appendNextSegment() async {
+    if (_openingSibling || _noNextSegment) {
+      return null;
+    }
     final Future<ReadPageInfo?> Function({required bool next})? load =
-        state.readPageInfo.loadSiblingBook;
+        state.segments.last.info.loadSiblingBook;
+    if (load == null) {
+      return null;
+    }
+    _openingSibling = true;
+    update([endOfBookId, topMenuId]);
+    try {
+      final ReadPageInfo? next = await load(next: true);
+      if (isClosed) {
+        return null;
+      }
+      if (next == null) {
+        _noNextSegment = true;
+        return null;
+      }
+      if (!state.canAppend(next)) {
+        log.warning('Book can not follow in this reader: ${next.galleryTitle}');
+        return null;
+      }
+      final ReadSegment segment = state.appendSegment(next);
+      log.info('Appended ${next.galleryTitle}: pages ${segment.start}-${segment.end - 1}');
+      _onPagesAppended();
+      return segment;
+    } catch (e) {
+      log.error('Append next book failed', e);
+      return null;
+    } finally {
+      _openingSibling = false;
+      updateSafely([endOfBookId, topMenuId]);
+    }
+  }
+
+  void _onPagesAppended() {
+    for (final BaseLayoutLogic logic in <BaseLayoutLogic?>[
+      if (Get.isRegistered<VerticalListLayoutLogic>()) Get.find<VerticalListLayoutLogic>(),
+      if (Get.isRegistered<HorizontalListLayoutLogic>()) Get.find<HorizontalListLayoutLogic>(),
+      if (Get.isRegistered<HorizontalPageLayoutLogic>()) Get.find<HorizontalPageLayoutLogic>(),
+      if (Get.isRegistered<HorizontalDoubleColumnLayoutLogic>()) Get.find<HorizontalDoubleColumnLayoutLogic>(),
+    ].whereType<BaseLayoutLogic>()) {
+      logic.onPagesAppended();
+    }
+    updateSafely([sliderId, pageNoId, thumbnailNoId, bottomMenuId]);
+  }
+
+  /// The previous or next book: within this reader when it is there or can
+  /// be appended, otherwise by closing this reader with the book as the
+  /// result; the page that opened the reader opens it once this reader is
+  /// disposed. Replacing the route in place would let the new page bind to
+  /// this reader's still-registered controllers, so the new book's page
+  /// events would be recorded as the old book's progress.
+  Future<void> openSiblingBook({required bool next}) async {
+    final int position = state.segments.indexOf(_currentSegment);
+    final int target = position + (next ? 1 : -1);
+    if (target >= 0 && target < state.segments.length) {
+      jump2ImageIndex(state.segments[target].start);
+      return;
+    }
+    if (next && readsBooksInARow) {
+      final ReadSegment? appended = await appendNextSegment();
+      if (appended != null) {
+        jump2ImageIndex(appended.start);
+      } else if (_noNextSegment) {
+        toast((state.readPageInfo.siblingsAreChapters ? 'noNextChapter' : 'noNextBook').tr);
+      }
+      return;
+    }
+
+    final Future<ReadPageInfo?> Function({required bool next})? load =
+        _currentSegment.info.loadSiblingBook;
     if (load == null || _openingSibling) {
       return;
     }
@@ -1046,13 +1163,14 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     layoutLogic.jump2ImageIndex(pageIndex);
   }
 
+  /// [pageNo] counts within the book being read.
   void handleSlide(double pageNo) {
-    state.readPageInfo.currentImageIndex = (pageNo - 1).toInt();
+    state.readPageInfo.currentImageIndex = _currentSegment.start + (pageNo - 1).toInt();
     update([sliderId, pageNoId]);
   }
 
   void handleSlideEnd(double pageNo) {
-    jump2ImageIndex((pageNo - 1).toInt());
+    jump2ImageIndex(_currentSegment.start + (pageNo - 1).toInt());
   }
 
   /// Sync thumbnails after user scrolling to image whose index is [targetImageIndex]
@@ -1140,27 +1258,70 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   }
 
   /// [index] is the first visible image; [reachedEnd] tells whether the end
-  /// of the book is on screen.
+  /// of its book is on screen. The book's last page as the first visible
+  /// image is the end as well, so a book counts as finished exactly when the
+  /// button to the next book or chapter shows.
   void recordReadProgress(int index, {bool reachedEnd = false}) {
+    final ReadSegment left = _currentSegment;
+    final int leftProgress = _progressIndex;
+
     state.readPageInfo.currentImageIndex = index;
-    final bool endChanged = _reachedEnd != reachedEnd;
-    _reachedEnd = reachedEnd;
-    update([sliderId, pageNoId, thumbnailNoId, if (endChanged) endOfBookId]);
+    final ReadSegment segment = state.segmentAt(index);
+    final bool atEnd = reachedEnd || (segment.pageCount > 0 && index >= segment.end - 1);
+
+    final bool bookChanged = !identical(segment, left);
+    if (bookChanged) {
+      // Where the book being left was, kept before its record goes quiet.
+      unawaited(_flushCoordinatorOf(left).schedule(leftProgress));
+      _currentSegment = segment;
+      unawaited(_notifyShown(segment));
+      toast(segment.info.galleryTitle, isCenter: false);
+    }
+
+    final bool endChanged = _reachedEnd != atEnd;
+    _reachedEnd = atEnd;
+    update([sliderId, pageNoId, thumbnailNoId, if (endChanged || bookChanged) endOfBookId, if (bookChanged) topMenuId]);
   }
 
-  int get _progressIndex => progressIndexFor(
-    currentIndex: state.readPageInfo.currentImageIndex,
-    reachedEnd: _reachedEnd,
-    pageCount: state.readPageInfo.pageCount,
+  /// For the scrolling layouts: records [visible] (in index order) and
+  /// appends the next book as the end of the last one comes near.
+  void recordVisibleItems(List<ItemPosition> visible) {
+    if (visible.isEmpty) {
+      return;
+    }
+    final int first = visible.first.index;
+    final ReadSegment segment = state.segmentAt(first);
+    recordReadProgress(first, reachedEnd: listShowsEnd(visible, segment.end));
+    if (readsBooksInARow && visible.last.index >= state.readPageInfo.pageCount - _appendAhead) {
+      unawaited(appendNextSegment());
+    }
+  }
+
+  /// Progress of [segment] when [index] (of the reader) was the first
+  /// visible image: within the book, its last page once its end was reached.
+  int _progressIndexIn(ReadSegment segment, bool reachedEnd, int index) => progressIndexFor(
+    currentIndex: (index - segment.start).clamp(0, max(0, segment.pageCount - 1)),
+    reachedEnd: reachedEnd,
+    pageCount: segment.pageCount,
   );
 
+  int get _progressIndex => _progressIndexIn(_currentSegment, _reachedEnd, state.readPageInfo.currentImageIndex);
+
+  Future<void> _notifyShown(ReadSegment segment) async {
+    try {
+      await segment.info.onShown?.call();
+    } catch (e) {
+      log.error('Notify book shown failed', e);
+    }
+  }
+
   Future<void> _scheduleReadProgressFlush() {
-    return _progressFlushCoordinator.schedule(_progressIndex);
+    return _flushCoordinatorOf(_currentSegment).schedule(_progressIndex);
   }
 
   Future<void> _flushReadProgressAndSync() async {
     try {
-      await _progressFlushCoordinator.flushFinalAndSync(
+      await _flushCoordinatorOf(_currentSegment).flushFinalAndSync(
         _progressIndex,
         sync: () async {
           await syncService.syncReadProgress(force: true);

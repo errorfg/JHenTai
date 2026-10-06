@@ -255,7 +255,7 @@ void main() {
       final ReadPageInfo info = await KomgaReaderLauncher(client).prepare(alpha[1]);
       expect(info.mode, ReadMode.remote);
       expect(info.pageCount, 4);
-      expect(info.images!.first.thumbnailUrl, contains('/pages/1/thumbnail'));
+      expect(info.images!.first!.thumbnailUrl, contains('/pages/1/thumbnail'));
 
       final ReadPageInfo next = (await info.loadSiblingBook!(next: true))!;
       expect(next.galleryTitle, '${TestLibrary.alpha} vol 3');
@@ -267,8 +267,8 @@ void main() {
       // Read it online: a downloaded copy would open from disk instead.
       await komgaDownloadService.delete(client.progressRecordKey(gamma[2].id));
       final ReadPageInfo info = await KomgaReaderLauncher(client).prepare(gamma[2]);
-      expect(Uri.parse(info.images!.last.url).queryParameters['convert'], 'png');
-      expect(Uri.parse(info.images!.first.url).queryParameters.containsKey('convert'), isFalse);
+      expect(Uri.parse(info.images!.last!.url).queryParameters['convert'], 'png');
+      expect(Uri.parse(info.images!.first!.url).queryParameters.containsKey('convert'), isFalse);
     });
 
     test('a text EPUB is refused with a message', () async {
@@ -291,7 +291,7 @@ void main() {
       final ReadPageInfo next = (await info.loadSiblingBook!(next: true))!;
       expect(next.mode, ReadMode.local);
       expect(next.galleryTitle, '${TestLibrary.alpha} vol 2');
-      final Uint8List firstPage = File(next.images!.first.path!).readAsBytesSync();
+      final Uint8List firstPage = File(next.images!.first!.path!).readAsBytesSync();
       expect(firstPage, TestLibrary.pagePng('${TestLibrary.alpha} v2.cbz', 1));
     });
   });

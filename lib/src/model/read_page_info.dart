@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../setting/read_setting.dart';
 import 'gallery_image.dart';
+import 'gallery_thumbnail.dart';
 
 enum ReadMode { downloaded, online, archive, local, remote }
 
@@ -33,6 +34,8 @@ class ReadPageInfo {
 
   int currentImageIndex;
 
+  /// Pages of the whole reader: grows as later books are appended to a
+  /// running reader (see [ReadSegment]).
   int pageCount;
 
   /// used for archive
@@ -40,8 +43,17 @@ class ReadPageInfo {
 
   String readProgressRecordStorageKey;
 
-  /// used for archive&local
-  List<GalleryImage>? images;
+  /// used for archive, local and remote; in online mode, pages already
+  /// downloaded, the others null
+  List<GalleryImage?>? images;
+
+  /// Links of the pages' image pages when known in advance (JM chapters), so
+  /// no thumbnail page is requested.
+  List<GalleryThumbnail?>? thumbnails;
+
+  /// Called when this book becomes the one being read, at the start or once
+  /// it is scrolled to after being appended.
+  FutureOr<void> Function()? onShown;
 
   /// used for initialize
   bool useSuperResolution;
@@ -73,10 +85,26 @@ class ReadPageInfo {
     this.isOriginal = false,
     required this.readProgressRecordStorageKey,
     this.images,
+    this.thumbnails,
+    this.onShown,
     required this.useSuperResolution,
     this.reportReadProgress,
     this.loadSiblingBook,
     this.siblingsAreChapters = false,
     this.readDirection,
   }) : currentImageIndex = initialIndex;
+}
+
+/// One book of a reader that reads several in a row: [info] describes the
+/// book, whose pages are [start] to [start] + [pageCount] - 1 of the reader.
+class ReadSegment {
+  ReadSegment({required this.info, required this.start, required this.pageCount});
+
+  final ReadPageInfo info;
+  final int start;
+  final int pageCount;
+
+  int get end => start + pageCount;
+
+  bool contains(int index) => index >= start && index < end;
 }

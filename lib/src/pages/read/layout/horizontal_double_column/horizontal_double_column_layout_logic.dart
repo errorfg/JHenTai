@@ -45,6 +45,18 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
   }
 
   @override
+  void onPagesAppended() {
+    if (state.isSpreadPageCompleter.isCompleted) {
+      state.isSpreadPage = <bool>[
+        ...state.isSpreadPage,
+        for (int i = state.isSpreadPage.length; i < readPageState.readPageInfo.pageCount; i++) false,
+      ];
+      state.pageCount = computePageCount();
+    }
+    super.onPagesAppended();
+  }
+
+  @override
   void toLeft() {
     if (readPageLogic.isInRight2LeftDirection) {
       toNext();
@@ -152,7 +164,7 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
     readPageLogic.recordReadProgress(
       imageIndexes.first,
       reachedEnd: imageIndexes.contains(
-        readPageState.readPageInfo.pageCount - 1,
+        readPageState.segmentAt(imageIndexes.first).end - 1,
       ),
     );
     readPageLogic.syncThumbnails(imageIndexes.first);

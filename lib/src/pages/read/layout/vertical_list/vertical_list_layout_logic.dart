@@ -10,7 +10,6 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../../../../setting/read_setting.dart';
 import '../../../../utils/screen_size_util.dart';
-import '../../read_page_logic.dart' show listShowsEnd;
 import '../base/base_layout_logic.dart';
 
 class VerticalListLayoutLogic extends BaseLayoutLogic {
@@ -239,13 +238,7 @@ class VerticalListLayoutLogic extends BaseLayoutLogic {
       return;
     }
 
-    readPageLogic.recordReadProgress(
-      firstImageIndex,
-      reachedEnd: listShowsEnd(
-        visibleItems,
-        readPageState.readPageInfo.pageCount,
-      ),
-    );
+    readPageLogic.recordVisibleItems(visibleItems);
     readPageLogic.syncThumbnails(firstImageIndex);
   }
 

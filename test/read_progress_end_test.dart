@@ -17,9 +17,21 @@ void main() {
       );
     });
 
-    test('a partly visible last page is not the end', () {
+    test('half of the last page on screen is the end, short of the list end', () {
+      // Several pages on one screen; the list is not pulled to its end.
       expect(
         listShowsEnd([_item(18, -0.1, 0.6), _item(19, 0.6, 1.3)], 20),
+        isTrue,
+      );
+      expect(
+        listShowsEnd([_item(17, -0.2, 0.2), _item(18, 0.2, 0.6), _item(19, 0.6, 1.0)], 20),
+        isTrue,
+      );
+    });
+
+    test('a last page barely on screen is not the end', () {
+      expect(
+        listShowsEnd([_item(18, -0.2, 0.85), _item(19, 0.85, 1.55)], 20),
         isFalse,
       );
     });

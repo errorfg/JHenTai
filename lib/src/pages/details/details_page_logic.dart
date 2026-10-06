@@ -1936,6 +1936,18 @@ class DetailsPageLogic extends GetxController
   Future<void> goToReadPage([int? forceIndex]) async {
     ReadDirection? webtoonReadDirection = _detectWebtoonReadDirection();
 
+    // A chapter of a JM series reads on into the next chapters, downloaded
+    // or not.
+    JmChapterBundle? jmChapter = state.jmChapterBundle;
+    if (jmChapter != null && jmChapter.isMultiChapter) {
+      unawaited(
+        _openReader(
+          await _jmChapterSession(jmChapter, initialIndex: forceIndex),
+        ),
+      );
+      return;
+    }
+
     /// online
     if (galleryDownloadService
             .galleryDownloadInfos[state.galleryUrl.gid]
@@ -1995,16 +2007,8 @@ class DetailsPageLogic extends GetxController
   /// with the previous or next chapter as its result, which then opens in
   /// turn, the way Komga moves between books of a series.
   Future<void> _openReader(ReadPageInfo info) async {
-    JmChapterBundle? jmChapter = state.jmChapterBundle;
-    if (jmChapter != null && jmChapter.isMultiChapter) {
-      info
-        ..loadSiblingBook = _jmSiblingLoader(jmChapter.chapter.id)
-        ..siblingsAreChapters = true;
-    }
-
     ReadPageInfo? session = info;
     while (session != null) {
-      unawaited(_rememberJmChapterOpened(session));
       final dynamic result = await toRoute<dynamic>(
         Routes.read,
         arguments: session,
@@ -2017,28 +2021,25 @@ class DetailsPageLogic extends GetxController
 
     await Future.delayed(const Duration(milliseconds: 800));
     updateSafely([readButtonId]);
+    await _showJmChapterRead();
   }
 
-  /// For a chapter of a multi-chapter JM album: its page count, and that it
-  /// is the chapter being read, which the album then opens on.
-  Future<void> _rememberJmChapterOpened(ReadPageInfo session) async {
-    if (!state.galleryUrl.isJM || session.gid == null) {
+  /// After reading on into later chapters, the page shows the chapter read
+  /// last, with its progress.
+  Future<void> _showJmChapterRead() async {
+    JmChapterBundle? current = state.jmChapterBundle;
+    if (current == null || !current.isMultiChapter || isClosed) {
       return;
     }
-    try {
-      final JmChapterBundle bundle = await ehRequest.jmSource.bundle(
-        session.gid! - GalleryUrl.jmGidOffset,
-      );
-      if (bundle.isMultiChapter) {
-        await jmReadingService.remember(
-          albumId: bundle.album.id,
-          pageCounts: {bundle.chapter.id: bundle.pageCount},
-          openedChapterId: bundle.chapter.id,
-        );
-      }
-    } catch (e) {
-      log.warning('Remember JM chapter failed: ${session.gid}', e);
+    int? last = await jmReadingService.lastOpenedChapter(current.album.id);
+    if (last == null || last == current.chapter.id || isClosed) {
+      return;
     }
+    if (!current.album.chapters.any((JmChapterRef c) => c.id == last)) {
+      return;
+    }
+    state.galleryUrl = GalleryUrl.jm(last);
+    await getDetails(refreshPageImmediately: true);
   }
 
   Future<ReadPageInfo?> Function({required bool next}) _jmSiblingLoader(
@@ -2058,30 +2059,45 @@ class DetailsPageLogic extends GetxController
     };
   }
 
-  /// A reader session for a JM chapter: the downloaded copy when there is
-  /// one, online otherwise.
-  Future<ReadPageInfo> _jmChapterSession(JmChapterBundle chapter) async {
+  /// A reader session for a JM chapter: online, with the pages already
+  /// downloaded read from their files, so that the next chapters can follow
+  /// in the same reader (see [ReadSegment]). Opens at the chapter's progress
+  /// unless [initialIndex] is given.
+  Future<ReadPageInfo> _jmChapterSession(
+    JmChapterBundle chapter, {
+    int? initialIndex,
+  }) async {
     GalleryUrl url = chapter.galleryUrl;
-    GalleryDownloadedData? downloaded =
-        galleryDownloadService.galleryDownloadInfos[url.gid]?.downloadProgress ==
-            null
-        ? null
-        : galleryDownloadService.gallerys.firstWhereOrNull(
-            (g) => g.gid == url.gid,
-          );
+    List<GalleryImage?>? downloaded = galleryDownloadService
+        .galleryDownloadInfos[url.gid]
+        ?.images
+        .map(
+          (GalleryImage? image) =>
+              image?.downloadStatus == DownloadStatus.downloaded ? image : null,
+        )
+        .toList();
     return ReadPageInfo(
-      mode: downloaded == null ? ReadMode.online : ReadMode.downloaded,
+      mode: ReadMode.online,
       gid: url.gid,
       token: url.token,
-      galleryTitle: downloaded?.title ?? chapter.title,
+      galleryTitle: chapter.title,
       galleryUrl: url.url,
-      initialIndex: await readProgressService.getReadProgress(url.gid),
+      initialIndex:
+          initialIndex ?? await readProgressService.getReadProgress(url.gid),
       readProgressRecordStorageKey: url.gid.toString(),
-      pageCount: downloaded?.pageCount ?? chapter.pageCount,
-      useSuperResolution:
-          downloaded != null &&
-          superResolutionService.get(url.gid, SuperResolutionType.gallery) !=
-              null,
+      pageCount: chapter.pageCount,
+      images: downloaded,
+      thumbnails: JmSource.pageThumbnails(
+        chapter,
+        ehRequest.jmSource.imageDomain(),
+      ),
+      // The chapter being read, which the album then opens on.
+      onShown: () => jmReadingService.remember(
+        albumId: chapter.album.id,
+        pageCounts: {chapter.chapter.id: chapter.pageCount},
+        openedChapterId: chapter.chapter.id,
+      ),
+      useSuperResolution: false,
       readDirection: _detectWebtoonReadDirection(),
       loadSiblingBook: _jmSiblingLoader(chapter.chapter.id),
       siblingsAreChapters: true,

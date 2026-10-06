@@ -42,11 +42,16 @@ class ReadPageState with ScrollStatusListerState {
   final ItemScrollController thumbnailsScrollController = ItemScrollController();
   final ScrollOffsetController thumbnailsScrollOffsetController = ScrollOffsetController();
 
+  /// The books being read, in order; the first is the one the reader was
+  /// opened with, later ones are appended as reading goes on.
+  late final List<ReadSegment> segments;
+
   ReadPageState() {
-    thumbnails = List.generate(readPageInfo.pageCount, (_) => null, growable: true);
+    segments = <ReadSegment>[ReadSegment(info: readPageInfo, start: 0, pageCount: readPageInfo.pageCount)];
+    thumbnails = _pagesOf(readPageInfo.thumbnails, readPageInfo.pageCount);
 
     if (readPageInfo.mode == ReadMode.online) {
-      images = List.generate(readPageInfo.pageCount, (_) => null);
+      images = _pagesOf(readPageInfo.images, readPageInfo.pageCount);
     }
 
     if (readPageInfo.mode == ReadMode.downloaded) {
@@ -54,15 +59,57 @@ class ReadPageState with ScrollStatusListerState {
     }
 
     if (readPageInfo.mode == ReadMode.archive || readPageInfo.mode == ReadMode.local || readPageInfo.mode == ReadMode.remote) {
-      images = readPageInfo.images!.cast<GalleryImage?>();
+      images = List<GalleryImage?>.of(readPageInfo.images!);
     }
 
     parseImageHrefsStates = List.generate(readPageInfo.pageCount, (_) => LoadingState.idle);
     parseImageUrlStates = List.generate(readPageInfo.pageCount, (_) => LoadingState.idle);
     imageContainerSizes = List.generate(readPageInfo.pageCount, (_) => null);
     parseImageUrlErrorMsg = List.generate(readPageInfo.pageCount, (_) => null);
-    parseImageUrlErrorMsg = List.generate(readPageInfo.pageCount, (_) => null);
 
     useSuperResolution = readPageInfo.useSuperResolution;
+  }
+
+  /// [known] padded with nulls to [pageCount], in a list that can grow.
+  static List<T?> _pagesOf<T>(List<T?>? known, int pageCount) =>
+      List<T?>.generate(pageCount, (int i) => known != null && i < known.length ? known[i] : null);
+
+  /// The book page [index] of the reader belongs to.
+  ReadSegment segmentAt(int index) {
+    for (int i = segments.length - 1; i > 0; i--) {
+      if (index >= segments[i].start) {
+        return segments[i];
+      }
+    }
+    return segments.first;
+  }
+
+  /// Whether [info] can follow the books being read in this reader: same
+  /// kind of source, its pages reachable by index.
+  bool canAppend(ReadPageInfo info) {
+    if (info.mode != readPageInfo.mode || info.pageCount <= 0) {
+      return false;
+    }
+    return switch (readPageInfo.mode) {
+      ReadMode.online => info.thumbnails != null || info.galleryUrl != null,
+      ReadMode.remote => info.images != null,
+      _ => false,
+    };
+  }
+
+  /// Puts the pages of [info] after the last book; pages already there keep
+  /// their index.
+  ReadSegment appendSegment(ReadPageInfo info) {
+    final int count = info.pageCount;
+    final ReadSegment segment = ReadSegment(info: info, start: readPageInfo.pageCount, pageCount: count);
+    segments.add(segment);
+    thumbnails.addAll(_pagesOf(info.thumbnails, count));
+    images.addAll(_pagesOf(info.images, count));
+    parseImageHrefsStates.addAll(List.generate(count, (_) => LoadingState.idle));
+    parseImageUrlStates.addAll(List.generate(count, (_) => LoadingState.idle));
+    imageContainerSizes.addAll(List.generate(count, (_) => null));
+    parseImageUrlErrorMsg.addAll(List.generate(count, (_) => null));
+    readPageInfo.pageCount += count;
+    return segment;
   }
 }

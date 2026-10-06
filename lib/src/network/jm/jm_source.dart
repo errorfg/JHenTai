@@ -502,6 +502,20 @@ class JmSource {
     );
   }
 
+  /// Links of every page of a chapter, for a reader that needs no thumbnail
+  /// page requests.
+  static List<GalleryThumbnail> pageThumbnails(JmChapterBundle b, String imageDomain) => <GalleryThumbnail>[
+        for (int i = 0; i < b.pageCount; i++)
+          GalleryThumbnail(
+            href: 'jm://${b.chapter.id}/${i + 1}',
+            isLarge: true,
+            thumbUrl: b.imageUrl(imageDomain, i),
+            thumbWidth: null,
+            thumbHeight: null,
+            originImageHash: 'jm-${b.chapter.id}-${i + 1}',
+          ),
+      ];
+
   List<GalleryThumbnail> _thumbnails(JmChapterBundle b, int pageIndex) {
     final int start = pageIndex * thumbnailsPerPage;
     if (start < 0 || start >= b.pageCount) {
