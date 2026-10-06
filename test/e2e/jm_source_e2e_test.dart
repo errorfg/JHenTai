@@ -7,8 +7,6 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
-import 'package:drift/drift.dart' show driftRuntimeOptions;
-import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:jhentai/src/database/database.dart';
@@ -24,12 +22,7 @@ import 'package:jhentai/src/network/jm/jm_api.dart';
 import 'package:jhentai/src/network/jm/jm_image.dart';
 import 'package:jhentai/src/network/jm/jm_models.dart';
 import 'package:jhentai/src/network/jm/jm_source.dart';
-import 'package:jhentai/src/service/jm_album_tag_service.dart';
-import 'package:jhentai/src/service/local_config_service.dart';
-import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/utils/eh_spider_parser.dart';
-
-import 'support/e2e_app.dart';
 
 /// The JM source adapter against the live JM API: the shapes the list,
 /// detail page, reader and downloader consume. Enabled by
@@ -330,99 +323,4 @@ void main() {
     expect(info.galleryDetails.pageCount, second.pageCount);
     expect(info.galleryDetails.rawTitle, second.title);
   }, timeout: const Timeout(Duration(minutes: 3)));
-
-  test('a list names authors only; its cards get the tags from the albums\' details, a few at a time and once', () async {
-    driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
-    log = SilentLogService();
-    final AppDb db = AppDb.forTesting(NativeDatabase.memory());
-    appDb = db;
-    localConfigService = LocalConfigService();
-    addTearDown(db.close);
-
-    int inFlight = 0;
-    int mostInFlight = 0;
-    final List<String> albumRequests = <String>[];
-    final List<int> albumMs = <int>[];
-    final Dio counting = Dio(dio.options)
-      ..interceptors.add(
-        InterceptorsWrapper(
-          onRequest: (RequestOptions options, RequestInterceptorHandler handler) {
-            if (options.uri.path == '/album') {
-              albumRequests.add('${options.uri.queryParameters['id']}');
-              options.extra['startedAt'] = DateTime.now();
-              inFlight++;
-              mostInFlight = mostInFlight < inFlight ? inFlight : mostInFlight;
-            }
-            handler.next(options);
-          },
-          onResponse: (Response<dynamic> response, ResponseInterceptorHandler handler) {
-            if (response.requestOptions.uri.path == '/album') {
-              inFlight--;
-              albumMs.add(DateTime.now().difference(response.requestOptions.extra['startedAt'] as DateTime).inMilliseconds);
-            }
-            handler.next(response);
-          },
-          onError: (DioException error, ErrorInterceptorHandler handler) {
-            if (error.requestOptions.uri.path == '/album') {
-              inFlight--;
-            }
-            handler.next(error);
-          },
-        ),
-      );
-    final JmAlbumTagService tags = JmAlbumTagService();
-    final JmSource listed = JmSource(
-      api: JmApi(dio: counting, apiDomains: () => domains, discoverDomains: false),
-      imageDomain: () => JmApi.imageDomains.first,
-      onAlbum: tags.record,
-      fillTags: tags.fill,
-    );
-    tags.loadAlbum = listed.album;
-
-    // Every kind of list: none carries tags.
-    final List<Gallery> page = (await listed.galleryPage()).gallerys;
-    final List<Gallery> searched = (await listed.galleryPage(keyword: 'MANA')).gallerys;
-    final List<Gallery> ranked = (await listed.list(const JmFilterQuery(category: '0', order: 'mv', period: 'w'))).gallerys;
-    for (final Gallery gallery in <Gallery>[...page, ...searched, ...ranked]) {
-      expect(JmAlbumTagService.lacksTags(gallery), isTrue, reason: gallery.title);
-    }
-    expect(albumRequests, isEmpty);
-
-    // Twelve cards show.
-    final List<Gallery> shown = page.take(12).toList();
-    final Map<int, JmAlbumTags> arrived = <int, JmAlbumTags>{};
-    tags.loaded.listen((({int albumId, JmAlbumTags tags}) loaded) => arrived[loaded.albumId] = loaded.tags);
-    final Stopwatch watch = Stopwatch()..start();
-    for (final Gallery gallery in shown) {
-      tags.want(gallery.galleryUrl.jmChapterId);
-    }
-    while (arrived.length < shown.length && watch.elapsed < const Duration(seconds: 90)) {
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-    }
-    watch.stop();
-    expect(arrived.keys.toSet(), shown.map((Gallery g) => g.galleryUrl.jmChapterId).toSet());
-    expect(albumRequests.toSet().length, shown.length);
-    expect(mostInFlight, lessThanOrEqualTo(JmAlbumTagService.concurrency));
-    // Albums carry tags beyond their author.
-    expect(arrived.values.where((JmAlbumTags t) => (t['tag'] ?? const <String>[]).isNotEmpty).length, greaterThan(shown.length ~/ 2));
-    albumMs.sort();
-    // ignore: avoid_print
-    print('tags of ${shown.length} albums in ${watch.elapsedMilliseconds} ms; '
-        'a details request: median ${albumMs[albumMs.length ~/ 2]} ms, slowest ${albumMs.last} ms; '
-        'at most $mostInFlight at once');
-    // ignore: avoid_print
-    print('e.g. ${shown.first.title}: ${arrived[shown.first.galleryUrl.jmChapterId]}');
-
-    // The same list again: the tags come with the page, nothing is asked.
-    final int asked = albumRequests.length;
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    final List<Gallery> again = (await listed.galleryPage()).gallerys;
-    final Set<int> known = arrived.keys.toSet();
-    for (final Gallery gallery in again.where((Gallery g) => known.contains(g.galleryUrl.jmChapterId))) {
-      expect(JmAlbumTagService.lacksTags(gallery) && (arrived[gallery.galleryUrl.jmChapterId]!['tag'] ?? const <String>[]).isNotEmpty, isFalse,
-          reason: gallery.title);
-    }
-    expect(again.where((Gallery g) => known.contains(g.galleryUrl.jmChapterId)), isNotEmpty);
-    expect(albumRequests.length, asked);
-  });
 }

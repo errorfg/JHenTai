@@ -18,7 +18,6 @@ import '../model/gallery_tag.dart';
 import 'eh_gallery_category_tag.dart';
 import 'eh_gallery_list_card_.dart';
 import 'eh_image.dart';
-import 'jm_album_tags_loader.dart';
 
 class EHGalleryWaterFlowCard extends StatelessWidget {
   final Gallery gallery;
@@ -44,13 +43,7 @@ class EHGalleryWaterFlowCard extends StatelessWidget {
       onTap: () => handleTapCard(gallery),
       onLongPressStart: handleLongPressCard == null ? null : (details) => handleLongPressCard!(gallery, details.globalPosition),
       onSecondaryTapDown: handleSecondaryTapCard == null ? null : (details) => handleSecondaryTapCard!(gallery, details.globalPosition),
-      child: FadeIn(
-        // Of the waterfall cards the big one shows tags; a JM list names only
-        // the author, so the card loads the album's.
-        child: listMode == ListMode.waterfallFlowBig && gallery.galleryUrl.isJM
-            ? JmAlbumTagsLoader(gallery: gallery, builder: _buildCard)
-            : _buildCard(context),
-      ),
+      child: FadeIn(child: _buildCard(context)),
     );
   }
 

@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/service/jm_reading_service.dart';
-import 'package:jhentai/src/widget/jm_album_tags_loader.dart';
 import 'package:jhentai/src/widget/jm_chapter_dialog.dart';
 import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
@@ -60,15 +59,11 @@ class EHGalleryListCard extends StatelessWidget {
         duration: const Duration(milliseconds: 100),
         child: SizedBox(
           height: withTags ? UIConfig.galleryCardHeight : UIConfig.galleryCardHeightWithoutTags,
-          // A JM list names only the author: the card loads the album's tags.
-          child: withTags && gallery.galleryUrl.isJM ? JmAlbumTagsLoader(gallery: gallery, builder: _buildCard) : _buildCard(context),
+          child: listMode == ListMode.flat || listMode == ListMode.flatWithoutTags ? buildFlatGalleryCard(context) : buildRoundGalleryCard(context),
         ),
       ),
     );
   }
-
-  Widget _buildCard(BuildContext context) =>
-      listMode == ListMode.flat || listMode == ListMode.flatWithoutTags ? buildFlatGalleryCard(context) : buildRoundGalleryCard(context);
 
   Widget buildRoundGalleryCard(BuildContext context) {
     return Container(
