@@ -341,12 +341,17 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   final Set<int> _srInFlight = <int>{};
   final Set<int> _srSkipped = <int>{};
 
-  /// Whether pages are upscaled as they are read: online reading on a
-  /// desktop, switched on, with the upscaler of the chosen model installed.
-  bool get realtimeSrOn => state.readPageInfo.mode == ReadMode.online && realtimeSrService.active;
+  /// Whether pages are upscaled as they are read: on a desktop, switched
+  /// on, with the upscaler of the chosen model installed. Wherever the pages
+  /// come from: a site, a Komga server, files.
+  bool get realtimeSrOn => _realtimeSrApplies && realtimeSrService.active;
 
   /// Shown in the reader's menu where upscaling while reading can be used.
-  bool get canUseRealtimeSr => GetPlatform.isDesktop && state.readPageInfo.mode == ReadMode.online;
+  bool get canUseRealtimeSr => GetPlatform.isDesktop && _realtimeSrApplies;
+
+  /// Not while the reader shows the copy of a downloaded gallery or archive
+  /// that was upscaled as a whole: those pages are upscaled already.
+  bool get _realtimeSrApplies => !state.useSuperResolution;
 
   Future<void> toggleRealtimeSr() async {
     final bool enable = !superResolutionSetting.realtimeEnabled.value;
@@ -370,14 +375,26 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     if (image == null) {
       return null;
     }
+    // A page of a download that is still running is not there yet; it is
+    // never fetched from its site here.
+    if (state.readPageInfo.mode == ReadMode.downloaded && image.downloadStatus != DownloadStatus.downloaded) {
+      return null;
+    }
     if (image.path != null) {
-      // A page already on disk (a downloaded JM page): restored when saved.
+      // A page on disk: of a download (a JM page was restored when saved), an
+      // archive, a downloaded Komga book, a local gallery.
       final String path = GalleryDownloadService.computeImageDownloadAbsolutePathFromRelativePath(image.path!);
       return (key: path, strips: 0, load: () => io.File(path).readAsBytes());
     }
     final String requestUrl = JmImage.requestUrl(image.url);
-    // From the image cache when the page was shown, else downloaded into it.
-    return (key: requestUrl, strips: JmImage.stripsOf(image.url), load: () => getNetworkImageData(requestUrl));
+    // From the image cache when the page was shown, else downloaded into it:
+    // with the headers and under the cache key the page is shown with (a
+    // Komga server wants its login).
+    return (
+      key: requestUrl,
+      strips: JmImage.stripsOf(image.url),
+      load: () => ExtendedNetworkImageProvider(requestUrl, headers: image.headers, cacheKey: image.cacheKey, cache: true).getNetworkImageData(),
+    );
   }
 
   /// The upscaled copy of page [index] (encoded), when it is ready.
@@ -459,6 +476,9 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     }
     if (state.images[index] != null) {
       requestRealtimeSr(index);
+    } else if (state.readPageInfo.mode != ReadMode.online) {
+      // A page a download has not reached: asked for when it is shown.
+      return;
     } else if (state.thumbnails[index] == null) {
       if (state.parseImageHrefsStates[index] == LoadingState.idle) {
         beginToParseImageHref(index);

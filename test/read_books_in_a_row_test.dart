@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:dio/dio.dart' show CancelToken;
 import 'package:drift/native.dart';
+import 'package:executor/executor.dart' show AsyncTask;
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -272,5 +274,209 @@ void main() {
       Get.reset();
       await appDb.close();
     });
+  }, skip: _srToolsRoot() == null);
+
+  /// Reads [info] with upscaling on until the pages [upscaled] have their
+  /// upscaled copy, and checks that the first page shows as it: the reader's
+  /// switch is there, and the pages [left] are left alone.
+  Future<void> readUpscaled(
+    WidgetTester tester,
+    ReadPageInfo info, {
+    List<int> upscaled = const <int>[0, 1, 2, 3, 4],
+    List<int> left = const <int>[],
+  }) async {
+    appDb = (await tester.runAsync(() async => AppDb.forTesting(NativeDatabase.memory())))!;
+    Get.testMode = true;
+    Get.put<ReadProgressService>(readProgressService, permanent: true);
+    Get.put<GalleryDownloadService>(galleryDownloadService, permanent: true);
+    readSetting.readDirection.value = ReadDirection.top2bottomList;
+    readSetting.keepScreenAwakeWhenReading.value = false;
+    readSetting.showThumbnails.value = false;
+    superResolutionSetting = SuperResolutionSetting()..realtimeEnabled.value = true;
+    final Directory cache = Directory.systemTemp.createTempSync('read_sr_cache');
+    addTearDown(() => cache.deleteSync(recursive: true));
+    realtimeSrService = RealtimeSrService()
+      ..toolsRootOverride = _srToolsRoot()!
+      ..workDirOverride = cache.path;
+    tester.view.physicalSize = const Size(600, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (MethodCall call) async => null);
+    tester.binding.defaultBinaryMessenger.setMockMessageHandler(
+      'dev.flutter.pigeon.wakelock_plus_platform_interface.WakelockPlusApi.toggle',
+      (ByteData? message) async => const StandardMessageCodec().encodeMessage(<Object?>[]),
+    );
+    // The image cache of pages fetched from a server.
+    final Directory imageCache = Directory.systemTemp.createTempSync('read_sr_images');
+    addTearDown(() => imageCache.deleteSync(recursive: true));
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/path_provider'),
+      (MethodCall call) async => imageCache.path,
+    );
+    Future<void> settle([int rounds = 6]) async {
+      for (int i = 0; i < rounds; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 60)));
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        GetMaterialApp(
+          home: const Scaffold(),
+          getPages: [GetPage(name: '/read', page: () => const ReadPage())],
+        ),
+      );
+      Get.toNamed('/read', arguments: info);
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await settle();
+    final ReadPageLogic reader = Get.find<ReadPageLogic>();
+    expect(reader.realtimeSrOn, isTrue);
+    // In the reader's menu, shown or not.
+    expect(find.byKey(const Key('realtimeSrToggle')), findsOneWidget);
+
+    final DateTime deadline = DateTime.now().add(const Duration(seconds: 90));
+    while (upscaled.any((int i) => reader.upscaledPage(i) == null) && DateTime.now().isBefore(deadline)) {
+      await settle(1);
+    }
+    expect(<int>[for (int i = 0; i < info.pageCount; i++) if (reader.upscaledPage(i) != null) i], upscaled);
+    for (final int index in left) {
+      expect(reader.upscaledPage(index), isNull, reason: 'page $index');
+    }
+    await settle();
+    // 300 x 400 as stored, twice that upscaled.
+    final ui.Image shown = tester.widget<ExtendedRawImage>(find.byType(ExtendedRawImage).first).image!;
+    expect((shown.width, shown.height), (600, 800));
+    expect(cache.listSync(recursive: true), isEmpty);
+
+    await tester.runAsync(() async {
+      Get.back();
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    await settle(10);
+    expect(Get.isRegistered<ReadPageLogic>(), isFalse);
+    await tester.runAsync(() async {
+      Get.reset();
+      await appDb.close();
+    });
+  }
+
+  testWidgets('pages read from a Komga server are upscaled, fetched with its login', (WidgetTester tester) async {
+    // The test binding answers every request itself otherwise.
+    HttpOverrides.global = null;
+    final Map<String, int> served = <String, int>{};
+    int refused = 0;
+    final HttpServer server = (await tester.runAsync(() async {
+      final HttpServer server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((HttpRequest request) async {
+        // No connection kept: an idle one leaves a timer behind in the test.
+        request.response.persistentConnection = false;
+        if (request.headers.value('X-API-Key') != 'key-of-the-test') {
+          refused++;
+          request.response.statusCode = HttpStatus.unauthorized;
+        } else {
+          final int page = int.parse(request.uri.pathSegments.last);
+          served[request.uri.path] = (served[request.uri.path] ?? 0) + 1;
+          request.response
+            ..headers.contentType = ContentType('image', 'png')
+            ..add(File('${files.path}/c1-${page - 1}.png').readAsBytesSync());
+        }
+        await request.response.close();
+      });
+      return server;
+    }))!;
+    addTearDown(() => tester.runAsync(() => server.close(force: true)));
+
+    // As the Komga reader launcher makes a book's session.
+    await readUpscaled(
+      tester,
+      ReadPageInfo(
+        mode: ReadMode.remote,
+        galleryTitle: 'Volume 1',
+        initialIndex: 0,
+        pageCount: _pages,
+        readProgressRecordStorageKey: 'komga:test:book-1',
+        images: <GalleryImage?>[
+          for (int i = 0; i < _pages; i++)
+            GalleryImage(
+              url: 'http://127.0.0.1:${server.port}/api/v1/books/book-1/pages/${i + 1}',
+              headers: const <String, String>{'X-API-Key': 'key-of-the-test', 'Accept': 'image/*'},
+              cacheKey: 'komga-test-book-1-${i + 1}',
+              downloadStatus: DownloadStatus.downloaded,
+            ),
+        ],
+        useSuperResolution: false,
+      ),
+    );
+
+    expect(refused, 0);
+    expect(served.keys.toSet(), <String>{for (int i = 1; i <= _pages; i++) '/api/v1/books/book-1/pages/$i'});
+  }, skip: _srToolsRoot() == null);
+
+  testWidgets('a downloaded Komga book is upscaled as it is read', (WidgetTester tester) async {
+    await readUpscaled(
+      tester,
+      ReadPageInfo(
+        mode: ReadMode.local,
+        galleryTitle: 'Volume 1',
+        initialIndex: 0,
+        pageCount: _pages,
+        readProgressRecordStorageKey: 'komga:test:book-1',
+        images: <GalleryImage?>[
+          for (int i = 0; i < _pages; i++)
+            GalleryImage(url: '', path: '${files.path}/c1-$i.png', downloadStatus: DownloadStatus.downloaded),
+        ],
+        useSuperResolution: false,
+      ),
+    );
+  }, skip: _srToolsRoot() == null);
+
+  testWidgets('a downloaded gallery is upscaled as it is read, but for a page still downloading', (WidgetTester tester) async {
+    const int gid = 4242;
+    galleryDownloadService.galleryDownloadInfos[gid] = GalleryDownloadInfo(
+      thumbnailsCountPerPage: 20,
+      tasks: <AsyncTask<dynamic>>[],
+      cancelToken: CancelToken(),
+      downloadProgress: GalleryDownloadProgress(
+        curCount: _pages - 1,
+        totalCount: _pages,
+        downloadStatus: DownloadStatus.downloading,
+        hasDownloaded: <bool>[for (int i = 0; i < _pages; i++) i != 3],
+      ),
+      imageHrefs: <GalleryThumbnail?>[
+        for (int i = 0; i < _pages; i++) GalleryThumbnail(href: 'test://1/$i', isLarge: true, thumbUrl: ''),
+      ],
+      images: <GalleryImage?>[
+        for (int i = 0; i < _pages; i++)
+          GalleryImage(
+            url: 'test://1/$i',
+            path: 'c1-$i.png',
+            downloadStatus: i == 3 ? DownloadStatus.downloading : DownloadStatus.downloaded,
+          ),
+      ],
+      speedComputer: GalleryDownloadSpeedComputer(_pages, () {}),
+      priority: 0,
+      sortOrder: 0,
+      group: 'default',
+    );
+    addTearDown(() => galleryDownloadService.galleryDownloadInfos.remove(gid));
+
+    await readUpscaled(
+      tester,
+      ReadPageInfo(
+        mode: ReadMode.downloaded,
+        gid: gid,
+        token: 'test',
+        galleryTitle: 'Gallery',
+        galleryUrl: 'https://example.test/g/$gid',
+        initialIndex: 0,
+        pageCount: _pages,
+        readProgressRecordStorageKey: '$gid',
+        useSuperResolution: false,
+      ),
+      upscaled: const <int>[0, 1, 2, 4],
+      left: const <int>[3],
+    );
   }, skip: _srToolsRoot() == null);
 }

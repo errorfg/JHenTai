@@ -332,22 +332,34 @@ abstract class BaseLayout extends StatelessWidget {
   }
 
   Widget _buildLocalImage(BuildContext context, int index) {
-    return GestureDetector(
-      onLongPressStart: (details) => logic.showLocalImageContextMenu(index, context, position: details.globalPosition),
-      onSecondaryTapDown: (details) => logic.showLocalImageContextMenu(index, context, position: details.globalPosition),
-      child: EHImage(
-        galleryImage: readPageState.images[index]!,
-        containerWidth: logic.readPageState.imageContainerSizes[index]?.width ?? logic.getPlaceHolderSize(index).width,
-        containerHeight: logic.readPageState.imageContainerSizes[index]?.height ?? logic.getPlaceHolderSize(index).height,
-        clearMemoryCacheWhenDispose: true,
-        downloadingWidgetBuilder: () => _downloadingWidgetBuilder(index),
-        pausedWidgetBuilder: () => _pausedWidgetBuilder(index),
-        loadingWidgetBuilder: () => _loadingWidgetBuilder(context, index),
-        failedWidgetBuilder: (state) => _failedWidgetBuilderForLocalMode(index, state),
-        completedWidgetBuilder: (state) => completedWidgetBuilderForLocalModeCallBack(index, state),
-        animateOnlyWhenVisible: true,
-        maxBytes: readSetting.enableMaxImageKilobyte.isTrue ? readSetting.maxImageKilobyte.toInt() * 1024 : null,
-      ),
+    // Built again when the page's upscaled copy is ready, as an online page
+    // is.
+    return GetBuilder<ReadPageLogic>(
+      id: '${readPageLogic.onlineImageId}::$index',
+      builder: (_) {
+        final Uint8List? upscaled = readPageLogic.realtimeSrOn ? readPageLogic.upscaledPage(index) : null;
+        return GestureDetector(
+          onLongPressStart: (details) => logic.showLocalImageContextMenu(index, context, position: details.globalPosition),
+          onSecondaryTapDown: (details) => logic.showLocalImageContextMenu(index, context, position: details.globalPosition),
+          child: EHImage(
+            // Another widget, not the original's updated: its loading starts
+            // from the decoded copy.
+            key: ValueKey<int?>(upscaled == null ? null : identityHashCode(upscaled)),
+            galleryImage: readPageState.images[index]!,
+            memory: upscaled,
+            containerWidth: logic.readPageState.imageContainerSizes[index]?.width ?? logic.getPlaceHolderSize(index).width,
+            containerHeight: logic.readPageState.imageContainerSizes[index]?.height ?? logic.getPlaceHolderSize(index).height,
+            clearMemoryCacheWhenDispose: true,
+            downloadingWidgetBuilder: () => _downloadingWidgetBuilder(index),
+            pausedWidgetBuilder: () => _pausedWidgetBuilder(index),
+            loadingWidgetBuilder: () => _loadingWidgetBuilder(context, index),
+            failedWidgetBuilder: (state) => _failedWidgetBuilderForLocalMode(index, state),
+            completedWidgetBuilder: (state) => completedWidgetBuilderForLocalModeCallBack(index, state),
+            animateOnlyWhenVisible: true,
+            maxBytes: readSetting.enableMaxImageKilobyte.isTrue ? readSetting.maxImageKilobyte.toInt() * 1024 : null,
+          ),
+        );
+      },
     );
   }
 
@@ -414,6 +426,12 @@ abstract class BaseLayout extends StatelessWidget {
 
   /// completed for local mode
   Widget? completedWidgetBuilderForLocalModeCallBack(int index, ExtendedImageState state) {
+    // A page outside the pages upscaled ahead (reached by a jump, or
+    // downloaded since) asks for its upscaled copy once its original is shown.
+    if (state.extendedImageInfo != null) {
+      readPageLogic.requestRealtimeSr(index);
+    }
+
     if (state.extendedImageInfo == null || logic.readPageState.imageContainerSizes[index] != null) {
       return null;
     }
