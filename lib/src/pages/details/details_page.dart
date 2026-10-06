@@ -398,6 +398,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                               .textInside(
                                 editableTextState.currentTextEditingValue.text,
                               ),
+                          site: logic.ownSite,
                           forceNewRoute: true,
                         );
                       },
@@ -493,6 +494,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                                           .currentTextEditingValue
                                           .text,
                                     ),
+                                site: logic.ownSite,
                                 forceNewRoute: true,
                               );
                             },
@@ -525,7 +527,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
         label: 'search'.tr,
         onPressed: () {
           ContextMenuController.removeAny();
-          newSearch(keyword: rawSelectedText, forceNewRoute: true);
+          newSearch(keyword: rawSelectedText, forceNewRoute: true, site: logic.ownSite);
         },
       ),
     );

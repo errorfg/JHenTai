@@ -1,3 +1,5 @@
+import 'package:jhentai/src/pages/search/mixin/search_page_logic_mixin.dart';
+import 'package:jhentai/src/model/content_scheme.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/pages/search/mixin/new_search_argument.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
@@ -13,7 +15,18 @@ import '../setting/preference_setting.dart';
 import '../setting/style_setting.dart';
 import '../widget/eh_search_config_dialog.dart';
 
-Future<void> newSearch({String? keyword, SearchConfig? rewriteSearchConfig, bool forceNewRoute = false}) async {
+/// Opens a search for [keyword], or with [rewriteSearchConfig] as it is.
+///
+/// A keyword alone says nothing about where to search: [site] names the
+/// site when the caller knows it (the site of the gallery the keyword comes
+/// from, or E-Hentai when a title is looked up there); without it the search
+/// starts on the site of the current scheme.
+Future<void> newSearch({
+  String? keyword,
+  SearchConfig? rewriteSearchConfig,
+  bool forceNewRoute = false,
+  ContentScheme? site,
+}) async {
   assert(keyword != null || rewriteSearchConfig != null);
 
   switch (styleSetting.actualLayout) {
@@ -24,7 +37,7 @@ Future<void> newSearch({String? keyword, SearchConfig? rewriteSearchConfig, bool
 
       DesktopSearchPageLogic desktopSearchPageLogic = Get.find<DesktopSearchPageLogic>();
       if (forceNewRoute) {
-        desktopSearchPageLogic.addNewTab(keyword: keyword, rewriteSearchConfig: rewriteSearchConfig);
+        desktopSearchPageLogic.addNewTab(keyword: keyword, rewriteSearchConfig: rewriteSearchConfig, site: site);
       } else {
         await desktopSearchPageLogic.currentTabLogic.state.searchConfigInitCompleter.future;
         if (rewriteSearchConfig != null) {
@@ -39,6 +52,9 @@ Future<void> newSearch({String? keyword, SearchConfig? rewriteSearchConfig, bool
         } else if (preferenceSetting.searchBehaviour.value == SearchBehaviour.none) {
           desktopSearchPageLogic.currentTabLogic.state.searchConfig = SearchConfig(keyword: keyword);
         }
+        if (rewriteSearchConfig == null && site != null) {
+          SearchPageLogicMixin.applySearchSite(desktopSearchPageLogic.currentTabLogic.state.searchConfig, site);
+        }
         desktopSearchPageLogic.handleClearAndRefresh();
       }
       return;
@@ -51,6 +67,7 @@ Future<void> newSearch({String? keyword, SearchConfig? rewriteSearchConfig, bool
             keyword: keyword,
             keywordSearchBehaviour: preferenceSetting.searchBehaviour.value,
             rewriteSearchConfig: rewriteSearchConfig,
+            site: site,
           ),
         );
         return;
@@ -74,6 +91,9 @@ Future<void> newSearch({String? keyword, SearchConfig? rewriteSearchConfig, bool
         } else if (preferenceSetting.searchBehaviour.value == SearchBehaviour.none) {
           SearchPageMobileV2Logic.current!.state.searchConfig = SearchConfig(keyword: keyword);
         }
+        if (rewriteSearchConfig == null && site != null) {
+          SearchPageLogicMixin.applySearchSite(SearchPageMobileV2Logic.current!.state.searchConfig, site);
+        }
         SearchPageMobileV2Logic.current!.handleClearAndRefresh();
         return;
       }
@@ -84,6 +104,7 @@ Future<void> newSearch({String? keyword, SearchConfig? rewriteSearchConfig, bool
           keyword: keyword,
           keywordSearchBehaviour: preferenceSetting.searchBehaviour.value,
           rewriteSearchConfig: rewriteSearchConfig,
+          site: site,
         ),
         preventDuplicates: false,
       );

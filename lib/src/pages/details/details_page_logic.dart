@@ -18,6 +18,7 @@ import 'package:jhentai/src/mixin/login_required_logic_mixin.dart';
 import 'package:jhentai/src/model/gallery.dart';
 import 'package:jhentai/src/model/gallery_comment.dart';
 import 'package:jhentai/src/model/gallery_tag.dart';
+import 'package:jhentai/src/model/content_scheme.dart';
 import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'package:jhentai/src/model/gallery_thumbnail.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
@@ -1442,10 +1443,22 @@ class DetailsPageLogic extends GetxController
         forceNewRoute: true,
       );
     } else {
-      newSearch(keyword: keyword, forceNewRoute: true);
+      newSearch(keyword: keyword, forceNewRoute: true, site: ContentScheme.ehentai);
     }
   }
 
+  /// The site this gallery is from: where a keyword taken from it is
+  /// searched, whatever site the app is switched to.
+  ContentScheme get ownSite => state.galleryUrl.isNH
+      ? ContentScheme.nhentai
+      : state.galleryUrl.isWN
+      ? ContentScheme.wnacg
+      : state.galleryUrl.isJM
+      ? ContentScheme.jm
+      : ContentScheme.ehentai;
+
+  /// The "EH" action of a gallery from another site: its title, searched on
+  /// E-Hentai.
   void searchInEhByNhTitle() {
     if (!state.galleryUrl.isNH &&
         !state.galleryUrl.isWN &&
@@ -1458,7 +1471,7 @@ class DetailsPageLogic extends GetxController
       return;
     }
 
-    newSearch(keyword: keyword, forceNewRoute: true);
+    newSearch(keyword: keyword, forceNewRoute: true, site: ContentScheme.ehentai);
   }
 
   void searchUploader() {
@@ -1488,7 +1501,7 @@ class DetailsPageLogic extends GetxController
         forceNewRoute: true,
       );
     } else {
-      newSearch(keyword: keyword, forceNewRoute: true);
+      newSearch(keyword: keyword, forceNewRoute: true, site: ContentScheme.ehentai);
     }
   }
 

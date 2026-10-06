@@ -1,3 +1,4 @@
+import 'package:jhentai/src/model/content_scheme.dart';
 import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
@@ -45,9 +46,14 @@ class DesktopSearchPageLogic extends GetxController with Scroll2TopLogicMixin {
     updateSafely([tabBarId]);
   }
 
-  void addNewTab({String? keyword, SearchConfig? rewriteSearchConfig, bool loadImmediately = true}) {
+  void addNewTab({String? keyword, SearchConfig? rewriteSearchConfig, bool loadImmediately = true, ContentScheme? site}) {
     DesktopSearchPageTabLogic newTabLogic = DesktopSearchPageTabLogic(
-      NewSearchArgument(keyword: keyword, keywordSearchBehaviour: preferenceSetting.searchBehaviour.value, rewriteSearchConfig: rewriteSearchConfig),
+      NewSearchArgument(
+        keyword: keyword,
+        keywordSearchBehaviour: preferenceSetting.searchBehaviour.value,
+        rewriteSearchConfig: rewriteSearchConfig,
+        site: site,
+      ),
       loadImmediately,
     );
 

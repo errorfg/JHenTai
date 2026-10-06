@@ -5,6 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
+import 'package:jhentai/src/setting/preference_setting.dart';
+import 'package:jhentai/src/pages/search/mixin/new_search_argument.dart';
+import 'package:jhentai/src/pages/search/desktop/desktop_search_page_tab_logic.dart';
+import 'package:jhentai/src/model/search_config.dart';
 import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/l18n/locale_text.dart';
 import 'package:jhentai/src/model/content_scheme.dart';
@@ -191,6 +195,37 @@ void main() {
     expect(logic.state.showWnFavorites, isTrue);
     expect(logic.state.showJmFavorites, isFalse);
     expect(logic.state.gallerys, isEmpty);
+  });
+
+  test('a keyword search goes to the site it names, whatever the app is switched to', () async {
+    /// The search a new search tab starts with.
+    Future<SearchConfig> opened({ContentScheme? site}) async {
+      final DesktopSearchPageTabLogic tab = DesktopSearchPageTabLogic(
+        NewSearchArgument(keyword: 'some title', keywordSearchBehaviour: SearchBehaviour.inheritAll, site: site),
+        false,
+      );
+      tab.onInit();
+      await tab.onReady();
+      return tab.state.searchConfig;
+    }
+
+    List<bool> sites(SearchConfig config) => <bool>[config.isNhSearch, config.isWnacgSearch, config.isJmSearch];
+
+    // The app is switched to JM.
+    schemeSetting.site.value = ContentScheme.jm;
+    // A gallery's "EH" action looks its title up on E-Hentai.
+    final SearchConfig onEh = await opened(site: ContentScheme.ehentai);
+    expect(sites(onEh), <bool>[false, false, false]);
+    expect(onEh.keyword, 'some title');
+    // Text picked on an nhentai gallery is searched on nhentai.
+    expect(sites(await opened(site: ContentScheme.nhentai)), <bool>[true, false, false]);
+    // A search that names no site starts on the scheme's.
+    expect(sites(await opened()), <bool>[false, false, true]);
+
+    // Switched to E-Hentai, a search naming JM is still JM's.
+    schemeSetting.site.value = ContentScheme.ehentai;
+    expect(sites(await opened(site: ContentScheme.jm)), <bool>[false, false, true]);
+    expect(sites(await opened()), <bool>[false, false, false]);
   });
 }
 

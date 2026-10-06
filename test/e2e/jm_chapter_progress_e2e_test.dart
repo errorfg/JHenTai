@@ -14,6 +14,9 @@ import 'package:get/get.dart';
 import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/l18n/locale_text.dart';
 import 'package:jhentai/src/model/gallery_history_model.dart';
+import 'package:jhentai/src/model/content_scheme.dart';
+import 'package:jhentai/src/pages/search/mixin/new_search_argument.dart';
+import 'package:jhentai/src/setting/scheme_setting.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/model/jh_layout.dart';
 import 'package:jhentai/src/network/eh_request.dart';
@@ -48,6 +51,7 @@ void main() {
   }
 
   late JmAlbum album;
+  final List<NewSearchArgument> searchesOpened = <NewSearchArgument>[];
 
   setUpAll(() async {
     // flutter_test answers every HTTP request with 400 unless told not to.
@@ -106,7 +110,18 @@ void main() {
           translations: LocaleText(),
           locale: const Locale('zh', 'CN'),
           home: const Scaffold(),
-          getPages: [GetPage(name: Routes.details, page: DetailsPage.new)],
+          getPages: [
+            GetPage(name: Routes.details, page: DetailsPage.new),
+            // Stands in for the search page: what it is opened with is
+            // what the tests look at.
+            GetPage(
+              name: Routes.mobileV2Search,
+              page: () {
+                searchesOpened.add(Get.arguments as NewSearchArgument);
+                return const Scaffold(body: Text('search page'));
+              },
+            ),
+          ],
         ),
       );
       Get.toNamed(Routes.details, arguments: argument);
@@ -230,6 +245,30 @@ void main() {
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
     await tester.pump(const Duration(seconds: 5));
     await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('the EH action of a JM gallery searches its title on E-Hentai while the app is on JM', (WidgetTester tester) async {
+    schemeSetting.site.value = ContentScheme.jm;
+    addTearDown(() => schemeSetting.site.value = ContentScheme.ehentai);
+    searchesOpened.clear();
+
+    await openDetails(tester, DetailsPageArgument(galleryUrl: GalleryUrl.jm(album.id), jmExactChapter: true));
+    await tester.runAsync(() async {
+      await tester.tap(find.text('EH'));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    for (int i = 0; i < 5; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 60)));
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+
+    expect(find.text('search page'), findsOneWidget);
+    final NewSearchArgument opened = searchesOpened.single;
+    expect(opened.site, ContentScheme.ehentai);
+    expect(opened.rewriteSearchConfig, isNull);
+    expect(opened.keyword, isNotEmpty);
+    // The keyword is built from the album's title.
+    expect(opened.keyword, contains(album.name.substring(0, album.name.length.clamp(0, 4))));
   });
 
   testWidgets('a chapter picked from the list opens as is', (WidgetTester tester) async {
