@@ -1188,9 +1188,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
               ]);
             }
 
-            if (!state.galleryUrl.isWN && !state.galleryUrl.isJM) {
-              actions.add(_buildTelegraphButton(context));
-            }
+            actions.add(_buildTelegraphButton(context));
 
             return ListView(
               scrollDirection: Axis.horizontal,

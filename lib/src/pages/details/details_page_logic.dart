@@ -1523,10 +1523,9 @@ class DetailsPageLogic extends GetxController
   }
 
   /// 发送到 eh2telegraph 机器人：POST 同步接口，202 即成功，结果稍后由 Telegram 通知。
+  /// Every source the app reads from goes to eh2telegraph: E-Hentai and
+  /// nhentai by their links, wnacg and JM through its archive mode.
   Future<void> handleTapSendToTelegraph() async {
-    if (state.galleryUrl.isWN || state.galleryUrl.isJM) {
-      return;
-    }
     final String galleryUrl = state.galleryUrl.url;
     try {
       final String accepted = await Eh2TelegraphClient.fromSetting().sync(

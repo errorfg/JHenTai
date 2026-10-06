@@ -27,6 +27,7 @@ import 'package:jhentai/src/service/gallery_download_service.dart';
 import 'package:jhentai/src/service/jm_reading_service.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
+import 'package:jhentai/src/setting/eh2telegraph_setting.dart';
 import 'package:jhentai/src/setting/style_setting.dart';
 import 'package:jhentai/src/widget/loading_state_indicator.dart';
 
@@ -165,6 +166,53 @@ void main() {
     final DetailsPageLogic logic = await openDetails(tester, DetailsPageArgument(galleryUrl: GalleryUrl.jm(album.id)));
     expect(logic.state.galleryUrl.jmChapterId, album.chapters[3].id);
     expect(find.text('章节 4/${album.chapters.length}'), findsOneWidget);
+  });
+
+  testWidgets('a JM chapter is sent to eh2telegraph by its link', (WidgetTester tester) async {
+    // The user's eh2telegraph sync interface, here on this machine.
+    final List<({String? authorization, String body})> received = <({String? authorization, String body})>[];
+    // Bound and listened to on real time, where its requests arrive.
+    final HttpServer bot = (await tester.runAsync(() async {
+      final HttpServer server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((HttpRequest request) async {
+        final String body = await utf8.decoder.bind(request).join();
+        received.add((authorization: request.headers.value(HttpHeaders.authorizationHeader), body: body));
+        request.response
+          ..statusCode = HttpStatus.accepted
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode(<String, dynamic>{'accepted': true, 'url': (jsonDecode(body) as Map)['url']}));
+        await request.response.close();
+      });
+      return server;
+    }))!;
+    addTearDown(() => bot.close(force: true));
+    eh2telegraphSetting.endpoint.value = 'http://${bot.address.host}:${bot.port}';
+    eh2telegraphSetting.token.value = 'test-token-0123456789';
+    addTearDown(() {
+      eh2telegraphSetting.endpoint.value = '';
+      eh2telegraphSetting.token.value = '';
+    });
+
+    final JmChapterRef chapter = album.chapters[1];
+    await openDetails(
+      tester,
+      DetailsPageArgument(galleryUrl: GalleryUrl.jm(chapter.id), jmExactChapter: true),
+    );
+
+    await tester.runAsync(() async {
+      await tester.tap(find.byIcon(Icons.send_outlined));
+      final DateTime deadline = DateTime.now().add(const Duration(seconds: 20));
+      while (received.isEmpty && DateTime.now().isBefore(deadline)) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+    });
+    expect(received, hasLength(1));
+    expect(received.single.authorization, 'Bearer test-token-0123456789');
+    expect(jsonDecode(received.single.body), <String, dynamic>{'url': 'https://18comic.vip/photo/${chapter.id}'});
+    // The notice of the accepted link shows and goes away.
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 300)));
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pump(const Duration(seconds: 5));
   });
 
   testWidgets('a chapter picked from the list opens as is', (WidgetTester tester) async {
