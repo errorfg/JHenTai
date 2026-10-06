@@ -26,6 +26,7 @@ import 'package:jhentai/src/service/cloud/hot_data_sync_engine.dart';
 import 'package:jhentai/src/service/cloud/pending_sync_tracker.dart';
 import 'package:jhentai/src/service/history_service.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
+import 'package:jhentai/src/service/jm_history_merger.dart';
 import 'package:jhentai/src/service/jm_reading_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/log.dart';
@@ -222,27 +223,101 @@ void main() {
     await desktop.db.close();
   });
 
-  test('the history shows a multi-chapter album as one entry', () async {
+  test('the history lists a multi-chapter album once, where its newest entry is', () async {
     final _Device device = _Device()..activate();
-    // Entries made per chapter by earlier versions, and an unrelated gallery.
-    await historyService.record(_history(GalleryUrl.jm(101), 'Album - Chapter 2'));
-    await historyService.record(_history(GalleryUrl.jm(103), 'Album - Chapter 4'));
-    await historyService.record(_history(GalleryUrl.tryParse('https://e-hentai.org/g/123456/abcdef0123/')!, 'Other'));
     Future<List<String>> shown() async => (await HistoryPageLogic.visibleHistory(0, await historyService.getPageCount()))
         .rows
         .map((GalleryHistoryModel row) => row.title)
         .toList();
-    expect(await shown(), <String>['Other', 'Album - Chapter 4', 'Album - Chapter 2'], reason: 'the album is not known yet');
+    // Entries made per chapter by an earlier version, and an unrelated gallery.
+    await historyService.record(_history(GalleryUrl.jm(101), 'Album - Chapter 2'));
+    await historyService.record(_history(GalleryUrl.tryParse('https://e-hentai.org/g/123456/abcdef0123/')!, 'Other'));
+    await historyService.record(_history(GalleryUrl.jm(103), 'Album - Chapter 4'));
+    expect(await shown(), <String>['Album - Chapter 4', 'Other', 'Album - Chapter 2'], reason: 'the album is not known yet');
 
-    // Opening the album: its chapters become known and it gets its entry.
+    // The album's chapters become known: its newest entry stands for it.
     await jmReadingService.remember(albumId: 100, chapterIds: _chapters);
-    await historyService.record(_history(GalleryUrl.jm(100), 'Album'));
+    expect(await shown(), <String>['Album - Chapter 4', 'Other']);
+
+    // The album has its own entry, older than chapter 4's: it is listed
+    // where chapter 4's entry is.
+    await historyService.recordAt(_history(GalleryUrl.jm(100), 'Album'), '2020-01-01T00:00:00.000000Z');
     expect(await shown(), <String>['Album', 'Other']);
-    expect(await jmReadingService.chapterGidsOfKnownAlbums(), <int>{
-      for (final int id in _chapters.skip(1)) GalleryUrl.jm(id).gid,
-    });
-    // The old entries are kept, only not shown.
-    expect(await GalleryHistoryDao.selectTotalCount(), 4);
+
+    // A device still on an earlier version reads chapter 5: the album moves up.
+    await historyService.record(_history(GalleryUrl.tryParse('https://e-hentai.org/g/654321/abcdef0123/')!, 'Third'));
+    await historyService.record(_history(GalleryUrl.jm(104), 'Album - Chapter 5'));
+    expect(await shown(), <String>['Album', 'Third', 'Other']);
+
+    // Across pages an album is listed once; nothing was deleted.
+    final Set<int> listed = <int>{};
+    final List<GalleryHistoryModel> first = (await HistoryPageLogic.visibleHistory(0, 2, shownAlbums: listed)).rows;
+    expect(first.where((GalleryHistoryModel row) => row.galleryUrl.isJM), hasLength(1));
+    expect(listed, <int>{100});
+    expect(await GalleryHistoryDao.selectTotalCount(), 6);
+
+    await device.db.close();
+  });
+
+  test('entries made per chapter find their album by themselves, once', () async {
+    final _Device device = _Device()..activate();
+    JmAlbum album(int id, List<int> chapterIds) => JmAlbum(
+          id: id,
+          name: 'Album $id',
+          authors: const <String>[],
+          description: '',
+          tags: const <String>[],
+          works: const <String>[],
+          actors: const <String>[],
+          chapters: <JmChapterRef>[for (int i = 0; i < chapterIds.length; i++) JmChapterRef(id: chapterIds[i], name: '', sort: i + 1)],
+          totalPhotos: 100,
+          addTime: DateTime.utc(2026),
+          views: 0,
+          likes: 0,
+          commentCount: 0,
+          related: const <JmAlbumSummary>[],
+        );
+    final List<int> lookups = <int>[];
+    jmHistoryMerger = JmHistoryMerger()
+      ..albumOfChapter = (int chapterId) async {
+        lookups.add(chapterId);
+        if (chapterId == 700) {
+          throw const JmApiException('unreachable');
+        }
+        return _chapters.contains(chapterId) ? album(100, _chapters) : album(chapterId, <int>[chapterId]);
+      }
+      ..historyModelOfAlbum = (JmAlbum a) => _history(GalleryUrl.jm(a.id), a.name);
+
+    await historyService.record(_history(GalleryUrl.jm(101), 'Album - Chapter 2'));
+    await historyService.record(_history(GalleryUrl.jm(103), 'Album - Chapter 4'));
+    await historyService.record(_history(GalleryUrl.jm(700), 'Away - Chapter 1'));
+    await historyService.record(_history(GalleryUrl.jm(500), 'Solo - special'));
+    await historyService.record(_history(GalleryUrl.jm(600), 'Plain'));
+    await historyService.record(_history(GalleryUrl.tryParse('https://e-hentai.org/g/123456/abcdef0123/')!, 'Other - thing'));
+    Future<({List<GalleryHistoryModel> rows, List<GalleryHistoryModel> raw, int pageIndex})> page() async =>
+        HistoryPageLogic.visibleHistory(0, await historyService.getPageCount());
+    final String chapter4ReadAt = (await GalleryHistoryDao.selectByGid(GalleryUrl.jm(103).gid))!.lastReadTime;
+
+    expect(await jmHistoryMerger.resolve((await page()).raw), 1);
+    // Newest first; chapter 4's lookup covers chapter 2, "Plain" is no
+    // chapter's entry, and only JM entries are looked up.
+    expect(lookups, <int>[500, 700, 103]);
+    expect((await page()).rows.map((GalleryHistoryModel row) => row.title), <String>[
+      'Other - thing',
+      'Plain',
+      'Solo - special',
+      'Away - Chapter 1',
+      'Album 100',
+    ]);
+    expect(await jmReadingService.chaptersOf(100), _chapters);
+    // The album's entry is its own, read just after its newest chapter.
+    final GalleryHistoryV2Data entry = (await GalleryHistoryDao.selectByGid(GalleryUrl.jm(100).gid))!;
+    expect(jsonDecode(entry.jsonBody)['title'], 'Album 100');
+    expect(entry.lastReadTime.compareTo(chapter4ReadAt), greaterThan(0));
+
+    // Known now, or failed in this run: nothing is asked again.
+    expect(await jmHistoryMerger.resolve((await page()).raw), 0);
+    expect(lookups, hasLength(3));
 
     await device.db.close();
   });
