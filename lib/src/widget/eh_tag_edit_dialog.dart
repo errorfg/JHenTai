@@ -1,3 +1,4 @@
+import 'package:jhentai/src/model/content_scheme.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -118,7 +119,8 @@ class _EHTagEditDialogState extends State<EHTagEditDialog> {
                     tooltip: 'search'.tr,
                     onPressed: () {
                       backRoute();
-                      newSearch(keyword: '${tag.tagData.namespace}:${tag.tagData.key}');
+                      // An E-Hentai tag, from the E-Hentai tag sets.
+                      newSearch(keyword: '${tag.tagData.namespace}:${tag.tagData.key}', site: ContentScheme.ehentai);
                     },
                   ),
               ],
