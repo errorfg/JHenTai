@@ -1083,6 +1083,8 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'realtimeSrModel': '모델',
       'realtimeSrScale': '배율',
       'realtimeSrDenoise': '노이즈 제거 단계',
+      'realtimeSrBatchSize': '실행당 페이지 수',
+      'realtimeSrBatchSizeHint': '이 수의 배수만큼 미리 가져와 함께 업스케일합니다. 업스케일러를 시작하는 비용이 한 페이지 처리보다 훨씬 큽니다',
       'realtimeSrMaxWidth': '이 너비 이상의 페이지는 그대로 둠',
       'noLimit': '제한 없음',
       'srTools': '업스케일러 프로그램',

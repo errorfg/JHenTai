@@ -1133,6 +1133,8 @@ class ru_RU {
       'realtimeSrModel': 'Модель',
       'realtimeSrScale': 'Масштаб',
       'realtimeSrDenoise': 'Уровень шумоподавления',
+      'realtimeSrBatchSize': 'Страниц за запуск',
+      'realtimeSrBatchSizeHint': 'Страницы загружаются заранее кратно этому числу и увеличиваются вместе; запуск апскейлера стоит намного дороже одной страницы',
       'realtimeSrMaxWidth': 'Не обрабатывать страницы такой ширины и больше',
       'noLimit': 'Без ограничений',
       'srTools': 'Программы апскейла',

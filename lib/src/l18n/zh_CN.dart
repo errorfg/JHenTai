@@ -1177,6 +1177,8 @@ favnote：匹配收藏备注
       'realtimeSrModel': '模型',
       'realtimeSrScale': '放大倍数',
       'realtimeSrDenoise': '降噪等级',
+      'realtimeSrBatchSize': '每批页数',
+      'realtimeSrBatchSizeHint': '按此数的整数倍提前取页并一起超分；启动超分程序的开销远大于处理一页',
       'realtimeSrMaxWidth': '不处理宽度不小于此值的图片',
       'noLimit': '不限',
       'srTools': '超分程序',

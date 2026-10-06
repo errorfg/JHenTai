@@ -1130,6 +1130,8 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'realtimeSrModel': 'Modelo',
       'realtimeSrScale': 'Escala',
       'realtimeSrDenoise': 'Nível de redução de ruído',
+      'realtimeSrBatchSize': 'Páginas por execução',
+      'realtimeSrBatchSizeHint': 'As páginas são buscadas com antecedência em múltiplos deste número e ampliadas juntas; iniciar o ampliador custa muito mais que uma página',
       'realtimeSrMaxWidth': 'Não processar páginas com esta largura ou mais',
       'noLimit': 'Sem limite',
       'srTools': 'Programas de ampliação',

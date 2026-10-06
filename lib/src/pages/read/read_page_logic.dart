@@ -336,8 +336,10 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   /// Pages left below the last visible one when the next book is fetched.
   static const int _appendAhead = 3;
 
-  /// Pages whose upscaled copy has been asked for in this reader.
-  final Set<int> _srRequested = <int>{};
+  /// Pages whose upscaled copy is being made, and pages left as they are
+  /// (animated, wide enough, failed), which are not asked for again.
+  final Set<int> _srInFlight = <int>{};
+  final Set<int> _srSkipped = <int>{};
 
   /// Whether pages are upscaled as they are read: online reading on a
   /// desktop, switched on, with the upscaler of the chosen model installed.
@@ -355,59 +357,115 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     await superResolutionSetting.saveRealtimeEnabled(enable);
     log.info('toggle real-time super resolution: $enable');
     updateSafely([topMenuId]);
-    // Rebuilt pages ask for their upscaled copy, or go back to the original.
+    // Rebuilt pages show their upscaled copy, or go back to the original.
     layoutLogic.updateSafely([BaseLayoutLogic.pageId]);
+    requestRealtimeSrAhead();
   }
 
-  /// Asks for the upscaled copy of page [index], once, when its original
-  /// has loaded; the page switches to it when it is ready and decoded.
-  void requestRealtimeSr(int index) {
-    if (!realtimeSrOn || state.srImages[index] != null || !_srRequested.add(index)) {
-      return;
-    }
-    final GalleryImage? image = state.images[index];
+  /// Where page [index] comes from, for the upscaler: a key naming it, the
+  /// strips of a JM page, and its encoded bytes. Null until the page's
+  /// address is known.
+  ({String key, int strips, Future<Uint8List?> Function() load})? _srSource(int index) {
+    final GalleryImage? image = index < state.images.length ? state.images[index] : null;
     if (image == null) {
-      _srRequested.remove(index);
-      return;
+      return null;
     }
-
-    final String sourceKey;
-    final int strips;
-    final Future<Uint8List?> Function() loadEncoded;
     if (image.path != null) {
       // A page already on disk (a downloaded JM page): restored when saved.
       final String path = GalleryDownloadService.computeImageDownloadAbsolutePathFromRelativePath(image.path!);
-      sourceKey = path;
-      strips = 0;
-      loadEncoded = () => io.File(path).readAsBytes();
-    } else {
-      final String requestUrl = JmImage.requestUrl(image.url);
-      sourceKey = requestUrl;
-      strips = JmImage.stripsOf(image.url);
-      // Shown already, so this reads the image cache.
-      loadEncoded = () => getNetworkImageData(requestUrl);
+      return (key: path, strips: 0, load: () => io.File(path).readAsBytes());
+    }
+    final String requestUrl = JmImage.requestUrl(image.url);
+    // From the image cache when the page was shown, else downloaded into it.
+    return (key: requestUrl, strips: JmImage.stripsOf(image.url), load: () => getNetworkImageData(requestUrl));
+  }
+
+  /// The upscaled copy of page [index] (encoded), when it is ready.
+  Uint8List? upscaledPage(int index) {
+    final ({String key, int strips, Future<Uint8List?> Function() load})? source = _srSource(index);
+    return source == null ? null : realtimeSrService.cached(source.key);
+  }
+
+  /// Asks for the upscaled copy of page [index] unless it is there, being
+  /// made, or the page is left as it is; the page is rebuilt with it once
+  /// it is ready and decoded.
+  void requestRealtimeSr(int index) {
+    if (!realtimeSrOn || _srSkipped.contains(index) || _srInFlight.contains(index)) {
+      return;
+    }
+    final ({String key, int strips, Future<Uint8List?> Function() load})? source = _srSource(index);
+    if (source == null || realtimeSrService.cached(source.key) != null) {
+      return;
     }
 
+    _srInFlight.add(index);
     unawaited(
-      realtimeSrService.upscale(sourceKey: sourceKey, position: index, strips: strips, loadEncoded: loadEncoded).then((String? path) async {
-        if (path == null) {
-          return;
-        }
-        // Decoded before the page switches to it, so the switch does not
-        // show a loading page in between.
-        final BuildContext? context = Get.context;
-        if (context != null && context.mounted) {
-          await precacheImage(ExtendedFileImageProvider(io.File(path)), context);
-        }
-        if (isClosed || index >= state.srImages.length) {
-          return;
-        }
-        state.srImages[index] = path;
-        updateSafely(['$onlineImageId::$index']);
-      }, onError: (Object e, StackTrace s) {
-        log.error('Upscale page $index failed', e, s);
-      }),
+      realtimeSrService.upscale(sourceKey: source.key, position: index, strips: source.strips, loadEncoded: source.load).then(
+        (Uint8List? bytes) async {
+          _srInFlight.remove(index);
+          if (isClosed) {
+            return;
+          }
+          if (bytes == null) {
+            _srSkipped.add(index);
+            return;
+          }
+          // Decoded before the page switches to it, so the switch does not
+          // show a loading page in between.
+          final BuildContext? context = Get.context;
+          if (context != null && context.mounted) {
+            await precacheImage(ExtendedMemoryImageProvider(bytes), context);
+          }
+          if (!isClosed) {
+            updateSafely(['$onlineImageId::$index']);
+          }
+        },
+        onError: (Object e, StackTrace s) {
+          _srInFlight.remove(index);
+          log.error('Upscale page $index failed', e, s);
+        },
+      ),
     );
+  }
+
+  /// End of the pages to have upscaled ahead of the reader's page: at least
+  /// a batch (or the preload setting, when larger) ahead, rounded up to a
+  /// whole number of batches, so that pages come due a batch at a time
+  /// rather than one with each page turned.
+  int get _srAheadEnd {
+    final int batch = realtimeSrService.batchSize;
+    final int ahead = max(readSetting.preloadPageCount.value, batch);
+    final int end = ((state.readPageInfo.currentImageIndex + 1 + ahead) / batch).ceil() * batch;
+    return min(end, state.readPageInfo.pageCount);
+  }
+
+  /// Fetches and upscales the pages up to [_srAheadEnd] that are not there
+  /// yet, whether or not the layout has built them.
+  void requestRealtimeSrAhead() {
+    if (!realtimeSrOn) {
+      return;
+    }
+    for (int index = state.readPageInfo.currentImageIndex; index < _srAheadEnd; index++) {
+      _ensureRealtimeSr(index);
+    }
+  }
+
+  /// Page [index] on its way to being upscaled: its address is looked up
+  /// first when it is not known (the lookups call back here), then its
+  /// upscaled copy asked for.
+  void _ensureRealtimeSr(int index) {
+    if (!realtimeSrOn || index < state.readPageInfo.currentImageIndex || index >= _srAheadEnd) {
+      return;
+    }
+    if (state.images[index] != null) {
+      requestRealtimeSr(index);
+    } else if (state.thumbnails[index] == null) {
+      if (state.parseImageHrefsStates[index] == LoadingState.idle) {
+        beginToParseImageHref(index);
+      }
+    } else if (state.parseImageUrlStates[index] == LoadingState.idle) {
+      beginToParseImageUrl(index, false);
+    }
   }
 
   ReadProgressFlushCoordinator _flushCoordinatorOf(ReadSegment segment) {
@@ -596,9 +654,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     unawaited(_notifyShown(state.segments.first));
 
     realtimeSrService.focus = () => state.readPageInfo.currentImageIndex;
-    if (realtimeSrOn) {
-      unawaited(realtimeSrService.pruneCache());
-    }
+    requestRealtimeSrAhead();
 
     inited = true;
     if (!delayInitCompleter.isCompleted) {
@@ -754,6 +810,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     }
 
     updateSafely(['$onlineImageId::$index']);
+    _ensureRealtimeSr(index);
   }
 
   void beginToParseImageUrl(int index, bool reParse, {String? reloadKey}) {
@@ -802,6 +859,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     state.images[index] = image;
     state.parseImageUrlStates[index] = LoadingState.success;
     updateSafely(['$onlineImageId::$index']);
+    _ensureRealtimeSr(index);
   }
 
   Future<GalleryImage> requestImage(
@@ -1371,6 +1429,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     final bool endChanged = _reachedEnd != atEnd;
     _reachedEnd = atEnd;
     update([sliderId, pageNoId, thumbnailNoId, if (endChanged || bookChanged) endOfBookId, if (bookChanged) topMenuId]);
+    requestRealtimeSrAhead();
   }
 
   /// For the scrolling layouts: records [visible] (in index order) and

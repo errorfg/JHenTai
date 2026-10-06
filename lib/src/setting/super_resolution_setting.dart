@@ -22,6 +22,11 @@ class SuperResolutionSetting with JHLifeCircleBeanWithConfigStorage implements J
   RxInt realtimeDenoise = 0.obs;
   RxInt realtimeMaxWidth = 1600.obs;
 
+  /// Pages given to the upscaler program in one run. Starting the program
+  /// costs far more than a page, so pages are fetched ahead and upscaled a
+  /// batch at a time.
+  RxInt realtimeBatchSize = 4.obs;
+
   @override
   ConfigEnum get configEnum => ConfigEnum.superResolutionSetting;
 
@@ -37,6 +42,7 @@ class SuperResolutionSetting with JHLifeCircleBeanWithConfigStorage implements J
     realtimeScale.value = map['realtimeScale'] ?? realtimeScale.value;
     realtimeDenoise.value = map['realtimeDenoise'] ?? realtimeDenoise.value;
     realtimeMaxWidth.value = map['realtimeMaxWidth'] ?? realtimeMaxWidth.value;
+    realtimeBatchSize.value = map['realtimeBatchSize'] ?? realtimeBatchSize.value;
   }
 
   @override
@@ -50,6 +56,7 @@ class SuperResolutionSetting with JHLifeCircleBeanWithConfigStorage implements J
       'realtimeScale': realtimeScale.value,
       'realtimeDenoise': realtimeDenoise.value,
       'realtimeMaxWidth': realtimeMaxWidth.value,
+      'realtimeBatchSize': realtimeBatchSize.value,
     });
   }
 
@@ -90,6 +97,12 @@ class SuperResolutionSetting with JHLifeCircleBeanWithConfigStorage implements J
     realtimeModel.value = model;
     realtimeScale.value = scale;
     realtimeDenoise.value = denoise;
+    await saveBeanConfig();
+  }
+
+  Future<void> saveRealtimeBatchSize(int size) async {
+    log.debug('saveRealtimeBatchSize:$size');
+    realtimeBatchSize.value = size;
     await saveBeanConfig();
   }
 

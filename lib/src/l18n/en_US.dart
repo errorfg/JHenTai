@@ -1241,6 +1241,8 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'realtimeSrModel': 'Model',
       'realtimeSrScale': 'Scale',
       'realtimeSrDenoise': 'Denoise level',
+      'realtimeSrBatchSize': 'Pages per run',
+      'realtimeSrBatchSizeHint': 'Pages are fetched ahead in multiples of this and upscaled together; starting the upscaler costs far more than a page',
       'realtimeSrMaxWidth': 'Leave pages at least this wide as they are',
       'noLimit': 'No limit',
       'srTools': 'Upscaler programs',

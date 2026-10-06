@@ -49,6 +49,7 @@ class SettingSuperResolutionPage extends StatelessWidget {
             _buildRealtimeModel(),
             _buildRealtimeScale(),
             if (realtimeSrService.config.model.denoiseLevels.isNotEmpty) _buildRealtimeDenoise(),
+            _buildRealtimeBatchSize(),
             _buildRealtimeMaxWidth(),
             for (final SrEngine engine in SrEngine.values) _SrToolTile(engine: engine),
             _buildBenchmark(),
@@ -198,6 +199,22 @@ class SettingSuperResolutionPage extends StatelessWidget {
         items: [
           for (final int level in config.model.denoiseLevels) DropdownMenuItem(value: level, child: Text('$level')),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRealtimeBatchSize() {
+    const List<int> sizes = <int>[1, 2, 4, 8, 16];
+    final int current = superResolutionSetting.realtimeBatchSize.value;
+    return ListTile(
+      title: Text('realtimeSrBatchSize'.tr),
+      subtitle: Text('realtimeSrBatchSizeHint'.tr),
+      trailing: DropdownButton<int>(
+        value: sizes.contains(current) ? current : 4,
+        elevation: 4,
+        alignment: AlignmentDirectional.centerEnd,
+        onChanged: (int? size) => superResolutionSetting.saveRealtimeBatchSize(size!),
+        items: [for (final int size in sizes) DropdownMenuItem(value: size, child: Text('$size'))],
       ),
     );
   }

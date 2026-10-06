@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:collection';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/service/log.dart';
@@ -17,27 +16,41 @@ import 'package:path/path.dart' as p;
 RealtimeSrService realtimeSrService = RealtimeSrService();
 
 class _Task {
-  _Task({required this.output, required this.position, required this.strips, required this.loadEncoded});
+  _Task({
+    required this.key,
+    required this.config,
+    required this.position,
+    required this.strips,
+    required this.loadEncoded,
+  });
 
-  final String output;
+  final String key;
+  final SrConfig config;
   final int position;
   final int strips;
   final Future<Uint8List?> Function() loadEncoded;
-  final Completer<String?> done = Completer<String?>();
+  final Completer<Uint8List?> done = Completer<Uint8List?>();
 }
 
-/// Upscales pages as they are read (desktop): each page goes through one of
-/// the upscaler programs once, the result is kept on disk and shown in place
-/// of the original. Pages wait in a queue, the ones just ahead of where the
-/// reader is first; one runs at a time, as they share the GPU.
+/// Upscales pages as they are read (desktop): pages go through one of the
+/// upscaler programs a batch at a time, the ones just ahead of where the
+/// reader is first, and the results are shown in place of the originals.
+///
+/// Starting the program costs far more than a page (about 0.85 s against
+/// 0.03 s on an RTX 5090), so a run takes a batch of the waiting pages.
+///
+/// Nothing is kept on disk. The programs only read and write files, so a
+/// batch passes through a temporary folder that is deleted as soon as its
+/// results are read; the upscaled pages stay in memory, up to
+/// [memoryLimitBytes], the least recently used going first.
 class RealtimeSrService {
-  /// Upscaled pages kept on disk; the oldest go first.
-  static const int cacheLimitBytes = 2 * 1024 * 1024 * 1024;
+  /// Upscaled pages (encoded) kept in memory.
+  static const int memoryLimitBytes = 512 * 1024 * 1024;
 
   /// Set by tests; the app keeps the programs with its own data and the
-  /// upscaled pages with its temporary files.
+  /// folders of running batches with its temporary files.
   String? toolsRootOverride;
-  String? cacheDirOverride;
+  String? workDirOverride;
 
   /// Where the upscaler programs are: a `sr_tools` folder shipped next to
   /// the app's executable when there is one, so that nothing has to be
@@ -63,7 +76,8 @@ class RealtimeSrService {
     return Directory(dir).existsSync() ? dir : null;
   }
 
-  String get cacheDir => cacheDirOverride ?? p.join(pathService.tempDir.path, 'sr_cache');
+  /// Parent of the folders batches pass through.
+  String get workDir => workDirOverride ?? p.join(pathService.tempDir.path, 'sr_work');
 
   /// The model, scale and denoise level chosen in the settings; a scale or
   /// level the model lacks falls back to its first.
@@ -78,6 +92,9 @@ class RealtimeSrService {
     );
   }
 
+  /// Pages a run of the program takes at most.
+  int get batchSize => superResolutionSetting.realtimeBatchSize.value.clamp(1, 64);
+
   /// Whether the program of the chosen model is there to run.
   bool get available => GetPlatform.isDesktop && config.model.engine.isInstalled(toolsRoot);
 
@@ -87,55 +104,74 @@ class RealtimeSrService {
   int Function()? focus;
 
   final List<_Task> _pending = <_Task>[];
-  final Map<String, Future<String?>> _requests = <String, Future<String?>>{};
+  final Map<String, Future<Uint8List?>> _requests = <String, Future<Uint8List?>>{};
   bool _running = false;
+  bool _cleaned = false;
 
-  /// Runs of an upscaler program so far; tests tell cached pages by it.
+  /// Upscaled pages by key, least recently used first.
+  final LinkedHashMap<String, Uint8List> _memory = LinkedHashMap<String, Uint8List>();
+  int _memoryBytes = 0;
+
+  /// Runs of an upscaler program so far, and the pages of each; tests tell
+  /// batches and pages served from memory by them.
   int runs = 0;
+  final List<int> batchSizes = <int>[];
 
-  String outputPathOf(String sourceKey) {
-    final String name = md5.convert(utf8.encode('${config.label}|$sourceKey')).toString();
-    return p.join(cacheDir, '$name.jpg');
+  String _keyOf(String sourceKey) => '${config.label}|$sourceKey';
+
+  /// The upscaled copy of the page [sourceKey] (encoded), when it is in
+  /// memory.
+  Uint8List? cached(String sourceKey) {
+    final String key = _keyOf(sourceKey);
+    final Uint8List? bytes = _memory.remove(key);
+    if (bytes != null) {
+      _memory[key] = bytes;
+    }
+    return bytes;
   }
 
-  /// The upscaled copy of the page [sourceKey], when it is on disk already.
-  String? cached(String sourceKey) {
-    final String output = outputPathOf(sourceKey);
-    return File(output).existsSync() ? output : null;
+  void _remember(String key, Uint8List bytes) {
+    _memoryBytes -= _memory.remove(key)?.length ?? 0;
+    _memory[key] = bytes;
+    _memoryBytes += bytes.length;
+    while (_memoryBytes > memoryLimitBytes && _memory.length > 1) {
+      _memoryBytes -= _memory.remove(_memory.keys.first)!.length;
+    }
   }
 
   /// Upscales the page [sourceKey] (its url or file path), whose encoded
-  /// bytes [loadEncoded] gives. Completes with the path of the upscaled
-  /// image; with null when the page is left as it is (animated, wide
-  /// enough already), cannot be read, the program fails, or the queue was
-  /// cleared first. [position] is the page's place in the reader.
-  Future<String?> upscale({
+  /// bytes [loadEncoded] gives. Completes with the upscaled image, encoded;
+  /// with null when the page is left as it is (animated, wide enough
+  /// already), cannot be read, the program fails, or the queue was cleared
+  /// first. [position] is the page's place in the reader.
+  Future<Uint8List?> upscale({
     required String sourceKey,
     required int position,
     required Future<Uint8List?> Function() loadEncoded,
     int strips = 0,
   }) {
-    final String output = outputPathOf(sourceKey);
-    if (File(output).existsSync()) {
-      return Future<String?>.value(output);
+    final Uint8List? hit = cached(sourceKey);
+    if (hit != null) {
+      return Future<Uint8List?>.value(hit);
     }
-    final Future<String?>? known = _requests[output];
+    final String key = _keyOf(sourceKey);
+    final Future<Uint8List?>? known = _requests[key];
     if (known != null) {
       return known;
     }
-    final _Task task = _Task(output: output, position: position, strips: strips, loadEncoded: loadEncoded);
+    final _Task task = _Task(key: key, config: config, position: position, strips: strips, loadEncoded: loadEncoded);
     _pending.add(task);
     // A block body: returning the removed future (this very request) from
     // whenComplete would make it wait for itself.
-    final Future<String?> request = task.done.future.whenComplete(() {
-      _requests.remove(output);
+    final Future<Uint8List?> request = task.done.future.whenComplete(() {
+      _requests.remove(key);
     });
-    _requests[output] = request;
+    _requests[key] = request;
     unawaited(_pump());
     return request;
   }
 
-  /// Drops the pages still waiting; the one in the program finishes.
+  /// Drops the pages still waiting; the batch in the program finishes.
   void clearPending() {
     for (final _Task task in _pending) {
       task.done.complete(null);
@@ -143,18 +179,16 @@ class RealtimeSrService {
     _pending.clear();
   }
 
-  /// The waiting page nearest ahead of the reader, pages behind it last.
-  _Task _next() {
+  /// The next batch: the waiting pages nearest ahead of the reader, pages
+  /// behind it last, up to [batchSize], of one model configuration.
+  List<_Task> _takeBatch() {
     final int at = focus?.call() ?? 0;
     int cost(_Task task) => task.position >= at ? task.position - at : (at - task.position) * 2 + 1000;
-    _Task best = _pending.first;
-    for (final _Task task in _pending.skip(1)) {
-      if (cost(task) < cost(best)) {
-        best = task;
-      }
-    }
-    _pending.remove(best);
-    return best;
+    final List<_Task> ordered = List<_Task>.of(_pending)..sort((_Task a, _Task b) => cost(a).compareTo(cost(b)));
+    final SrConfig first = ordered.first.config;
+    final List<_Task> batch = ordered.where((_Task t) => t.config.label == first.label).take(batchSize).toList();
+    _pending.removeWhere(batch.contains);
+    return batch;
   }
 
   Future<void> _pump() async {
@@ -163,83 +197,115 @@ class RealtimeSrService {
     }
     _running = true;
     try {
+      // Pages asked for in the same turn (a screenful, a batch ahead) are
+      // all waiting before the first batch is taken.
+      await Future<void>.delayed(Duration.zero);
+      await _cleanDiskOnce();
       while (_pending.isNotEmpty) {
-        final _Task task = _next();
-        String? result;
+        final List<_Task> batch = _takeBatch();
+        Map<_Task, Uint8List> results = const <_Task, Uint8List>{};
         try {
-          result = await _run(task);
+          results = await _runBatch(batch);
         } catch (e, s) {
-          log.error('Upscale page failed', e, s);
+          log.error('Upscale batch failed', e, s);
         }
-        task.done.complete(result);
+        for (final _Task task in batch) {
+          final Uint8List? bytes = results[task];
+          if (bytes != null) {
+            _remember(task.key, bytes);
+          }
+          task.done.complete(bytes);
+        }
       }
     } finally {
       _running = false;
     }
   }
 
-  Future<String?> _run(_Task task) async {
-    final Uint8List? encoded = await task.loadEncoded();
-    if (encoded == null) {
-      return null;
-    }
-    final SrInput? input = await prepareSrInput(
-      encoded,
-      strips: task.strips,
-      maxWidth: superResolutionSetting.realtimeMaxWidth.value,
+  /// One run of the program on the pages of [batch]. Each page is written
+  /// as `<its place in the batch>.png`, and the program writes its result
+  /// under the same name, so results cannot be mixed up; pages left as they
+  /// are take no part and get no result.
+  Future<Map<_Task, Uint8List>> _runBatch(List<_Task> batch) async {
+    final int maxWidth = superResolutionSetting.realtimeMaxWidth.value;
+    final List<SrInput?> inputs = await Future.wait(
+      batch.map((_Task task) async {
+        final Uint8List? encoded = await task.loadEncoded();
+        return encoded == null ? null : prepareSrInput(encoded, strips: task.strips, maxWidth: maxWidth);
+      }),
     );
-    if (input == null) {
-      return null;
+    if (inputs.every((SrInput? input) => input == null)) {
+      return const <_Task, Uint8List>{};
     }
 
-    await Directory(cacheDir).create(recursive: true);
-    final String inputPath = '${p.withoutExtension(task.output)}.in.png';
-    // Written under another name first: a file at the output path is a
-    // finished page.
-    final String partial = '${p.withoutExtension(task.output)}.part.jpg';
-    await File(inputPath).writeAsBytes(input.png);
+    await Directory(workDir).create(recursive: true);
+    final Directory run = await Directory(workDir).createTemp('run-');
     try {
+      final Directory inDir = await Directory(p.join(run.path, 'in')).create();
+      final Directory outDir = await Directory(p.join(run.path, 'out')).create();
+      String name(int i) => i.toString().padLeft(4, '0');
+      for (int i = 0; i < batch.length; i++) {
+        if (inputs[i] != null) {
+          await File(p.join(inDir.path, '${name(i)}.png')).writeAsBytes(inputs[i]!.png);
+        }
+      }
+
       runs++;
+      batchSizes.add(inputs.whereType<SrInput>().length);
+      final SrConfig config = batch.first.config;
       final SrRunResult result = await SrRunner(toolsRoot).run(
         config: config,
-        input: inputPath,
-        output: partial,
+        input: inDir.path,
+        output: outDir.path,
         gpuId: superResolutionSetting.gpuId.value,
       );
-      if (!result.ok || !File(partial).existsSync()) {
+      if (!result.ok) {
         log.error('Upscaler exited with ${result.exitCode}', result.stderr);
-        return null;
+        return const <_Task, Uint8List>{};
       }
-      await File(partial).rename(task.output);
-      log.trace('Upscaled ${input.width}x${input.height} with ${config.label} in ${result.elapsed.inMilliseconds} ms');
-      return task.output;
-    } finally {
-      for (final String leftover in <String>[inputPath, partial]) {
-        final File file = File(leftover);
-        if (file.existsSync()) {
-          await file.delete();
+
+      final Map<_Task, Uint8List> results = <_Task, Uint8List>{};
+      for (int i = 0; i < batch.length; i++) {
+        if (inputs[i] == null) {
+          continue;
         }
+        final File output = File(p.join(outDir.path, '${name(i)}.jpg'));
+        if (output.existsSync()) {
+          results[batch[i]] = await output.readAsBytes();
+        } else {
+          log.error('Upscaler wrote no result for page ${batch[i].position}', result.stderr);
+        }
+      }
+      log.trace('Upscaled ${results.length} page(s) with ${config.label} in ${result.elapsed.inMilliseconds} ms');
+      return results;
+    } finally {
+      try {
+        await run.delete(recursive: true);
+      } on FileSystemException catch (e) {
+        log.warning('Delete upscaler work folder failed', e);
       }
     }
   }
 
-  /// Deletes the oldest upscaled pages beyond [cacheLimitBytes].
-  Future<void> pruneCache({int limitBytes = cacheLimitBytes}) async {
-    final Directory dir = Directory(cacheDir);
-    if (!dir.existsSync()) {
+  /// Removes what earlier runs left on disk: work folders of batches cut
+  /// short, and the page cache the first experimental build kept.
+  Future<void> _cleanDiskOnce() async {
+    if (_cleaned) {
       return;
     }
-    final List<File> files = dir.listSync().whereType<File>().toList()
-      ..sort((File a, File b) => b.statSync().modified.compareTo(a.statSync().modified));
-    int total = 0;
-    for (final File file in files) {
-      total += file.statSync().size;
-      if (total > limitBytes) {
-        try {
-          file.deleteSync();
-        } on FileSystemException catch (e) {
-          log.warning('Delete upscaled page failed', e);
+    _cleaned = true;
+    final List<String> leftovers = <String>[
+      workDir,
+      if (workDirOverride == null) p.join(pathService.tempDir.path, 'sr_cache'),
+    ];
+    for (final String path in leftovers) {
+      try {
+        final Directory dir = Directory(path);
+        if (dir.existsSync()) {
+          await dir.delete(recursive: true);
         }
+      } on FileSystemException catch (e) {
+        log.warning('Delete $path failed', e);
       }
     }
   }

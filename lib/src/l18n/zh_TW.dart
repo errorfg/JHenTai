@@ -1055,6 +1055,8 @@ favnote：配對收藏備註
       'realtimeSrModel': '模型',
       'realtimeSrScale': '放大倍數',
       'realtimeSrDenoise': '降噪等級',
+      'realtimeSrBatchSize': '每批頁數',
+      'realtimeSrBatchSizeHint': '按此數的整數倍提前取頁並一起超分；啟動超分程式的開銷遠大於處理一頁',
       'realtimeSrMaxWidth': '不處理寬度不小於此值的圖片',
       'noLimit': '不限',
       'srTools': '超分程式',

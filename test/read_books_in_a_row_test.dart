@@ -197,7 +197,7 @@ void main() {
     addTearDown(() => cache.deleteSync(recursive: true));
     realtimeSrService = RealtimeSrService()
       ..toolsRootOverride = toolsRoot
-      ..cacheDirOverride = cache.path;
+      ..workDirOverride = cache.path;
     tester.view.physicalSize = const Size(600, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -227,17 +227,26 @@ void main() {
     // The first page shown: 300 x 400 as stored, then its upscaled copy.
     ui.Image shown() => tester.widget<ExtendedRawImage>(find.byType(ExtendedRawImage).first).image!;
     final DateTime deadline = DateTime.now().add(const Duration(seconds: 60));
-    while (reader.state.srImages[0] == null && DateTime.now().isBefore(deadline)) {
+    while (reader.upscaledPage(0) == null && DateTime.now().isBefore(deadline)) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
       await tester.pump(const Duration(milliseconds: 100));
     }
-    expect(reader.state.srImages[0], isNotNull, reason: 'the first page was not upscaled');
+    expect(reader.upscaledPage(0), isNotNull, reason: 'the first page was not upscaled');
     for (int i = 0; i < 5; i++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 60)));
       await tester.pump(const Duration(milliseconds: 100));
     }
     expect((shown().width, shown().height), (600, 800));
-    expect(realtimeSrService.runs, greaterThanOrEqualTo(1));
+    // The five pages of the chapter were fetched ahead and upscaled four to a
+    // run; the results are in memory, and no file is left.
+    final DateTime allDone = DateTime.now().add(const Duration(seconds: 30));
+    while (reader.upscaledPage(4) == null && DateTime.now().isBefore(allDone)) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(realtimeSrService.batchSizes, <int>[4, 1]);
+    expect(<int>[for (int i = 0; i < 5; i++) if (reader.upscaledPage(i) != null) i], <int>[0, 1, 2, 3, 4]);
+    expect(cache.listSync(recursive: true), isEmpty);
 
     // Off: the original again, once it is decoded anew.
     await tester.runAsync(reader.toggleRealtimeSr);
