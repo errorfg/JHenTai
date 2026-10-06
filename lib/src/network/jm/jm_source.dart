@@ -95,15 +95,27 @@ typedef JmHomeSection = ({String title, List<Gallery> gallerys, JmListQuery? mor
 /// Serves the app's gallery requests (list, detail, image page) from the
 /// JM API, in the shapes the E-Hentai parsers would produce.
 class JmSource {
-  JmSource({required this.api, required this.imageDomain});
+  JmSource({required this.api, required this.imageDomain, this.onAlbum, this.fillTags});
 
   static const int thumbnailsPerPage = 40;
+
+  /// Albums whose details are kept; list cards load the details of every
+  /// album scrolled past, for its tags.
+  static const int albumsKept = 300;
 
   final JmApi api;
   final String Function() imageDomain;
 
+  /// Called with every album whose details JM answered with.
+  final void Function(JmAlbum album)? onAlbum;
+
+  /// Gives the albums of a list page the tags known for them; lists carry
+  /// none.
+  final Future<void> Function(List<Gallery> gallerys)? fillTags;
+
   /// Requests in flight or done, so concurrent callers (the downloader
-  /// parses many pages of a chapter at once) share one request.
+  /// parses many pages of a chapter at once) share one request. The
+  /// [albumsKept] used last.
   final Map<int, Future<JmAlbum>> _albums = <int, Future<JmAlbum>>{};
   final Map<int, Future<JmChapter>> _chapters = <int, Future<JmChapter>>{};
   /// Album of each chapter seen, and ids known to be albums (from lists):
@@ -174,8 +186,8 @@ class JmSource {
     return _pageOf(result, page);
   }
 
-  GalleryPageInfo _pageOf(JmSearchResult result, int page) {
-    final List<Gallery> gallerys = result.albums.map(_galleryOfSummary).toList();
+  Future<GalleryPageInfo> _pageOf(JmSearchResult result, int page) async {
+    final List<Gallery> gallerys = await _gallerysOf(result.albums);
     final int pages = (result.total / JmApi.searchPageSize).ceil();
     final bool hasNext = result.total > 0
         ? page < pages
@@ -200,7 +212,7 @@ class JmSource {
         final bool hasNext =
             result.albums.isNotEmpty && page * pageSize + result.albums.length < result.total;
         return GalleryPageInfo(
-          gallerys: result.albums.map(_galleryOfSummary).toList(),
+          gallerys: await _gallerysOf(result.albums),
           prevGid: page > 0 ? '${page - 1}' : null,
           nextGid: hasNext ? '${page + 1}' : null,
         );
@@ -212,8 +224,15 @@ class JmSource {
         );
       case JmWeekQuery(:final String issueId, :final String type):
         final JmListPage result = await api.weekFilter(issueId, type);
-        return GalleryPageInfo(gallerys: result.albums.map(_galleryOfSummary).toList());
+        return GalleryPageInfo(gallerys: await _gallerysOf(result.albums));
     }
+  }
+
+  /// The albums of a list page as galleries, with the tags known for them.
+  Future<List<Gallery>> _gallerysOf(List<JmAlbumSummary> albums) async {
+    final List<Gallery> gallerys = albums.map(_galleryOfSummary).toList();
+    await fillTags?.call(gallerys);
+    return gallerys;
   }
 
   /// The home sections that list comics; book and novel sections are left
@@ -406,8 +425,25 @@ class JmSource {
     return 'N/A';
   }
 
-  Future<JmAlbum> _album(int id) =>
-      sharedRequest(_albums, id, () => api.album(id));
+  /// The details of the album [id], requested once however many ask.
+  Future<JmAlbum> album(int id) => _album(id);
+
+  Future<JmAlbum> _album(int id) {
+    final Future<JmAlbum>? known = _albums.remove(id);
+    if (known != null) {
+      // Back at the end: used last.
+      _albums[id] = known;
+      return known;
+    }
+    final Future<JmAlbum> request = sharedRequest(_albums, id, () => api.album(id));
+    if (onAlbum != null) {
+      request.then<void>(onAlbum!, onError: (Object _) {});
+    }
+    if (_albums.length > albumsKept) {
+      _albums.remove(_albums.keys.first);
+    }
+    return request;
+  }
 
   /// The album [chapterId] is a chapter of (the album itself when it is an
   /// album's id): the chapter is requested to learn its album, then the
@@ -475,9 +511,10 @@ class JmSource {
       uploader: summary.author.isEmpty ? null : summary.author,
       publishTime: summary.updateAt == null ? '' : _format(summary.updateAt!),
       isExpunged: false,
+      // All a list tells; the rest comes from the album's details.
       tags: summary.author.isEmpty
           ? LinkedHashMap<String, List<GalleryTag>>()
-          : _tagMap(<String, List<String>>{
+          : tagMap(<String, List<String>>{
               'artist': <String>[summary.author],
             }),
     );
@@ -690,15 +727,17 @@ class JmSource {
     }
   }
 
-  LinkedHashMap<String, List<GalleryTag>> _albumTags(JmAlbum album) =>
-      _tagMap(<String, List<String>>{
+  LinkedHashMap<String, List<GalleryTag>> _albumTags(JmAlbum album) => tagMap(tagsByNamespace(album));
+
+  /// [album]'s tags under the E-Hentai namespaces they are shown in.
+  static Map<String, List<String>> tagsByNamespace(JmAlbum album) => <String, List<String>>{
         'artist': album.authors,
         'parody': album.works,
         'character': album.actors,
         'tag': album.tags,
-      });
+      };
 
-  static LinkedHashMap<String, List<GalleryTag>> _tagMap(
+  static LinkedHashMap<String, List<GalleryTag>> tagMap(
     Map<String, List<String>> byNamespace,
   ) {
     final LinkedHashMap<String, List<GalleryTag>> tags =

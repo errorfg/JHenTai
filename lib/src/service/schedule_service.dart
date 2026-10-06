@@ -21,6 +21,7 @@ import 'package:jhentai/src/setting/user_setting.dart';
 import 'package:jhentai/src/utils/convert_util.dart';
 import 'package:jhentai/src/utils/eh_spider_parser.dart';
 import 'package:jhentai/src/utils/snack_util.dart';
+import 'package:jhentai/src/utils/sync_time_util.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -36,6 +37,7 @@ import '../setting/advanced_setting.dart';
 import '../utils/version_util.dart';
 import '../widget/update_dialog.dart';
 import 'jh_service.dart';
+import 'jm_album_tag_service.dart';
 import 'local_config_service.dart';
 import 'log.dart';
 
@@ -52,6 +54,7 @@ class ScheduleService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBea
     Timer(const Duration(seconds: 10), refreshArchiveTags);
     Timer(const Duration(seconds: 5), clearOutdatedImageCache);
     Timer(const Duration(seconds: 1), _clearOutdatedGalleryImageHashCache);
+    Timer(const Duration(seconds: 1), _clearOutdatedJmAlbumTags);
 
     Timer(const Duration(seconds: 5), checkEHEvent);
     Timer.periodic(const Duration(minutes: 5), (_) => checkEHEvent());
@@ -197,6 +200,16 @@ class ScheduleService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBea
         .filter((config) => config.configKey.equals(ConfigEnum.galleryImageHash.key) & config.utime.column.isSmallerThanValue(thresholdTimeStr))
         .delete()
         .then((value) => value > 0);
+  }
+
+  /// Tags kept for JM list cards: an album not loaded for a while is dropped,
+  /// and loaded anew when a card shows it again.
+  Future<void> _clearOutdatedJmAlbumTags() async {
+    String threshold = SyncTimeUtil.format(DateTime.now().subtract(JmAlbumTagService.kept));
+
+    await appDb.managers.localConfig
+        .filter((config) => config.configKey.equals(ConfigEnum.jmAlbumTags.key) & config.utime.column.isSmallerThanValue(threshold))
+        .delete();
   }
 
   Future<void> checkEHEvent() async {

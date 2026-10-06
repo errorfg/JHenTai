@@ -33,6 +33,7 @@ import 'package:jhentai/src/network/eh_ip_provider.dart';
 import 'package:jhentai/src/network/eh_timeout_translator.dart';
 import 'package:jhentai/src/pages/ranklist/ranklist_page_state.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
+import 'package:jhentai/src/service/jm_album_tag_service.dart';
 import 'package:jhentai/src/service/path_service.dart';
 import 'package:jhentai/src/setting/eh_setting.dart';
 import 'package:jhentai/src/setting/nhentai_api_setting.dart';
@@ -132,6 +133,8 @@ class EHRequest with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         onLinesMeasured: jmSetting.saveMeasurement,
       ),
       imageDomain: () => jmSetting.imageDomain,
+      onAlbum: jmAlbumTagService.record,
+      fillTags: jmAlbumTagService.fill,
     );
 
     systemProxyAddress = await getSystemProxyAddress();
