@@ -1180,6 +1180,7 @@ favnote：匹配收藏备注
       'srSectionCommon': '通用',
       'srSectionCommonHint': '两项功能共用。',
       'realtimeSrHint': '也可在阅读器顶部菜单用 HD 图标开关',
+      'realtimeSrReaderHint': '更改后，阅读中的页面立即按新设置重新超分。每批页数、超分程序与基准测试在「设置 → 高级设置 → 图片超分辨率」。',
       'realtimeSrNotInstalled': '请先在设置的"超分辨率"中安装所选模型的超分程序',
       'realtimeSrModel': '模型',
       'realtimeSrScale': '放大倍数',

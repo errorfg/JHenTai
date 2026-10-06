@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
+import 'package:jhentai/src/pages/setting/advanced/super_resolution/realtime_sr_controls.dart';
 import 'package:jhentai/src/pages/setting/keyboard_shortcuts/setting_keyboard_shortcuts_page.dart';
 import 'package:jhentai/src/pages/setting/read/tap_zone/setting_tap_zone_page.dart';
 import 'package:jhentai/src/setting/preference_setting.dart';
@@ -36,6 +37,18 @@ class SettingReadPage extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.only(top: 16),
                 children: [
+                  // First, where it is at hand from the reader: a change
+                  // shows on the page being read.
+                  if (GetPlatform.isDesktop) ...[
+                    SrSectionHeader(
+                      key: const Key('readRealtimeSrSection'),
+                      title: 'realtimeSr'.tr,
+                      hint: 'realtimeSrReaderHint'.tr,
+                      experimental: true,
+                    ),
+                    for (final Widget tile in realtimeSrTiles(context)) tile.center(),
+                    const Divider(),
+                  ],
                   if (GetPlatform.isMobile || GetPlatform.isWindows) _buildEnableImmersiveMode().center(),
                   _buildKeepScreenAwake().center(),
                   if (GetPlatform.isMobile) _buildEnableCustomReadBrightness().center(),

@@ -250,6 +250,48 @@ void main() {
     expect(<int>[for (int i = 0; i < 5; i++) if (reader.upscaledPage(i) != null) i], <int>[0, 1, 2, 3, 4]);
     expect(cache.listSync(recursive: true), isEmpty);
 
+    // The scale is changed in the settings while the page is read: the page
+    // is upscaled anew and shows at three times its size.
+    (int, int)? size() {
+      final Iterable<Element> found = find.byType(ExtendedRawImage).evaluate();
+      final ui.Image? image = found.isEmpty ? null : (found.first.widget as ExtendedRawImage).image;
+      return image == null ? null : (image.width, image.height);
+    }
+
+    Future<void> shows((int, int) wanted) async {
+      final DateTime until = DateTime.now().add(const Duration(seconds: 60));
+      while (size() != wanted && DateTime.now().isBefore(until)) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 60)));
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(size(), wanted);
+    }
+
+    Future<void> setScale(int scale) => tester.runAsync(
+          () => superResolutionSetting.saveRealtimeConfig(
+            model: superResolutionSetting.realtimeModel.value,
+            scale: scale,
+            denoise: superResolutionSetting.realtimeDenoise.value,
+          ),
+        );
+
+    int runs = realtimeSrService.runs;
+    await setScale(3);
+    await shows((900, 1200));
+    expect(realtimeSrService.runs, greaterThan(runs));
+
+    // Back to the scale tried before: its pages are in memory, the program
+    // is not run for them again.
+    await setScale(2);
+    runs = realtimeSrService.runs;
+    await shows((600, 800));
+    for (int i = 0; i < 5; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 60)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(realtimeSrService.runs, runs);
+    expect(<int>[for (int i = 0; i < 5; i++) if (reader.upscaledPage(i) != null) i], <int>[0, 1, 2, 3, 4]);
+
     // Off: the original again, once it is decoded anew.
     await tester.runAsync(reader.toggleRealtimeSr);
     expect(reader.realtimeSrOn, isFalse);

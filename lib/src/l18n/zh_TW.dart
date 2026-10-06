@@ -1058,6 +1058,7 @@ favnote：配對收藏備註
       'srSectionCommon': '通用',
       'srSectionCommonHint': '兩項功能共用。',
       'realtimeSrHint': '也可在閱讀器頂部選單用 HD 圖示開關',
+      'realtimeSrReaderHint': '更改後，閱讀中的頁面立即按新設定重新超分。每批頁數、超分程式與基準測試在「設定 → 進階設定 → 圖片超解析度」。',
       'realtimeSrNotInstalled': '請先在設定的「超解析度」中安裝所選模型的超分程式',
       'realtimeSrModel': '模型',
       'realtimeSrScale': '放大倍數',

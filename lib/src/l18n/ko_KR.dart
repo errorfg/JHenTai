@@ -1086,6 +1086,7 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'srSectionCommon': '공통',
       'srSectionCommonHint': '두 기능이 함께 사용합니다.',
       'realtimeSrHint': '리더 상단 메뉴의 HD 아이콘으로도 켜고 끌 수 있습니다',
+      'realtimeSrReaderHint': '변경하면 읽고 있는 페이지에 바로 적용됩니다. 실행당 페이지 수, 업스케일러 프로그램, 벤치마크는 설정 - 고급 설정 - 초고해상도 이미지 생성에 있습니다.',
       'realtimeSrNotInstalled': '먼저 설정의 초해상도에서 선택한 모델의 업스케일러를 설치하세요',
       'realtimeSrModel': '모델',
       'realtimeSrScale': '배율',

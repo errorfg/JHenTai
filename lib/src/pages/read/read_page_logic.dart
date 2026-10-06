@@ -295,6 +295,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   late Worker customBrightnessListener;
   late Worker preloadListener;
   late Worker enableBottomMenuListener;
+  late Worker realtimeSrSettingListener;
   late Worker orientationSpecificReadDirectionLister;
   late Worker portraitReadDirectionLister;
   late Worker landscapeReadDirectionLister;
@@ -341,6 +342,11 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   final Set<int> _srInFlight = <int>{};
   final Set<int> _srSkipped = <int>{};
 
+  /// Counts the changes of the upscaling settings: what was asked for under
+  /// earlier settings is not waited for.
+  int _srGeneration = 0;
+  bool _srRestartScheduled = false;
+
   /// Whether pages are upscaled as they are read: on a desktop, switched
   /// on, with the upscaler of the chosen model installed. Wherever the pages
   /// come from: a site, a Komga server, files.
@@ -353,6 +359,8 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   /// that was upscaled as a whole: those pages are upscaled already.
   bool get _realtimeSrApplies => !state.useSuperResolution;
 
+  /// The reader follows the setting, as it follows the settings page (see
+  /// [_restartRealtimeSr]).
   Future<void> toggleRealtimeSr() async {
     final bool enable = !superResolutionSetting.realtimeEnabled.value;
     if (enable && !realtimeSrService.available) {
@@ -360,9 +368,37 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       return;
     }
     await superResolutionSetting.saveRealtimeEnabled(enable);
-    log.info('toggle real-time super resolution: $enable');
+  }
+
+  /// One restart for the changes made in a turn: choosing a model sets its
+  /// scale and denoise level with it.
+  void _scheduleRealtimeSrRestart() {
+    if (_srRestartScheduled) {
+      return;
+    }
+    _srRestartScheduled = true;
+    scheduleMicrotask(() {
+      _srRestartScheduled = false;
+      if (!isClosed) {
+        _restartRealtimeSr();
+      }
+    });
+  }
+
+  /// The upscaling settings changed (the switch, the model, its scale or
+  /// denoise level, the width limit), in the reader's menu or in the
+  /// settings shown over it: the pages are shown and asked for anew under
+  /// them, so that the effect of a model shows on the page being read. Pages
+  /// already upscaled under the new settings come from memory.
+  void _restartRealtimeSr() {
+    _srGeneration++;
+    _srInFlight.clear();
+    _srSkipped.clear();
+    realtimeSrService.clearPending();
+    log.info('real-time super resolution: ${realtimeSrOn ? realtimeSrService.config.label : 'off'}');
     updateSafely([topMenuId]);
-    // Rebuilt pages show their upscaled copy, or go back to the original.
+    // Rebuilt pages show their upscaled copy, or the original until there
+    // is one.
     layoutLogic.updateSafely([BaseLayoutLogic.pageId]);
     requestRealtimeSrAhead();
   }
@@ -415,14 +451,16 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       return;
     }
 
+    final int generation = _srGeneration;
     _srInFlight.add(index);
     unawaited(
       realtimeSrService.upscale(sourceKey: source.key, position: index, strips: source.strips, loadEncoded: source.load).then(
         (Uint8List? bytes) async {
-          _srInFlight.remove(index);
-          if (isClosed) {
+          // The settings changed since: the page was asked for anew.
+          if (isClosed || generation != _srGeneration) {
             return;
           }
+          _srInFlight.remove(index);
           if (bytes == null) {
             _srSkipped.add(index);
             return;
@@ -433,12 +471,14 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
           if (context != null && context.mounted) {
             await precacheImage(ExtendedMemoryImageProvider(bytes), context);
           }
-          if (!isClosed) {
+          if (!isClosed && generation == _srGeneration) {
             updateSafely(['$onlineImageId::$index']);
           }
         },
         onError: (Object e, StackTrace s) {
-          _srInFlight.remove(index);
+          if (generation == _srGeneration) {
+            _srInFlight.remove(index);
+          }
           log.error('Upscale page $index failed', e, s);
         },
       ),
@@ -665,6 +705,14 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       readSetting.preloadDistance,
     ], (_) => updateSafely([layoutId]));
 
+    realtimeSrSettingListener = everAll([
+      superResolutionSetting.realtimeEnabled,
+      superResolutionSetting.realtimeModel,
+      superResolutionSetting.realtimeScale,
+      superResolutionSetting.realtimeDenoise,
+      superResolutionSetting.realtimeMaxWidth,
+    ], (_) => _scheduleRealtimeSrRestart());
+
     _syncDisplayFirstPageAloneToState();
 
     tapZoneConfigListener = ever(readSetting.tapZoneConfigJson, (_) => updateSafely([tapZoneId]));
@@ -715,6 +763,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     customBrightnessListener.dispose();
     preloadListener.dispose();
     enableBottomMenuListener.dispose();
+    realtimeSrSettingListener.dispose();
     orientationSpecificReadDirectionLister.dispose();
     portraitReadDirectionLister.dispose();
     landscapeReadDirectionLister.dispose();

@@ -1133,6 +1133,7 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'srSectionCommon': 'Comum',
       'srSectionCommonHint': 'Usado pelos dois recursos.',
       'realtimeSrHint': 'O ícone HD no menu superior do leitor também alterna',
+      'realtimeSrReaderHint': 'Uma alteração é aplicada de imediato às páginas em leitura. Páginas por execução, os programas de ampliação e o benchmark ficam em Configuração - Configurações avançadas - Image Super Resolution.',
       'realtimeSrNotInstalled': 'Instale primeiro o ampliador do modelo escolhido (Configurações - Super resolução)',
       'realtimeSrModel': 'Modelo',
       'realtimeSrScale': 'Escala',

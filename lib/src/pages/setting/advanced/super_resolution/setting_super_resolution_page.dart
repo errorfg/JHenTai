@@ -13,6 +13,7 @@ import '../../../../service/super_resolution_service.dart';
 import '../../../../setting/super_resolution_setting.dart';
 import '../../../../service/log.dart';
 import '../../../../widget/loading_state_indicator.dart';
+import 'realtime_sr_controls.dart';
 import 'sr_benchmark_dialog.dart';
 
 class SettingSuperResolutionPage extends StatelessWidget {
@@ -44,7 +45,7 @@ class SettingSuperResolutionPage extends StatelessWidget {
             // Two features that share nothing but the GPU: upscaling what
             // is downloaded, a whole gallery at a time, and upscaling pages
             // while reading online. Each has its own programs and models.
-            _SectionHeader(
+            SrSectionHeader(
               key: const Key('srOfflineSection'),
               title: 'srSectionOffline'.tr,
               hint: 'srSectionOfflineHint'.tr,
@@ -52,22 +53,18 @@ class SettingSuperResolutionPage extends StatelessWidget {
             _buildModelDirectoryPath(),
             _buildModelType(),
             const Divider(),
-            _SectionHeader(
+            SrSectionHeader(
               key: const Key('srRealtimeSection'),
               title: 'realtimeSr'.tr,
               hint: 'srSectionRealtimeHint'.tr,
               experimental: true,
             ),
-            _buildRealtime(),
-            _buildRealtimeModel(),
-            _buildRealtimeScale(),
-            if (realtimeSrService.config.model.denoiseLevels.isNotEmpty) _buildRealtimeDenoise(),
+            ...realtimeSrTiles(context),
             _buildRealtimeBatchSize(),
-            _buildRealtimeMaxWidth(),
             for (final SrEngine engine in SrEngine.values) _SrToolTile(engine: engine),
             _buildBenchmark(),
             const Divider(),
-            _SectionHeader(
+            SrSectionHeader(
               key: const Key('srCommonSection'),
               title: 'srSectionCommon'.tr,
               hint: 'srSectionCommonHint'.tr,
@@ -148,81 +145,6 @@ class SettingSuperResolutionPage extends StatelessWidget {
     );
   }
 
-  Widget _buildRealtime() {
-    return SwitchListTile(
-      key: const Key('realtimeSrSwitch'),
-      title: Text('realtimeSrEnable'.tr),
-      subtitle: Text('realtimeSrHint'.tr),
-      value: superResolutionSetting.realtimeEnabled.value,
-      onChanged: (bool value) {
-        if (value && !realtimeSrService.available) {
-          toast('realtimeSrNotInstalled'.tr, isShort: false);
-          return;
-        }
-        superResolutionSetting.saveRealtimeEnabled(value);
-      },
-    );
-  }
-
-  /// Keeps the scale and denoise level when the model has them, else its
-  /// first.
-  void _saveRealtime({String? model, int? scale, int? denoise}) {
-    final SrModel chosen = SrModel.byId(model ?? superResolutionSetting.realtimeModel.value);
-    final int wantedScale = scale ?? superResolutionSetting.realtimeScale.value;
-    final int wantedDenoise = denoise ?? superResolutionSetting.realtimeDenoise.value;
-    superResolutionSetting.saveRealtimeConfig(
-      model: chosen.id,
-      scale: chosen.scales.contains(wantedScale) ? wantedScale : chosen.scales.first,
-      denoise: chosen.denoiseLevels.contains(wantedDenoise)
-          ? wantedDenoise
-          : (chosen.denoiseLevels.isEmpty ? 0 : chosen.denoiseLevels.first),
-    );
-  }
-
-  Widget _buildRealtimeModel() {
-    return ListTile(
-      title: Text('realtimeSrModel'.tr),
-      trailing: DropdownButton<String>(
-        key: const Key('realtimeSrModel'),
-        value: realtimeSrService.config.model.id,
-        elevation: 4,
-        alignment: AlignmentDirectional.centerEnd,
-        onChanged: (String? id) => _saveRealtime(model: id),
-        items: [for (final SrModel model in SrModel.all) DropdownMenuItem(value: model.id, child: Text(model.id))],
-      ),
-    );
-  }
-
-  Widget _buildRealtimeScale() {
-    final SrConfig config = realtimeSrService.config;
-    return ListTile(
-      title: Text('realtimeSrScale'.tr),
-      trailing: DropdownButton<int>(
-        value: config.scale,
-        elevation: 4,
-        alignment: AlignmentDirectional.centerEnd,
-        onChanged: (int? scale) => _saveRealtime(scale: scale),
-        items: [for (final int scale in config.model.scales) DropdownMenuItem(value: scale, child: Text('x$scale'))],
-      ),
-    );
-  }
-
-  Widget _buildRealtimeDenoise() {
-    final SrConfig config = realtimeSrService.config;
-    return ListTile(
-      title: Text('realtimeSrDenoise'.tr),
-      trailing: DropdownButton<int>(
-        value: config.denoise,
-        elevation: 4,
-        alignment: AlignmentDirectional.centerEnd,
-        onChanged: (int? denoise) => _saveRealtime(denoise: denoise),
-        items: [
-          for (final int level in config.model.denoiseLevels) DropdownMenuItem(value: level, child: Text('$level')),
-        ],
-      ),
-    );
-  }
-
   Widget _buildRealtimeBatchSize() {
     const List<int> sizes = <int>[1, 2, 4, 8, 16];
     final int current = superResolutionSetting.realtimeBatchSize.value;
@@ -235,24 +157,6 @@ class SettingSuperResolutionPage extends StatelessWidget {
         alignment: AlignmentDirectional.centerEnd,
         onChanged: (int? size) => superResolutionSetting.saveRealtimeBatchSize(size!),
         items: [for (final int size in sizes) DropdownMenuItem(value: size, child: Text('$size'))],
-      ),
-    );
-  }
-
-  Widget _buildRealtimeMaxWidth() {
-    const List<int> widths = <int>[0, 1000, 1200, 1600, 2000, 2560];
-    final int current = superResolutionSetting.realtimeMaxWidth.value;
-    return ListTile(
-      title: Text('realtimeSrMaxWidth'.tr),
-      trailing: DropdownButton<int>(
-        value: widths.contains(current) ? current : 1600,
-        elevation: 4,
-        alignment: AlignmentDirectional.centerEnd,
-        onChanged: (int? width) => superResolutionSetting.saveRealtimeMaxWidth(width!),
-        items: [
-          for (final int width in widths)
-            DropdownMenuItem(value: width, child: Text(width == 0 ? 'noLimit'.tr : '$width px')),
-        ],
       ),
     );
   }
@@ -340,54 +244,6 @@ class _SrToolTileState extends State<_SrToolTile> {
       trailing: _progress != null
           ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
           : IconButton(icon: Icon(installed ? Icons.refresh : Icons.download), onPressed: _install),
-    );
-  }
-}
-
-/// Title of a group of settings, with what the group is for; [experimental]
-/// adds a badge saying so.
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({super.key, required this.title, required this.hint, this.experimental = false});
-
-  final String title;
-  final String hint;
-  final bool experimental;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Flexible(
-                child: Text(
-                  title,
-                  style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
-                ),
-              ),
-              if (experimental)
-                Container(
-                  margin: const EdgeInsets.only(left: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: theme.colorScheme.tertiary),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'experimental'.tr,
-                    style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.tertiary),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(hint, style: theme.textTheme.bodySmall),
-        ],
-      ),
     );
   }
 }

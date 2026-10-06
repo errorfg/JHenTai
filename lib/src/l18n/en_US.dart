@@ -1244,6 +1244,7 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'srSectionCommon': 'Common',
       'srSectionCommonHint': 'Used by both features.',
       'realtimeSrHint': 'The HD icon in the top menu of the reader switches it as well',
+      'realtimeSrReaderHint': 'A change is applied at once to the pages being read. Pages per run, the upscaler programs and the benchmark are in Setting - Advanced Setting - Image Super Resolution.',
       'realtimeSrNotInstalled': 'Install the upscaler of the chosen model first (Settings - Super resolution)',
       'realtimeSrModel': 'Model',
       'realtimeSrScale': 'Scale',
