@@ -13,6 +13,15 @@ class SuperResolutionSetting with JHLifeCircleBeanWithConfigStorage implements J
   Rx<ModelType> model = Rx<ModelType>(ModelType.CUGAN);
   RxInt gpuId = 0.obs;
 
+  /// Upscaling pages while reading online (desktop): on or off, the model
+  /// (an [SrModel] id) with its scale and denoise level, and the width from
+  /// which pages are left as they are (0: every page is upscaled).
+  RxBool realtimeEnabled = false.obs;
+  RxString realtimeModel = 'realesr-animevideov3'.obs;
+  RxInt realtimeScale = 2.obs;
+  RxInt realtimeDenoise = 0.obs;
+  RxInt realtimeMaxWidth = 1600.obs;
+
   @override
   ConfigEnum get configEnum => ConfigEnum.superResolutionSetting;
 
@@ -23,6 +32,11 @@ class SuperResolutionSetting with JHLifeCircleBeanWithConfigStorage implements J
     modelDirectoryPath.value = map['modelDirectoryPath'];
     model.value = map['model'] == null ? ModelType.CUGAN : ModelType.values[map['model']];
     gpuId.value = map['gpuId'] ?? gpuId.value;
+    realtimeEnabled.value = map['realtimeEnabled'] ?? realtimeEnabled.value;
+    realtimeModel.value = map['realtimeModel'] ?? realtimeModel.value;
+    realtimeScale.value = map['realtimeScale'] ?? realtimeScale.value;
+    realtimeDenoise.value = map['realtimeDenoise'] ?? realtimeDenoise.value;
+    realtimeMaxWidth.value = map['realtimeMaxWidth'] ?? realtimeMaxWidth.value;
   }
 
   @override
@@ -31,6 +45,11 @@ class SuperResolutionSetting with JHLifeCircleBeanWithConfigStorage implements J
       'modelDirectoryPath': modelDirectoryPath.value,
       'model': model.value.index,
       'gpuId': gpuId.value,
+      'realtimeEnabled': realtimeEnabled.value,
+      'realtimeModel': realtimeModel.value,
+      'realtimeScale': realtimeScale.value,
+      'realtimeDenoise': realtimeDenoise.value,
+      'realtimeMaxWidth': realtimeMaxWidth.value,
     });
   }
 
@@ -55,6 +74,28 @@ class SuperResolutionSetting with JHLifeCircleBeanWithConfigStorage implements J
   Future<void> saveGpuId(int gpuId) async {
     log.debug('saveGpuId:$gpuId');
     this.gpuId.value = gpuId;
+    await saveBeanConfig();
+  }
+
+  Future<void> saveRealtimeEnabled(bool enabled) async {
+    log.debug('saveRealtimeEnabled:$enabled');
+    realtimeEnabled.value = enabled;
+    await saveBeanConfig();
+  }
+
+  /// [model] is an [SrModel] id; a scale or denoise level the model lacks
+  /// falls back to its first.
+  Future<void> saveRealtimeConfig({required String model, required int scale, required int denoise}) async {
+    log.debug('saveRealtimeConfig:$model x$scale n$denoise');
+    realtimeModel.value = model;
+    realtimeScale.value = scale;
+    realtimeDenoise.value = denoise;
+    await saveBeanConfig();
+  }
+
+  Future<void> saveRealtimeMaxWidth(int width) async {
+    log.debug('saveRealtimeMaxWidth:$width');
+    realtimeMaxWidth.value = width;
     await saveBeanConfig();
   }
 }

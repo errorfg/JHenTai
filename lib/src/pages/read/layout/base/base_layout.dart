@@ -4,6 +4,7 @@ import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
+import 'package:jhentai/src/model/gallery_image.dart';
 import 'package:jhentai/src/model/read_page_info.dart';
 import 'package:jhentai/src/setting/read_setting.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -155,11 +156,19 @@ abstract class BaseLayout extends StatelessWidget {
   }
 
   Widget _buildOnlineImage(BuildContext context, int index) {
+    // The upscaled copy once it is ready, in place of the original.
+    final String? upscaled = readPageLogic.realtimeSrOn ? readPageState.srImages[index] : null;
+    final GalleryImage original = readPageState.images[index]!;
     return GestureDetector(
       onLongPressStart: (details) => logic.showOnlineImageContextMenu(index, context, position: details.globalPosition),
       onSecondaryTapDown: (details) => logic.showOnlineImageContextMenu(index, context, position: details.globalPosition),
       child: EHImage(
-        galleryImage: readPageState.images[index]!,
+        // Another widget, not the original's updated: its loading starts
+        // from the decoded copy.
+        key: ValueKey<String?>(upscaled),
+        galleryImage: upscaled == null
+            ? original
+            : GalleryImage(url: original.url, path: upscaled, downloadStatus: DownloadStatus.downloaded),
         containerWidth: logic.readPageState.imageContainerSizes[index]?.width ?? logic.getPlaceHolderSize(index).width,
         containerHeight: logic.readPageState.imageContainerSizes[index]?.height ?? logic.getPlaceHolderSize(index).height,
         clearMemoryCacheWhenDispose: true,
@@ -203,6 +212,11 @@ abstract class BaseLayout extends StatelessWidget {
 
   /// completed for online mode
   Widget? completedWidgetBuilderCallBack(int index, ExtendedImageState state) {
+    // The original is shown: its upscaled copy can be made.
+    if (state.extendedImageInfo != null) {
+      readPageLogic.requestRealtimeSr(index);
+    }
+
     if (state.extendedImageInfo == null || logic.readPageState.imageContainerSizes[index] != null) {
       return null;
     }

@@ -56,3 +56,6 @@ CLAUDE.md
 /test/e2e/komga_e2e.json
 # JM end-to-end tests against the live JM API (copy from jm_e2e.example.json)
 /test/e2e/jm_e2e.json
+# Upscaler tests with the real programs (copy from sr_e2e.example.json); toolsRoot holds
+# the unpacked releases as realesrgan/ and realcugan/
+/test/e2e/sr_e2e.json

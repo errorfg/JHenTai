@@ -7,10 +7,13 @@ import 'package:jhentai/src/setting/preference_setting.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
+import '../../../../service/sr/realtime_sr_service.dart';
+import '../../../../service/sr/sr_tools.dart';
 import '../../../../service/super_resolution_service.dart';
 import '../../../../setting/super_resolution_setting.dart';
 import '../../../../service/log.dart';
 import '../../../../widget/loading_state_indicator.dart';
+import 'sr_benchmark_dialog.dart';
 
 class SettingSuperResolutionPage extends StatelessWidget {
   const SettingSuperResolutionPage({Key? key}) : super(key: key);
@@ -41,6 +44,14 @@ class SettingSuperResolutionPage extends StatelessWidget {
             _buildModelDirectoryPath(),
             _buildModelType(),
             _buildGpuId(),
+            const Divider(),
+            _buildRealtime(),
+            _buildRealtimeModel(),
+            _buildRealtimeScale(),
+            if (realtimeSrService.config.model.denoiseLevels.isNotEmpty) _buildRealtimeDenoise(),
+            _buildRealtimeMaxWidth(),
+            for (final SrEngine engine in SrEngine.values) _SrToolTile(engine: engine),
+            _buildBenchmark(),
           ],
         ).withListTileTheme(context),
       ),
@@ -116,6 +127,109 @@ class SettingSuperResolutionPage extends StatelessWidget {
     );
   }
 
+  Widget _buildRealtime() {
+    return SwitchListTile(
+      key: const Key('realtimeSrSwitch'),
+      title: Text('realtimeSr'.tr),
+      subtitle: Text('realtimeSrHint'.tr),
+      value: superResolutionSetting.realtimeEnabled.value,
+      onChanged: (bool value) {
+        if (value && !realtimeSrService.available) {
+          toast('realtimeSrNotInstalled'.tr, isShort: false);
+          return;
+        }
+        superResolutionSetting.saveRealtimeEnabled(value);
+      },
+    );
+  }
+
+  /// Keeps the scale and denoise level when the model has them, else its
+  /// first.
+  void _saveRealtime({String? model, int? scale, int? denoise}) {
+    final SrModel chosen = SrModel.byId(model ?? superResolutionSetting.realtimeModel.value);
+    final int wantedScale = scale ?? superResolutionSetting.realtimeScale.value;
+    final int wantedDenoise = denoise ?? superResolutionSetting.realtimeDenoise.value;
+    superResolutionSetting.saveRealtimeConfig(
+      model: chosen.id,
+      scale: chosen.scales.contains(wantedScale) ? wantedScale : chosen.scales.first,
+      denoise: chosen.denoiseLevels.contains(wantedDenoise)
+          ? wantedDenoise
+          : (chosen.denoiseLevels.isEmpty ? 0 : chosen.denoiseLevels.first),
+    );
+  }
+
+  Widget _buildRealtimeModel() {
+    return ListTile(
+      title: Text('realtimeSrModel'.tr),
+      trailing: DropdownButton<String>(
+        key: const Key('realtimeSrModel'),
+        value: realtimeSrService.config.model.id,
+        elevation: 4,
+        alignment: AlignmentDirectional.centerEnd,
+        onChanged: (String? id) => _saveRealtime(model: id),
+        items: [for (final SrModel model in SrModel.all) DropdownMenuItem(value: model.id, child: Text(model.id))],
+      ),
+    );
+  }
+
+  Widget _buildRealtimeScale() {
+    final SrConfig config = realtimeSrService.config;
+    return ListTile(
+      title: Text('realtimeSrScale'.tr),
+      trailing: DropdownButton<int>(
+        value: config.scale,
+        elevation: 4,
+        alignment: AlignmentDirectional.centerEnd,
+        onChanged: (int? scale) => _saveRealtime(scale: scale),
+        items: [for (final int scale in config.model.scales) DropdownMenuItem(value: scale, child: Text('x$scale'))],
+      ),
+    );
+  }
+
+  Widget _buildRealtimeDenoise() {
+    final SrConfig config = realtimeSrService.config;
+    return ListTile(
+      title: Text('realtimeSrDenoise'.tr),
+      trailing: DropdownButton<int>(
+        value: config.denoise,
+        elevation: 4,
+        alignment: AlignmentDirectional.centerEnd,
+        onChanged: (int? denoise) => _saveRealtime(denoise: denoise),
+        items: [
+          for (final int level in config.model.denoiseLevels) DropdownMenuItem(value: level, child: Text('$level')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRealtimeMaxWidth() {
+    const List<int> widths = <int>[0, 1000, 1200, 1600, 2000, 2560];
+    final int current = superResolutionSetting.realtimeMaxWidth.value;
+    return ListTile(
+      title: Text('realtimeSrMaxWidth'.tr),
+      trailing: DropdownButton<int>(
+        value: widths.contains(current) ? current : 1600,
+        elevation: 4,
+        alignment: AlignmentDirectional.centerEnd,
+        onChanged: (int? width) => superResolutionSetting.saveRealtimeMaxWidth(width!),
+        items: [
+          for (final int width in widths)
+            DropdownMenuItem(value: width, child: Text(width == 0 ? 'noLimit'.tr : '$width px')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBenchmark() {
+    return ListTile(
+      key: const Key('srBenchmark'),
+      title: Text('srBenchmark'.tr),
+      subtitle: Text('srBenchmarkHint'.tr),
+      trailing: const Icon(Icons.keyboard_arrow_right),
+      onTap: () => Get.dialog(const SrBenchmarkDialog(), barrierDismissible: false),
+    );
+  }
+
   Widget _buildGpuId() {
     return ListTile(
       title: const Text('GPU-id'),
@@ -139,3 +253,57 @@ class SettingSuperResolutionPage extends StatelessWidget {
     );
   }
 }
+
+/// One upscaler program: whether it is installed, and a button that
+/// downloads and unpacks it.
+class _SrToolTile extends StatefulWidget {
+  const _SrToolTile({required this.engine});
+
+  final SrEngine engine;
+
+  @override
+  State<_SrToolTile> createState() => _SrToolTileState();
+}
+
+class _SrToolTileState extends State<_SrToolTile> {
+  double? _progress;
+
+  Future<void> _install() async {
+    setState(() => _progress = 0);
+    try {
+      await realtimeSrService.install(
+        widget.engine,
+        onProgress: (double progress) {
+          if (mounted) {
+            setState(() => _progress = progress);
+          }
+        },
+      );
+      toast('success'.tr);
+    } catch (e, s) {
+      log.error('Install upscaler ${widget.engine.name} failed', e, s);
+      toast('${'failed'.tr}: $e', isShort: false);
+    } finally {
+      if (mounted) {
+        setState(() => _progress = null);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool installed = widget.engine.isInstalled(realtimeSrService.toolsRoot);
+    return ListTile(
+      title: Text('${'srTools'.tr}: ${widget.engine.name}'),
+      subtitle: Text(
+        _progress != null
+            ? '${'downloading'.tr} ${(_progress! * 100).toStringAsFixed(0)}%'
+            : (installed ? 'srToolInstalled'.tr : 'srToolNotInstalled'.tr),
+      ),
+      trailing: _progress != null
+          ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+          : IconButton(icon: Icon(installed ? Icons.refresh : Icons.download), onPressed: _install),
+    );
+  }
+}
+

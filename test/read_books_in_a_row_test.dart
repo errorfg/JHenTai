@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:drift/native.dart';
+import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,7 +20,10 @@ import 'package:jhentai/src/service/gallery_download_service.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/path_service.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
+import 'package:jhentai/src/service/sr/realtime_sr_service.dart';
+import 'package:jhentai/src/service/sr/sr_tools.dart';
 import 'package:jhentai/src/setting/read_setting.dart';
+import 'package:jhentai/src/setting/super_resolution_setting.dart';
 
 class _SilentLogService extends LogService {
   @override
@@ -62,6 +67,14 @@ ReadPageInfo _chapter(
     loadSiblingBook: next,
     siblingsAreChapters: true,
   );
+}
+
+/// Where the upscaler programs are, from test/e2e/sr_e2e.json; null to skip
+/// the tests that run them.
+String? _srToolsRoot() {
+  final File config = File('test/e2e/sr_e2e.json');
+  final String? root = config.existsSync() ? (jsonDecode(config.readAsStringSync()) as Map)['toolsRoot'] as String? : null;
+  return root != null && SrEngine.realesrgan.isInstalled(root) ? root : null;
 }
 
 void main() {
@@ -170,4 +183,85 @@ void main() {
       await appDb.close();
     });
   });
+  testWidgets('with upscaling on, a page is replaced by its upscaled copy; switched off, the original is back', (WidgetTester tester) async {
+    final String toolsRoot = _srToolsRoot()!;
+    appDb = (await tester.runAsync(() async => AppDb.forTesting(NativeDatabase.memory())))!;
+    Get.testMode = true;
+    Get.put<ReadProgressService>(readProgressService, permanent: true);
+    Get.put<GalleryDownloadService>(galleryDownloadService, permanent: true);
+    readSetting.readDirection.value = ReadDirection.top2bottomList;
+    readSetting.keepScreenAwakeWhenReading.value = false;
+    readSetting.showThumbnails.value = false;
+    superResolutionSetting = SuperResolutionSetting()..realtimeEnabled.value = true;
+    final Directory cache = Directory.systemTemp.createTempSync('read_sr_cache');
+    addTearDown(() => cache.deleteSync(recursive: true));
+    realtimeSrService = RealtimeSrService()
+      ..toolsRootOverride = toolsRoot
+      ..cacheDirOverride = cache.path;
+    tester.view.physicalSize = const Size(600, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (MethodCall call) async => null);
+    tester.binding.defaultBinaryMessenger.setMockMessageHandler(
+      'dev.flutter.pigeon.wakelock_plus_platform_interface.WakelockPlusApi.toggle',
+      (ByteData? message) async => const StandardMessageCodec().encodeMessage(<Object?>[]),
+    );
+
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        GetMaterialApp(
+          home: const Scaffold(),
+          getPages: [GetPage(name: '/read', page: () => const ReadPage())],
+        ),
+      );
+      Get.toNamed('/read', arguments: _chapter(1, shown: <String>[]));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    for (int i = 0; i < 6; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 60)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    final ReadPageLogic reader = Get.find<ReadPageLogic>();
+    expect(reader.realtimeSrOn, isTrue);
+
+    // The first page shown: 300 x 400 as stored, then its upscaled copy.
+    ui.Image shown() => tester.widget<ExtendedRawImage>(find.byType(ExtendedRawImage).first).image!;
+    final DateTime deadline = DateTime.now().add(const Duration(seconds: 60));
+    while (reader.state.srImages[0] == null && DateTime.now().isBefore(deadline)) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(reader.state.srImages[0], isNotNull, reason: 'the first page was not upscaled');
+    for (int i = 0; i < 5; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 60)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect((shown().width, shown().height), (600, 800));
+    expect(realtimeSrService.runs, greaterThanOrEqualTo(1));
+
+    // Off: the original again, once it is decoded anew.
+    await tester.runAsync(reader.toggleRealtimeSr);
+    expect(reader.realtimeSrOn, isFalse);
+    final DateTime reloaded = DateTime.now().add(const Duration(seconds: 20));
+    do {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 60)));
+      await tester.pump(const Duration(milliseconds: 100));
+    } while (find.byType(ExtendedRawImage).evaluate().isEmpty && DateTime.now().isBefore(reloaded));
+    expect((shown().width, shown().height), (300, 400));
+
+    await tester.runAsync(() async {
+      Get.back();
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    // The route leaves and the reader is disposed with it.
+    for (int i = 0; i < 10; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 60)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(Get.isRegistered<ReadPageLogic>(), isFalse);
+    await tester.runAsync(() async {
+      Get.reset();
+      await appDb.close();
+    });
+  }, skip: _srToolsRoot() == null);
 }

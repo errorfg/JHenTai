@@ -24,6 +24,10 @@ class ReadPageState with ScrollStatusListerState {
   late List<LoadingState> parseImageHrefsStates;
   late List<LoadingState> parseImageUrlStates;
   late List<Size?> imageContainerSizes;
+
+  /// File of each page's upscaled copy, once it is ready and decoded; null
+  /// while the original is shown (see `RealtimeSrService`).
+  late List<String?> srImages;
   String? parseImageHrefErrorMsg;
   late List<String?> parseImageUrlErrorMsg;
 
@@ -65,6 +69,7 @@ class ReadPageState with ScrollStatusListerState {
     parseImageHrefsStates = List.generate(readPageInfo.pageCount, (_) => LoadingState.idle);
     parseImageUrlStates = List.generate(readPageInfo.pageCount, (_) => LoadingState.idle);
     imageContainerSizes = List.generate(readPageInfo.pageCount, (_) => null);
+    srImages = List.generate(readPageInfo.pageCount, (_) => null);
     parseImageUrlErrorMsg = List.generate(readPageInfo.pageCount, (_) => null);
 
     useSuperResolution = readPageInfo.useSuperResolution;
@@ -108,6 +113,7 @@ class ReadPageState with ScrollStatusListerState {
     parseImageHrefsStates.addAll(List.generate(count, (_) => LoadingState.idle));
     parseImageUrlStates.addAll(List.generate(count, (_) => LoadingState.idle));
     imageContainerSizes.addAll(List.generate(count, (_) => null));
+    srImages.addAll(List.generate(count, (_) => null));
     parseImageUrlErrorMsg.addAll(List.generate(count, (_) => null));
     readPageInfo.pageCount += count;
     return segment;

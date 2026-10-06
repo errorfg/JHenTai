@@ -4,6 +4,9 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:dio/dio.dart';
 import 'package:executor/executor.dart';
+import 'dart:io' as io;
+import 'dart:typed_data';
+
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -32,6 +35,10 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../model/detail_page_info.dart';
 import '../../model/gallery_image.dart';
+import '../../setting/super_resolution_setting.dart';
+import '../../service/sr/realtime_sr_service.dart';
+import '../../service/gallery_download_service.dart';
+import '../../network/jm/jm_image.dart';
 import '../../model/read_page_info.dart';
 import '../../network/eh_request.dart';
 import '../../routes/routes.dart';
@@ -329,6 +336,80 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   /// Pages left below the last visible one when the next book is fetched.
   static const int _appendAhead = 3;
 
+  /// Pages whose upscaled copy has been asked for in this reader.
+  final Set<int> _srRequested = <int>{};
+
+  /// Whether pages are upscaled as they are read: online reading on a
+  /// desktop, switched on, with the upscaler of the chosen model installed.
+  bool get realtimeSrOn => state.readPageInfo.mode == ReadMode.online && realtimeSrService.active;
+
+  /// Shown in the reader's menu where upscaling while reading can be used.
+  bool get canUseRealtimeSr => GetPlatform.isDesktop && state.readPageInfo.mode == ReadMode.online;
+
+  Future<void> toggleRealtimeSr() async {
+    final bool enable = !superResolutionSetting.realtimeEnabled.value;
+    if (enable && !realtimeSrService.available) {
+      toast('realtimeSrNotInstalled'.tr, isShort: false);
+      return;
+    }
+    await superResolutionSetting.saveRealtimeEnabled(enable);
+    log.info('toggle real-time super resolution: $enable');
+    updateSafely([topMenuId]);
+    // Rebuilt pages ask for their upscaled copy, or go back to the original.
+    layoutLogic.updateSafely([BaseLayoutLogic.pageId]);
+  }
+
+  /// Asks for the upscaled copy of page [index], once, when its original
+  /// has loaded; the page switches to it when it is ready and decoded.
+  void requestRealtimeSr(int index) {
+    if (!realtimeSrOn || state.srImages[index] != null || !_srRequested.add(index)) {
+      return;
+    }
+    final GalleryImage? image = state.images[index];
+    if (image == null) {
+      _srRequested.remove(index);
+      return;
+    }
+
+    final String sourceKey;
+    final int strips;
+    final Future<Uint8List?> Function() loadEncoded;
+    if (image.path != null) {
+      // A page already on disk (a downloaded JM page): restored when saved.
+      final String path = GalleryDownloadService.computeImageDownloadAbsolutePathFromRelativePath(image.path!);
+      sourceKey = path;
+      strips = 0;
+      loadEncoded = () => io.File(path).readAsBytes();
+    } else {
+      final String requestUrl = JmImage.requestUrl(image.url);
+      sourceKey = requestUrl;
+      strips = JmImage.stripsOf(image.url);
+      // Shown already, so this reads the image cache.
+      loadEncoded = () => getNetworkImageData(requestUrl);
+    }
+
+    unawaited(
+      realtimeSrService.upscale(sourceKey: sourceKey, position: index, strips: strips, loadEncoded: loadEncoded).then((String? path) async {
+        if (path == null) {
+          return;
+        }
+        // Decoded before the page switches to it, so the switch does not
+        // show a loading page in between.
+        final BuildContext? context = Get.context;
+        if (context != null && context.mounted) {
+          await precacheImage(ExtendedFileImageProvider(io.File(path)), context);
+        }
+        if (isClosed || index >= state.srImages.length) {
+          return;
+        }
+        state.srImages[index] = path;
+        updateSafely(['$onlineImageId::$index']);
+      }, onError: (Object e, StackTrace s) {
+        log.error('Upscale page $index failed', e, s);
+      }),
+    );
+  }
+
   ReadProgressFlushCoordinator _flushCoordinatorOf(ReadSegment segment) {
     final ReadPageInfo info = segment.info;
     return _progressFlushCoordinators.putIfAbsent(
@@ -514,6 +595,11 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
     unawaited(_notifyShown(state.segments.first));
 
+    realtimeSrService.focus = () => state.readPageInfo.currentImageIndex;
+    if (realtimeSrOn) {
+      unawaited(realtimeSrService.pruneCache());
+    }
+
     inited = true;
     if (!delayInitCompleter.isCompleted) {
       delayInitCompleter.complete();
@@ -570,6 +656,10 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     restoreDeviceOrientation();
 
     unawaited(_flushReadProgressAndSync());
+
+    realtimeSrService
+      ..clearPending()
+      ..focus = null;
 
     if (readSetting.enableCustomReadBrightness.isTrue) {
       resetBrightness();
