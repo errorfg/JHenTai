@@ -94,6 +94,7 @@ import '../../widget/re_unlock_dialog.dart';
 import '../../widget/nhentai_archive_dialog.dart';
 import '../../widget/nhentai_related_dialog.dart';
 import '../../widget/nhentai_tag_suggestions_dialog.dart';
+import '../../widget/jm_chapter_download_dialog.dart';
 import 'details_page_state.dart';
 
 class DetailsPageArgument {
@@ -2120,18 +2121,28 @@ class DetailsPageLogic extends GetxController
     );
   }
 
-  /// Queues every chapter of the album that is not downloaded yet, in a
-  /// group named after the album unless the user picks another.
-  Future<void> handleDownloadAllJmChapters() async {
+  /// Queues the chapters of the album the user picks, in a group named
+  /// after the album unless the user picks another.
+  Future<void> handleDownloadJmChapters() async {
     JmChapterBundle? current = state.jmChapterBundle;
     if (current == null) {
       return;
     }
     JmAlbum album = current.album;
 
+    List<int>? chapterIds = await Get.dialog<List<int>>(
+      JmChapterDownloadDialog(
+        chapters: album.chapters,
+        currentChapterId: current.chapter.id,
+      ),
+    );
+    if (chapterIds == null || chapterIds.isEmpty) {
+      return;
+    }
+
     ({String group, bool downloadOriginalImage})? result = await Get.dialog(
       EHDownloadDialog(
-        title: 'downloadAllChapters'.tr,
+        title: 'downloadChapters'.tr,
         currentGroup: album.name,
         candidates: galleryDownloadService.allGroups,
         showDownloadOriginalImageCheckBox: false,
@@ -2145,9 +2156,10 @@ class DetailsPageLogic extends GetxController
 
     List<int> pending = [
       for (int i = 0; i < album.chapters.length; i++)
-        if (!galleryDownloadService.containGallery(
-          GalleryUrl.jm(album.chapters[i].id).gid,
-        ))
+        if (chapterIds.contains(album.chapters[i].id) &&
+            !galleryDownloadService.containGallery(
+              GalleryUrl.jm(album.chapters[i].id).gid,
+            ))
           i,
     ];
     if (pending.isEmpty) {

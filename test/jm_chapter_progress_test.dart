@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
@@ -15,6 +16,7 @@ import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'package:jhentai/src/model/gallery_image.dart';
 import 'package:jhentai/src/model/gallery_tag.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
+import 'package:jhentai/src/model/jh_layout.dart';
 import 'package:jhentai/src/pages/history/history_page_logic.dart';
 import 'package:jhentai/src/setting/style_setting.dart';
 import 'package:jhentai/src/widget/eh_gallery_list_card_.dart';
@@ -29,6 +31,7 @@ import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/widget/jm_chapter_dialog.dart';
+import 'package:jhentai/src/widget/jm_chapter_download_dialog.dart';
 
 class _SilentLogService extends LogService {
   @override
@@ -305,6 +308,55 @@ void main() {
     expect(find.text('4520P'), findsOneWidget);
 
     await tester.runAsync(device.db.close);
+  });
+
+  testWidgets('the download dialog picks all chapters or the next ones not downloaded yet', (WidgetTester tester) async {
+    styleSetting.actualLayout = LayoutMode.mobileV2;
+    Get.testMode = true;
+    addTearDown(Get.reset);
+    tester.view.physicalSize = const Size(900, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final List<JmChapterRef> chapters = <JmChapterRef>[
+      for (int i = 0; i < 30; i++) JmChapterRef(id: 300 + i, name: 'Chapter ${i + 1}', sort: i + 1),
+    ];
+
+    await tester.pumpWidget(const GetMaterialApp(home: Scaffold()));
+    List<int>? picked;
+    // Reading chapter 5; chapters 5 and 6 are in the download list already.
+    unawaited(
+      Get.dialog<List<int>>(
+        JmChapterDownloadDialog(
+          chapters: chapters,
+          currentChapterId: 304,
+          isDownloaded: (int id) => id == 304 || id == 305,
+        ),
+      ).then((List<int>? result) => picked = result),
+    );
+    await tester.pumpAndSettle();
+
+    TextButton confirm() => tester.widget<TextButton>(find.byKey(const Key('jmDownloadConfirm')));
+    expect(confirm().onPressed, isNull, reason: 'nothing picked yet');
+
+    await tester.tap(find.byKey(const Key('jmDownloadAll')));
+    await tester.pump();
+    expect(find.text('download (28)'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('jmDownloadNext20')));
+    await tester.pump();
+    expect(find.text('download (20)'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('jmDownloadNext10')));
+    await tester.pump();
+    expect(find.text('download (10)'), findsOneWidget);
+    // One chapter more, picked by hand.
+    await tester.tap(find.byKey(const ValueKey<String>('jmDownloadChapter:303')));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('jmDownloadConfirm')));
+    await tester.pumpAndSettle();
+    // Chapter 4, then the ten after the downloaded 5 and 6: 7 to 16.
+    expect(picked, <int>[303, for (int id = 306; id <= 315; id++) id]);
   });
 
   test('the chapter to continue with', () {

@@ -1277,9 +1277,10 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'downloadAllChapters'.tr,
+                  key: const Key('jmDownloadChapters'),
+                  tooltip: 'downloadChapters'.tr,
                   icon: const Icon(Icons.download_for_offline_outlined),
-                  onPressed: logic.handleDownloadAllJmChapters,
+                  onPressed: logic.handleDownloadJmChapters,
                 ),
               ],
             ),
