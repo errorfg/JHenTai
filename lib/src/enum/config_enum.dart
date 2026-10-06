@@ -84,10 +84,7 @@ enum ConfigEnum {
 
   /// cache
   isSpreadPage('isSpreadPage'),
-  galleryImageHash('galleryImageHash'),
-
-  /// tags of JM albums for their list cards, by album id
-  jmAlbumTags('jmAlbumTags');
+  galleryImageHash('galleryImageHash');
 
   final String key;
 
