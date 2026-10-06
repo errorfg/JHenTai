@@ -18,6 +18,7 @@ import 'package:jhentai/src/mixin/login_required_logic_mixin.dart';
 import 'package:jhentai/src/model/gallery.dart';
 import 'package:jhentai/src/model/gallery_comment.dart';
 import 'package:jhentai/src/model/gallery_tag.dart';
+import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'package:jhentai/src/model/gallery_thumbnail.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/model/read_page_info.dart';
@@ -302,6 +303,9 @@ class DetailsPageLogic extends GetxController
           jmReadingService.remember(
             albumId: bundle.album.id,
             pageCounts: {bundle.chapter.id: bundle.pageCount},
+            chapterIds: bundle.album.chapters
+                .map((JmChapterRef c) => c.id)
+                .toList(),
           ),
         );
       }
@@ -324,9 +328,7 @@ class DetailsPageLogic extends GetxController
     updateSafely(_judgeUpdateIds());
 
     SchedulerBinding.instance.scheduleTask(
-      () => historyService.record(
-        galleryDetail2GalleryHistoryModel(state.galleryDetails!),
-      ),
+      () => historyService.record(_historyModel()),
       Priority.animation,
     );
     SchedulerBinding.instance.scheduleTask(
@@ -2227,6 +2229,25 @@ class DetailsPageLogic extends GetxController
 
   Future<int> getReadIndexRecord() async {
     return readProgressService.getReadProgress(state.galleryUrl.gid);
+  }
+
+  /// The history entry of this page. A multi-chapter JM album is one entry,
+  /// whichever of its chapters is open: under the album's id, with the
+  /// album's title and page count.
+  GalleryHistoryModel _historyModel() {
+    GalleryHistoryModel model = galleryDetail2GalleryHistoryModel(
+      state.galleryDetails!,
+    );
+    JmChapterBundle? bundle = state.jmChapterBundle;
+    if (bundle != null && bundle.isMultiChapter) {
+      model
+        ..galleryUrl = GalleryUrl.jm(bundle.album.id)
+        ..title = bundle.album.name;
+      if (bundle.album.totalPhotos > 0) {
+        model.pageCount = bundle.album.totalPhotos;
+      }
+    }
+    return model;
   }
 
   /// Details of a JM entry: an album opened from a list, the history or a

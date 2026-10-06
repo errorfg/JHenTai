@@ -1,10 +1,23 @@
+import 'dart:collection';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get/get.dart';
+import 'package:jhentai/src/database/dao/gallery_history_dao.dart';
 import 'package:jhentai/src/database/database.dart';
+import 'package:jhentai/src/model/gallery.dart';
+import 'package:jhentai/src/model/gallery_history_model.dart';
+import 'package:jhentai/src/model/gallery_image.dart';
+import 'package:jhentai/src/model/gallery_tag.dart';
+import 'package:jhentai/src/model/gallery_url.dart';
+import 'package:jhentai/src/pages/history/history_page_logic.dart';
+import 'package:jhentai/src/setting/style_setting.dart';
+import 'package:jhentai/src/widget/eh_gallery_list_card_.dart';
 import 'package:jhentai/src/network/jm/jm_models.dart';
 import 'package:jhentai/src/service/cloud/cloud_provider.dart';
 import 'package:jhentai/src/service/cloud/hot_data_sync_engine.dart';
@@ -109,6 +122,22 @@ Future<Map<int, String>> _states() async {
   };
 }
 
+Future<String?> _albumPosition() async => (await jmReadingService.albumProgress(100))?.positionText;
+
+GalleryHistoryModel _history(GalleryUrl url, String title) => GalleryHistoryModel(
+      galleryUrl: url,
+      title: title,
+      category: 'Manga',
+      coverUrl: 'https://cdn.example.test/cover.jpg',
+      pageCount: 20,
+      rating: 0,
+      language: '',
+      uploader: '',
+      publishTime: '',
+      isExpunged: false,
+      tags: const <String>[],
+    );
+
 Future<int> _resume() async =>
     JmReadingService.resumeChapter(_chapters, await jmReadingService.progressOf(_chapters));
 
@@ -126,9 +155,14 @@ void main() {
     final _Device desktop = _Device();
 
     phone.activate();
+    // Opening the album keeps its chapters in order.
+    await jmReadingService.remember(albumId: 100, chapterIds: _chapters);
+    expect(await jmReadingService.albumProgress(100), isNull, reason: 'nothing read yet');
     // Chapter 101 read to the end, 102 to page 15 of 30.
     await _read(101, page: 19, pageCount: 20);
     await _read(102, page: 14, pageCount: 30);
+    // The album stands where its highest-numbered chapter with a record is.
+    expect(await _albumPosition(), '3/6 · P15/30');
     expect(await _states(), <int, String>{
       100: 'unread',
       101: 'finished',
@@ -143,6 +177,7 @@ void main() {
     await jmReadingService.markRead(_chapters.sublist(0, 4));
     expect((await _states()).values.take(4), everyElement('finished'));
     expect(await _resume(), 104);
+    expect(await _albumPosition(), '4/6', reason: 'a marked chapter is a record');
     await phone.sync(cloud);
 
     // The desktop starts empty and gets the same picture.
@@ -156,6 +191,8 @@ void main() {
       105: 'unread',
     });
     expect(await _resume(), 104);
+    expect(await _albumPosition(), '4/6');
+    expect((await jmReadingService.albumProgress(100))!.fraction, closeTo(4 / 6, 1e-9));
     expect(await jmReadingService.lastOpenedChapter(100), 102);
     // A marked chapter re-read from the reader starts at its first page.
     expect(await readProgressService.getReadProgress(100 + 9000000000), 0);
@@ -166,6 +203,7 @@ void main() {
     await phone.sync(cloud);
     expect((await _states())[104], 'P6/25');
     expect(await _resume(), 104);
+    expect(await _albumPosition(), '5/6 · P6/25');
     expect(await jmReadingService.lastOpenedChapter(100), 104);
 
     // Marking is not reading: tidying up earlier chapters keeps the place.
@@ -179,6 +217,94 @@ void main() {
 
     await phone.db.close();
     await desktop.db.close();
+  });
+
+  test('the history shows a multi-chapter album as one entry', () async {
+    final _Device device = _Device()..activate();
+    // Entries made per chapter by earlier versions, and an unrelated gallery.
+    await historyService.record(_history(GalleryUrl.jm(101), 'Album - Chapter 2'));
+    await historyService.record(_history(GalleryUrl.jm(103), 'Album - Chapter 4'));
+    await historyService.record(_history(GalleryUrl.tryParse('https://e-hentai.org/g/123456/abcdef0123/')!, 'Other'));
+    Future<List<String>> shown() async => (await HistoryPageLogic.visibleHistory(0, await historyService.getPageCount()))
+        .rows
+        .map((GalleryHistoryModel row) => row.title)
+        .toList();
+    expect(await shown(), <String>['Other', 'Album - Chapter 4', 'Album - Chapter 2'], reason: 'the album is not known yet');
+
+    // Opening the album: its chapters become known and it gets its entry.
+    await jmReadingService.remember(albumId: 100, chapterIds: _chapters);
+    await historyService.record(_history(GalleryUrl.jm(100), 'Album'));
+    expect(await shown(), <String>['Album', 'Other']);
+    expect(await jmReadingService.chapterGidsOfKnownAlbums(), <int>{
+      for (final int id in _chapters.skip(1)) GalleryUrl.jm(id).gid,
+    });
+    // The old entries are kept, only not shown.
+    expect(await GalleryHistoryDao.selectTotalCount(), 4);
+
+    await device.db.close();
+  });
+
+  testWidgets('a list card of a multi-chapter album shows where the album stands', (WidgetTester tester) async {
+    final _Device device = (await tester.runAsync(() async => _Device()..activate()))!;
+    Get.testMode = true;
+    Get.put<ReadProgressService>(readProgressService, permanent: true);
+    addTearDown(Get.reset);
+    final Directory cache = Directory.systemTemp.createTempSync('jm_card_test');
+    addTearDown(() => cache.deleteSync(recursive: true));
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/path_provider'),
+      (MethodCall call) async => cache.path,
+    );
+    tester.view.physicalSize = const Size(900, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.runAsync(() async {
+      await jmReadingService.remember(albumId: 100, chapterIds: _chapters);
+      await jmReadingService.markRead(<int>[100, 101]);
+      await _read(102, page: 14, pageCount: 30);
+    });
+
+    final Gallery album = Gallery(
+      galleryUrl: GalleryUrl.jm(100),
+      title: 'Album',
+      category: 'Manga',
+      cover: GalleryImage(url: 'https://cdn.example.test/cover.jpg'),
+      pageCount: 4520,
+      rating: 0,
+      hasRated: false,
+      favoriteTagIndex: null,
+      favoriteTagName: null,
+      language: null,
+      uploader: null,
+      publishTime: '',
+      isExpunged: false,
+      tags: LinkedHashMap<String, List<GalleryTag>>(),
+    );
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: EHGalleryListCard(
+              gallery: album,
+              downloaded: false,
+              listMode: ListMode.listWithoutTags,
+              handleTapCard: (_) {},
+            ),
+          ),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pump();
+
+    // Chapter 3 of 6, at page 15 of 30; the ring stands at chapter 3.
+    expect(find.text('3/6 · P15/30'), findsOneWidget);
+    final CircularProgressIndicator ring = tester.widget(find.byType(CircularProgressIndicator));
+    expect(ring.value, closeTo(0.5, 1e-9));
+    expect(find.text('4520P'), findsOneWidget);
+
+    await tester.runAsync(device.db.close);
   });
 
   test('the chapter to continue with', () {

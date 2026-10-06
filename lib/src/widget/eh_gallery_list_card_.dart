@@ -6,6 +6,8 @@ import 'package:blur/blur.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:get/get.dart';
+import 'package:jhentai/src/service/jm_reading_service.dart';
+import 'package:jhentai/src/widget/jm_chapter_dialog.dart';
 import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/model/gallery.dart';
@@ -198,6 +200,17 @@ class EHGalleryListCard extends StatelessWidget {
   }
 
   Widget buildGalleryInfoFooter(BuildContext context) {
+    // A multi-chapter JM album shows how far the album has been read.
+    if (gallery.galleryUrl.isJM) {
+      return JmAlbumProgressBuilder(
+        albumId: gallery.galleryUrl.jmChapterId,
+        builder: (BuildContext context, JmAlbumProgress? album) => _buildGalleryInfoFooter(context, album),
+      );
+    }
+    return _buildGalleryInfoFooter(context, null);
+  }
+
+  Widget _buildGalleryInfoFooter(BuildContext context, JmAlbumProgress? album) {
     Widget? timeWidget = _buildTime(context);
 
     return Column(
@@ -207,8 +220,8 @@ class EHGalleryListCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             EHGalleryCategoryTag(category: gallery.category),
-            const Expanded(child: SizedBox()),
-            _buildReadingProgress(context).marginOnly(right: 8),
+            Expanded(child: album == null ? const SizedBox() : _buildAlbumPosition(context, album)),
+            (album == null ? _buildReadingProgress(context) : _buildProgressRing(context, album.fraction)).marginOnly(right: 8),
             if (downloaded) _buildDownloadIcon(context).marginOnly(right: 4),
             if (gallery.isFavorite) _buildFavoriteIcon().marginOnly(right: 4),
             if (gallery.language != null) _buildLanguage(context).marginOnly(right: 4),
@@ -264,20 +277,44 @@ class EHGalleryListCard extends StatelessWidget {
 
             double progress = pageCount != null && pageCount > 0 ? ((readIndex + 1) / pageCount).clamp(0.0, 1.0) : 0.0;
 
-            return SizedBox(
-              width: UIConfig.galleryCardReadProgressIndicatorSize,
-              height: UIConfig.galleryCardReadProgressIndicatorSize,
-              child: CircularProgressIndicator(
-                value: progress,
-                strokeWidth: 2,
-                backgroundColor: UIConfig.galleryCardTextColor(context).withValues(alpha: 0.2),
-                valueColor: AlwaysStoppedAnimation<Color>(UIConfig.galleryCardTextColor(context)),
-              ),
-            );
+            return _buildProgressRing(context, progress);
           },
         );
       },
     );
+  }
+
+  Widget _buildProgressRing(BuildContext context, double progress) {
+    return SizedBox(
+      width: UIConfig.galleryCardReadProgressIndicatorSize,
+      height: UIConfig.galleryCardReadProgressIndicatorSize,
+      child: CircularProgressIndicator(
+        value: progress,
+        strokeWidth: 2,
+        backgroundColor: UIConfig.galleryCardTextColor(context).withValues(alpha: 0.2),
+        valueColor: AlwaysStoppedAnimation<Color>(UIConfig.galleryCardTextColor(context)),
+      ),
+    );
+  }
+
+  /// The chapter the ring stands for, e.g. `143/237 · P15/30`.
+  Widget _buildAlbumPosition(BuildContext context, JmAlbumProgress album) {
+    final Color color = UIConfig.galleryCardTextColor(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Icon(Icons.format_list_numbered, size: 11, color: color),
+        const SizedBox(width: 2),
+        Flexible(
+          child: Text(
+            album.positionText,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: UIConfig.galleryCardTextSize, color: color),
+          ),
+        ),
+      ],
+    ).marginOnly(left: 6, right: 6);
   }
 
   Future<(int, int?)> _getReadProgressAndPageCount() async {

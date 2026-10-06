@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/l18n/locale_text.dart';
+import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/model/jh_layout.dart';
 import 'package:jhentai/src/network/eh_request.dart';
@@ -24,6 +25,7 @@ import 'package:jhentai/src/pages/details/details_page_logic.dart';
 import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/service/archive_download_service.dart';
 import 'package:jhentai/src/service/gallery_download_service.dart';
+import 'package:jhentai/src/service/history_service.dart';
 import 'package:jhentai/src/service/jm_reading_service.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
@@ -142,6 +144,21 @@ void main() {
     expect(logic.state.galleryUrl.jmChapterId, reading.id);
     expect(find.text('章节 3/$total'), findsOneWidget);
     expect(find.text('P15'), findsWidgets, reason: 'read button and chapter row');
+
+    // The history has the album once, under its own name, not the chapter.
+    late List<GalleryHistoryModel> history;
+    for (int i = 0; i < 20; i++) {
+      history = (await tester.runAsync(() => historyService.getByPageIndex(0)))!;
+      if (history.isNotEmpty) {
+        break;
+      }
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(history.map((GalleryHistoryModel row) => (row.galleryUrl.gid, row.title)), [
+      (GalleryUrl.jm(album.id).gid, album.name),
+    ]);
+    expect(await tester.runAsync(() => jmReadingService.chaptersOf(album.id)), album.chapters.map((JmChapterRef c) => c.id).toList());
 
     // The chapter list shows each chapter's state.
     await tester.runAsync(() async {
