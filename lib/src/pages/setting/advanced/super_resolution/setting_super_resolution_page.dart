@@ -41,10 +41,23 @@ class SettingSuperResolutionPage extends StatelessWidget {
         () => ListView(
           padding: const EdgeInsets.only(top: 16),
           children: [
+            // Two features that share nothing but the GPU: upscaling what
+            // is downloaded, a whole gallery at a time, and upscaling pages
+            // while reading online. Each has its own programs and models.
+            _SectionHeader(
+              key: const Key('srOfflineSection'),
+              title: 'srSectionOffline'.tr,
+              hint: 'srSectionOfflineHint'.tr,
+            ),
             _buildModelDirectoryPath(),
             _buildModelType(),
-            _buildGpuId(),
             const Divider(),
+            _SectionHeader(
+              key: const Key('srRealtimeSection'),
+              title: 'realtimeSr'.tr,
+              hint: 'srSectionRealtimeHint'.tr,
+              experimental: true,
+            ),
             _buildRealtime(),
             _buildRealtimeModel(),
             _buildRealtimeScale(),
@@ -53,6 +66,13 @@ class SettingSuperResolutionPage extends StatelessWidget {
             _buildRealtimeMaxWidth(),
             for (final SrEngine engine in SrEngine.values) _SrToolTile(engine: engine),
             _buildBenchmark(),
+            const Divider(),
+            _SectionHeader(
+              key: const Key('srCommonSection'),
+              title: 'srSectionCommon'.tr,
+              hint: 'srSectionCommonHint'.tr,
+            ),
+            _buildGpuId(),
           ],
         ).withListTileTheme(context),
       ),
@@ -131,7 +151,7 @@ class SettingSuperResolutionPage extends StatelessWidget {
   Widget _buildRealtime() {
     return SwitchListTile(
       key: const Key('realtimeSrSwitch'),
-      title: Text('realtimeSr'.tr),
+      title: Text('realtimeSrEnable'.tr),
       subtitle: Text('realtimeSrHint'.tr),
       value: superResolutionSetting.realtimeEnabled.value,
       onChanged: (bool value) {
@@ -324,3 +344,50 @@ class _SrToolTileState extends State<_SrToolTile> {
   }
 }
 
+/// Title of a group of settings, with what the group is for; [experimental]
+/// adds a badge saying so.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({super.key, required this.title, required this.hint, this.experimental = false});
+
+  final String title;
+  final String hint;
+  final bool experimental;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Flexible(
+                child: Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w600),
+                ),
+              ),
+              if (experimental)
+                Container(
+                  margin: const EdgeInsets.only(left: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: theme.colorScheme.tertiary),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'experimental'.tr,
+                    style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.tertiary),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(hint, style: theme.textTheme.bodySmall),
+        ],
+      ),
+    );
+  }
+}

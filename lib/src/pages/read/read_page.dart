@@ -326,7 +326,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
               if (logic.canUseRealtimeSr)
                 IconButton(
                   key: const Key('realtimeSrToggle'),
-                  tooltip: 'realtimeSr'.tr,
+                  tooltip: '${'realtimeSr'.tr} (${'experimental'.tr})',
                   icon: Icon(
                     logic.realtimeSrOn ? Icons.hd : Icons.hd_outlined,
                     color: logic.realtimeSrOn ? UIConfig.readPageActiveButtonColor(context) : UIConfig.readPageButtonColor,
