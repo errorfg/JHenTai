@@ -6,60 +6,86 @@ import 'package:extended_image_library/src/network/network_image_io.dart' as net
 import 'package:flutter/painting.dart';
 import 'package:jhentai/src/network/jm/jm_image.dart';
 
-/// Loads a JM page image and puts its strips back in order before display.
+/// Loads a JM page image, puts its strips back in order and shrinks it for
+/// thumbnails before display.
 ///
-/// Resizing happens here too, for thumbnails ([maxBytes]): JM pages are
-/// large and full of screentones, which need a filtered downscale.
-/// [maxBytes] is part of equality so a thumbnail never serves a full-size
-/// request.
+/// A thumbnail of a JM page is the whole page, and its screentones are dot
+/// grids finer than a thumbnail can show. Left for the screen to shrink
+/// while drawing, which samples a few source pixels per screen pixel, they
+/// turn into coarse dots (moiré); shrunk here once, with filtering, they
+/// turn grey. [fitSize] and [maxBytes] are part of equality so a thumbnail
+/// never serves a full-size request.
 class JmNetworkImageProvider extends network_image_io.ExtendedNetworkImageProvider {
   JmNetworkImageProvider(
     String url, {
     required this.strips,
     this.maxBytes,
+    this.fitSize,
     super.headers,
     super.cacheKey,
     super.cache,
     super.printError,
   }) : super(JmImage.requestUrl(url));
 
+  /// 0 when the page is stored whole.
   final int strips;
   final int? maxBytes;
 
+  /// Box in physical pixels the image is shown in; the image shrinks to fit
+  /// it.
+  final Size? fitSize;
+
   @override
   Future<ui.Codec> instantiateImageCodec(Uint8List data, ImageDecoderCallback decode) async {
-    final ui.Codec source = await ui.instantiateImageCodec(data);
-    final ui.Image image = (await source.getNextFrame()).image;
-    source.dispose();
-
-    final int width = image.width;
-    final int height = image.height;
+    final ui.ImmutableBuffer encoded = await ui.ImmutableBuffer.fromUint8List(data);
+    final ui.ImageDescriptor descriptor = await ui.ImageDescriptor.encoded(encoded);
+    final int width = descriptor.width;
+    final int height = descriptor.height;
     final int? limit = maxBytes;
-    final double scale = limit != null && width * height * 4 > limit ? math.sqrt(limit / (width * height * 4)) : 1;
+    final Size? box = fitSize;
+    double scale = 1;
+    if (limit != null && width * height * 4 > limit) {
+      scale = math.sqrt(limit / (width * height * 4));
+    }
+    if (box != null) {
+      scale = math.min(scale, math.min(box.width / width, box.height / height));
+    }
     final int targetWidth = math.max(1, (width * scale).floor());
     final int targetHeight = math.max(1, (height * scale).floor());
 
-    // The strips back in order, pixel for pixel.
-    ui.Image current = await _paint(width, height, (Canvas canvas) {
-      final Paint paint = Paint()..filterQuality = FilterQuality.none;
-      for (final ({int srcY, int dstY, int height}) strip in JmImage.stripLayout(height, strips)) {
-        canvas.drawImageRect(
-          image,
-          Rect.fromLTWH(0, strip.srcY.toDouble(), width.toDouble(), strip.height.toDouble()),
-          Rect.fromLTWH(0, strip.dstY.toDouble(), width.toDouble(), strip.height.toDouble()),
-          paint,
-        );
-      }
-    });
-    image.dispose();
+    // Nothing to do: decoded as is, animations included. The codec reads
+    // from the descriptor until its frames are decoded.
+    final ui.Codec source = await descriptor.instantiateCodec();
+    encoded.dispose();
+    if (strips <= 0 && scale >= 1) {
+      return source;
+    }
+    final ui.Image image = (await source.getNextFrame()).image;
+    source.dispose();
+    descriptor.dispose();
 
-    // Thumbnails: screentones are dot grids finer than a thumbnail can
-    // show; shrunk as they are, they fold into coarse dots (moiré). A
-    // Gaussian blur scaled to the shrink factor first averages them into
-    // grey, as a proper resampling filter does; the blur is drawn by the
-    // renderer, so the result does not depend on whether it smooths when
-    // scaling. 0.4 per unit of shrink came closest to a Lanczos reference
-    // on real JM pages.
+    // The strips back in order, pixel for pixel.
+    ui.Image current = image;
+    if (strips > 0) {
+      current = await _paint(width, height, (Canvas canvas) {
+        final Paint paint = Paint()..filterQuality = FilterQuality.none;
+        for (final ({int srcY, int dstY, int height}) strip in JmImage.stripLayout(height, strips)) {
+          canvas.drawImageRect(
+            image,
+            Rect.fromLTWH(0, strip.srcY.toDouble(), width.toDouble(), strip.height.toDouble()),
+            Rect.fromLTWH(0, strip.dstY.toDouble(), width.toDouble(), strip.height.toDouble()),
+            paint,
+          );
+        }
+      });
+      image.dispose();
+    }
+
+    // A Gaussian blur scaled to the shrink factor first averages the
+    // screentones into grey, as a proper resampling filter does; the blur
+    // is drawn by the renderer, so the result does not depend on whether it
+    // smooths when scaling. 0.4 per unit of shrink came closest to a
+    // Lanczos reference on real JM pages.
     if (scale < 1) {
       final double sigma = 0.4 / scale;
       final ui.Image source = current;
@@ -79,13 +105,13 @@ class JmNetworkImageProvider extends network_image_io.ExtendedNetworkImageProvid
     final int outHeight = current.height;
     current.dispose();
     final ui.ImmutableBuffer buffer = await ui.ImmutableBuffer.fromUint8List(pixels!.buffer.asUint8List());
-    final ui.ImageDescriptor descriptor = ui.ImageDescriptor.raw(
+    final ui.ImageDescriptor restored = ui.ImageDescriptor.raw(
       buffer,
       width: outWidth,
       height: outHeight,
       pixelFormat: ui.PixelFormat.rgba8888,
     );
-    return descriptor.instantiateCodec();
+    return restored.instantiateCodec();
   }
 
   /// [image] drawn at [width] x [height] with bilinear sampling; disposes
@@ -114,8 +140,12 @@ class JmNetworkImageProvider extends network_image_io.ExtendedNetworkImageProvid
 
   @override
   bool operator ==(Object other) =>
-      other is JmNetworkImageProvider && super == other && other.strips == strips && other.maxBytes == maxBytes;
+      other is JmNetworkImageProvider &&
+      super == other &&
+      other.strips == strips &&
+      other.maxBytes == maxBytes &&
+      other.fitSize == fitSize;
 
   @override
-  int get hashCode => Object.hash(super.hashCode, strips, maxBytes);
+  int get hashCode => Object.hash(super.hashCode, strips, maxBytes, fitSize);
 }

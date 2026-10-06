@@ -30,6 +30,7 @@ class EHThumbnail extends StatelessWidget {
       containerHeight: containerHeight,
       containerWidth: containerWidth,
       borderRadius: borderRadius,
+      shrinkToContainer: true,
     );
   }
 

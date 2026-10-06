@@ -52,6 +52,10 @@ abstract final class JmImage {
     return strips > 0 ? '$url#$_fragmentKey=$strips' : url;
   }
 
+  /// Whether [url] is a JM page image, stored in strips or not; image
+  /// lines change, the path does not.
+  static bool isPage(String url) => Uri.tryParse(requestUrl(url))?.path.startsWith('/media/photos/') ?? false;
+
   static String coverUrl({required String imageDomain, required int albumId}) =>
       'https://$imageDomain/media/albums/${albumId}_3x4.jpg';
 

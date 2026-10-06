@@ -45,6 +45,12 @@ class EHImage extends StatefulWidget {
   final bool forceFadeIn;
   final int? maxBytes;
 
+  /// Shrinks a JM page to the container's size in physical pixels once, as
+  /// it loads, instead of leaving the screen to shrink it on every frame;
+  /// see [JmNetworkImageProvider]. For thumbnails, which on JM are whole
+  /// pages. Other images are drawn as they come.
+  final bool shrinkToContainer;
+
   final LoadingProgressWidgetBuilder? loadingProgressWidgetBuilder;
   final FailedWidgetBuilder? failedWidgetBuilder;
   final DownloadingWidgetBuilder? downloadingWidgetBuilder;
@@ -74,6 +80,7 @@ class EHImage extends StatefulWidget {
     this.shadows,
     this.forceFadeIn = false,
     this.maxBytes,
+    this.shrinkToContainer = false,
     this.disableAnimation = false,
     this.animateOnlyWhenVisible = false,
     this.loadingProgressWidgetBuilder,
@@ -99,6 +106,7 @@ class EHImage extends StatefulWidget {
     this.shadows,
     this.forceFadeIn = false,
     this.maxBytes,
+    this.shrinkToContainer = false,
     this.disableAnimation = false,
     this.animateOnlyWhenVisible = false,
     this.loadingProgressWidgetBuilder,
@@ -208,15 +216,17 @@ class _EHImageState extends State<EHImage> {
     final String url = _replaceEXUrl(widget.galleryImage.url);
     final bool useGate = widget.animateOnlyWhenVisible && !widget.disableAnimation;
     final int jmStrips = JmImage.stripsOf(url);
+    final Size? fitSize = widget.shrinkToContainer && JmImage.isPage(url) ? _physicalContainerSize(context) : null;
 
     return ExtendedImage(
       // JM pages are stored in shuffled strips; that provider restores them
-      // and applies maxBytes itself.
-      image: jmStrips > 0
+      // and applies maxBytes and fitSize itself.
+      image: jmStrips > 0 || fitSize != null
           ? JmNetworkImageProvider(
               url,
               strips: jmStrips,
               maxBytes: widget.maxBytes,
+              fitSize: fitSize,
               headers: widget.galleryImage.headers,
               cacheKey: widget.galleryImage.cacheKey,
               cache: true,
@@ -283,6 +293,17 @@ class _EHImageState extends State<EHImage> {
         }
       },
     );
+  }
+
+  /// The container in physical pixels, null when it has no fixed size.
+  Size? _physicalContainerSize(BuildContext context) {
+    final double? width = widget.containerWidth;
+    final double? height = widget.containerHeight;
+    if (width == null || height == null || !width.isFinite || !height.isFinite || width <= 0 || height <= 0) {
+      return null;
+    }
+    final double ratio = MediaQuery.devicePixelRatioOf(context);
+    return Size((width * ratio).ceilToDouble(), (height * ratio).ceilToDouble());
   }
 
   Widget buildFileImage(BuildContext context) {
