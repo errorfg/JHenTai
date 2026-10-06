@@ -29,7 +29,9 @@ import 'package:jhentai/src/network/nhentai_api_support.dart';
 import 'package:jhentai/src/pages/download/download_base_page.dart';
 import 'package:jhentai/src/pages/favorite/favorite_page_logic.dart';
 import 'package:jhentai/src/pages/read/read_page_logic.dart';
+import 'package:jhentai/src/service/jm_reading_service.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
+import 'package:jhentai/src/service/sync_service.dart';
 import 'package:jhentai/src/service/super_resolution_service.dart';
 import 'package:jhentai/src/setting/download_setting.dart';
 import 'package:jhentai/src/setting/my_tags_setting.dart';
@@ -100,10 +102,15 @@ class DetailsPageArgument {
 
   final ({GalleryDetail galleryDetails, String apikey})? detailsPageInfo;
 
+  /// A JM chapter picked from the chapter list opens as is; otherwise
+  /// opening an album goes on to the chapter being read.
+  final bool jmExactChapter;
+
   const DetailsPageArgument({
     required this.galleryUrl,
     this.gallery,
     this.detailsPageInfo,
+    this.jmExactChapter = false,
   });
 
   @override
@@ -139,6 +146,10 @@ class DetailsPageLogic extends GetxController
 
   final DetailsPageState state = DetailsPageState();
 
+  /// The JM album or chapter this page was opened with, until its first
+  /// successful load has moved on to the chapter being read.
+  int? _jmEntryId;
+
   @override
   Scroll2TopStateMixin get scroll2TopState => state;
 
@@ -166,6 +177,9 @@ class DetailsPageLogic extends GetxController
         : argument.gallery;
     state.galleryDetails = argument.detailsPageInfo?.galleryDetails;
     state.apikey = argument.detailsPageInfo?.apikey;
+    if (argument.galleryUrl.isJM && !argument.jmExactChapter) {
+      _jmEntryId = argument.galleryUrl.jmChapterId;
+    }
 
     _syncNhFavoriteStatus();
     _syncLocalSourceFavoriteStatus();
@@ -235,9 +249,11 @@ class DetailsPageLogic extends GetxController
 
     ({GalleryDetail galleryDetails, String apikey})? detailPageInfo;
     try {
-      detailPageInfo = await _getDetailsWithRedirectAndFallback(
-        useCache: useCacheIfAvailable,
-      );
+      detailPageInfo = _jmEntryId != null
+          ? await _getJmEntryDetails(_jmEntryId!, useCache: useCacheIfAvailable)
+          : await _getDetailsWithRedirectAndFallback(
+              useCache: useCacheIfAvailable,
+            );
     } on DioException catch (e) {
       log.error('Get Gallery Detail Failed', e.errorMsg, e.stackTrace);
       snack('getGalleryDetailFailed'.tr, e.errorMsg ?? '', isShort: true);
@@ -280,6 +296,15 @@ class DetailsPageLogic extends GetxController
       // details (its title, pages) are what the page, the reader and
       // downloads use.
       state.gallery = null;
+      final JmChapterBundle bundle = state.jmChapterBundle!;
+      if (bundle.isMultiChapter) {
+        unawaited(
+          jmReadingService.remember(
+            albumId: bundle.album.id,
+            pageCounts: {bundle.chapter.id: bundle.pageCount},
+          ),
+        );
+      }
     }
 
     _syncNhFavoriteStatus();
@@ -1979,6 +2004,7 @@ class DetailsPageLogic extends GetxController
 
     ReadPageInfo? session = info;
     while (session != null) {
+      unawaited(_rememberJmChapterOpened(session));
       final dynamic result = await toRoute<dynamic>(
         Routes.read,
         arguments: session,
@@ -1991,6 +2017,28 @@ class DetailsPageLogic extends GetxController
 
     await Future.delayed(const Duration(milliseconds: 800));
     updateSafely([readButtonId]);
+  }
+
+  /// For a chapter of a multi-chapter JM album: its page count, and that it
+  /// is the chapter being read, which the album then opens on.
+  Future<void> _rememberJmChapterOpened(ReadPageInfo session) async {
+    if (!state.galleryUrl.isJM || session.gid == null) {
+      return;
+    }
+    try {
+      final JmChapterBundle bundle = await ehRequest.jmSource.bundle(
+        session.gid! - GalleryUrl.jmGidOffset,
+      );
+      if (bundle.isMultiChapter) {
+        await jmReadingService.remember(
+          albumId: bundle.album.id,
+          pageCounts: {bundle.chapter.id: bundle.pageCount},
+          openedChapterId: bundle.chapter.id,
+        );
+      }
+    } catch (e) {
+      log.warning('Remember JM chapter failed: ${session.gid}', e);
+    }
   }
 
   Future<ReadPageInfo?> Function({required bool next}) _jmSiblingLoader(
@@ -2046,7 +2094,10 @@ class DetailsPageLogic extends GetxController
     }
     toRoute(
       Routes.details,
-      arguments: DetailsPageArgument(galleryUrl: GalleryUrl.jm(chapter.id)),
+      arguments: DetailsPageArgument(
+        galleryUrl: GalleryUrl.jm(chapter.id),
+        jmExactChapter: true,
+      ),
       offAllBefore: false,
       preventDuplicates: false,
     );
@@ -2089,11 +2140,13 @@ class DetailsPageLogic extends GetxController
     toast('${'beginToDownload'.tr}： ${pending.length}', isCenter: false);
 
     int failed = 0;
+    final Map<int, int> pageCounts = {};
     for (int index in pending) {
       GalleryUrl url = GalleryUrl.jm(album.chapters[index].id);
       int pageCount;
       try {
         pageCount = await ehRequest.jmSource.chapterPageCount(url.jmChapterId);
+        pageCounts[url.jmChapterId] = pageCount;
       } catch (e) {
         log.error('Get JM chapter failed: ${url.jmChapterId}', e);
         failed++;
@@ -2127,6 +2180,9 @@ class DetailsPageLogic extends GetxController
     }
 
     updateGlobalGalleryStatus();
+    unawaited(
+      jmReadingService.remember(albumId: album.id, pageCounts: pageCounts),
+    );
     if (failed > 0) {
       snack('failed'.tr, '${'downloadAllChaptersFailed'.tr}: $failed', isShort: true);
     }
@@ -2156,6 +2212,66 @@ class DetailsPageLogic extends GetxController
 
   Future<int> getReadIndexRecord() async {
     return readProgressService.getReadProgress(state.galleryUrl.gid);
+  }
+
+  /// Details of a JM entry: an album opened from a list, the history or a
+  /// link goes on to the chapter being read (see
+  /// [JmReadingService.resumeChapter]). The page stays loading until that
+  /// chapter is shown, and does this until it has once succeeded.
+  Future<({GalleryDetail galleryDetails, String apikey})> _getJmEntryDetails(
+    int entryId, {
+    bool useCache = true,
+  }) async {
+    state.galleryUrl = GalleryUrl.jm(entryId);
+
+    // Progress made on other devices, fetched alongside the JM requests.
+    final Future<void> progressSync = syncService
+        .syncReadProgress()
+        .then<void>((_) {}, onError: (Object _) {});
+
+    // The chapter last opened in the reader, requested straight away with
+    // its album.
+    final int? lastOpened = await jmReadingService.lastOpenedChapter(entryId);
+    if (lastOpened != null && lastOpened != entryId) {
+      ehRequest.jmSource.rememberAlbumOf(lastOpened, entryId);
+      state.galleryUrl = GalleryUrl.jm(lastOpened);
+    }
+
+    ({GalleryDetail galleryDetails, String apikey}) details;
+    try {
+      details = await _getDetailsWithRedirectAndFallback(useCache: useCache);
+    } catch (e) {
+      if (state.galleryUrl.jmChapterId == entryId) {
+        rethrow;
+      }
+      log.warning('JM chapter $lastOpened failed, opening album $entryId', e);
+      state.galleryUrl = GalleryUrl.jm(entryId);
+      details = await _getDetailsWithRedirectAndFallback(useCache: useCache);
+    }
+
+    final JmChapterBundle bundle = await ehRequest.jmSource.bundle(
+      state.galleryUrl.jmChapterId,
+    );
+    // A chapter of its own (not the album's first) opens as is.
+    if (bundle.album.id != entryId || !bundle.isMultiChapter) {
+      _jmEntryId = null;
+      return details;
+    }
+
+    await progressSync.timeout(const Duration(seconds: 5), onTimeout: () {});
+    final List<int> chapterIds = bundle.album.chapters
+        .map((JmChapterRef c) => c.id)
+        .toList();
+    final int target = JmReadingService.resumeChapter(
+      chapterIds,
+      await jmReadingService.progressOf(chapterIds),
+    );
+    if (target != bundle.chapter.id) {
+      state.galleryUrl = GalleryUrl.jm(target);
+      details = await _getDetailsWithRedirectAndFallback(useCache: useCache);
+    }
+    _jmEntryId = null;
+    return details;
   }
 
   Future<({GalleryDetail galleryDetails, String apikey})>

@@ -29,6 +29,8 @@ import 'package:jhentai/src/widget/eh_tag.dart';
 import 'package:jhentai/src/widget/eh_thumbnail.dart';
 import 'package:jhentai/src/widget/eh_wheel_speed_controller.dart';
 import 'package:jhentai/src/widget/icon_text_button.dart';
+import 'package:jhentai/src/extension/get_logic_extension.dart';
+import 'package:jhentai/src/service/jm_reading_service.dart';
 import 'package:jhentai/src/widget/jm_chapter_dialog.dart';
 import 'package:jhentai/src/widget/loading_state_indicator.dart';
 
@@ -1233,6 +1235,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
               children: [
                 Expanded(
                   child: ListTile(
+                    key: const Key('jmChapterRow'),
                     dense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                     leading: const Icon(Icons.format_list_numbered),
@@ -1244,13 +1247,33 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    trailing: const Icon(Icons.chevron_right),
+                    // How far this chapter has been read.
+                    trailing: JmChapterProgressBuilder(
+                      chapterIds: [bundle.chapter.id],
+                      builder: (context, progress) {
+                        final JmChapterProgress? current = progress[bundle.chapter.id];
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (current?.finished ?? false)
+                              const Icon(Icons.check, size: 18)
+                            else if (current?.inProgress ?? false)
+                              Text(
+                                jmChapterPageText(current!),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            const Icon(Icons.chevron_right),
+                          ],
+                        );
+                      },
+                    ),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     onTap: () => Get.dialog(
                       JmChapterDialog(
                         chapters: bundle.album.chapters,
                         currentChapterId: bundle.chapter.id,
                         onTap: logic.openJmChapter,
+                        onMarked: () => logic.updateSafely([DetailsPageLogic.readButtonId]),
                       ),
                     ),
                   ),

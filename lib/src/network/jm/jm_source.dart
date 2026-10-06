@@ -113,6 +113,12 @@ class JmSource {
   int? _knownAlbumOf(int chapterId) =>
       _albumIdOfChapter[chapterId] ?? (_albumIds.contains(chapterId) ? chapterId : null);
 
+  /// [chapterId] belongs to [albumId], as recorded earlier: its details are
+  /// requested together with the album's.
+  void rememberAlbumOf(int chapterId, int albumId) {
+    _albumIdOfChapter[chapterId] = albumId;
+  }
+
   /// E-Hentai category of albums seen in lists; album details lack it.
   final Map<int, String> _categories = <int, String>{};
 
