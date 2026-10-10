@@ -7,6 +7,8 @@ import 'package:jhentai/src/extension/list_extension.dart';
 import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/path_service.dart';
+import 'package:jhentai/src/service/record_sync/record_sync_engine.dart';
+import 'package:jhentai/src/setting/sync_setting.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
 import 'cloud/pending_sync_tracker.dart';
 import 'jh_service.dart';
@@ -239,11 +241,29 @@ class HistoryService
   Future<bool> delete(int gid) async {
     log.info('Delete history: $gid');
 
-    return await GalleryHistoryDao.deleteHistory(gid) > 0;
+    bool deleted = await GalleryHistoryDao.deleteHistory(gid) > 0;
+    await _recordDeletions(['$gid']);
+    return deleted;
   }
 
   Future<bool> deleteAll() async {
     log.info('Delete all historys');
-    return await GalleryHistoryDao.deleteAllHistory() > 0;
+    Iterable<int> gids = (await GalleryHistoryDao.selectGidToLastReadTime()).keys;
+    bool deleted = await GalleryHistoryDao.deleteAllHistory() > 0;
+    await _recordDeletions(gids.map((gid) => '$gid'));
+    return deleted;
+  }
+
+  /// A sync server passes deletions to the other devices.
+  Future<void> _recordDeletions(Iterable<String> gids) async {
+    try {
+      await recordSyncEngine.recordDeletions(
+        'history',
+        gids,
+        serverChosen: syncSetting.currentProvider.value == SyncService.serverProvider,
+      );
+    } on Exception catch (e) {
+      log.error('Record history deletions for sync failed', e);
+    }
   }
 }

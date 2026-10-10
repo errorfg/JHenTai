@@ -41,6 +41,10 @@ class _CloudSyncSettingsPageState extends State<CloudSyncSettingsPage> {
   final TextEditingController _webdavPasswordController = TextEditingController();
   final TextEditingController _webdavRemotePathController = TextEditingController();
 
+  // Sync server Controllers
+  final TextEditingController _syncServerUrlController = TextEditingController();
+  final TextEditingController _syncServerTokenController = TextEditingController();
+
   // History Controllers
   final TextEditingController _maxHistoryVersionsController = TextEditingController();
 
@@ -48,6 +52,7 @@ class _CloudSyncSettingsPageState extends State<CloudSyncSettingsPage> {
   bool _s3AccessKeyVisible = false;
   bool _s3SecretKeyVisible = false;
   bool _webdavPasswordVisible = false;
+  bool _syncServerTokenVisible = false;
 
   // Debounce timer for auto-save
   Timer? _debounceTimer;
@@ -73,6 +78,10 @@ class _CloudSyncSettingsPageState extends State<CloudSyncSettingsPage> {
     _webdavPasswordController.text = syncSetting.webdavPassword.value;
     _webdavRemotePathController.text = syncSetting.webdavRemotePath.value;
 
+    // Sync server settings
+    _syncServerUrlController.text = syncSetting.syncServerUrl.value;
+    _syncServerTokenController.text = syncSetting.syncServerToken.value;
+
     // History settings
     _maxHistoryVersionsController.text = syncSetting.maxHistoryVersions.value.toString();
   }
@@ -90,6 +99,8 @@ class _CloudSyncSettingsPageState extends State<CloudSyncSettingsPage> {
     _webdavUsernameController.dispose();
     _webdavPasswordController.dispose();
     _webdavRemotePathController.dispose();
+    _syncServerUrlController.dispose();
+    _syncServerTokenController.dispose();
     _maxHistoryVersionsController.dispose();
     super.dispose();
   }
@@ -113,12 +124,17 @@ class _CloudSyncSettingsPageState extends State<CloudSyncSettingsPage> {
               const Divider(height: 32),
               if (syncSetting.currentProvider.value == 's3') ..._buildS3Settings(context),
               if (syncSetting.currentProvider.value == 'webdav') ..._buildWebDavSettings(context),
+              if (syncSetting.currentProvider.value == SyncService.serverProvider) ..._buildSyncServerSettings(context),
               const Divider(height: 32),
-              ..._buildHistorySettings(context),
-              const Divider(height: 32),
+              // Version history is kept by the buckets' latest.json only
+              if (syncSetting.currentProvider.value != SyncService.serverProvider) ...[
+                ..._buildHistorySettings(context),
+                const Divider(height: 32),
+              ],
               _buildTestConnectionButton(context),
               _buildSyncButton(context),
-              if (syncSetting.enableHistory.value) _buildViewHistoryButton(context),
+              if (syncSetting.enableHistory.value && syncSetting.currentProvider.value != SyncService.serverProvider)
+                _buildViewHistoryButton(context),
             ],
           ],
         ).withListTileTheme(context),
@@ -155,6 +171,7 @@ class _CloudSyncSettingsPageState extends State<CloudSyncSettingsPage> {
         items: [
           DropdownMenuItem(value: 's3', child: Text('cloudProviderS3'.tr)),
           DropdownMenuItem(value: 'webdav', child: Text('cloudProviderWebDAV'.tr)),
+          DropdownMenuItem(value: SyncService.serverProvider, child: Text('cloudProviderServer'.tr)),
         ],
       ),
     );
@@ -264,6 +281,32 @@ class _CloudSyncSettingsPageState extends State<CloudSyncSettingsPage> {
         subtitle: 'webdavRemotePathHint'.tr,
         controller: _webdavRemotePathController,
         onSave: syncSetting.saveWebdavRemotePath,
+      ),
+    ];
+  }
+
+  List<Widget> _buildSyncServerSettings(BuildContext context) {
+    return [
+      ListTile(
+        title: Text('syncServerConfig'.tr, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        subtitle: Text('syncServerHint'.tr, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+      ),
+      _buildTextFieldTile(
+        context: context,
+        title: 'syncServerUrl'.tr,
+        subtitle: 'syncServerUrlHint'.tr,
+        controller: _syncServerUrlController,
+        onSave: syncSetting.saveSyncServerUrl,
+        keyboardType: TextInputType.url,
+      ),
+      _buildTextFieldTile(
+        context: context,
+        title: 'syncServerToken'.tr,
+        controller: _syncServerTokenController,
+        onSave: syncSetting.saveSyncServerToken,
+        obscureText: true,
+        isPasswordVisible: _syncServerTokenVisible,
+        togglePasswordVisibility: () => setState(() => _syncServerTokenVisible = !_syncServerTokenVisible),
       ),
     ];
   }
@@ -425,6 +468,9 @@ class _CloudSyncSettingsPageState extends State<CloudSyncSettingsPage> {
         await syncSetting.saveWebdavUsername(_webdavUsernameController.text);
         await syncSetting.saveWebdavPassword(_webdavPasswordController.text);
         await syncSetting.saveWebdavRemotePath(_webdavRemotePathController.text);
+      } else if (syncSetting.currentProvider.value == SyncService.serverProvider) {
+        await syncSetting.saveSyncServerUrl(_syncServerUrlController.text);
+        await syncSetting.saveSyncServerToken(_syncServerTokenController.text);
       }
 
       bool success = await syncService.testConnection(syncSetting.currentProvider.value);

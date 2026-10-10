@@ -15,6 +15,9 @@ enum ConfigEnum {
   oplogLastPushedKey('oplogLastPushedKey'),
   oplogPendingPush('oplogPendingPush'),
 
+  /// sync server state: its database, the pull cursor, the kinds taken in
+  recordSyncState('recordSyncState'),
+
   /// Komga read-progress sync state (device-local, never cloud-synced)
   komgaProgressBase('komgaProgressBase'),
   komgaProgressPending('komgaProgressPending'),

@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:jhentai/src/database/database.dart';
@@ -9,6 +8,7 @@ import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/model/config.dart';
 import 'package:jhentai/src/service/cloud/cloud_provider.dart';
 import 'package:jhentai/src/service/cloud/pending_sync_tracker.dart';
+import 'package:jhentai/src/service/cloud/sync_device_id.dart';
 import 'package:jhentai/src/service/history_service.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
@@ -88,7 +88,7 @@ class HotDataSyncEngine {
     await historyService.ensureMigrated();
     await localConfigService.ensureMigrated();
 
-    String deviceId = await _ensureDeviceId();
+    String deviceId = await ensureSyncDeviceId();
 
     _Manifest? manifest = await _readManifest(provider);
     bool bootstrapped = false;
@@ -628,27 +628,6 @@ class HotDataSyncEngine {
       configKey: ConfigEnum.oplogAppliedOps,
       value: jsonEncode(cursors),
     );
-  }
-
-  Future<String> _ensureDeviceId() async {
-    String? id = await localConfigService.read(
-      configKey: ConfigEnum.syncDeviceId,
-    );
-    if (id != null && id.isNotEmpty) {
-      return id;
-    }
-    String generated = _generateDeviceId();
-    await localConfigService.write(
-      configKey: ConfigEnum.syncDeviceId,
-      value: generated,
-    );
-    return generated;
-  }
-
-  String _generateDeviceId() {
-    final random = Random.secure();
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    return List.generate(12, (_) => chars[random.nextInt(chars.length)]).join();
   }
 
   /// Next object-key timestamp, forced strictly monotonic per device so a
