@@ -64,3 +64,5 @@ CLAUDE.md
 /pubspec_overrides.yaml
 # Crash reports of the flutter tool
 /flutter_*.log
+# Signing material paths and passwords of this machine (tool/ohos/prepare.sh)
+/ohos/signing.local.json5

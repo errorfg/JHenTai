@@ -1,7 +1,10 @@
 
 {
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      // >>> local signing (ohos/signing.local.json5, written by tool/ohos/prepare.sh) >>>
+      // <<< local signing <<<
+    ],
     "products": [
       {
         "name": "default",

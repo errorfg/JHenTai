@@ -27,9 +27,26 @@ if a >= 0 and b >= 0:
 PY
 }
 
+# Signing: ohos/signing.local.json5 (not in git) holds one signingConfigs
+# entry - certificate, key store and profile of this machine. It goes into
+# ohos/build-profile.json5 between the markers there, and comes out again.
+set_signing() {
+  python3 - "$1" <<'PY'
+import pathlib, re, sys
+p = pathlib.Path('ohos/build-profile.json5'); s = p.read_text()
+begin = '// >>> local signing (ohos/signing.local.json5, written by tool/ohos/prepare.sh) >>>\n'
+end = '      // <<< local signing <<<'
+a = s.index(begin) + len(begin); b = s.index(end)
+local = pathlib.Path('ohos/signing.local.json5')
+body = local.read_text() if sys.argv[1] == 'set' and local.exists() else ''
+p.write_text(s[:a] + body + s[b:])
+PY
+}
+
 if [ "${1:-}" = "--undo" ]; then
   rm -f pubspec_overrides.yaml
   remove_hooks
+  set_signing unset
   git checkout -- pubspec.lock
   flutter pub get
   exit 0
@@ -46,7 +63,15 @@ done < <(awk '/^dependency_overrides:/{f=1;next} /^[a-z_]+:/{f=0} f && /^  [a-z_
 [ "$missing" = 0 ] || exit 1
 
 source tool/ohos/env.sh
+
+# The SDK needs one fix for debug builds (see patch_sdk.py); after a change
+# the flutter tool is built again on its next run.
+if [ "$(python3 tool/ohos/patch_sdk.py "$FLUTTER_OHOS_ROOT")" = "patched" ]; then
+  rm -f "$FLUTTER_OHOS_ROOT/bin/cache/flutter_tools.snapshot" "$FLUTTER_OHOS_ROOT/bin/cache/flutter_tools.stamp"
+fi
+
 cp ohos/pubspec_overrides.ohos.yaml pubspec_overrides.yaml
+set_signing set
 remove_hooks
 cat >> pubspec.yaml <<EOF_HOOKS
 
