@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/pages/setting/account/login/login_page_state.dart';
+import 'package:jhentai/src/service/eh_account_sync.dart';
 import 'package:jhentai/src/service/sync_service.dart';
 import 'package:jhentai/src/setting/jm_account_setting.dart';
 import 'package:jhentai/src/setting/nhentai_api_setting.dart';
@@ -32,6 +33,8 @@ Future<void> logout(LoginSite site) async {
   switch (site) {
     case LoginSite.eh:
       await ehRequest.requestLogout();
+      await ehAccountSync.markLoggedOut();
+      await syncAccountIfAuto(CloudConfigTypeEnum.ehAccount);
     case LoginSite.nh:
       // The nhentai account is the API key, which is cloud-synced.
       await nhentaiApiSetting.saveApiKey('');

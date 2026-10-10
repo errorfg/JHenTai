@@ -11,7 +11,8 @@ enum CloudConfigTypeEnum {
   nhentaiApiSetting(10, 'nhentaiApiSetting'),
   eh2telegraphSetting(11, 'eh2telegraphSetting'),
   jmFavorite(12, 'jmFavorite'),
-  jmAccount(13, 'jmAccount');
+  jmAccount(13, 'jmAccount'),
+  ehAccount(14, 'ehAccount');
 
   final int code;
 
@@ -57,6 +58,8 @@ enum CloudConfigTypeEnum {
         return CloudConfigTypeEnum.jmFavorite;
       case 13:
         return CloudConfigTypeEnum.jmAccount;
+      case 14:
+        return CloudConfigTypeEnum.ehAccount;
       default:
         throw Exception('Unknown CloudConfigTypeEnum code: $code');
     }

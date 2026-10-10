@@ -18,6 +18,9 @@ enum ConfigEnum {
   /// sync server state: its database, the pull cursor, the kinds taken in
   recordSyncState('recordSyncState'),
 
+  /// a login received through sync still has no igneous of this device's own
+  ehIgneousPending('ehIgneousPending'),
+
   /// Komga read-progress sync state (device-local, never cloud-synced)
   komgaProgressBase('komgaProgressBase'),
   komgaProgressPending('komgaProgressPending'),

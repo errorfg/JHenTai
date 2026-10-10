@@ -7,6 +7,7 @@ import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/service/cloud/pending_sync_tracker.dart';
+import 'package:jhentai/src/service/eh_account_sync.dart';
 import 'package:jhentai/src/service/history_service.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/jm_favorite_service.dart';
@@ -143,6 +144,7 @@ List<RecordAdapter> defaultRecordAdapters() => [
         configKey: ConfigEnum.jmAccountSetting,
         refresh: () => jmAccountSetting.refreshBean(),
       ),
+      EhAccountRecords(),
     ];
 
 class HistoryRecords extends RowKindAdapter {
@@ -514,6 +516,34 @@ class SingleConfigRecords extends WholeKindAdapter {
       ),
     ]);
     await refresh();
+  }
+}
+
+/// The E-Hentai login (see [EhAccountSync]), one record.
+class EhAccountRecords extends WholeKindAdapter {
+  static const String key = 'default';
+
+  @override
+  String get kind => 'ehAccount';
+
+  @override
+  CloudConfigTypeEnum get type => CloudConfigTypeEnum.ehAccount;
+
+  @override
+  Future<List<MapEntry<String, LocalItem>>> export() async {
+    EhAccountValue? account = await ehAccountSync.export();
+    return account == null ? [] : [MapEntry(key, LocalItem(account.value, firstTime: account.time))];
+  }
+
+  @override
+  Future<String> changeTime() async => (await ehAccountSync.export())?.time ?? SyncTimeUtil.nowIso();
+
+  @override
+  Future<void> replaceAll(List<SyncRecordData> records) async {
+    SyncRecordData? record = records.firstWhereOrNull((r) => r.key == key);
+    if (record != null) {
+      await ehAccountSync.apply(record.value!, record.updatedAt);
+    }
   }
 }
 

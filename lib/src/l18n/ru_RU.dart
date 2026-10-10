@@ -1163,6 +1163,7 @@ class ru_RU {
       'jmApiLine': 'Линия API',
       'jmImageLine': 'Линия изображений',
       'jmAccount': 'Аккаунт JM',
+      'ehAccount': 'Аккаунт E-Hentai',
       'jmMeasureLines': 'Замерить линии',
       'jmLineAutoHint': 'Авто замеряет линии раз в день и использует самую быструю здесь',
       'jmLineNotMeasured': 'Не замерено',

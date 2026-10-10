@@ -32,6 +32,7 @@ import 'package:jhentai/src/model/search_config.dart';
 import 'package:jhentai/src/network/eh_ip_provider.dart';
 import 'package:jhentai/src/network/eh_timeout_translator.dart';
 import 'package:jhentai/src/pages/ranklist/ranklist_page_state.dart';
+import 'package:jhentai/src/service/eh_account_sync.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/path_service.dart';
 import 'package:jhentai/src/setting/eh_setting.dart';
@@ -161,7 +162,9 @@ class EHRequest with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   }
 
   @override
-  Future<void> doAfterBeanReady() async {}
+  Future<void> doAfterBeanReady() async {
+    unawaited(ehAccountSync.fetchIgneousIfPending());
+  }
 
   bool get hasNhentaiApiKey => nhentaiApiSetting.apiKey.value.isNotEmpty;
 
@@ -461,6 +464,10 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
 
   Future<void> storeEHCookies(List<Cookie> cookies) {
     return _cookieManager.storeEHCookies(cookies);
+  }
+
+  Future<void> removeCookies(List<String> cookieNames) {
+    return _cookieManager.removeCookies(cookieNames);
   }
 
   Future<bool> removeAllCookies() {

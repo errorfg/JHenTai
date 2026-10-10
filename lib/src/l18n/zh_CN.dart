@@ -1213,6 +1213,7 @@ favnote：匹配收藏备注
       'jmApiLine': 'API 线路',
       'jmImageLine': '图片线路',
       'jmAccount': 'JM 账号',
+      'ehAccount': 'E-Hentai 账号',
       'jmMeasureLines': '测速',
       'jmLineAutoHint': '自动：每天测速一次，使用本机最快的线路',
       'jmLineNotMeasured': '未测速',

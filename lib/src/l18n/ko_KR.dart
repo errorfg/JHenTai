@@ -1113,6 +1113,7 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'jmApiLine': 'API 회선',
       'jmImageLine': '이미지 회선',
       'jmAccount': 'JM 계정',
+      'ehAccount': 'E-Hentai 계정',
       'jmMeasureLines': '속도 측정',
       'jmLineAutoHint': '자동: 하루에 한 번 측정해 이 기기에서 가장 빠른 회선을 사용합니다',
       'jmLineNotMeasured': '측정 안 함',
