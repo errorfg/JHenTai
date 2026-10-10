@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "module description"
+      "value": "Gallery Reader"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "description"
+      "value": "Gallery Reader"
     },
     {
       "name": "EntryAbility_label",
-      "value": "jhentai"
+      "value": "Gallery Reader"
     }
   ]
 }

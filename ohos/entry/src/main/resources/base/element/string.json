@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "JHenTai"
+      "value": "Gallery Reader"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "JHenTai"
+      "value": "Gallery Reader"
     },
     {
       "name": "EntryAbility_label",
-      "value": "JHenTai"
+      "value": "Gallery Reader"
     }
   ]
 }
