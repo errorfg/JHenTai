@@ -44,7 +44,8 @@ class DetailPreviewPage extends DetailsPage {
       child: EHWheelSpeedController(
         controller: state.scrollController,
         child: CustomScrollView(
-          scrollCacheExtent: ScrollCacheExtent.pixels(5000),
+          // cacheExtent, not scrollCacheExtent: the HarmonyOS Flutter SDK (3.41) has only the former.
+          cacheExtent: 5000,
           controller: state.scrollController,
           scrollBehavior: UIConfig.scrollBehaviourWithScrollBarWithMouse  ,
           slivers: [

@@ -1,0 +1,16 @@
+name: saver_gallery
+description: >-
+  Stand-in for saver_gallery on HarmonyOS, where the real package has no
+  implementation and its 5.x releases need Dart 3.12 (the HarmonyOS Flutter
+  SDK ships 3.11). Same API as 5.1.0 for what the app calls; every call
+  reports failure. Used only through ohos/pubspec_overrides.ohos.yaml.
+version: 5.1.0+ohos.stub
+publish_to: none
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter

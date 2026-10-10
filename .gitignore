@@ -59,3 +59,8 @@ CLAUDE.md
 # Upscaler tests with the real programs (copy from sr_e2e.example.json); toolsRoot holds
 # the unpacked releases as realesrgan/ and realcugan/
 /test/e2e/sr_e2e.json
+
+# Written by tool/ohos/prepare.sh for HarmonyOS builds; see ohos/pubspec_overrides.yaml
+/pubspec_overrides.yaml
+# Crash reports of the flutter tool
+/flutter_*.log

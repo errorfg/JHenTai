@@ -34,10 +34,9 @@ class _ContextMenuRegionState extends State<ContextMenuRegion> {
       case TargetPlatform.android:
       case TargetPlatform.iOS:
         return true;
-      case TargetPlatform.macOS:
-      case TargetPlatform.fuchsia:
-      case TargetPlatform.linux:
-      case TargetPlatform.windows:
+      // Desktops, and TargetPlatform.ohos of the HarmonyOS Flutter SDK, which
+      // the other SDKs do not have.
+      default:
         return false;
     }
   }

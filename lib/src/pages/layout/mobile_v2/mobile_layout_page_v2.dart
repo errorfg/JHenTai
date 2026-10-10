@@ -162,7 +162,8 @@ class MobileLeftDrawer extends StatelessWidget {
                 key: const PageStorageKey('leftDrawer'),
                 controller: state.scrollController,
                 itemCount: state.icons.length,
-                scrollCacheExtent: const ScrollCacheExtent.pixels(1000),
+                // cacheExtent, not scrollCacheExtent: the HarmonyOS Flutter SDK (3.41) has only the former.
+                cacheExtent: 1000,
                 itemBuilder: (context, index) => ListTile(
                   key: ValueKey<String>(
                     'readerMenu:${state.icons[index].name.name}',

@@ -1,0 +1,12 @@
+{
+  "name": "sqlite3_flutter_libs",
+  "version": "1.0.0",
+  "description": "Ships libsqlite3.so for package:sqlite3 on HarmonyOS.",
+  "main": "index.ets",
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@ohos/flutter_ohos": "file:./har/flutter.har",
+    "sqlite3-native-library": "^3.46.0"
+  }
+}

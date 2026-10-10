@@ -1,0 +1,145 @@
+# Dependency overrides for HarmonyOS builds. tool/ohos/prepare.sh copies this
+# file to /pubspec_overrides.yaml (ignored by git), which pub reads in place of
+# the dependency_overrides section of pubspec.yaml - so the entries of that
+# section are repeated here first. Keep the two in step.
+#
+# The plugin ports are the community's HarmonyOS adaptations (see
+# docs/superpowers/specs/2026-10-10-harmonyos-native-feasibility.md, section 4);
+# each is pinned to a tag or branch that matches the version the other
+# platforms use as closely as the ports allow.
+dependency_overrides:
+  # ---- As in pubspec.yaml ----------------------------------------------------
+  system_network_proxy_macos:
+    path: third_party/system_network_proxy_macos
+  system_network_proxy_linux:
+    path: third_party/system_network_proxy_linux
+  system_network_proxy_windows:
+    path: third_party/system_network_proxy_windows
+  uuid: ^4.5.1
+  photo_view:
+    git:
+      url: https://github.com/jiangtian616/photo_view
+      ref: 1fecde37
+  # chewie: a patched copy, not 1.13.1 from pub.dev (a switch over
+  # TargetPlatform without a default; see ohos/patched/chewie/README.md).
+  chewie:
+    path: ohos/patched/chewie
+  http: 1.6.0
+  cached_network_image: 3.4.0
+  dio:
+    git:
+      url: https://github.com/jiangtian616/dio
+      path: dio
+      ref: append-mode
+
+  # ---- Official packages (openharmony-sig/flutter_packages) ----------------
+  path_provider:
+    git:
+      url: https://gitcode.com/openharmony-sig/flutter_packages.git
+      path: packages/path_provider/path_provider
+      ref: br_path_provider-v2.1.5_ohos
+  url_launcher:
+    git:
+      url: https://gitcode.com/openharmony-sig/flutter_packages.git
+      path: packages/url_launcher/url_launcher
+      ref: url_launcher_v6.3.2-ohos-1.0.2
+  local_auth:
+    git:
+      url: https://gitcode.com/openharmony-sig/flutter_packages.git
+      path: packages/local_auth/local_auth
+      ref: local_auth-v3.0.1-ohos-1.0.0
+  webview_flutter:
+    git:
+      url: https://gitcode.com/openharmony-sig/flutter_packages.git
+      path: packages/webview_flutter/webview_flutter
+      ref: webview_flutter-v4.13.1-ohos-1.0.2
+  # video_player (videos in HTML comments): the port's video_player_ohos lists
+  # a ported pigeon as a runtime dependency, whose analyzer bound (< 10) clashes
+  # with drift_dev 2.34 (>= 10). Not replaced for now; videos in comments do
+  # not play on HarmonyOS.
+
+  # ---- Third-party ports ---------------------------------------------------
+  # file_picker: no port fits yet. fluttertpc_file_picker's 8.0.7 branch wants
+  # web ^0.5 (share_plus 12 wants ^1); its 10.3.8 tag is the whole package
+  # renamed file_picker_ohos. Until then file picking is unavailable on
+  # HarmonyOS (the calls throw MissingPluginException).
+  permission_handler:
+    git:
+      url: https://gitcode.com/openharmony-sig/flutter_permission_handler.git
+      path: permission_handler
+      ref: 12.0.1-ohos-1.0.0
+  share_plus:
+    git:
+      url: https://gitcode.com/openharmony-sig/flutter_plus_plugins.git
+      path: packages/share_plus/share_plus
+      ref: br_share_plus-v12.0.1_ohos
+  battery_plus:
+    git:
+      url: https://gitcode.com/openharmony-sig/flutter_plus_plugins.git
+      path: packages/battery_plus/battery_plus
+      ref: br_battery_plus-v7.0.0_ohos
+  device_info_plus:
+    git:
+      url: https://gitcode.com/openharmony-sig/flutter_plus_plugins.git
+      path: packages/device_info_plus/device_info_plus
+      ref: br_device_info_plus-v11.1.0_ohos
+  package_info_plus:
+    git:
+      url: https://gitcode.com/openharmony-sig/flutter_plus_plugins.git
+      path: packages/package_info_plus/package_info_plus
+      ref: br_package_info_plus-v9.0.0_ohos
+  wakelock_plus:
+    git:
+      url: https://gitcode.com/openharmony-sig/fluttertpc_wakelock_plus.git
+      path: wakelock_plus
+      ref: 1.4.0-ohos-1.0.0
+  fluttertoast:
+    git:
+      url: https://gitcode.com/openharmony-sig/flutter_fluttertoast.git
+      ref: br_8.2.8_ohos
+  pdfx:
+    git:
+      url: https://gitcode.com/openharmony-sig/flutter_pdfx.git
+      path: packages/pdfx
+      ref: 2.9.2-ohos-1.0.0
+  receive_sharing_intent:
+    git:
+      url: https://gitcode.com/openharmony-sig/fluttertpc_receive_sharing_intent.git
+      ref: 1.8.1-ohos-1.0.0
+  sqflite:
+    git:
+      url: https://gitcode.com/openharmony-sig/flutter_sqflite.git
+      path: sqflite
+      ref: 2.4.2-ohos-1.0.0
+  just_audio:
+    git:
+      url: https://gitcode.com/openharmony-sig/fluttertpc_just_audio.git
+      path: just_audio
+      ref: br_v0.10.5_ohos
+  audio_session:
+    git:
+      url: https://gitcode.com/openharmony-sig/flutter_audio_session.git
+      ref: br_v0.2.2_ohos
+
+  # ---- Constraints the ports have not caught up with ------------------------
+  # local_auth_ohos asks for intl < 0.19; Flutter 3.41's localizations need
+  # 0.20. An override makes pub ignore the port's bound.
+  intl: 0.20.2
+
+  # ---- Native assets ---------------------------------------------------------
+  # The HarmonyOS Flutter tool runs build hooks (sqlite3's) with target OS
+  # "ohos", which only this patched code_assets knows; the ref is the one the
+  # tool itself is built with (flutter_ohos/packages/flutter_tools/pubspec.yaml).
+  code_assets:
+    git:
+      url: https://gitcode.com/openharmony-sig/fluttertpc_dart_native
+      path: pkgs/code_assets
+      ref: flutter_3.41.9_deps
+
+  # ---- Our own ---------------------------------------------------------------
+  sqlite3_flutter_libs:
+    path: third_party/sqlite3_flutter_libs_ohos
+  flex_color_picker:
+    path: ohos/patched/flex_color_picker
+  saver_gallery:
+    path: ohos/stubs/saver_gallery

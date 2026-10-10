@@ -1,0 +1,11 @@
+{
+  "module": {
+    "name": "sqlite3_flutter_libs",
+    "type": "har",
+    "deviceTypes": [
+      "default",
+      "tablet",
+      "phone"
+    ]
+  }
+}

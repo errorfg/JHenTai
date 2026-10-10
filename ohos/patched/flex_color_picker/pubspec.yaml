@@ -1,0 +1,23 @@
+name: flex_color_picker
+description: >-
+  flex_color_picker 3.8.0 with its two switches over TargetPlatform given a
+  default branch, which the HarmonyOS Flutter SDK's extra TargetPlatform.ohos
+  needs. Used only by HarmonyOS builds (ohos/pubspec_overrides.ohos.yaml).
+version: 3.8.0+ohos.1
+publish_to: none
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+  flutter: '>=3.38.0'
+
+dependencies:
+  # FlexSeedScheme package, by Mike Rydstrom, rydmike.com (@rydmike).
+  # https://pub.dev/packages/flex_seed_scheme
+  flex_seed_scheme: ^4.0.0
+
+  flutter:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/

@@ -29,7 +29,10 @@ class QuickSearchPage extends StatelessWidget {
           return ReorderableListView.builder(
             scrollController: scrollController,
             itemCount: quickSearchService.quickSearchConfigs.length,
-            onReorderItem: quickSearchService.reOrderQuickSearch,
+            // onReorder, not onReorderItem (3.44): the HarmonyOS Flutter SDK (3.41)
+            // has only the former, whose newIndex counts the item being moved.
+            onReorder: (int oldIndex, int newIndex) =>
+                quickSearchService.reOrderQuickSearch(oldIndex, oldIndex < newIndex ? newIndex - 1 : newIndex),
             padding: const EdgeInsets.only(bottom: 120),
             itemBuilder: (_, int index) => Column(
               key: Key(entries[index].key),

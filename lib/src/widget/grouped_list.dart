@@ -112,7 +112,8 @@ class _GroupedListState<G, E> extends State<GroupedList<G, E>> {
       controller: scrollController,
       child: ListView.builder(
         controller: scrollController,
-        scrollCacheExtent: ScrollCacheExtent.pixels(200),
+        // cacheExtent, not scrollCacheExtent: the HarmonyOS Flutter SDK (3.41) has only the former.
+        cacheExtent: 200,
         itemCount: _groups.length + widget.elements.length,
         itemBuilder: (context, index) {
           int i = 0;
@@ -148,7 +149,7 @@ class _GroupedListState<G, E> extends State<GroupedList<G, E>> {
       controller: scrollController,
       child: CustomScrollView(
         controller: scrollController,
-        scrollCacheExtent: ScrollCacheExtent.pixels(200),
+        cacheExtent: 200,
         slivers: _buildSlivers(context),
       ),
     );

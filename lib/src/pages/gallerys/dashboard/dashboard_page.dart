@@ -132,7 +132,8 @@ class DashboardPage extends BasePage {
                   gallery: state.ranklistGallerys[index],
                   badge: _getRanklistBadge(index)),
               separatorBuilder: (_, __) => const VerticalDivider(),
-              scrollCacheExtent: ScrollCacheExtent.pixels(2000),
+              // cacheExtent, not scrollCacheExtent: the HarmonyOS Flutter SDK (3.41) has only the former.
+              cacheExtent: 2000,
             ).enableMouseDrag(withScrollBar: false).fadeIn(),
           ),
         ),
@@ -165,7 +166,7 @@ class DashboardPage extends BasePage {
               itemBuilder: (_, index) =>
                   EHDashboardCard(gallery: state.popularGallerys[index]),
               separatorBuilder: (_, __) => const VerticalDivider(),
-              scrollCacheExtent: ScrollCacheExtent.pixels(2000),
+              cacheExtent: 2000,
             ).enableMouseDrag(withScrollBar: false).fadeIn(),
           ),
         ),

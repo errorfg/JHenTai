@@ -1,0 +1,22 @@
+name: sqlite3_flutter_libs
+description: >-
+  sqlite3_flutter_libs 0.5.42 with a HarmonyOS module. Used only by HarmonyOS
+  builds (ohos/pubspec_overrides.ohos.yaml); the other platforms take the
+  package from pub.dev. The HarmonyOS module ships libsqlite3.so from the
+  ohpm package sqlite3-native-library, which package:sqlite3 opens by name.
+version: 0.5.42+ohos.1
+publish_to: none
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      ohos:
+        pluginClass: Sqlite3FlutterLibsPlugin

@@ -1,0 +1,10 @@
+{
+  "app": {
+    "bundleName": "top.jtmonster.jhentai",
+    "vendor": "errorfg",
+    "versionCode": 350,
+    "versionName": "8.0.36",
+    "icon": "$media:app_icon",
+    "label": "$string:app_name"
+  }
+}

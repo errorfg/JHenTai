@@ -156,7 +156,8 @@ class TagSetsPage extends StatelessWidget {
                     Expanded(
                       child: ListView.builder(
                         itemExtent: 64,
-                        scrollCacheExtent: ScrollCacheExtent.pixels(3000),
+                        // cacheExtent, not scrollCacheExtent: the HarmonyOS Flutter SDK (3.41) has only the former.
+                        cacheExtent: 3000,
                         itemCount: logic.filteredTags.length,
                         controller: state.scrollController,
                         itemBuilder: (_, int displayIndex) {
