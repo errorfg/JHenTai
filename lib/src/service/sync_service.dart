@@ -71,6 +71,10 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   int _lastHistoryAutoSyncCount = 0;
   bool _historyAutoSyncInProgress = false;
   static const _minSyncInterval = Duration(seconds: 30);
+
+  /// A sync that has not ended by then is given up, so that one stuck request
+  /// cannot keep every later sync "already in progress".
+  static const Duration _syncTimeout = Duration(minutes: 15);
   static const int _historyAutoSyncStep = 5;
 
   @override
@@ -281,7 +285,17 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
                 types: types,
                 providerName: providerName,
                 onProgress: onProgress,
-              ));
+              )).timeout(
+        _syncTimeout,
+        onTimeout: () {
+          log.error('Sync gave up after $_syncTimeout');
+          return SyncResult(
+            success: false,
+            message: 'Sync timed out after ${_syncTimeout.inMinutes} minutes',
+            statistics: {},
+          );
+        },
+      );
       if (result.success) {
         final DateTime completedAt = _now();
         if (types.contains(CloudConfigTypeEnum.readIndexRecord)) {

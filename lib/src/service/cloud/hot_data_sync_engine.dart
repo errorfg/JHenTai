@@ -64,6 +64,15 @@ class HotDataSyncEngine {
   /// Keep this many most recent snapshots (older ones are garbage).
   static const int _snapshotsToKeep = 2;
 
+  /// Op packs applied, and their cursors stored, per round.
+  static const int _applyChunk = 20;
+
+  /// Op packs downloaded at once.
+  static const int _downloadParallel = 4;
+
+  /// A download that failed is tried once more after this.
+  static const Duration _retryDelay = Duration(seconds: 2);
+
   /// Sync the hot data types through [provider].
   ///
   /// [legacyRemoteConfigJson]: raw content of the legacy latest.json if the
@@ -147,29 +156,31 @@ class HotDataSyncEngine {
     }
     pending.sort((a, b) => a.key.compareTo(b.key));
 
-    /// Download everything first, apply in ONE guarded write per type
-    /// (guarded writes read a full-table timestamp map, so applying pack by
-    /// pack would be O(packs x table size)), then advance cursors.
-    List<Map<String, dynamic>> packs = [];
-    for (RemoteObjectInfo obj in pending) {
-      List<int>? bytes = await provider.getRawObject(obj.key);
-      if (bytes == null) {
-        continue;
+    /// Packs are taken a chunk at a time: the chunk is downloaded (a few at
+    /// once), applied in ONE guarded write per type (guarded writes read a
+    /// full-table timestamp map, so applying pack by pack would be
+    /// O(packs x table size)), and the cursors are advanced and stored.
+    /// A device that is far behind (hundreds of packs) thus keeps what it got
+    /// through when the app is closed or a download fails part way; before,
+    /// the cursors moved only after the last pack, and a run cut short at any
+    /// point started the whole list over on the next launch.
+    for (int start = 0; start < pending.length; start += _applyChunk) {
+      List<RemoteObjectInfo> chunk = pending.sublist(
+        start,
+        start + _applyChunk > pending.length ? pending.length : start + _applyChunk,
+      );
+      List<Map<String, dynamic>> packs = await _downloadPacks(provider, chunk);
+      applied += await _applyPacks(packs);
+      for (RemoteObjectInfo obj in chunk) {
+        _OpKey parsed = _OpKey.tryParse(obj.key)!;
+        String current = appliedCursors[parsed.deviceId] ?? '';
+        if (parsed.ts.compareTo(current) > 0) {
+          appliedCursors[parsed.deviceId] = parsed.ts;
+        }
       }
-      packs.add(await _decodePack(bytes));
-    }
-    applied += await _applyPacks(packs);
-    for (RemoteObjectInfo obj in pending) {
-      _OpKey parsed = _OpKey.tryParse(obj.key)!;
-      String current = appliedCursors[parsed.deviceId] ?? '';
-      if (parsed.ts.compareTo(current) > 0) {
-        appliedCursors[parsed.deviceId] = parsed.ts;
-      }
-    }
-    if (pending.isNotEmpty) {
       await _writeAppliedCursors(appliedCursors);
       log.info(
-        '🔁 Hot sync: applied ${pending.length} op packs ($applied rows total)',
+        '🔁 Hot sync: applied ${start + chunk.length}/${pending.length} op packs ($applied rows total)',
       );
     }
 
@@ -555,6 +566,40 @@ class HotDataSyncEngine {
   Future<List<int>> _encodePack(Map<String, dynamic> pack) async {
     String json = await isolateService.jsonEncodeAsync(pack);
     return gzip.encode(utf8.encode(json));
+  }
+
+  /// The packs of [chunk], decoded, in the order of [chunk]; a pack that is
+  /// gone from the remote is left out. A download that fails is tried once
+  /// more; a second failure fails the sync, with the chunks before this one
+  /// already applied and recorded.
+  Future<List<Map<String, dynamic>>> _downloadPacks(
+    CloudProvider provider,
+    List<RemoteObjectInfo> chunk,
+  ) async {
+    List<Map<String, dynamic>?> packs = List<Map<String, dynamic>?>.filled(chunk.length, null);
+    int next = 0;
+    Future<void> worker() async {
+      while (next < chunk.length) {
+        int i = next++;
+        List<int>? bytes;
+        try {
+          bytes = await provider.getRawObject(chunk[i].key);
+        } catch (e) {
+          log.warning('Hot sync: download of ${chunk[i].key} failed, trying once more', e);
+          await Future<void>.delayed(_retryDelay);
+          bytes = await provider.getRawObject(chunk[i].key);
+        }
+        if (bytes != null) {
+          packs[i] = await _decodePack(bytes);
+        }
+      }
+    }
+
+    await Future.wait(List<Future<void>>.generate(
+      chunk.length < _downloadParallel ? chunk.length : _downloadParallel,
+      (_) => worker(),
+    ));
+    return packs.whereType<Map<String, dynamic>>().toList();
   }
 
   Future<Map<String, dynamic>> _decodePack(List<int> bytes) async {
