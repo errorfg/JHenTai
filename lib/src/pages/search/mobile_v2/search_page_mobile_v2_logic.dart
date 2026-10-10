@@ -54,7 +54,7 @@ class SearchPageMobileV2Logic extends BasePageLogic with SearchPageLogicMixin {
     }
 
     if (rewriteSearchConfig == null) {
-      applySchemeSite();
+      applySchemeSite(Get.arguments is NewSearchArgument ? (Get.arguments as NewSearchArgument).site : null);
     }
 
     if (Get.arguments is NewSearchArgument) {

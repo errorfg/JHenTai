@@ -1,3 +1,4 @@
+import 'package:jhentai/src/model/search_config.dart';
 import 'dart:async';
 import 'dart:math';
 
@@ -102,18 +103,29 @@ mixin SearchPageLogicMixin on BasePageLogic {
     updateSafely([searchFieldId]);
   }
 
-  /// A search opened without explicit settings starts on the site of the
-  /// current scheme; under E-Hentai the saved choice is kept.
-  void applySchemeSite() {
+  /// A search opened with a keyword only is for [site] when the caller
+  /// names one (a gallery's own site, or E-Hentai for a title looked up
+  /// there). Otherwise it starts on the site of the current scheme; under
+  /// E-Hentai the saved choice is kept.
+  void applySchemeSite([ContentScheme? site]) {
+    if (site != null) {
+      applySearchSite(state.searchConfig, site);
+      return;
+    }
     final ContentScheme scheme = schemeSetting.site.value;
     if (scheme == ContentScheme.ehentai || !scheme.isSite) {
       return;
     }
-    state.searchConfig.isNhSearch = scheme == ContentScheme.nhentai;
-    state.searchConfig.isWnacgSearch = scheme == ContentScheme.wnacg;
-    state.searchConfig.isJmSearch = scheme == ContentScheme.jm;
-    if (scheme == ContentScheme.nhentai) {
-      state.searchConfig.nhentaiSource = 'net';
+    applySearchSite(state.searchConfig, scheme);
+  }
+
+  /// Makes [config] a search of [site].
+  static void applySearchSite(SearchConfig config, ContentScheme site) {
+    config.isNhSearch = site == ContentScheme.nhentai;
+    config.isWnacgSearch = site == ContentScheme.wnacg;
+    config.isJmSearch = site == ContentScheme.jm;
+    if (site == ContentScheme.nhentai) {
+      config.nhentaiSource = 'net';
     }
   }
 

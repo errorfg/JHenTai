@@ -4,6 +4,9 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:dio/dio.dart';
 import 'package:executor/executor.dart';
+import 'dart:io' as io;
+import 'dart:typed_data';
+
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -32,6 +35,10 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../model/detail_page_info.dart';
 import '../../model/gallery_image.dart';
+import '../../setting/super_resolution_setting.dart';
+import '../../service/sr/realtime_sr_service.dart';
+import '../../service/gallery_download_service.dart';
+import '../../network/jm/jm_image.dart';
 import '../../model/read_page_info.dart';
 import '../../network/eh_request.dart';
 import '../../routes/routes.dart';
@@ -288,6 +295,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   late Worker customBrightnessListener;
   late Worker preloadListener;
   late Worker enableBottomMenuListener;
+  late Worker realtimeSrSettingListener;
   late Worker orientationSpecificReadDirectionLister;
   late Worker portraitReadDirectionLister;
   late Worker landscapeReadDirectionLister;
@@ -328,6 +336,197 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
   /// Pages left below the last visible one when the next book is fetched.
   static const int _appendAhead = 3;
+
+  /// Pages whose upscaled copy is being made, and pages left as they are
+  /// (animated, wide enough, failed), which are not asked for again.
+  final Set<int> _srInFlight = <int>{};
+  final Set<int> _srSkipped = <int>{};
+
+  /// Counts the changes of the upscaling settings: what was asked for under
+  /// earlier settings is not waited for.
+  int _srGeneration = 0;
+  bool _srRestartScheduled = false;
+
+  /// Whether pages are upscaled as they are read: on a desktop, switched
+  /// on, with the upscaler of the chosen model installed. Wherever the pages
+  /// come from: a site, a Komga server, files.
+  bool get realtimeSrOn => _realtimeSrApplies && realtimeSrService.active;
+
+  /// Shown in the reader's menu where upscaling while reading can be used.
+  bool get canUseRealtimeSr => GetPlatform.isDesktop && _realtimeSrApplies;
+
+  /// Not while the reader shows the copy of a downloaded gallery or archive
+  /// that was upscaled as a whole: those pages are upscaled already.
+  bool get _realtimeSrApplies => !state.useSuperResolution;
+
+  /// The reader follows the setting, as it follows the settings page (see
+  /// [_restartRealtimeSr]).
+  Future<void> toggleRealtimeSr() async {
+    final bool enable = !superResolutionSetting.realtimeEnabled.value;
+    if (enable && !realtimeSrService.available) {
+      toast('realtimeSrNotInstalled'.tr, isShort: false);
+      return;
+    }
+    await superResolutionSetting.saveRealtimeEnabled(enable);
+  }
+
+  /// One restart for the changes made in a turn: choosing a model sets its
+  /// scale and denoise level with it.
+  void _scheduleRealtimeSrRestart() {
+    if (_srRestartScheduled) {
+      return;
+    }
+    _srRestartScheduled = true;
+    scheduleMicrotask(() {
+      _srRestartScheduled = false;
+      if (!isClosed) {
+        _restartRealtimeSr();
+      }
+    });
+  }
+
+  /// The upscaling settings changed (the switch, the model, its scale or
+  /// denoise level, the width limit), in the reader's menu or in the
+  /// settings shown over it: the pages are shown and asked for anew under
+  /// them, so that the effect of a model shows on the page being read. Pages
+  /// already upscaled under the new settings come from memory.
+  void _restartRealtimeSr() {
+    _srGeneration++;
+    _srInFlight.clear();
+    _srSkipped.clear();
+    realtimeSrService.clearPending();
+    log.info('real-time super resolution: ${realtimeSrOn ? realtimeSrService.config.label : 'off'}');
+    updateSafely([topMenuId]);
+    // Rebuilt pages show their upscaled copy, or the original until there
+    // is one.
+    layoutLogic.updateSafely([BaseLayoutLogic.pageId]);
+    requestRealtimeSrAhead();
+  }
+
+  /// Where page [index] comes from, for the upscaler: a key naming it, the
+  /// strips of a JM page, and its encoded bytes. Null until the page's
+  /// address is known.
+  ({String key, int strips, Future<Uint8List?> Function() load})? _srSource(int index) {
+    final GalleryImage? image = index < state.images.length ? state.images[index] : null;
+    if (image == null) {
+      return null;
+    }
+    // A page of a download that is still running is not there yet; it is
+    // never fetched from its site here.
+    if (state.readPageInfo.mode == ReadMode.downloaded && image.downloadStatus != DownloadStatus.downloaded) {
+      return null;
+    }
+    if (image.path != null) {
+      // A page on disk: of a download (a JM page was restored when saved), an
+      // archive, a downloaded Komga book, a local gallery.
+      final String path = GalleryDownloadService.computeImageDownloadAbsolutePathFromRelativePath(image.path!);
+      return (key: path, strips: 0, load: () => io.File(path).readAsBytes());
+    }
+    final String requestUrl = JmImage.requestUrl(image.url);
+    // From the image cache when the page was shown, else downloaded into it:
+    // with the headers and under the cache key the page is shown with (a
+    // Komga server wants its login).
+    return (
+      key: requestUrl,
+      strips: JmImage.stripsOf(image.url),
+      load: () => ExtendedNetworkImageProvider(requestUrl, headers: image.headers, cacheKey: image.cacheKey, cache: true).getNetworkImageData(),
+    );
+  }
+
+  /// The upscaled copy of page [index] (encoded), when it is ready.
+  Uint8List? upscaledPage(int index) {
+    final ({String key, int strips, Future<Uint8List?> Function() load})? source = _srSource(index);
+    return source == null ? null : realtimeSrService.cached(source.key);
+  }
+
+  /// Asks for the upscaled copy of page [index] unless it is there, being
+  /// made, or the page is left as it is; the page is rebuilt with it once
+  /// it is ready and decoded.
+  void requestRealtimeSr(int index) {
+    if (!realtimeSrOn || _srSkipped.contains(index) || _srInFlight.contains(index)) {
+      return;
+    }
+    final ({String key, int strips, Future<Uint8List?> Function() load})? source = _srSource(index);
+    if (source == null || realtimeSrService.cached(source.key) != null) {
+      return;
+    }
+
+    final int generation = _srGeneration;
+    _srInFlight.add(index);
+    unawaited(
+      realtimeSrService.upscale(sourceKey: source.key, position: index, strips: source.strips, loadEncoded: source.load).then(
+        (Uint8List? bytes) async {
+          // The settings changed since: the page was asked for anew.
+          if (isClosed || generation != _srGeneration) {
+            return;
+          }
+          _srInFlight.remove(index);
+          if (bytes == null) {
+            _srSkipped.add(index);
+            return;
+          }
+          // Decoded before the page switches to it, so the switch does not
+          // show a loading page in between.
+          final BuildContext? context = Get.context;
+          if (context != null && context.mounted) {
+            await precacheImage(ExtendedMemoryImageProvider(bytes), context);
+          }
+          if (!isClosed && generation == _srGeneration) {
+            updateSafely(['$onlineImageId::$index']);
+          }
+        },
+        onError: (Object e, StackTrace s) {
+          if (generation == _srGeneration) {
+            _srInFlight.remove(index);
+          }
+          log.error('Upscale page $index failed', e, s);
+        },
+      ),
+    );
+  }
+
+  /// End of the pages to have upscaled ahead of the reader's page: at least
+  /// a batch (or the preload setting, when larger) ahead, rounded up to a
+  /// whole number of batches, so that pages come due a batch at a time
+  /// rather than one with each page turned.
+  int get _srAheadEnd {
+    final int batch = realtimeSrService.batchSize;
+    final int ahead = max(readSetting.preloadPageCount.value, batch);
+    final int end = ((state.readPageInfo.currentImageIndex + 1 + ahead) / batch).ceil() * batch;
+    return min(end, state.readPageInfo.pageCount);
+  }
+
+  /// Fetches and upscales the pages up to [_srAheadEnd] that are not there
+  /// yet, whether or not the layout has built them.
+  void requestRealtimeSrAhead() {
+    if (!realtimeSrOn) {
+      return;
+    }
+    for (int index = state.readPageInfo.currentImageIndex; index < _srAheadEnd; index++) {
+      _ensureRealtimeSr(index);
+    }
+  }
+
+  /// Page [index] on its way to being upscaled: its address is looked up
+  /// first when it is not known (the lookups call back here), then its
+  /// upscaled copy asked for.
+  void _ensureRealtimeSr(int index) {
+    if (!realtimeSrOn || index < state.readPageInfo.currentImageIndex || index >= _srAheadEnd) {
+      return;
+    }
+    if (state.images[index] != null) {
+      requestRealtimeSr(index);
+    } else if (state.readPageInfo.mode != ReadMode.online) {
+      // A page a download has not reached: asked for when it is shown.
+      return;
+    } else if (state.thumbnails[index] == null) {
+      if (state.parseImageHrefsStates[index] == LoadingState.idle) {
+        beginToParseImageHref(index);
+      }
+    } else if (state.parseImageUrlStates[index] == LoadingState.idle) {
+      beginToParseImageUrl(index, false);
+    }
+  }
 
   ReadProgressFlushCoordinator _flushCoordinatorOf(ReadSegment segment) {
     final ReadPageInfo info = segment.info;
@@ -506,6 +705,14 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       readSetting.preloadDistance,
     ], (_) => updateSafely([layoutId]));
 
+    realtimeSrSettingListener = everAll([
+      superResolutionSetting.realtimeEnabled,
+      superResolutionSetting.realtimeModel,
+      superResolutionSetting.realtimeScale,
+      superResolutionSetting.realtimeDenoise,
+      superResolutionSetting.realtimeMaxWidth,
+    ], (_) => _scheduleRealtimeSrRestart());
+
     _syncDisplayFirstPageAloneToState();
 
     tapZoneConfigListener = ever(readSetting.tapZoneConfigJson, (_) => updateSafely([tapZoneId]));
@@ -513,6 +720,9 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     _maybeShowTapZoneGuide();
 
     unawaited(_notifyShown(state.segments.first));
+
+    realtimeSrService.focus = () => state.readPageInfo.currentImageIndex;
+    requestRealtimeSrAhead();
 
     inited = true;
     if (!delayInitCompleter.isCompleted) {
@@ -553,6 +763,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     customBrightnessListener.dispose();
     preloadListener.dispose();
     enableBottomMenuListener.dispose();
+    realtimeSrSettingListener.dispose();
     orientationSpecificReadDirectionLister.dispose();
     portraitReadDirectionLister.dispose();
     landscapeReadDirectionLister.dispose();
@@ -570,6 +781,10 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     restoreDeviceOrientation();
 
     unawaited(_flushReadProgressAndSync());
+
+    realtimeSrService
+      ..clearPending()
+      ..focus = null;
 
     if (readSetting.enableCustomReadBrightness.isTrue) {
       resetBrightness();
@@ -664,6 +879,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     }
 
     updateSafely(['$onlineImageId::$index']);
+    _ensureRealtimeSr(index);
   }
 
   void beginToParseImageUrl(int index, bool reParse, {String? reloadKey}) {
@@ -712,6 +928,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     state.images[index] = image;
     state.parseImageUrlStates[index] = LoadingState.success;
     updateSafely(['$onlineImageId::$index']);
+    _ensureRealtimeSr(index);
   }
 
   Future<GalleryImage> requestImage(
@@ -1281,6 +1498,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     final bool endChanged = _reachedEnd != atEnd;
     _reachedEnd = atEnd;
     update([sliderId, pageNoId, thumbnailNoId, if (endChanged || bookChanged) endOfBookId, if (bookChanged) topMenuId]);
+    requestRealtimeSrAhead();
   }
 
   /// For the scrolling layouts: records [visible] (in index order) and

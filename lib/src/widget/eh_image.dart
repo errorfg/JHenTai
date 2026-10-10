@@ -45,6 +45,10 @@ class EHImage extends StatefulWidget {
   final bool forceFadeIn;
   final int? maxBytes;
 
+  /// Encoded image shown instead of [galleryImage]'s own (its upscaled
+  /// copy); [galleryImage] still names the page.
+  final Uint8List? memory;
+
   /// Shrinks a JM page to the container's size in physical pixels once, as
   /// it loads, instead of leaving the screen to shrink it on every frame;
   /// see [JmNetworkImageProvider]. For thumbnails, which on JM are whole
@@ -80,6 +84,7 @@ class EHImage extends StatefulWidget {
     this.shadows,
     this.forceFadeIn = false,
     this.maxBytes,
+    this.memory,
     this.shrinkToContainer = false,
     this.disableAnimation = false,
     this.animateOnlyWhenVisible = false,
@@ -106,6 +111,7 @@ class EHImage extends StatefulWidget {
     this.shadows,
     this.forceFadeIn = false,
     this.maxBytes,
+    this.memory,
     this.shrinkToContainer = false,
     this.disableAnimation = false,
     this.animateOnlyWhenVisible = false,
@@ -185,9 +191,11 @@ class _EHImageState extends State<EHImage> {
   Widget build(BuildContext context) {
     Widget child = advancedSetting.inNoImageMode.isTrue
         ? const SizedBox()
-        : widget.galleryImage.path == null
-            ? buildNetworkImage(context)
-            : buildFileImage(context);
+        : widget.memory != null
+            ? buildMemoryImage(context)
+            : widget.galleryImage.path == null
+                ? buildNetworkImage(context)
+                : buildFileImage(context);
 
     if (widget.heroTag != null && styleSetting.isInMobileLayout) {
       child = Hero(tag: widget.heroTag!, child: child);
@@ -306,6 +314,11 @@ class _EHImageState extends State<EHImage> {
     return Size((width * ratio).ceilToDouble(), (height * ratio).ceilToDouble());
   }
 
+  /// [EHImage.memory], laid out and reported like a file image.
+  Widget buildMemoryImage(BuildContext context) {
+    return _buildLocalImage(context, ExtendedMemoryImageProvider(widget.memory!));
+  }
+
   Widget buildFileImage(BuildContext context) {
     if (widget.galleryImage.downloadStatus == DownloadStatus.paused) {
       return widget.pausedWidgetBuilder?.call() ?? const Center(child: CircularProgressIndicator());
@@ -328,6 +341,10 @@ class _EHImageState extends State<EHImage> {
       provider = ExtendedFileImageProvider(file);
     }
 
+    return _buildLocalImage(context, provider);
+  }
+
+  Widget _buildLocalImage(BuildContext context, ImageProvider provider) {
     return ExtendedImage(
       image: ExtendedResizeImage.resizeIfNeeded(provider: provider, maxBytes: widget.maxBytes),
       fit: widget.fit,

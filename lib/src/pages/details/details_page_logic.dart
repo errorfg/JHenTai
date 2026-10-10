@@ -18,6 +18,8 @@ import 'package:jhentai/src/mixin/login_required_logic_mixin.dart';
 import 'package:jhentai/src/model/gallery.dart';
 import 'package:jhentai/src/model/gallery_comment.dart';
 import 'package:jhentai/src/model/gallery_tag.dart';
+import 'package:jhentai/src/model/content_scheme.dart';
+import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'package:jhentai/src/model/gallery_thumbnail.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/model/read_page_info.dart';
@@ -93,6 +95,7 @@ import '../../widget/re_unlock_dialog.dart';
 import '../../widget/nhentai_archive_dialog.dart';
 import '../../widget/nhentai_related_dialog.dart';
 import '../../widget/nhentai_tag_suggestions_dialog.dart';
+import '../../widget/jm_chapter_download_dialog.dart';
 import 'details_page_state.dart';
 
 class DetailsPageArgument {
@@ -302,6 +305,9 @@ class DetailsPageLogic extends GetxController
           jmReadingService.remember(
             albumId: bundle.album.id,
             pageCounts: {bundle.chapter.id: bundle.pageCount},
+            chapterIds: bundle.album.chapters
+                .map((JmChapterRef c) => c.id)
+                .toList(),
           ),
         );
       }
@@ -324,9 +330,7 @@ class DetailsPageLogic extends GetxController
     updateSafely(_judgeUpdateIds());
 
     SchedulerBinding.instance.scheduleTask(
-      () => historyService.record(
-        galleryDetail2GalleryHistoryModel(state.galleryDetails!),
-      ),
+      () => historyService.record(_historyModel()),
       Priority.animation,
     );
     SchedulerBinding.instance.scheduleTask(
@@ -1439,10 +1443,22 @@ class DetailsPageLogic extends GetxController
         forceNewRoute: true,
       );
     } else {
-      newSearch(keyword: keyword, forceNewRoute: true);
+      newSearch(keyword: keyword, forceNewRoute: true, site: ContentScheme.ehentai);
     }
   }
 
+  /// The site this gallery is from: where a keyword taken from it is
+  /// searched, whatever site the app is switched to.
+  ContentScheme get ownSite => state.galleryUrl.isNH
+      ? ContentScheme.nhentai
+      : state.galleryUrl.isWN
+      ? ContentScheme.wnacg
+      : state.galleryUrl.isJM
+      ? ContentScheme.jm
+      : ContentScheme.ehentai;
+
+  /// The "EH" action of a gallery from another site: its title, searched on
+  /// E-Hentai.
   void searchInEhByNhTitle() {
     if (!state.galleryUrl.isNH &&
         !state.galleryUrl.isWN &&
@@ -1455,7 +1471,7 @@ class DetailsPageLogic extends GetxController
       return;
     }
 
-    newSearch(keyword: keyword, forceNewRoute: true);
+    newSearch(keyword: keyword, forceNewRoute: true, site: ContentScheme.ehentai);
   }
 
   void searchUploader() {
@@ -1485,7 +1501,7 @@ class DetailsPageLogic extends GetxController
         forceNewRoute: true,
       );
     } else {
-      newSearch(keyword: keyword, forceNewRoute: true);
+      newSearch(keyword: keyword, forceNewRoute: true, site: ContentScheme.ehentai);
     }
   }
 
@@ -2118,18 +2134,28 @@ class DetailsPageLogic extends GetxController
     );
   }
 
-  /// Queues every chapter of the album that is not downloaded yet, in a
-  /// group named after the album unless the user picks another.
-  Future<void> handleDownloadAllJmChapters() async {
+  /// Queues the chapters of the album the user picks, in a group named
+  /// after the album unless the user picks another.
+  Future<void> handleDownloadJmChapters() async {
     JmChapterBundle? current = state.jmChapterBundle;
     if (current == null) {
       return;
     }
     JmAlbum album = current.album;
 
+    List<int>? chapterIds = await Get.dialog<List<int>>(
+      JmChapterDownloadDialog(
+        chapters: album.chapters,
+        currentChapterId: current.chapter.id,
+      ),
+    );
+    if (chapterIds == null || chapterIds.isEmpty) {
+      return;
+    }
+
     ({String group, bool downloadOriginalImage})? result = await Get.dialog(
       EHDownloadDialog(
-        title: 'downloadAllChapters'.tr,
+        title: 'downloadChapters'.tr,
         currentGroup: album.name,
         candidates: galleryDownloadService.allGroups,
         showDownloadOriginalImageCheckBox: false,
@@ -2143,9 +2169,10 @@ class DetailsPageLogic extends GetxController
 
     List<int> pending = [
       for (int i = 0; i < album.chapters.length; i++)
-        if (!galleryDownloadService.containGallery(
-          GalleryUrl.jm(album.chapters[i].id).gid,
-        ))
+        if (chapterIds.contains(album.chapters[i].id) &&
+            !galleryDownloadService.containGallery(
+              GalleryUrl.jm(album.chapters[i].id).gid,
+            ))
           i,
     ];
     if (pending.isEmpty) {
@@ -2227,6 +2254,25 @@ class DetailsPageLogic extends GetxController
 
   Future<int> getReadIndexRecord() async {
     return readProgressService.getReadProgress(state.galleryUrl.gid);
+  }
+
+  /// The history entry of this page. A multi-chapter JM album is one entry,
+  /// whichever of its chapters is open: under the album's id, with the
+  /// album's title and page count.
+  GalleryHistoryModel _historyModel() {
+    GalleryHistoryModel model = galleryDetail2GalleryHistoryModel(
+      state.galleryDetails!,
+    );
+    JmChapterBundle? bundle = state.jmChapterBundle;
+    if (bundle != null && bundle.isMultiChapter) {
+      model
+        ..galleryUrl = GalleryUrl.jm(bundle.album.id)
+        ..title = bundle.album.name;
+      if (bundle.album.totalPhotos > 0) {
+        model.pageCount = bundle.album.totalPhotos;
+      }
+    }
+    return model;
   }
 
   /// Details of a JM entry: an album opened from a list, the history or a

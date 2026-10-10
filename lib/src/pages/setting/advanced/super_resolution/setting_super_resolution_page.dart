@@ -7,10 +7,14 @@ import 'package:jhentai/src/setting/preference_setting.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
+import '../../../../service/sr/realtime_sr_service.dart';
+import '../../../../service/sr/sr_tools.dart';
 import '../../../../service/super_resolution_service.dart';
 import '../../../../setting/super_resolution_setting.dart';
 import '../../../../service/log.dart';
 import '../../../../widget/loading_state_indicator.dart';
+import 'realtime_sr_controls.dart';
+import 'sr_benchmark_dialog.dart';
 
 class SettingSuperResolutionPage extends StatelessWidget {
   const SettingSuperResolutionPage({Key? key}) : super(key: key);
@@ -38,8 +42,33 @@ class SettingSuperResolutionPage extends StatelessWidget {
         () => ListView(
           padding: const EdgeInsets.only(top: 16),
           children: [
+            // Two features that share nothing but the GPU: upscaling what
+            // is downloaded, a whole gallery at a time, and upscaling pages
+            // while reading online. Each has its own programs and models.
+            SrSectionHeader(
+              key: const Key('srOfflineSection'),
+              title: 'srSectionOffline'.tr,
+              hint: 'srSectionOfflineHint'.tr,
+            ),
             _buildModelDirectoryPath(),
             _buildModelType(),
+            const Divider(),
+            SrSectionHeader(
+              key: const Key('srRealtimeSection'),
+              title: 'realtimeSr'.tr,
+              hint: 'srSectionRealtimeHint'.tr,
+              experimental: true,
+            ),
+            ...realtimeSrTiles(context),
+            _buildRealtimeBatchSize(),
+            for (final SrEngine engine in SrEngine.values) _SrToolTile(engine: engine),
+            _buildBenchmark(),
+            const Divider(),
+            SrSectionHeader(
+              key: const Key('srCommonSection'),
+              title: 'srSectionCommon'.tr,
+              hint: 'srSectionCommonHint'.tr,
+            ),
             _buildGpuId(),
           ],
         ).withListTileTheme(context),
@@ -116,6 +145,32 @@ class SettingSuperResolutionPage extends StatelessWidget {
     );
   }
 
+  Widget _buildRealtimeBatchSize() {
+    const List<int> sizes = <int>[1, 2, 4, 8, 16];
+    final int current = superResolutionSetting.realtimeBatchSize.value;
+    return ListTile(
+      title: Text('realtimeSrBatchSize'.tr),
+      subtitle: Text('realtimeSrBatchSizeHint'.tr),
+      trailing: DropdownButton<int>(
+        value: sizes.contains(current) ? current : 4,
+        elevation: 4,
+        alignment: AlignmentDirectional.centerEnd,
+        onChanged: (int? size) => superResolutionSetting.saveRealtimeBatchSize(size!),
+        items: [for (final int size in sizes) DropdownMenuItem(value: size, child: Text('$size'))],
+      ),
+    );
+  }
+
+  Widget _buildBenchmark() {
+    return ListTile(
+      key: const Key('srBenchmark'),
+      title: Text('srBenchmark'.tr),
+      subtitle: Text('srBenchmarkHint'.tr),
+      trailing: const Icon(Icons.keyboard_arrow_right),
+      onTap: () => Get.dialog(const SrBenchmarkDialog(), barrierDismissible: false),
+    );
+  }
+
   Widget _buildGpuId() {
     return ListTile(
       title: const Text('GPU-id'),
@@ -136,6 +191,59 @@ class SettingSuperResolutionPage extends StatelessWidget {
           DropdownMenuItem(child: Text('7'), value: 7),
         ],
       ),
+    );
+  }
+}
+
+/// One upscaler program: whether it is installed, and a button that
+/// downloads and unpacks it.
+class _SrToolTile extends StatefulWidget {
+  const _SrToolTile({required this.engine});
+
+  final SrEngine engine;
+
+  @override
+  State<_SrToolTile> createState() => _SrToolTileState();
+}
+
+class _SrToolTileState extends State<_SrToolTile> {
+  double? _progress;
+
+  Future<void> _install() async {
+    setState(() => _progress = 0);
+    try {
+      await realtimeSrService.install(
+        widget.engine,
+        onProgress: (double progress) {
+          if (mounted) {
+            setState(() => _progress = progress);
+          }
+        },
+      );
+      toast('success'.tr);
+    } catch (e, s) {
+      log.error('Install upscaler ${widget.engine.name} failed', e, s);
+      toast('${'failed'.tr}: $e', isShort: false);
+    } finally {
+      if (mounted) {
+        setState(() => _progress = null);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool installed = widget.engine.isInstalled(realtimeSrService.toolsRoot);
+    return ListTile(
+      title: Text('${'srTools'.tr}: ${widget.engine.name}'),
+      subtitle: Text(
+        _progress != null
+            ? '${'downloading'.tr} ${(_progress! * 100).toStringAsFixed(0)}%'
+            : (installed ? 'srToolInstalled'.tr : 'srToolNotInstalled'.tr),
+      ),
+      trailing: _progress != null
+          ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+          : IconButton(icon: Icon(installed ? Icons.refresh : Icons.download), onPressed: _install),
     );
   }
 }

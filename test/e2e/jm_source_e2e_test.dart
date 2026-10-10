@@ -308,6 +308,8 @@ void main() {
     final JmChapterBundle second = await source.bundle(secondRef.id);
     expect(second.chapterIndex, 1);
     expect(second.album.id, multiChapterAlbum.id);
+    // A chapter leads to its album, as merging old history entries needs.
+    expect((await source.albumOfChapter(secondRef.id)).id, multiChapterAlbum.id);
     expect(second.title, startsWith(multiChapterAlbum.name));
     expect(second.title, isNot(firstChapter.title));
     expect(await source.chapterPageCount(secondRef.id), second.pageCount);

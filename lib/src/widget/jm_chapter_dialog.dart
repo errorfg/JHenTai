@@ -66,9 +66,61 @@ class _JmChapterProgressBuilderState extends State<JmChapterProgressBuilder> {
 }
 
 /// `P15/30`, or `P15` while the page count is unknown.
-String jmChapterPageText(JmChapterProgress progress) {
-  final int page = (progress.pageIndex ?? 0) + 1;
-  return progress.pageCount == null ? 'P$page' : 'P$page/${progress.pageCount}';
+String jmChapterPageText(JmChapterProgress progress) => progress.pageText;
+
+/// Builds with how far the multi-chapter album [albumId] has been read
+/// (null when it is not known as one, or untouched), again whenever read
+/// progress changes.
+class JmAlbumProgressBuilder extends StatefulWidget {
+  const JmAlbumProgressBuilder({
+    super.key,
+    required this.albumId,
+    required this.builder,
+  });
+
+  final int albumId;
+  final Widget Function(BuildContext context, JmAlbumProgress? progress) builder;
+
+  @override
+  State<JmAlbumProgressBuilder> createState() => _JmAlbumProgressBuilderState();
+}
+
+class _JmAlbumProgressBuilderState extends State<JmAlbumProgressBuilder> {
+  JmAlbumProgress? _progress;
+  int _generation = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    readProgressService.addListener(_load);
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(JmAlbumProgressBuilder oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.albumId != widget.albumId) {
+      _progress = null;
+      _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    readProgressService.removeListener(_load);
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final int generation = ++_generation;
+    final JmAlbumProgress? progress = await jmReadingService.albumProgress(widget.albumId);
+    if (mounted && generation == _generation) {
+      setState(() => _progress = progress);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, _progress);
 }
 
 enum _ChapterAction { markRead, markUnread, markPreviousRead }

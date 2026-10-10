@@ -287,6 +287,31 @@ class LocalConfigService
         );
   }
 
+  /// Rows of [configKey] whose subConfigKey starts with [prefix], which must
+  /// not contain the LIKE wildcards `%` and `_`.
+  Future<List<LocalConfig>> readBySubKeyPrefix({
+    required ConfigEnum configKey,
+    required String prefix,
+  }) async {
+    List<LocalConfigData> rows =
+        await (appDb.select(appDb.localConfig)..where(
+              (tbl) =>
+                  tbl.configKey.equals(configKey.key) &
+                  tbl.subConfigKey.like('$prefix%'),
+            ))
+            .get();
+    return rows
+        .map(
+          (LocalConfigData row) => LocalConfig(
+            configKey: configKey,
+            subConfigKey: row.subConfigKey,
+            value: row.value,
+            utime: row.utime,
+          ),
+        )
+        .toList();
+  }
+
   /// Rows of [configKey] whose subConfigKey is in [subConfigKeys].
   Future<List<LocalConfig>> readBySubKeys({
     required ConfigEnum configKey,

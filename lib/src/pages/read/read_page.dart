@@ -323,6 +323,16 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                   onPressed: logic.openingSibling ? null : () => logic.openSiblingBook(next: true),
                 ),
               ],
+              if (logic.canUseRealtimeSr)
+                IconButton(
+                  key: const Key('realtimeSrToggle'),
+                  tooltip: '${'realtimeSr'.tr} (${'experimental'.tr})',
+                  icon: Icon(
+                    logic.realtimeSrOn ? Icons.hd : Icons.hd_outlined,
+                    color: logic.realtimeSrOn ? UIConfig.readPageActiveButtonColor(context) : UIConfig.readPageButtonColor,
+                  ),
+                  onPressed: logic.toggleRealtimeSr,
+                ),
               if (GetPlatform.isDesktop &&
                   state.readPageInfo.gid != null &&
                   (state.readPageInfo.mode == ReadMode.downloaded || state.readPageInfo.mode == ReadMode.archive) &&

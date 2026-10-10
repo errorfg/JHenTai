@@ -161,6 +161,19 @@ class HistoryService
     }
   }
 
+  /// Writes the entry of [gallery] as last read at [lastReadTime]
+  /// (canonical UTC ISO 8601), in place of the one it has.
+  Future<void> recordAt(GalleryHistoryModel gallery, String lastReadTime) async {
+    await GalleryHistoryDao.replaceHistory(
+      GalleryHistoryV2Data(
+        gid: gallery.galleryUrl.gid,
+        jsonBody: jsonEncode(gallery),
+        lastReadTime: lastReadTime,
+      ),
+    );
+    await pendingSyncTracker.markHistoryPending(gallery.galleryUrl.gid);
+  }
+
   Future<void> batchRecord(List<GalleryHistoryV2Data> gallerys) async {
     log.trace('Batch record history, size: ${gallerys.length}');
 

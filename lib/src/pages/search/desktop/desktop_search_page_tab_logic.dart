@@ -40,7 +40,7 @@ class DesktopSearchPageTabLogic extends BasePageLogic with SearchPageLogicMixin 
     }
 
     if (rewriteSearchConfig == null) {
-      applySchemeSite();
+      applySchemeSite(newSearchArgument.site);
     }
 
     if (loadImmediately) {
