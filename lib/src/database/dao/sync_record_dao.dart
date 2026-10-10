@@ -44,11 +44,16 @@ class SyncRecordDao {
     return (appDb.select(appDb.syncRecord)..where((r) => r.kind.equals(kind) & r.applyPending.equals(true))).get();
   }
 
+  /// Upserts [rows] whole. Companions keep their nulls: a data class would
+  /// drop them from the update and leave the old value of a column cleared
+  /// on purpose (the value of a deletion, a hash no longer valid).
   static Future<void> write(Iterable<SyncRecordData> rows) async {
     if (rows.isEmpty) {
       return;
     }
-    await appDb.batch((batch) => batch.insertAllOnConflictUpdate(appDb.syncRecord, rows.toList()));
+    await appDb.batch(
+      (batch) => batch.insertAllOnConflictUpdate(appDb.syncRecord, rows.map((r) => r.toCompanion(false)).toList()),
+    );
   }
 
   /// Clears [dirty] of [rows] that are still the versions given: a row
