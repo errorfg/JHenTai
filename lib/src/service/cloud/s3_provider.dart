@@ -198,15 +198,22 @@ class S3Provider implements CloudProvider {
     return DateFormat('yyyyMMddHHmmss').format(DateTime.now());
   }
 
+  /// The minio client has no timeouts of its own: a request that stalls
+  /// would hold a sync forever (and with it the "sync in progress" state).
+  static const Duration _objectTimeout = Duration(seconds: 90);
+  static const Duration _listTimeout = Duration(seconds: 60);
+
   @override
   Future<void> putRawObject(String key, List<int> bytes) async {
     Uint8List data = bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
-    await _client.putObject(
-      _bucketName,
-      '$_baseKey$key',
-      Stream.value(data),
-      size: data.length,
-    );
+    await _client
+        .putObject(
+          _bucketName,
+          '$_baseKey$key',
+          Stream.value(data),
+          size: data.length,
+        )
+        .timeout(_objectTimeout);
   }
 
   @override
@@ -214,12 +221,15 @@ class S3Provider implements CloudProvider {
     String fullKey = '$_baseKey$key';
 
     try {
-      var stream = await _client.getObject(_bucketName, fullKey);
-      List<int> result = [];
-      await for (var chunk in stream) {
-        result.addAll(chunk);
-      }
-      return result;
+      return await () async {
+        var stream = await _client.getObject(_bucketName, fullKey);
+        List<int> result = [];
+        await for (var chunk in stream) {
+          result.addAll(chunk);
+        }
+        return result;
+      }()
+          .timeout(_objectTimeout);
     } on MinioS3Error catch (e) {
       /// S3-level error: by far the most common case is NoSuchKey. Only the
       /// runtime type is safe to log - minio-dart error objects can throw on
@@ -232,7 +242,10 @@ class S3Provider implements CloudProvider {
   @override
   Future<List<RemoteObjectInfo>> listRawObjects(String prefix) async {
     List<RemoteObjectInfo> result = [];
-    var chunks = await _client.listObjects(_bucketName, prefix: '$_baseKey$prefix', recursive: true).toList();
+    var chunks = await _client
+        .listObjects(_bucketName, prefix: '$_baseKey$prefix', recursive: true)
+        .toList()
+        .timeout(_listTimeout);
     for (var chunk in chunks) {
       for (var obj in chunk.objects) {
         String? objKey = obj.key;
@@ -251,6 +264,6 @@ class S3Provider implements CloudProvider {
 
   @override
   Future<void> deleteRawObject(String key) async {
-    await _client.removeObject(_bucketName, '$_baseKey$key');
+    await _client.removeObject(_bucketName, '$_baseKey$key').timeout(_objectTimeout);
   }
 }
