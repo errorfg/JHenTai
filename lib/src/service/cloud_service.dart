@@ -152,7 +152,7 @@ class CloudConfigService
       case CloudConfigTypeEnum.syncSetting:
         await localConfigService.write(
           configKey: ConfigEnum.syncSetting,
-          value: config.config,
+          value: syncSetting.withDeviceFields(config.config),
         );
         await syncSetting.refreshBean();
         log.info('  ✅ Sync setting imported and refreshed');

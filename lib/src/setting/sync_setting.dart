@@ -80,6 +80,22 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
   @override
   ConfigEnum get configEnum => ConfigEnum.syncSetting;
 
+  /// How this device syncs, and whether it does: its own choice, which sync
+  /// settings taken from another device do not change. A bucket sync still
+  /// running when the user switched to the sync server used to switch the
+  /// device back.
+  static const List<String> deviceFields = ['currentProvider', 'enableSync', 'autoSync'];
+
+  /// [configString] of another device, with this device's [deviceFields].
+  String withDeviceFields(String configString) {
+    Map map = jsonDecode(configString);
+    Map own = jsonDecode(toConfigString());
+    for (String field in deviceFields) {
+      map[field] = own[field];
+    }
+    return jsonEncode(map);
+  }
+
   @override
   void applyBeanConfig(String configString) {
     Map map = jsonDecode(configString);

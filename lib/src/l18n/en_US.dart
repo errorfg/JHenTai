@@ -1073,9 +1073,9 @@ class en_US {
       'serverCondition': 'Server Condition',
       'configSync': 'Config Sync',
       'configSyncHint': 'Store your config data in cloud(up to 50 entries)',
-      'cloudSyncSettings': 'WebDAV/S3 Sync Settings',
+      'cloudSyncSettings': 'Cloud Sync Settings',
       'cloudSyncSettingsHint':
-          'Configure WebDAV or S3-compatible storage for automatic sync',
+          'Sync between devices through a sync server, S3-compatible storage or WebDAV',
       'upload2cloud': 'Upload to Cloud',
       'upload2cloudHint': 'Upload your current local configuration',
       'tap2upload': 'Tap to upload',

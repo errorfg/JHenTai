@@ -119,6 +119,7 @@ List<RecordAdapter> defaultRecordAdapters() => [
         type: CloudConfigTypeEnum.syncSetting,
         configKey: ConfigEnum.syncSetting,
         refresh: () => syncSetting.refreshBean(),
+        keepLocal: (value) => syncSetting.withDeviceFields(value),
       ),
       SingleConfigRecords(
         kind: 'komgaSetting',
@@ -486,7 +487,17 @@ class SingleConfigRecords extends WholeKindAdapter {
   final ConfigEnum configKey;
   final Future<void> Function() refresh;
 
-  SingleConfigRecords({required this.kind, required this.type, required this.configKey, required this.refresh});
+  /// The value to store for a value of another device, when part of the
+  /// setting stays this device's own.
+  final String Function(String value)? keepLocal;
+
+  SingleConfigRecords({
+    required this.kind,
+    required this.type,
+    required this.configKey,
+    required this.refresh,
+    this.keepLocal,
+  });
 
   @override
   Future<List<MapEntry<String, LocalItem>>> export() async {
@@ -511,7 +522,7 @@ class SingleConfigRecords extends WholeKindAdapter {
       LocalConfigCompanion(
         configKey: Value(configKey.key),
         subConfigKey: const Value(LocalConfigService.defaultSubConfigKey),
-        value: Value(record.value!),
+        value: Value(keepLocal?.call(record.value!) ?? record.value!),
         utime: Value(record.updatedAt),
       ),
     ]);
