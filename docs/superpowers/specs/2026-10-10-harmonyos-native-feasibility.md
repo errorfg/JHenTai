@@ -164,6 +164,20 @@ Dart 侧没有参与：失败发生在编译 Dart 之前。
 
 第 4 节表中的仓库与分支名均经 `git ls-remote` 核对；`fluttertpc_sqlite3` 存在但只有模板 README；`fluttertpc_saver_gallery`、`fluttertpc_pasteboard`、`fluttertpc_volume_button_override`、`fluttertpc_system_network_proxy`、`fluttertpc_http_proxy` 均不存在。
 
+### 7.5 2026-10-11：应用在真机上运行
+
+DevEco Studio 换到 26.0.0（API 26）后，空工程与本项目都能编译。随后逐项解决：
+
+- 纯 Dart 包里对 `TargetPlatform` 穷尽的 switch（chewie、flex_color_picker）在 kernel 编译时报错：放补丁副本于 `ohos/patched/`。
+- chewie 的社区移植依赖 video_player 的移植，后者与 drift_dev 冲突：同样用补丁副本。
+- ohpm 的 `sqlite3-native-library` 是字节码 HAR，工程要开 `useNormalizedOHMUrl`。
+- debug 包空白：鸿蒙 SDK 的 `OhosAssetBundle` 拷资源时不带 `NativeAssetsManifest.json`，JIT 模式下 `package:sqlite3` 的 `@Native` 符号解析失败（`Couldn't resolve native function 'sqlite3_temp_directory'`），数据库打不开，启动流程停住。`tool/ohos/patch_sdk.py` 给 SDK 补上这一行，并清掉构建系统对资源拷贝步骤的缓存后重建。
+- 首次 `hdc install` 中断后再装报 `install already exist`（9568276）：`bm uninstall` 后重装即可。
+
+签名：用现有的调试证书与密钥库，只为 `com.gallery.reader` 在 AGC 申请了一份调试 profile（两台设备）；配置放在不入库的 `ohos/signing.local.json5`。
+
+结果：debug 包装到 Mate XTs（HarmonyOS 7.0.0.109）上，所有服务初始化成功，主页正常显示并从站点加载图片，网络、数据库、标签翻译库更新、版本检查都工作；宽屏下走平板布局。release 包（AOT，40 MB）重新从干净的中间产物构建后同样正常；此前一次 release 空白页是在构建缓存未清理时出的，没有再现。
+
 ## 8. 工作量与建议
 
 ### 8.1 先决条件（用户）
