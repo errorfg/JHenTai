@@ -148,7 +148,7 @@ Dart 侧没有参与：失败发生在编译 Dart 之前。
 
 ### 7.2 对照：空工程
 
-用 `flutter create -t app --platforms ohos` 新建的空工程，3.41.10-ohos-1.0.1 与 3.35.8-ohos-1.0.4（另克隆到 `/Users/georgezhang/vscode-project/flutter_ohos_335`）两个 SDK 都在同一处、同一组错误失败。与本项目无关。
+用 `flutter create -t app --platforms ohos` 新建的空工程，3.41.10-ohos-1.0.1 与 3.35.8-ohos-1.0.4（临时克隆，试完已删除）两个 SDK 都在同一处、同一组错误失败。与本项目无关。
 
 ### 7.3 原因
 
