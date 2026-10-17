@@ -249,11 +249,17 @@ void main() {
     await historyService.record(_history(GalleryUrl.jm(104), 'Album - Chapter 5'));
     expect(await shown(), <String>['Album', 'Third', 'Other']);
 
-    // Across pages an album is listed once; nothing was deleted.
-    final Set<int> listed = <int>{};
-    final List<GalleryHistoryModel> first = (await HistoryPageLogic.visibleHistory(0, 2, shownAlbums: listed)).rows;
-    expect(first.where((GalleryHistoryModel row) => row.galleryUrl.isJM), hasLength(1));
-    expect(listed, <int>{100});
+    // Across pages an album is listed once, whichever page loads first (a
+    // refresh can run while a later page loads); nothing was deleted.
+    HistoryService.pageSize = 2;
+    addTearDown(() => HistoryService.pageSize = 100);
+    final int pages = await historyService.getPageCount();
+    Future<List<GalleryHistoryModel>> rowsOf(int page) async => (await HistoryPageLogic.visibleHistory(page, pages)).rows;
+    final List<GalleryHistoryModel> backwards = <GalleryHistoryModel>[for (int page = pages - 1; page >= 0; page--) ...await rowsOf(page)];
+    final List<GalleryHistoryModel> forwards = <GalleryHistoryModel>[for (int page = 0; page < pages; page++) ...await rowsOf(page)];
+    for (final List<GalleryHistoryModel> all in <List<GalleryHistoryModel>>[backwards, forwards]) {
+      expect(all.where((GalleryHistoryModel row) => row.galleryUrl.isJM).map((GalleryHistoryModel row) => row.title), <String>['Album']);
+    }
     expect(await GalleryHistoryDao.selectTotalCount(), 6);
 
     await device.db.close();

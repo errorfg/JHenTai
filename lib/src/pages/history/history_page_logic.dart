@@ -28,19 +28,13 @@ class HistoryPageLogic extends OldBasePageLogic {
   @override
   bool get useSearchConfig => false;
 
-  /// Multi-chapter JM albums already listed, from the first page on.
-  final Set<int> _shownAlbums = <int>{};
-
   @override
   Future<List<dynamic>> getGallerysAndPageInfoByPage(int pageIndex) async {
     log.info('Get history by page index $pageIndex');
 
-    if (pageIndex == 0) {
-      _shownAlbums.clear();
-    }
     int pageCount = await historyService.getPageCount();
     final ({List<GalleryHistoryModel> rows, List<GalleryHistoryModel> raw, int pageIndex}) visible =
-        await visibleHistory(pageIndex, pageCount, shownAlbums: _shownAlbums);
+        await visibleHistory(pageIndex, pageCount);
     List<Gallery> gallerys = visible.rows.map(galleryHistoryModel2Gallery).toList();
     unawaited(_mergeChapterEntries(visible.raw));
 
@@ -68,17 +62,18 @@ class HistoryPageLogic extends OldBasePageLogic {
   /// album is one entry, listed where the newest of its entries is, whether
   /// that one was made for the album or (by a version up to 8.0.36) for one
   /// of its chapters; its other entries are left out. They stay stored, as
-  /// deleting history does not reach other devices. [shownAlbums] carries
-  /// the albums listed from one page to the next. A page left with nothing
+  /// deleting history does not reach other devices. Whether an entry is the
+  /// newest of its album is looked up, not carried from page to page, so
+  /// pages loaded in any order (a refresh while a later page loads) list
+  /// each album once and none not at all. A page left with nothing
   /// to show moves on to the next; [pageIndex] of the result is the last
   /// page read, and [raw] what was read.
   static Future<({List<GalleryHistoryModel> rows, List<GalleryHistoryModel> raw, int pageIndex})> visibleHistory(
     int pageIndex,
-    int pageCount, {
-    Set<int>? shownAlbums,
-  }) async {
+    int pageCount,
+  ) async {
     final Map<int, int> albumOf = (await jmReadingService.knownAlbums()).albumOf;
-    final Set<int> shown = shownAlbums ?? <int>{};
+    final Map<int, int?> newestOf = <int, int?>{};
     final List<GalleryHistoryModel> raw = <GalleryHistoryModel>[];
     int index = pageIndex;
     while (true) {
@@ -89,7 +84,10 @@ class HistoryPageLogic extends OldBasePageLogic {
         final int? album = row.galleryUrl.isJM ? albumOf[row.galleryUrl.jmChapterId] : null;
         if (album == null) {
           rows.add(row);
-        } else if (shown.add(album)) {
+          continue;
+        }
+        final int? newest = newestOf.containsKey(album) ? newestOf[album] : (newestOf[album] = await _newestEntryOf(album, albumOf));
+        if (newest == row.galleryUrl.gid) {
           // The album's own entry when it has one, else this chapter's.
           rows.add(row.galleryUrl.jmChapterId == album ? row : (await _albumEntry(album)) ?? row);
         }
@@ -99,6 +97,25 @@ class HistoryPageLogic extends OldBasePageLogic {
       }
       index++;
     }
+  }
+
+  /// The gid of the newest history entry of album [albumId], its own or one
+  /// of its chapters', in the order the history is listed: latest read
+  /// first, then the larger gid.
+  static Future<int?> _newestEntryOf(int albumId, Map<int, int> albumOf) async {
+    final List<int> gids = <int>[
+      for (final MapEntry<int, int> entry in albumOf.entries)
+        if (entry.value == albumId) GalleryUrl.jm(entry.key).gid,
+    ];
+    final List<GalleryHistoryV2Data> entries = await GalleryHistoryDao.selectByGids(gids);
+    if (entries.isEmpty) {
+      return null;
+    }
+    entries.sort((GalleryHistoryV2Data a, GalleryHistoryV2Data b) {
+      final int byTime = b.lastReadTime.compareTo(a.lastReadTime);
+      return byTime != 0 ? byTime : b.gid.compareTo(a.gid);
+    });
+    return entries.first.gid;
   }
 
   static Future<GalleryHistoryModel?> _albumEntry(int albumId) async {

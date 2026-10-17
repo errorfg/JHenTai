@@ -85,7 +85,7 @@ class Gallery {
 
   factory Gallery.fromJson(Map<String, dynamic> map) {
     return Gallery(
-      galleryUrl: GalleryUrl.parse(map['galleryUrl']),
+      galleryUrl: GalleryUrl.parseStored(map['galleryUrl']),
       title: map['title'],
       category: map['category'],
       cover: GalleryImage.fromJson(map['cover']),
