@@ -153,6 +153,10 @@ class DetailsPageLogic extends GetxController
   /// successful load has moved on to the chapter being read.
   int? _jmEntryId;
 
+  /// With the nhentai API: whether the account has this gallery, as the
+  /// details or the last change said.
+  bool _nhAccountFavorite = false;
+
   @override
   Scroll2TopStateMixin get scroll2TopState => state;
 
@@ -839,6 +843,9 @@ class DetailsPageLogic extends GetxController
     );
   }
 
+  /// A gallery that only this device keeps among its favorites shows as
+  /// favorited too; removing a favorite removes it from the account and
+  /// from this device.
   Future<void> _handleTapNhentaiRemoteFavorite() async {
     if (state.favoriteState == LoadingState.loading) {
       return;
@@ -851,21 +858,28 @@ class DetailsPageLogic extends GetxController
     updateSafely([favoriteId]);
 
     try {
-      ({bool favorited, int? numFavorites}) result = await ehRequest
-          .requestNhSetFavorite(state.galleryUrl.gid, favorited: !wasFavorite);
+      bool favorited = false;
+      if (!wasFavorite || _nhAccountFavorite) {
+        ({bool favorited, int? numFavorites}) result = await ehRequest
+            .requestNhSetFavorite(state.galleryUrl.gid, favorited: !wasFavorite);
+        favorited = _nhAccountFavorite = result.favorited;
+        if (state.galleryDetails != null) {
+          state.galleryDetails!.favoriteCount =
+              result.numFavorites ??
+              (state.galleryDetails!.favoriteCount + (result.favorited ? 1 : -1))
+                  .clamp(0, 1 << 31)
+                  .toInt();
+        }
+      }
+      if (!favorited) {
+        await nhentaiFavoriteService.removeFavorite(state.galleryUrl.gid);
+      }
       state.gallery
-        ?..favoriteTagIndex = result.favorited ? 0 : null
+        ?..favoriteTagIndex = favorited ? 0 : null
         ..favoriteTagName = null;
       state.galleryDetails
-        ?..favoriteTagIndex = result.favorited ? 0 : null
+        ?..favoriteTagIndex = favorited ? 0 : null
         ..favoriteTagName = null;
-      if (state.galleryDetails != null) {
-        state.galleryDetails!.favoriteCount =
-            result.numFavorites ??
-            (state.galleryDetails!.favoriteCount + (result.favorited ? 1 : -1))
-                .clamp(0, 1 << 31)
-                .toInt();
-      }
     } on DioException catch (e) {
       log.error('Update nhentai favorite failed', e.errorMsg);
       snack(
@@ -917,15 +931,20 @@ class DetailsPageLogic extends GetxController
       return;
     }
 
+    int? localIndex = nhentaiFavoriteService.getFavoriteCategoryIndex(
+      state.galleryUrl.gid,
+    );
     if (hasNhentaiOfficialApi) {
+      // The details tell whether the account has it.
+      _nhAccountFavorite =
+          state.galleryDetails?.isFavorite ?? state.gallery?.isFavorite ?? false;
+      if (!_nhAccountFavorite && localIndex != null) {
+        _applyNhFavoriteStatus(favoriteCategoryIndex: localIndex);
+      }
       return;
     }
 
-    _applyNhFavoriteStatus(
-      favoriteCategoryIndex: nhentaiFavoriteService.getFavoriteCategoryIndex(
-        state.galleryUrl.gid,
-      ),
-    );
+    _applyNhFavoriteStatus(favoriteCategoryIndex: localIndex);
   }
 
   /// Favorites of wnacg and JM galleries live on the device.
