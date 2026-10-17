@@ -958,6 +958,7 @@ class ru_RU {
       'save2Local': 'Сохранить локально',
       'readIndexRecord': 'Прогресс чтения',
       'quickSearch': 'Быстрый поиск',
+      'syncSetting': 'Настройки синхронизации',
       'blockRules': 'Правила блокировки',
       'searchHistory': 'История поиска',
       'galleryHistory': 'История галерей',
@@ -967,6 +968,7 @@ class ru_RU {
       'wnacgFavorite': 'Избранное wnacg',
       'jmFavorite': 'Избранное JM',
       'wnacgDomain': 'Домен wnacg',
+      'wnacgDomainHint': 'Рабочий сейчас домен wnacg, напр. www.wn07.ru. Из вставленной ссылки остаётся только домен; пустое поле возвращает значение по умолчанию.',
       'mixedModeUnavailable':
           'Смешанный режим недоступен: текущий макет не предоставляет время добавления в избранное',
 

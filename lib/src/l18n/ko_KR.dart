@@ -911,6 +911,7 @@ class ko_KR {
       'save2Local': 'Save to Local',
       'readIndexRecord': 'Read Progress',
       'quickSearch': 'Quick Search Config',
+      'syncSetting': '동기화 설정',
       'blockRules': 'Block Rules',
       'searchHistory': 'Search History',
       'galleryHistory': 'Gallery History',
@@ -920,6 +921,7 @@ class ko_KR {
       'wnacgFavorite': 'wnacg 즐겨찾기',
       'jmFavorite': 'JM 즐겨찾기',
       'wnacgDomain': 'wnacg 도메인',
+      'wnacgDomainHint': '현재 접속 가능한 wnacg 도메인(예: www.wn07.ru). 링크를 붙여 넣으면 도메인만 남고, 비워 두면 기본값으로 돌아갑니다.',
       'mixedModeUnavailable': '혼합 모드 사용 불가: 현재 레이아웃에서 즐겨찾기 시간을 제공하지 않습니다',
 
       /// block rule page

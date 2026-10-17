@@ -8,6 +8,7 @@ import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/pages/history/history_page_logic.dart';
 import 'package:jhentai/src/service/cloud/pending_sync_tracker.dart';
+import 'package:jhentai/src/service/cloud/webdav_provider.dart';
 import 'package:jhentai/src/service/history_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/log.dart';
@@ -55,6 +56,7 @@ void main() {
     historyService = HistoryService();
     readProgressService = ReadProgressService();
     ehSetting.nhentaiDomains.value = <String>['nhentai.net', 'nhentai.to'];
+    ehSetting.wnacgDomain.value = EHSetting.defaultWnacgDomain;
   });
 
   tearDown(() => appDb.close());
@@ -65,15 +67,21 @@ void main() {
     await _store(9, _row('not a gallery url', 'Broken'), '2026-10-18T09:00:00.000Z');
     await _store(3400000, _row('https://e-hentai.org/g/3400000/abcdef1234/', 'E-Hentai'), '2026-10-18T08:00:00.000Z');
     await _store(502, _row('https://nhentai.net/g/502/', 'On nhentai.net'), '2026-10-18T07:00:00.000Z');
+    // wnacg on the domain set before the current one.
+    await _store(77, _row('https://www.wn05.cc/photos-index-aid-77.html', 'On an old wnacg domain'), '2026-10-18T06:00:00.000Z');
 
     final List<GalleryHistoryModel> page = await historyService.getByPageIndex(0);
-    expect(page.map((GalleryHistoryModel h) => h.title), <String>['On a mirror', 'E-Hentai', 'On nhentai.net']);
+    expect(page.map((GalleryHistoryModel h) => h.title), <String>['On a mirror', 'E-Hentai', 'On nhentai.net', 'On an old wnacg domain']);
+    final GalleryUrl wnacg = page.last.galleryUrl;
+    expect((wnacg.isWN, wnacg.gid), (true, 77));
+    // Opened on the domain set now.
+    expect(wnacg.url, 'https://${ehSetting.wnacgDomain.value}/photos-index-aid-77.html');
     final GalleryUrl mirror = page.first.galleryUrl;
     expect((mirror.isNH, mirror.gid, mirror.sourceHost), (true, 501, 'nhentai.mirror.example'));
     expect(mirror.url, 'https://nhentai.mirror.example/g/501/');
 
     final List<GalleryHistoryModel> shown = (await HistoryPageLogic.visibleHistory(0, await historyService.getPageCount())).rows;
-    expect(shown, hasLength(3));
+    expect(shown, hasLength(4));
   });
 
   test('links met elsewhere are recognised as before: only stored urls take any nhentai domain', () {
@@ -82,6 +90,27 @@ void main() {
     expect(GalleryUrl.tryParseStored('https://www.nhentai.net/g/502/')?.sourceHost, 'nhentai.net');
     expect(GalleryUrl.tryParseStored('https://e-hentai.org/g/3400000/abcdef1234/')?.isNH, isFalse);
     expect(GalleryUrl.tryParseStored('https://example.com/page'), isNull);
+    expect(GalleryUrl.tryParse('https://www.wn05.cc/photos-index-aid-77.html'), isNull);
+    expect(GalleryUrl.tryParseStored('https://www.wn05.cc/photos-index-aid-77.html')?.isWN, isTrue);
+  });
+
+  test('the wnacg domain is kept as a host, whatever is pasted; nothing typed restores the default', () async {
+    expect(EHSetting.normalizeDomain(' https://www.wn08.ru/albums-index.html '), 'www.wn08.ru');
+    expect(EHSetting.normalizeDomain('WWW.WN08.RU'), 'www.wn08.ru');
+    expect(EHSetting.normalizeDomain('www.wn08.ru?x=1'), 'www.wn08.ru');
+    await ehSetting.saveWnacgDomain('https://www.wn08.ru/');
+    expect(ehSetting.wnacgDomain.value, 'www.wn08.ru');
+    expect(GalleryUrl.tryParse('https://www.wn08.ru/photos-index-aid-5.html')?.isWN, isTrue);
+    await ehSetting.saveWnacgDomain('  ');
+    expect(ehSetting.wnacgDomain.value, EHSetting.defaultWnacgDomain);
+  });
+
+  test('a WebDAV remote path ending in a slash does not give file paths with //', () {
+    expect(WebDavProvider.normalizeRemotePath('/JHenTaiConfig/'), '/JHenTaiConfig');
+    expect(WebDavProvider.normalizeRemotePath(' JHenTaiConfig// '), '/JHenTaiConfig');
+    expect(WebDavProvider.normalizeRemotePath('/a/b'), '/a/b');
+    expect(WebDavProvider.normalizeRemotePath('/'), '');
+    expect(WebDavProvider(serverUrl: 'https://dav.example.com/', username: 'u', password: 'p', remotePath: '/JHenTaiConfig/').remotePath, '/JHenTaiConfig');
   });
 
   group('a new version of an E-Hentai gallery', () {

@@ -615,6 +615,7 @@ class zh_CN {
       'invalidValue': '无效的值',
       'readingProgress': '阅读进度',
       'quickSearch': '快速搜索',
+      'syncSetting': '同步设置',
       'searchHistory': '搜索历史',
       'blockRules': '屏蔽规则',
       'galleryHistory': '浏览历史',
@@ -1030,6 +1031,7 @@ favnote：匹配收藏备注
       'wnacgFavorite': 'wnacg 收藏',
       'jmFavorite': 'JM 收藏',
       'wnacgDomain': 'wnacg 域名',
+      'wnacgDomainHint': 'wnacg 当前可以访问的域名，例如 www.wn07.ru。可以直接粘贴链接，只保留其中的域名；留空则恢复默认。',
       'mixedModeUnavailable': '混合模式不可用：当前布局不提供收藏时间',
 
       /// block rule page
