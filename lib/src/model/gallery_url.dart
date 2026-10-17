@@ -102,6 +102,38 @@ class GalleryUrl {
     return galleryUrl;
   }
 
+  /// A gallery url this app wrote down itself (history, favorites, downloads)
+  /// and may now read on another device or after its settings changed: an
+  /// nhentai url on a domain not in this device's list of nhentai domains is
+  /// still one ([url] writes `https://<domain>/g/<id>/`).
+  static GalleryUrl? tryParseStored(String url) {
+    GalleryUrl? galleryUrl = tryParse(url);
+    if (galleryUrl != null) {
+      return galleryUrl;
+    }
+    Match? nhMatch = RegExp(r'^https?://([^/]+)/g/(\d+)/?$').firstMatch(url);
+    if (nhMatch == null) {
+      return null;
+    }
+    return GalleryUrl(
+      isEH: true,
+      isNH: true,
+      gid: int.parse(nhMatch.group(2)!),
+      token: 'nhentai',
+      sourceHost: nhMatch.group(1)!.replaceFirst(RegExp(r'^www\.'), ''),
+    );
+  }
+
+  /// [tryParseStored], throwing when even that fails.
+  static GalleryUrl parseStored(String url) {
+    GalleryUrl? galleryUrl = tryParseStored(url);
+    if (galleryUrl == null) {
+      throw InternalException(message: 'Parse gallery url failed, url:$url');
+    }
+
+    return galleryUrl;
+  }
+
   String get url {
     if (isJM) {
       return 'https://18comic.vip/photo/$jmChapterId';

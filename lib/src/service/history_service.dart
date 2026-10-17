@@ -22,7 +22,8 @@ class HistoryService
     implements JHLifeCircleBean {
   static const String historyUpdateId = 'historyUpdateId';
 
-  static const int pageSize = 100;
+  /// Rows of a history page. Set by tests.
+  static int pageSize = 100;
 
   @override
   List<JHLifeCircleBean> get initDependencies =>
@@ -98,13 +99,20 @@ class HistoryService
     return totalCount == 0 ? 0 : (totalCount - 1) ~/ pageSize + 1;
   }
 
+  /// A row that cannot be read is left out (and logged) rather than taking
+  /// the page and every page after it down with it.
   Future<List<GalleryHistoryModel>> getByPageIndex(int pageIndex) async {
     List<GalleryHistoryV2Data> historys =
         await GalleryHistoryDao.selectByPageIndex(pageIndex, pageSize);
-    return historys
-        .map<GalleryHistoryModel>(
-            (h) => GalleryHistoryModel.fromJson(jsonDecode(h.jsonBody)))
-        .toList();
+    final List<GalleryHistoryModel> models = <GalleryHistoryModel>[];
+    for (final GalleryHistoryV2Data h in historys) {
+      try {
+        models.add(GalleryHistoryModel.fromJson(jsonDecode(h.jsonBody)));
+      } catch (e) {
+        log.warning('Skip a history row that cannot be read, gid ${h.gid}', e);
+      }
+    }
+    return models;
   }
 
   Future<List<GalleryHistoryV2Data>> getLatest10000RawHistory() async {
