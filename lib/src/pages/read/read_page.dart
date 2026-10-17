@@ -375,6 +375,29 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                   ),
                 );
               }),
+              // Phones and tablets lock the brightness here; desktops,
+              // where there is none to lock, turn pages by themselves.
+              if (GetPlatform.isMobile)
+                Obx(
+                  () => ElevatedButton(
+                    key: const Key('brightnessLockButton'),
+                    child: Icon(
+                      readSetting.enableCustomReadBrightness.isTrue ? Icons.brightness_high : Icons.brightness_auto,
+                      size: 24,
+                      color: readSetting.enableCustomReadBrightness.isTrue ? UIConfig.readPageActiveButtonColor(context) : UIConfig.readPageButtonColor,
+                    ),
+                    onPressed: logic.toggleBrightnessLock,
+                    style: ElevatedButton.styleFrom(
+                      elevation: 0,
+                      padding: const EdgeInsets.all(0),
+                      surfaceTintColor: Colors.transparent,
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      minimumSize: const Size(56, 56),
+                    ),
+                  ),
+                )
+              else
               GetBuilder<ReadPageLogic>(
                 id: logic.autoModeId,
                 builder: (_) => ElevatedButton(

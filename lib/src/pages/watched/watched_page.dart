@@ -23,6 +23,19 @@ class WatchedPage extends BasePage {
         );
 
   @override
+  List<Widget> buildAppBarActions() {
+    return [
+      IconButton(
+        key: const Key('watchedProgressButton'),
+        icon: const Icon(Icons.timeline, size: 22),
+        tooltip: 'watchedProgress'.tr,
+        onPressed: logic.openProgress,
+      ),
+      ...super.buildAppBarActions(),
+    ];
+  }
+
+  @override
   WatchedPageLogic get logic => Get.put<WatchedPageLogic>(WatchedPageLogic(), permanent: true);
 
   @override

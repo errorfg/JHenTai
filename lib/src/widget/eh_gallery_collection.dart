@@ -24,7 +24,10 @@ Widget EHGalleryCollection({
   CardContextMenuCallback? handleLongPressCard,
   CardContextMenuCallback? handleSecondaryTapCard,
   VoidCallback? handleLoadMore,
+  Widget Function(Gallery gallery, Widget card)? wrapCard,
 }) {
+  Widget wrap(Gallery gallery, Widget card) => wrapCard == null ? card : wrapCard(gallery, card);
+
   Widget _buildGalleryList() {
     /// use FlutterSliverList to [keepPosition] when insert items at top
     return FlutterSliverList(
@@ -34,7 +37,7 @@ Widget EHGalleryCollection({
           if (index == gallerys.length - 1 && loadingState == LoadingState.idle && handleLoadMore != null) {
             SchedulerBinding.instance.addPostFrameCallback((_) => handleLoadMore());
           }
-          return Container(
+          return wrap(gallerys[index], Container(
             decoration: listMode == ListMode.flat || listMode == ListMode.flatWithoutTags
                 ? BoxDecoration(
                     color: UIConfig.backGroundColor(context),
@@ -51,7 +54,7 @@ Widget EHGalleryCollection({
               handleSecondaryTapCard: handleSecondaryTapCard == null ? null : (gallery, position) => handleSecondaryTapCard(gallery, position),
               withTags: listMode == ListMode.listWithTags || listMode == ListMode.flat,
             ),
-          );
+          ));
         },
         childCount: gallerys.length,
         keepPosition: true,
@@ -83,14 +86,14 @@ Widget EHGalleryCollection({
               SchedulerBinding.instance.addPostFrameCallback((_) => handleLoadMore());
             }
 
-            return EHGalleryWaterFlowCard(
+            return wrap(gallerys[index], EHGalleryWaterFlowCard(
               gallery: gallerys[index],
               downloaded: galleryDownloadService.containGallery(gallerys[index].gid) || archiveDownloadService.containArchive(gallerys[index].gid),
               listMode: listMode,
               handleTapCard: handleTapCard,
               handleLongPressCard: handleLongPressCard == null ? null : (gallery, position) => handleLongPressCard(gallery, position),
               handleSecondaryTapCard: handleSecondaryTapCard == null ? null : (gallery, position) => handleSecondaryTapCard(gallery, position),
-            );
+            ));
           },
           childCount: gallerys.length,
         ),

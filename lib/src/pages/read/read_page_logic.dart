@@ -52,6 +52,7 @@ import '../../utils/eh_spider_parser.dart';
 import '../../utils/route_util.dart';
 import '../../utils/toast_util.dart';
 import '../../widget/auto_mode_interval_dialog.dart';
+import 'brightness_lock.dart';
 import '../../widget/eh_image.dart';
 import '../../widget/loading_state_indicator.dart';
 import '../home_page.dart';
@@ -688,11 +689,13 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
         } else {
           resetBrightness();
         }
+        _guardBrightness();
       },
     );
     customBrightnessListener = ever(readSetting.customBrightness, (_) {
       applyCurrentBrightness();
     });
+    _guardBrightness();
 
     enableBottomMenuListener = ever(readSetting.enableBottomMenu, (_) {
       updateSafely([topMenuId]);
@@ -761,6 +764,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     displayFirstPageAloneListener.dispose();
     enableCustomBrightnessListener.dispose();
     customBrightnessListener.dispose();
+    _brightnessGuard?.cancel();
     preloadListener.dispose();
     enableBottomMenuListener.dispose();
     realtimeSrSettingListener.dispose();
@@ -1006,6 +1010,37 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     if (GetPlatform.isMobile) {
       ScreenBrightness().resetScreenBrightness();
     }
+  }
+
+  /// The brightness lock of the top menu: see [toggleReadBrightnessLock].
+  Future<void> toggleBrightnessLock() async {
+    toast(await toggleReadBrightnessLock());
+  }
+
+  /// On iOS the system's automatic brightness can still move the screen
+  /// after the app set it: while the brightness is locked, it is set again
+  /// whenever the screen has drifted from it.
+  Timer? _brightnessGuard;
+
+  void _guardBrightness() {
+    _brightnessGuard?.cancel();
+    _brightnessGuard = null;
+    if (!GetPlatform.isIOS || readSetting.enableCustomReadBrightness.isFalse) {
+      return;
+    }
+    _brightnessGuard = Timer.periodic(const Duration(seconds: 2), (_) async {
+      if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed || readSetting.enableCustomReadBrightness.isFalse) {
+        return;
+      }
+      try {
+        final double screen = await ScreenBrightness().application;
+        if ((screen - readSetting.customBrightness.value / 100).abs() > 0.02) {
+          applyCurrentBrightness();
+        }
+      } catch (e) {
+        log.warning('Check screen brightness failed', e);
+      }
+    });
   }
 
   void updateDeviceOrientation() {
