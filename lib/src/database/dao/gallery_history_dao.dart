@@ -138,6 +138,16 @@ class GalleryHistoryDao {
         .go();
   }
 
+  /// Deletes the entry of [gid] unless it was read after [time] (canonical
+  /// UTC ISO8601): a deletion from another device does not remove a later read.
+  static Future<int> deleteIfNotNewer(int gid, String time) {
+    return (appDb.delete(appDb.galleryHistoryV2)
+          ..where((tbl) =>
+              tbl.gid.equals(gid) &
+              tbl.lastReadTime.isSmallerOrEqualValue(time)))
+        .go();
+  }
+
   static Future<int> deleteAllHistory() {
     return appDb.delete(appDb.galleryHistoryV2).go();
   }

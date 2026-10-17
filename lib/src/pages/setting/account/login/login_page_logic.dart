@@ -311,6 +311,7 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
       ipbMemberId: userInfoOrErrorMsg['ipbMemberId'],
       ipbPassHash: userInfoOrErrorMsg['ipbPassHash'],
     );
+    unawaited(syncAccountIfAuto(CloudConfigTypeEnum.ehAccount));
 
     ehRequest
         .requestForum(
@@ -409,6 +410,7 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
       avatarImgUrl: userInfo['avatarImgUrl'],
       nickName: userInfo['nickName'],
     );
+    unawaited(syncAccountIfAuto(CloudConfigTypeEnum.ehAccount));
 
     toast('loginSuccess'.tr);
     backRoute(currentRoute: Routes.login);
@@ -544,6 +546,7 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
       ipbMemberId: int.parse(state.ipbMemberId!),
       ipbPassHash: state.ipbPassHash!,
     );
+    unawaited(syncAccountIfAuto(CloudConfigTypeEnum.ehAccount));
 
     log.info('Login success by web via webview.');
     state.loginState = LoadingState.success;
@@ -607,6 +610,7 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
       ipbMemberId: int.parse(state.ipbMemberId!),
       ipbPassHash: state.ipbPassHash!,
     );
+    unawaited(syncAccountIfAuto(CloudConfigTypeEnum.ehAccount));
 
     log.info('Login success by web via webview.');
     state.loginState = LoadingState.success;
@@ -655,6 +659,7 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
       avatarImgUrl: null,
       nickName: null,
     );
+    unawaited(syncAccountIfAuto(CloudConfigTypeEnum.ehAccount));
 
     toast('loginSuccess'.tr);
     backRoute(currentRoute: Routes.login);
@@ -713,6 +718,7 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
 
       /// temporary name
       userSetting.saveUserInfo(userName: 'EHUser'.tr, ipbMemberId: ipbMemberId, ipbPassHash: ipbPassHash);
+      unawaited(syncAccountIfAuto(CloudConfigTypeEnum.ehAccount));
 
       webview.close();
       toast('loginSuccess'.tr);
@@ -758,6 +764,7 @@ class LoginPageLogic extends GetxController with GetSingleTickerProviderStateMix
 
       /// temporary name
       userSetting.saveUserInfo(userName: 'EHUser'.tr, ipbMemberId: ipbMemberId, ipbPassHash: ipbPassHash);
+      unawaited(syncAccountIfAuto(CloudConfigTypeEnum.ehAccount));
 
       toast('loginSuccess'.tr);
       untilRoute(

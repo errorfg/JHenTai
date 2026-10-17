@@ -21,6 +21,7 @@ import 'package:jhentai/src/database/table/gallery_history.dart';
 import 'package:jhentai/src/database/table/image.dart';
 import 'package:jhentai/src/database/table/local_config.dart';
 import 'package:jhentai/src/database/table/super_resolution_info.dart';
+import 'package:jhentai/src/database/table/sync_record.dart';
 import 'package:jhentai/src/database/table/tag.dart';
 import 'package:jhentai/src/database/table/tag_count.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
@@ -60,6 +61,7 @@ part 'database.g.dart';
     DioCache,
     BlockRule,
     LocalConfig,
+    SyncRecord,
   ],
 )
 class AppDb extends _$AppDb {
@@ -69,7 +71,7 @@ class AppDb extends _$AppDb {
   AppDb.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 24;
+  int get schemaVersion => 25;
 
   @override
   MigrationStrategy get migration {
@@ -168,6 +170,11 @@ class AppDb extends _$AppDb {
               await m.alterTable(TableMigration(archiveDownloaded, newColumns: [archiveDownloaded.sanitizedTitle]));
               await m.alterTable(TableMigration(galleryDownloaded, newColumns: [galleryDownloaded.sanitizedTitle]));
               await _backfillSanitizedTitles();
+            }
+            if (from < 25) {
+              await m.createTable(syncRecord);
+              await m.createIndex(srIdxDirty).ignoreDuplicateIndex();
+              await m.createIndex(srIdxApplyPending).ignoreDuplicateIndex();
             }
           });
         } on Exception catch (e) {
