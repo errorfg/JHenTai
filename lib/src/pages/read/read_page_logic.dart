@@ -347,13 +347,15 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   int _srGeneration = 0;
   bool _srRestartScheduled = false;
 
-  /// Whether pages are upscaled as they are read: on a desktop, switched
-  /// on, with the upscaler of the chosen model installed. Wherever the pages
-  /// come from: a site, a Komga server, files.
+  /// Whether pages are upscaled as they are read: switched on, with the
+  /// upscaler of the chosen model installed on this computer or an
+  /// upscaling service given. Wherever the pages come from: a site, a Komga
+  /// server, files.
   bool get realtimeSrOn => _realtimeSrApplies && realtimeSrService.active;
 
-  /// Shown in the reader's menu where upscaling while reading can be used.
-  bool get canUseRealtimeSr => GetPlatform.isDesktop && _realtimeSrApplies;
+  /// Shown in the reader's menu where upscaling while reading can be used:
+  /// on a desktop, and on a phone or tablet given an upscaling service.
+  bool get canUseRealtimeSr => realtimeSrService.supported && _realtimeSrApplies;
 
   /// Not while the reader shows the copy of a downloaded gallery or archive
   /// that was upscaled as a whole: those pages are upscaled already.
@@ -364,7 +366,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   Future<void> toggleRealtimeSr() async {
     final bool enable = !superResolutionSetting.realtimeEnabled.value;
     if (enable && !realtimeSrService.available) {
-      toast('realtimeSrNotInstalled'.tr, isShort: false);
+      toast(realtimeSrService.unavailableMessage, isShort: false);
       return;
     }
     await superResolutionSetting.saveRealtimeEnabled(enable);

@@ -76,7 +76,8 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
             _buildClearLogs(context),
             _buildClearImageCache(context),
             _buildClearNetworkCache(),
-            if (GetPlatform.isDesktop) _buildSuperResolution(),
+            // On a phone or tablet: upscaling while reading, through a service.
+            _buildSuperResolution(),
             _buildCheckUpdate(),
             _buildCheckClipboard(),
             _buildNhentaiDomains(),

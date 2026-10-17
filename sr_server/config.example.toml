@@ -1,0 +1,33 @@
+# Copy to config.toml and change what differs on your machine.
+# Relative paths are taken from the folder of this file.
+
+[server]
+# Only this machine: publish it to other devices with `tailscale serve`
+# (see README.md) rather than listening on a public address.
+host = "127.0.0.1"
+port = 8790
+
+[upscaler]
+# One folder per program, as `gallery-sr install-tools` unpacks them.
+tools_root = "tools"
+# Pages of a request are written here for the program and removed once it
+# is done; /dev/shm keeps them in memory.
+work_dir = "/dev/shm/gallery-sr"
+# GPU the programs use (-g); the programs list the GPUs they see when they
+# start, shown by GET /v1/models.
+gpu_id = 0
+# A run taking longer is stopped and its pages answered without results.
+timeout_seconds = 120
+
+[limits]
+# Pages in one request; the app sends its batch size (default 4).
+max_pages = 16
+# Size of one page as sent.
+max_page_bytes = 20000000
+# Width x height of one page.
+max_pixels = 40000000
+
+[install]
+# Proxy for downloading the programs from GitHub, e.g. "http://127.0.0.1:7890";
+# empty for none.
+proxy = ""

@@ -3,11 +3,13 @@ import 'dart:collection';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:dio/dio.dart' show DioException;
 import 'package:get/get.dart';
 import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/path_service.dart';
 import 'package:jhentai/src/service/sr/sr_input.dart';
+import 'package:jhentai/src/service/sr/sr_server_client.dart';
 import 'package:jhentai/src/service/sr/sr_tools.dart';
 import 'package:jhentai/src/setting/super_resolution_setting.dart';
 import 'package:jhentai/src/utils/archive_util.dart';
@@ -32,12 +34,16 @@ class _Task {
   final Completer<Uint8List?> done = Completer<Uint8List?>();
 }
 
-/// Upscales pages as they are read (desktop): pages go through one of the
-/// upscaler programs a batch at a time, the ones just ahead of where the
-/// reader is first, and the results are shown in place of the originals.
+/// Upscales pages as they are read: pages go through one of the upscaler
+/// programs a batch at a time, the ones just ahead of where the reader is
+/// first, and the results are shown in place of the originals. The
+/// programs run on this computer, or on another one with a GPU through its
+/// upscaling service ([SrServerClient]); a phone or tablet has only the
+/// service.
 ///
 /// Starting the program costs far more than a page (about 0.85 s against
-/// 0.03 s on an RTX 5090), so a run takes a batch of the waiting pages.
+/// 0.03 s on an RTX 5090), so a run takes a batch of the waiting pages; a
+/// batch for the service goes in one request and is one run there.
 ///
 /// Nothing is kept on disk. The programs only read and write files, so a
 /// batch passes through a temporary folder that is deleted as soon as its
@@ -95,8 +101,29 @@ class RealtimeSrService {
   /// Pages a run of the program takes at most.
   int get batchSize => superResolutionSetting.realtimeBatchSize.value.clamp(1, 64);
 
-  /// Whether the program of the chosen model is there to run.
-  bool get available => GetPlatform.isDesktop && config.model.engine.isInstalled(toolsRoot);
+  /// Whether pages go to the upscaling service rather than to the programs
+  /// on this computer: always on a phone or tablet.
+  bool get onServer => !GetPlatform.isDesktop || superResolutionSetting.realtimeOnServer.value;
+
+  /// Whether pages can be upscaled on this device at all: a desktop has
+  /// the programs, any device can have a service.
+  bool get supported => GetPlatform.isDesktop || superResolutionSetting.realtimeServerUrl.value.isNotEmpty;
+
+  /// Whether the chosen model has something to run it: the service, when it
+  /// is used and its address given; else the program on this computer.
+  bool get available => onServer
+      ? superResolutionSetting.realtimeServerUrl.value.isNotEmpty
+      : GetPlatform.isDesktop && config.model.engine.isInstalled(toolsRoot);
+
+  /// Why the chosen model cannot upscale: no service address, or its
+  /// program is not installed.
+  String get unavailableMessage => onServer ? 'realtimeSrNoServer'.tr : 'realtimeSrNotInstalled'.tr;
+
+  /// After the service could not be reached, batches are not sent to it for
+  /// this long: their pages stay as they are rather than each waiting to
+  /// fail. Another address is tried at once.
+  Duration serverRetryAfter = const Duration(seconds: 30);
+  ({String url, DateTime until})? _serverDown;
 
   bool get active => superResolutionSetting.realtimeEnabled.value && available;
 
@@ -222,11 +249,59 @@ class RealtimeSrService {
     }
   }
 
+  Future<Map<_Task, Uint8List>> _runBatch(List<_Task> batch) => onServer ? _runOnServer(batch) : _runProgram(batch);
+
+  /// One request to the service with the pages of [batch], each under its
+  /// place in the batch; pages left as they are take no part and get no
+  /// result.
+  Future<Map<_Task, Uint8List>> _runOnServer(List<_Task> batch) async {
+    final String url = superResolutionSetting.realtimeServerUrl.value;
+    final ({String url, DateTime until})? down = _serverDown;
+    if (down != null && down.url == url && DateTime.now().isBefore(down.until)) {
+      return const <_Task, Uint8List>{};
+    }
+    final int maxWidth = superResolutionSetting.realtimeMaxWidth.value;
+    final List<Uint8List?> pages = await Future.wait(
+      batch.map((_Task task) async {
+        final Uint8List? encoded = await task.loadEncoded();
+        return encoded == null ? null : prepareSrUpload(encoded, strips: task.strips, maxWidth: maxWidth);
+      }),
+    );
+    if (pages.every((Uint8List? page) => page == null)) {
+      return const <_Task, Uint8List>{};
+    }
+
+    runs++;
+    batchSizes.add(pages.whereType<Uint8List>().length);
+    final SrConfig config = batch.first.config;
+    final Stopwatch watch = Stopwatch()..start();
+    final List<Uint8List?> results;
+    try {
+      results = await SrServerClient(url).upscale(config, pages);
+    } on DioException {
+      _serverDown = (url: url, until: DateTime.now().add(serverRetryAfter));
+      rethrow;
+    }
+    _serverDown = null;
+
+    final Map<_Task, Uint8List> upscaled = <_Task, Uint8List>{
+      for (int i = 0; i < batch.length; i++)
+        if (results[i] != null) batch[i]: results[i]!,
+    };
+    for (int i = 0; i < batch.length; i++) {
+      if (pages[i] != null && results[i] == null) {
+        log.error('The upscaling service has no result for page ${batch[i].position}');
+      }
+    }
+    log.trace('Upscaled ${upscaled.length} page(s) with ${config.label} on the service in ${watch.elapsedMilliseconds} ms');
+    return upscaled;
+  }
+
   /// One run of the program on the pages of [batch]. Each page is written
   /// as `<its place in the batch>.png`, and the program writes its result
   /// under the same name, so results cannot be mixed up; pages left as they
   /// are take no part and get no result.
-  Future<Map<_Task, Uint8List>> _runBatch(List<_Task> batch) async {
+  Future<Map<_Task, Uint8List>> _runProgram(List<_Task> batch) async {
     final int maxWidth = superResolutionSetting.realtimeMaxWidth.value;
     final List<SrInput?> inputs = await Future.wait(
       batch.map((_Task task) async {

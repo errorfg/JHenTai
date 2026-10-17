@@ -44,32 +44,38 @@ class SettingSuperResolutionPage extends StatelessWidget {
           children: [
             // Two features that share nothing but the GPU: upscaling what
             // is downloaded, a whole gallery at a time, and upscaling pages
-            // while reading online. Each has its own programs and models.
-            SrSectionHeader(
-              key: const Key('srOfflineSection'),
-              title: 'srSectionOffline'.tr,
-              hint: 'srSectionOfflineHint'.tr,
-            ),
-            _buildModelDirectoryPath(),
-            _buildModelType(),
-            const Divider(),
+            // while reading. Each has its own programs and models. A phone
+            // or tablet has only the second, through an upscaling service.
+            if (GetPlatform.isDesktop) ...[
+              SrSectionHeader(
+                key: const Key('srOfflineSection'),
+                title: 'srSectionOffline'.tr,
+                hint: 'srSectionOfflineHint'.tr,
+              ),
+              _buildModelDirectoryPath(),
+              _buildModelType(),
+              const Divider(),
+            ],
             SrSectionHeader(
               key: const Key('srRealtimeSection'),
               title: 'realtimeSr'.tr,
-              hint: 'srSectionRealtimeHint'.tr,
+              hint: GetPlatform.isDesktop ? 'srSectionRealtimeHint'.tr : 'srSectionRealtimeHintMobile'.tr,
               experimental: true,
             ),
             ...realtimeSrTiles(context),
             _buildRealtimeBatchSize(),
-            for (final SrEngine engine in SrEngine.values) _SrToolTile(engine: engine),
-            _buildBenchmark(),
-            const Divider(),
-            SrSectionHeader(
-              key: const Key('srCommonSection'),
-              title: 'srSectionCommon'.tr,
-              hint: 'srSectionCommonHint'.tr,
-            ),
-            _buildGpuId(),
+            ...realtimeSrServerTiles(context),
+            if (GetPlatform.isDesktop) ...[
+              for (final SrEngine engine in SrEngine.values) _SrToolTile(engine: engine),
+              _buildBenchmark(),
+              const Divider(),
+              SrSectionHeader(
+                key: const Key('srCommonSection'),
+                title: 'srSectionCommon'.tr,
+                hint: 'srSectionCommonHint'.tr,
+              ),
+              _buildGpuId(),
+            ],
           ],
         ).withListTileTheme(context),
       ),

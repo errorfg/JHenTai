@@ -13,7 +13,7 @@ class SuperResolutionSetting with JHLifeCircleBeanWithConfigStorage implements J
   Rx<ModelType> model = Rx<ModelType>(ModelType.CUGAN);
   RxInt gpuId = 0.obs;
 
-  /// Upscaling pages while reading online (desktop): on or off, the model
+  /// Upscaling pages while reading: on or off, the model
   /// (an [SrModel] id) with its scale and denoise level, and the width from
   /// which pages are left as they are (0: every page is upscaled).
   RxBool realtimeEnabled = false.obs;
@@ -26,6 +26,13 @@ class SuperResolutionSetting with JHLifeCircleBeanWithConfigStorage implements J
   /// costs far more than a page, so pages are fetched ahead and upscaled a
   /// batch at a time.
   RxInt realtimeBatchSize = 4.obs;
+
+  /// Address of an upscaling service (`sr_server/` in the repository) on a
+  /// computer with a GPU, e.g. one in the same Tailscale network; empty:
+  /// none. A phone or tablet upscales only through it; a desktop does when
+  /// [realtimeOnServer] is on, else with the programs on itself.
+  RxString realtimeServerUrl = ''.obs;
+  RxBool realtimeOnServer = false.obs;
 
   @override
   ConfigEnum get configEnum => ConfigEnum.superResolutionSetting;
@@ -43,6 +50,8 @@ class SuperResolutionSetting with JHLifeCircleBeanWithConfigStorage implements J
     realtimeDenoise.value = map['realtimeDenoise'] ?? realtimeDenoise.value;
     realtimeMaxWidth.value = map['realtimeMaxWidth'] ?? realtimeMaxWidth.value;
     realtimeBatchSize.value = map['realtimeBatchSize'] ?? realtimeBatchSize.value;
+    realtimeServerUrl.value = map['realtimeServerUrl'] ?? realtimeServerUrl.value;
+    realtimeOnServer.value = map['realtimeOnServer'] ?? realtimeOnServer.value;
   }
 
   @override
@@ -57,6 +66,8 @@ class SuperResolutionSetting with JHLifeCircleBeanWithConfigStorage implements J
       'realtimeDenoise': realtimeDenoise.value,
       'realtimeMaxWidth': realtimeMaxWidth.value,
       'realtimeBatchSize': realtimeBatchSize.value,
+      'realtimeServerUrl': realtimeServerUrl.value,
+      'realtimeOnServer': realtimeOnServer.value,
     });
   }
 
@@ -109,6 +120,20 @@ class SuperResolutionSetting with JHLifeCircleBeanWithConfigStorage implements J
   Future<void> saveRealtimeMaxWidth(int width) async {
     log.debug('saveRealtimeMaxWidth:$width');
     realtimeMaxWidth.value = width;
+    await saveBeanConfig();
+  }
+
+  /// [url] is kept without spaces around or slashes at the end.
+  Future<void> saveRealtimeServerUrl(String url) async {
+    final String normalized = url.trim().replaceFirst(RegExp(r'/+$'), '');
+    log.debug('saveRealtimeServerUrl:$normalized');
+    realtimeServerUrl.value = normalized;
+    await saveBeanConfig();
+  }
+
+  Future<void> saveRealtimeOnServer(bool onServer) async {
+    log.debug('saveRealtimeOnServer:$onServer');
+    realtimeOnServer.value = onServer;
     await saveBeanConfig();
   }
 }
