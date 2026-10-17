@@ -3,6 +3,7 @@ package com.gallery.reader.exthost
 import android.app.Application
 import android.content.SharedPreferences
 import androidx.preference.PreferenceScreen
+import com.gallery.reader.exthost.net.HostProxySelector
 import okhttp3.CookieJar
 import okhttp3.OkHttpClient
 import java.io.File
@@ -40,7 +41,10 @@ interface HostPlatform {
     ): PreferenceScreen
 
     /** Lets a platform change how requests are carried, e.g. iOS's native networking. */
-    fun configureClient(builder: OkHttpClient.Builder) {}
+    fun configureClient(
+        builder: OkHttpClient.Builder,
+        proxy: HostProxySelector,
+    ) {}
 
     fun log(message: String) {
         System.err.println("ExtHost: $message")

@@ -6,13 +6,17 @@ import androidx.preference.PreferenceScreen
 import com.gallery.reader.exthost.HostPlatform
 import com.gallery.reader.exthost.compat.Bridges
 import com.gallery.reader.exthost.net.PersistentCookieJar
+import com.gallery.reader.exthost.net.HostProxySelector
 import okhttp3.CookieJar
+import okhttp3.OkHttpClient
 import java.io.File
 import java.net.URLClassLoader
 
 /** The host on a JVM: desktop through a bundled runtime, iOS through OpenJDK in the app. */
 open class JvmPlatform(
     final override val dataDir: File,
+    /** Carries requests outside the JVM (iOS); OkHttp's own when null. */
+    private val transport: Transport? = null,
 ) : HostPlatform {
     final override val application = Application(dataDir)
 
@@ -54,6 +58,13 @@ open class JvmPlatform(
 
     override fun releaseClassLoader(loader: ClassLoader) {
         (loader as? URLClassLoader)?.close()
+    }
+
+    override fun configureClient(
+        builder: OkHttpClient.Builder,
+        proxy: HostProxySelector,
+    ) {
+        if (transport != null) builder.addInterceptor(NativeTransportSwitch(transport) { proxy.spec })
     }
 
     override fun createPreferenceScreen(

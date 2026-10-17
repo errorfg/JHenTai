@@ -62,7 +62,8 @@ class HttpServer(
         socket?.let { if (!it.isClosed) return it.localPort }
         val server = ServerSocket()
         server.reuseAddress = true
-        server.bind(InetSocketAddress(InetAddress.getLoopbackAddress(), port), 64)
+        // 127.0.0.1, which the app connects to; getLoopbackAddress() is ::1 on Android.
+        server.bind(InetSocketAddress(InetAddress.getByAddress(byteArrayOf(127, 0, 0, 1)), port), 64)
         socket = server
         Thread({ accept(server) }, "exthost-accept").apply { isDaemon = true }.start()
         return server.localPort

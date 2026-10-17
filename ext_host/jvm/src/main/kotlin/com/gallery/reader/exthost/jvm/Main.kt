@@ -36,8 +36,10 @@ fun start(config: String): ExtHost.Running {
     val json = Json.parseToJsonElement(config).jsonObject
     fun string(key: String) = (json[key] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
     val dataDir = File(string("dataDir") ?: error("dataDir is required")).apply { mkdirs() }
+    // iOS carries requests with NSURLSession: TLS in the interpreter is slow.
+    val transport = if (string("platform") == "ios") NativeNet else null
     return ExtHost.start(
-        platform = JvmPlatform(dataDir),
+        platform = JvmPlatform(dataDir, transport),
         token = string("token") ?: error("token is required"),
         proxySpec = string("proxy"),
         port = json["port"]?.jsonPrimitive?.intOrNull ?: 0,

@@ -97,6 +97,8 @@ class TachiHost {
       'dataDir': dir.path,
       'token': token,
       'proxy': await proxySpecForHost(),
+      // iOS carries requests with NSURLSession (see NativeTransport.kt).
+      'platform': Platform.operatingSystem,
     });
     final Stopwatch watch = Stopwatch()..start();
     final int port;

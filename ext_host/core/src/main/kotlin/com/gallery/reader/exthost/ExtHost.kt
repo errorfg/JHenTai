@@ -36,7 +36,7 @@ object ExtHost {
         running?.let { return it }
         val started = System.currentTimeMillis()
         val proxy = HostProxySelector().apply { set(proxySpec) }
-        val network = NetworkHelper(platform.application, platform.cookieJar, proxy, platform::configureClient)
+        val network = NetworkHelper(platform.application, platform.cookieJar, proxy) { platform.configureClient(it, proxy) }
         Injekt.addSingleton<Application>(platform.application)
         Injekt.addSingleton<NetworkHelper>(network)
         Injekt.addSingleton<Json>(
