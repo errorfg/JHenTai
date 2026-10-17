@@ -34,7 +34,7 @@ E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jian
 - nhentai、wnacg、JM 的详情页有 `EH` 按钮，用标题在 E-Hentai 上搜索同一画廊；
 - 统一的登录页，可在 E-Hentai、nhentai、JM 之间选择；
 - 各来源的收藏可以与 E-Hentai 收藏混合显示，也可以分开显示；
-- 设置、本地收藏、历史和阅读进度通过 WebDAV 或 S3 兼容存储云同步；
+- 设置、本地收藏、历史、阅读进度和登录通过 WebDAV、S3 兼容存储或自行部署的同步服务云同步；
 - 「发送到 Telegraph 机器人」按钮，配合自行部署的 eh2telegraph 服务。
 
 ## 相对上游的改动
@@ -56,6 +56,8 @@ E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jian
   - `nhentai` API 密钥纳入配置同步，并自动迁移旧版保存在 EH 设置中的密钥。
   - JM 本地收藏纳入配置同步。
   - 配置同步原样保留无法识别的远端条目（由更新版本写入）以及本次未同步的类型；远端文件无法读取时中止同步，不再上传。
+  - 同步服务（自行部署 `sync_server/` 中的 Cloudflare Worker 与 D1 数据库）：按条同步，删除也会同步到其他设备；见 [wiki](https://github.com/errorfg/JHenTai/wiki/%E5%90%8C%E6%AD%A5%E6%9C%8D%E5%8A%A1%E9%83%A8%E7%BD%B2)。
+  - E-Hentai 登录纳入同步（igneous 由每台设备自行获取）；同步方式与开关由每台设备各自决定。
 - 画廊与检索体验：
   - 详情页支持多 Tag 选择搜索。
   - Popular / Ranklist 页支持客户端过滤。
@@ -72,6 +74,12 @@ E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jian
   - 统一的登录页可选择站点（E-Hentai、`nhentai`、JM）；账号设置页分别显示并登出各站点，`nhentai` API 密钥在登录页填写，验证成功后才保存。
   - 支持 wnacg 链接跳转，自动域名重写。
   - 各站点（E-Hentai / ExHentai、`nhentai`、wnacg、JM）详情页的「发送到 Telegraph 机器人」按钮，把画廊提交给自行部署的 eh2telegraph 服务，服务需提供 [wiki](https://github.com/errorfg/JHenTai/wiki/%E5%8F%91%E9%80%81%E5%88%B0Telegraph) 中说明的 HTTP 接口；服务地址与令牌纳入配置同步。
+- 关注页：
+  - 翻过的画廊记为已读并在下次淡化显示；进度页面以时间轴显示读过的部分、上次停留的位置与书签；详情页的「关注位置」按钮从这本画廊开始打开关注页。
+- 阅读：
+  - 阅读时实时超分（实验性）：桌面端使用本机的超分程序，也可以通过另一台有显卡的电脑上的超分服务（`sr_server/`），手机和平板同样可用；见 [wiki](https://github.com/errorfg/JHenTai/wiki/%E5%AE%9E%E6%97%B6%E8%B6%85%E5%88%86)。
+  - 手机和平板上，阅读器顶栏可以锁定亮度。
+  - E-Hentai 画廊的新版本沿用它所替换的旧版本的阅读进度。
 - 折叠屏设备支持：
   - 移动端布局新增全局悬浮按钮，可一键切换竖屏 / 横屏方向。
 - 本地书库与下载：

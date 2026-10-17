@@ -34,7 +34,7 @@ Across sources:
 - an `EH` button on nhentai, wnacg and JM details searches the same title on E-Hentai;
 - one login page with a site picker (E-Hentai, nhentai, JM);
 - favorites of all sources can be shown mixed with E-Hentai favorites or separately;
-- cloud sync (WebDAV or S3-compatible) of settings, local favorites, history and reading progress;
+- cloud sync (WebDAV, S3-compatible, or a self-hosted sync server) of settings, local favorites, history, reading progress and logins;
 - a "Send to Telegraph bot" button for a self-hosted eh2telegraph service.
 
 ## Changes Compared With Upstream
@@ -56,6 +56,8 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - `nhentai` API key included in config sync, with automatic migration from the legacy EH setting payload.
   - JM local favorites included in config sync.
   - config sync keeps remote entries it does not understand (written by newer versions) and the types it is not syncing, and aborts instead of uploading when the remote file cannot be read.
+  - sync server provider (a Cloudflare Worker with a D1 database in `sync_server/`, deployed by yourself): item-by-item sync where deletions reach other devices too; see the [wiki](https://github.com/errorfg/JHenTai/wiki/Sync-Service).
+  - E-Hentai login included in sync (each device fetches its own `igneous`); the sync provider and switches stay each device's own choice.
 - Gallery and search UX:
   - multi-tag selection in detail page.
   - client-side filters for Popular and Ranklist pages.
@@ -72,6 +74,12 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - single login page with a site picker (E-Hentai, `nhentai`, JM); the account page shows and logs out each site separately, and the `nhentai` API key is entered there and verified before it is saved.
   - wnacg URL link jumping with automatic domain rewriting.
   - "Send to Telegraph bot" button on the details pages of every site (E-Hentai/ExHentai, `nhentai`, wnacg, JM), posting the gallery to a self-hosted eh2telegraph service that offers the HTTP interface described in the [wiki](https://github.com/errorfg/JHenTai/wiki/Send-to-Telegraph); its address and token are included in config sync.
+- Watched list:
+  - galleries scrolled past count as read and show faded next time; a progress page shows what was read on a timeline, with where you left off and bookmarks; an "In Watched" button on details pages opens the watched list at that gallery.
+- Reading:
+  - upscale pages while reading (experimental): with the upscaler programs on a desktop, or through an upscaling service (`sr_server/`) on another computer with a GPU, which phones and tablets can use too; see the [wiki](https://github.com/errorfg/JHenTai/wiki/Real-time-Upscaling).
+  - brightness lock in the reader's top bar on phones and tablets.
+  - a new E-Hentai version of a gallery takes over the reading progress of the version it replaces.
 - Foldable device support:
   - global floating button to toggle between portrait and landscape orientation (mobile layout only).
 - Local library & downloads:
