@@ -52,6 +52,13 @@ class SearchConfig {
   bool isJmSearch;
   String nhentaiSource;
 
+  /// A Tachiyomi source to search, and the states of its filters as the
+  /// host gives them (see TachiFilter); null for other sites.
+  String? tachiSource;
+  List<dynamic>? tachiFilters;
+
+  bool get isTachiSearch => tachiSource != null;
+
   SearchConfig({
     this.searchType = SearchType.gallery,
     this.includeDoujinshi = true,
@@ -80,6 +87,8 @@ class SearchConfig {
     this.isWnacgSearch = false,
     this.isJmSearch = false,
     this.nhentaiSource = 'net',
+    this.tachiSource,
+    this.tachiFilters,
   });
 
   SearchConfig.nonHOnly({
@@ -110,6 +119,8 @@ class SearchConfig {
     this.isWnacgSearch = false,
     this.isJmSearch = false,
     this.nhentaiSource = 'net',
+    this.tachiSource,
+    this.tachiFilters,
   });
 
   void enableAllCategories() {
@@ -304,6 +315,8 @@ class SearchConfig {
       isWnacgSearch: json["isWnacgSearch"] ?? false,
       isJmSearch: json["isJmSearch"] ?? false,
       nhentaiSource: json["nhentaiSource"] ?? 'net',
+      tachiSource: json["tachiSource"],
+      tachiFilters: json["tachiFilters"],
     );
   }
 
@@ -336,6 +349,8 @@ class SearchConfig {
       "isWnacgSearch": isWnacgSearch,
       "isJmSearch": isJmSearch,
       "nhentaiSource": nhentaiSource,
+      if (tachiSource != null) "tachiSource": tachiSource,
+      if (tachiFilters != null) "tachiFilters": tachiFilters,
     };
   }
 
@@ -366,6 +381,8 @@ class SearchConfig {
     bool? isWnacgSearch,
     bool? isJmSearch,
     String? nhentaiSource,
+    String? tachiSource,
+    List<dynamic>? tachiFilters,
   }) {
     return SearchConfig(
       searchType: searchType ?? this.searchType,
@@ -395,6 +412,8 @@ class SearchConfig {
       isWnacgSearch: isWnacgSearch ?? this.isWnacgSearch,
       isJmSearch: isJmSearch ?? this.isJmSearch,
       nhentaiSource: nhentaiSource ?? this.nhentaiSource,
+      tachiSource: tachiSource ?? this.tachiSource,
+      tachiFilters: tachiFilters ?? this.tachiFilters,
     );
   }
 

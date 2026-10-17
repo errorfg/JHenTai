@@ -7,10 +7,14 @@ import 'package:jhentai/src/pages/jm/jm_home_page.dart';
 import 'package:jhentai/src/pages/jm/jm_ranking_page.dart';
 import 'package:jhentai/src/pages/jm/jm_weekly_page.dart';
 import 'package:jhentai/src/pages/site/site_gallerys_page.dart';
+import 'package:jhentai/src/pages/tachi/tachi_extensions_page.dart';
+import 'package:jhentai/src/pages/tachi/tachi_search_page.dart';
+import 'package:jhentai/src/pages/tachi/tachi_sources_page.dart';
+import 'package:jhentai/src/pages/tachi/tachi_updates_page.dart';
 
 /// Navigation of a site scheme other than E-Hentai: the site's own pages
 /// around [search], then the [shared] entries (favorites, history,
-/// downloads, settings). [mobile] pages carry the button that opens the
+/// downloads, settings). Tachiyomi has its own search, over its sources. [mobile] pages carry the button that opens the
 /// drawer.
 List<TabBarIcon> siteSchemeIcons(
   ContentScheme scheme, {
@@ -62,6 +66,42 @@ List<TabBarIcon> siteSchemeIcons(
           shouldRender: false,
         ),
         search,
+        ...shared,
+      ];
+    case ContentScheme.tachiyomi:
+      return [
+        TabBarIcon(
+          name: TabBarIconNameEnum.home,
+          routeName: '/scheme/tachiyomi/sources',
+          selectedIcon: const Icon(Icons.explore),
+          unselectedIcon: const Icon(Icons.explore_outlined),
+          page: () => TachiSourcesPage(showMenuButton: mobile, showTitle: true, name: 'tachiSources'.tr),
+          shouldRender: false,
+        ),
+        TabBarIcon(
+          name: TabBarIconNameEnum.search,
+          routeName: '/scheme/tachiyomi/search',
+          selectedIcon: const Icon(Icons.search, shadows: [Shadow(blurRadius: 2)]),
+          unselectedIcon: const Icon(Icons.search),
+          page: () => TachiSearchPage(showMenuButton: mobile, showTitle: true, name: 'search'.tr),
+          shouldRender: false,
+        ),
+        TabBarIcon(
+          name: TabBarIconNameEnum.updates,
+          routeName: '/scheme/tachiyomi/updates',
+          selectedIcon: const Icon(Icons.new_releases),
+          unselectedIcon: const Icon(Icons.new_releases_outlined),
+          page: () => TachiUpdatesPage(showMenuButton: mobile, showTitle: true, name: 'tachiUpdates'.tr),
+          shouldRender: false,
+        ),
+        TabBarIcon(
+          name: TabBarIconNameEnum.extensions,
+          routeName: '/scheme/tachiyomi/extensions',
+          selectedIcon: const Icon(Icons.extension),
+          unselectedIcon: const Icon(Icons.extension_outlined),
+          page: () => TachiExtensionsPage(showMenuButton: mobile, showTitle: true, name: 'tachiExtensions'.tr),
+          shouldRender: false,
+        ),
         ...shared,
       ];
     default:

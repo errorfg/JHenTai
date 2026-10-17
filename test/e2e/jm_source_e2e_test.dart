@@ -102,7 +102,7 @@ void main() {
       parser: EHSpiderParser.detailPage2GalleryAndDetailAndApikey,
     );
     final GalleryDetail detail = info.galleryDetails;
-    final JmChapterBundle bundle = await source.bundle(first.galleryUrl.jmChapterId);
+    final JmChapterBundle bundle = await source.chapterBundle(first.galleryUrl.jmChapterId);
     expect(detail.galleryUrl.gid, first.gid);
     expect(detail.pageCount, bundle.pageCount);
     expect(detail.thumbnails.length, bundle.pageCount.clamp(0, JmSource.thumbnailsPerPage));
@@ -300,12 +300,12 @@ void main() {
     }
     expect(album, isNotNull, reason: 'no multi-chapter album found');
     multiChapterAlbum = album!;
-    final JmChapterBundle firstChapter = await source.bundle(album.id);
+    final JmChapterBundle firstChapter = await source.chapterBundle(album.id);
     expect(firstChapter.isMultiChapter, isTrue);
     expect(firstChapter.chapterIndex, 0);
 
     final JmChapterRef secondRef = multiChapterAlbum.chapters[1];
-    final JmChapterBundle second = await source.bundle(secondRef.id);
+    final JmChapterBundle second = await source.chapterBundle(secondRef.id);
     expect(second.chapterIndex, 1);
     expect(second.album.id, multiChapterAlbum.id);
     // A chapter leads to its album, as merging old history entries needs.

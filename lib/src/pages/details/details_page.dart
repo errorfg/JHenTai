@@ -30,8 +30,9 @@ import 'package:jhentai/src/widget/eh_thumbnail.dart';
 import 'package:jhentai/src/widget/eh_wheel_speed_controller.dart';
 import 'package:jhentai/src/widget/icon_text_button.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
-import 'package:jhentai/src/service/jm_reading_service.dart';
-import 'package:jhentai/src/widget/jm_chapter_dialog.dart';
+import 'package:jhentai/src/model/series.dart';
+import 'package:jhentai/src/service/series_reading_service.dart';
+import 'package:jhentai/src/widget/series_chapter_dialog.dart';
 import 'package:jhentai/src/widget/loading_state_indicator.dart';
 
 import '../../database/database.dart';
@@ -142,7 +143,8 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                     if (state.galleryDetails != null &&
                         !state.galleryUrl.isNH &&
                         !state.galleryUrl.isWN &&
-                        !state.galleryUrl.isJM)
+                        !state.galleryUrl.isJM &&
+                        !state.galleryUrl.isTachi)
                       PopupMenuItem(
                         value: 2,
                         child: Row(
@@ -270,7 +272,8 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
             buildDivider(),
             buildNewVersionHint(),
             buildActions(context),
-            buildJmChapters(context),
+            buildDescription(context),
+            buildSeriesChapters(context),
             buildCopyRightRemovedHint(),
             buildLoadingDetailsIndicator(),
             buildTags(),
@@ -1171,13 +1174,15 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
 
             if (state.galleryUrl.isNH ||
                 state.galleryUrl.isWN ||
-                state.galleryUrl.isJM) {
+                state.galleryUrl.isJM ||
+                state.galleryUrl.isTachi) {
               actions.add(_buildSearchInEHButton(context));
             }
 
             if (!state.galleryUrl.isNH &&
                 !state.galleryUrl.isWN &&
-                !state.galleryUrl.isJM) {
+                !state.galleryUrl.isJM &&
+                !state.galleryUrl.isTachi) {
               actions.addAll([
                 _buildRatingButton(context),
                 _buildArchiveButton(context),
@@ -1197,7 +1202,8 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
             // Last: the least used.
             if (!state.galleryUrl.isNH &&
                 !state.galleryUrl.isWN &&
-                !state.galleryUrl.isJM) {
+                !state.galleryUrl.isJM &&
+                !state.galleryUrl.isTachi) {
               actions.add(_buildHHButton(context));
             }
 
@@ -1220,19 +1226,20 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
     );
   }
 
-  /// Chapter row of a multi-chapter JM album: opens the chapter list, and
-  /// queues every chapter for download.
-  Widget buildJmChapters(BuildContext context) {
+  /// Chapter row of a multi-chapter series (a JM album, a Tachiyomi
+  /// manga): opens the chapter list, and queues chapters for download.
+  Widget buildSeriesChapters(BuildContext context) {
     return SliverToBoxAdapter(
       child: GetBuilder<DetailsPageLogic>(
         id: DetailsPageLogic.detailsId,
         global: false,
         init: logic,
         builder: (_) {
-          final bundle = state.jmChapterBundle;
-          if (bundle == null || !bundle.isMultiChapter) {
+          final SeriesBundle? bundle = state.seriesBundle;
+          if (bundle == null || (!bundle.isMultiChapter && !bundle.galleryUrl.isTachi)) {
             return const SizedBox();
           }
+          final int index = bundle.chapterIndex;
 
           return Container(
             margin: const EdgeInsets.only(
@@ -1244,23 +1251,26 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
               children: [
                 Expanded(
                   child: ListTile(
-                    key: const Key('jmChapterRow'),
+                    key: const Key('seriesChapterRow'),
                     dense: true,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                     leading: const Icon(Icons.format_list_numbered),
                     title: Text(
-                      '${'chapters'.tr} ${bundle.chapterIndex + 1}/${bundle.album.chapters.length}',
+                      '${'chapters'.tr} ${index + 1}/${bundle.chapters.length}',
                     ),
-                    subtitle: Text(
-                      JmSource.chapterName(bundle.album.chapters[bundle.chapterIndex]),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    subtitle: index < 0
+                        ? null
+                        : Text(
+                            bundle.chapters[index].name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                     // How far this chapter has been read.
-                    trailing: JmChapterProgressBuilder(
-                      chapterIds: [bundle.chapter.id],
+                    trailing: SeriesChapterProgressBuilder(
+                      reading: logic.seriesReading,
+                      chapterIds: [bundle.chapterId],
                       builder: (context, progress) {
-                        final JmChapterProgress? current = progress[bundle.chapter.id];
+                        final SeriesChapterProgress? current = progress[bundle.chapterId];
                         return Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -1268,7 +1278,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                               const Icon(Icons.check, size: 18)
                             else if (current?.inProgress ?? false)
                               Text(
-                                jmChapterPageText(current!),
+                                current!.pageText,
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                             const Icon(Icons.chevron_right),
@@ -1278,23 +1288,45 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                     ),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     onTap: () => Get.dialog(
-                      JmChapterDialog(
-                        chapters: bundle.album.chapters,
-                        currentChapterId: bundle.chapter.id,
-                        onTap: logic.openJmChapter,
+                      SeriesChapterDialog(
+                        reading: logic.seriesReading,
+                        chapters: bundle.chapters,
+                        currentChapterId: bundle.chapterId,
+                        onTap: logic.openSeriesChapter,
                         onMarked: () => logic.updateSafely([DetailsPageLogic.readButtonId]),
                       ),
                     ),
                   ),
                 ),
                 IconButton(
-                  key: const Key('jmDownloadChapters'),
+                  key: const Key('seriesDownloadChapters'),
                   tooltip: 'downloadChapters'.tr,
                   icon: const Icon(Icons.download_for_offline_outlined),
-                  onPressed: logic.handleDownloadJmChapters,
+                  onPressed: logic.handleDownloadSeriesChapters,
                 ),
               ],
             ),
+          ).fadeIn();
+        },
+      ),
+    );
+  }
+
+  /// A summary of the work, from sources that give one.
+  Widget buildDescription(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: GetBuilder<DetailsPageLogic>(
+        id: DetailsPageLogic.detailsId,
+        global: false,
+        init: logic,
+        builder: (_) {
+          final String? description = state.galleryDetails?.description;
+          if (description == null || description.isEmpty) {
+            return const SizedBox();
+          }
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8, left: UIConfig.detailPagePadding + 8, right: UIConfig.detailPagePadding + 8),
+            child: _ExpandableText(text: description),
           ).fadeIn();
         },
       ),
@@ -1939,26 +1971,29 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
         onTap: state.isTagSelectionMode
             ? (tag) => logic.toggleTagSelection(tag)
             : (tag) => newSearch(
-                rewriteSearchConfig: SearchConfig(
-                  keyword: '${tag.tagData.namespace}:"${tag.tagData.key}\$"',
-                  isNhSearch: state.galleryUrl.isNH,
-                  isWnacgSearch: state.galleryUrl.isWN,
-                  isJmSearch: state.galleryUrl.isJM,
-                ),
+                // A Tachiyomi source takes plain text: the genre or author itself.
+                rewriteSearchConfig: state.galleryUrl.isTachi
+                    ? SearchConfig(keyword: tag.tagData.key, tachiSource: state.galleryUrl.tachiSource)
+                    : SearchConfig(
+                        keyword: '${tag.tagData.namespace}:"${tag.tagData.key}\$"',
+                        isNhSearch: state.galleryUrl.isNH,
+                        isWnacgSearch: state.galleryUrl.isWN,
+                        isJmSearch: state.galleryUrl.isJM,
+                      ),
                 forceNewRoute: true,
               ),
         onSecondaryTap: state.galleryUrl.isNH
             ? (logic.hasNhentaiOfficialApi
                   ? logic.toggleNhentaiBlacklistTag
                   : null)
-            : state.galleryUrl.isWN || state.galleryUrl.isJM
+            : state.galleryUrl.isWN || state.galleryUrl.isJM || state.galleryUrl.isTachi
             ? null
             : logic.showTagDialog,
         onLongPress: state.galleryUrl.isNH
             ? (logic.hasNhentaiOfficialApi
                   ? logic.toggleNhentaiBlacklistTag
                   : null)
-            : state.galleryUrl.isWN || state.galleryUrl.isJM
+            : state.galleryUrl.isWN || state.galleryUrl.isJM || state.galleryUrl.isTachi
             ? null
             : logic.showTagDialog,
         showTagStatus: preferenceSetting.showGalleryTagVoteStatus.isTrue,
@@ -2017,6 +2052,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
           bool disableButtons =
               state.galleryUrl.isNH ||
               state.galleryUrl.isJM ||
+              state.galleryUrl.isTachi ||
               state.galleryDetails!.comments.any((comment) => comment.fromMe);
 
           return Column(
@@ -2191,6 +2227,38 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
             ),
           ).marginOnly(bottom: 200, top: 20);
         },
+      ),
+    );
+  }
+}
+
+/// Text shown in a few lines, all of it after a tap.
+class _ExpandableText extends StatefulWidget {
+  const _ExpandableText({required this.text});
+
+  final String text;
+
+  @override
+  State<_ExpandableText> createState() => _ExpandableTextState();
+}
+
+class _ExpandableTextState extends State<_ExpandableText> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => setState(() => _expanded = !_expanded),
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 200),
+        alignment: Alignment.topCenter,
+        child: Text(
+          widget.text,
+          maxLines: _expanded ? null : 3,
+          overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
       ),
     );
   }

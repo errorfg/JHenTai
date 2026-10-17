@@ -19,6 +19,9 @@ import 'dart:io' as io;
 import 'dart:ui' as ui;
 
 import 'package:jhentai/src/network/jm/jm_image.dart';
+import 'package:jhentai/src/network/tachi/tachi_client.dart';
+import 'package:jhentai/src/network/tachi/tachi_host.dart';
+import 'package:jhentai/src/network/tachi/tachi_source.dart';
 import 'package:jhentai/src/widget/jm_network_image_provider.dart';
 
 import '../service/gallery_download_service.dart';
@@ -221,7 +224,27 @@ class _EHImageState extends State<EHImage> {
   }
 
   Widget buildNetworkImage(BuildContext context) {
-    final String url = _replaceEXUrl(widget.galleryImage.url);
+    String url = _replaceEXUrl(widget.galleryImage.url);
+    Map<String, String>? headers = widget.galleryImage.headers;
+    String? cacheKey = widget.galleryImage.cacheKey;
+    if (TachiImages.isTachi(url)) {
+      // Served by the extension host, which may not have started yet.
+      final TachiClient? client = tachiHost.clientIfRunning;
+      if (client == null) {
+        return FutureBuilder<TachiClient>(
+          future: tachiHost.client(),
+          builder: (BuildContext context, AsyncSnapshot<TachiClient> snapshot) => snapshot.hasData
+              ? buildNetworkImage(context)
+              : snapshot.hasError
+                  ? const Center(child: Icon(Icons.sentiment_very_dissatisfied))
+                  : Center(child: UIConfig.loadingAnimation(context)),
+        );
+      }
+      final ({Uri uri, String cacheKey}) resolved = TachiImages.resolve(client, url);
+      url = resolved.uri.toString();
+      headers = <String, String>{...?headers, ...client.authHeaders};
+      cacheKey ??= resolved.cacheKey;
+    }
     final bool useGate = widget.animateOnlyWhenVisible && !widget.disableAnimation;
     final int jmStrips = JmImage.stripsOf(url);
     final Size? fitSize = widget.shrinkToContainer && JmImage.isPage(url) ? _physicalContainerSize(context) : null;
@@ -235,8 +258,8 @@ class _EHImageState extends State<EHImage> {
               strips: jmStrips,
               maxBytes: widget.maxBytes,
               fitSize: fitSize,
-              headers: widget.galleryImage.headers,
-              cacheKey: widget.galleryImage.cacheKey,
+              headers: headers,
+              cacheKey: cacheKey,
               cache: true,
               printError: kDebugMode,
             )
@@ -244,16 +267,16 @@ class _EHImageState extends State<EHImage> {
         provider: useGate
             ? _GateExtendedNetworkImageProvider(
                 url,
-                headers: widget.galleryImage.headers,
-                cacheKey: widget.galleryImage.cacheKey,
+                headers: headers,
+                cacheKey: cacheKey,
                 cache: true,
                 printError: kDebugMode,
                 gate: _gate,
               )
             : ExtendedNetworkImageProvider(
                 url,
-                headers: widget.galleryImage.headers,
-                cacheKey: widget.galleryImage.cacheKey,
+                headers: headers,
+                cacheKey: cacheKey,
                 cache: true,
                 printError: kDebugMode,
               ),

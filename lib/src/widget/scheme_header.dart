@@ -5,6 +5,7 @@ import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/model/content_scheme.dart';
 import 'package:jhentai/src/pages/setting/account/login/login_page_state.dart';
 import 'package:jhentai/src/routes/routes.dart';
+import 'package:jhentai/src/service/tachi/tachi_extension_service.dart';
 import 'package:jhentai/src/setting/scheme_setting.dart';
 import 'package:jhentai/src/setting/user_setting.dart';
 import 'package:jhentai/src/utils/account_util.dart';
@@ -55,6 +56,11 @@ String? _accountText(ContentScheme scheme) {
   final LoginSite? site = scheme.loginSite;
   if (site != null) {
     return accountLabel(site) ?? 'tap2Login'.tr;
+  }
+  if (scheme == ContentScheme.tachiyomi) {
+    // Known once the extension host has been asked.
+    final int count = tachiExtensionService.origins.length;
+    return count == 0 ? 'noTachiSources'.tr : 'tachiExtensionCount'.trParams(<String, String>{'count': '$count'});
   }
   return scheme == ContentScheme.wnacg ? 'noAccountNeeded'.tr : null;
 }

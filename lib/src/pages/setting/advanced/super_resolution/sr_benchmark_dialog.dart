@@ -312,7 +312,7 @@ Future<String> runSrBenchmarkOnJmChapter(
   final String rawDir = p.join(directory, 'downloaded');
   await Directory(rawDir).create(recursive: true);
 
-  final JmChapterBundle bundle = await ehRequest.jmSource.bundle(chapterId);
+  final JmChapterBundle bundle = await ehRequest.jmSource.chapterBundle(chapterId);
   onLog('${bundle.title}: ${bundle.pageCount} pages');
   final List<SrBenchmarkPage> pages = <SrBenchmarkPage>[];
   for (int i = 0; i < bundle.pageCount; i++) {

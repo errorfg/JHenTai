@@ -13,6 +13,9 @@ import 'package:jhentai/src/pages/home_page.dart';
 import 'package:jhentai/src/pages/layout/desktop/desktop_home_page.dart';
 import 'package:jhentai/src/pages/lock_page.dart';
 import 'package:jhentai/src/pages/komga/komga_page.dart';
+import 'package:jhentai/src/pages/tachi/tachi_extensions_page.dart';
+import 'package:jhentai/src/pages/tachi/tachi_source_page.dart';
+import 'package:jhentai/src/pages/tachi/tachi_source_settings_page.dart';
 import 'package:jhentai/src/pages/komga/komga_settings_page.dart';
 import 'package:jhentai/src/pages/pdf/pdf_library_page.dart';
 import 'package:jhentai/src/pages/popular/popular_page.dart';
@@ -149,6 +152,9 @@ class Routes {
   static const String eh2telegraph = "/setting_advanced/eh2telegraph";
   static const String jmSetting = "/setting_advanced/jmSetting";
   static const String jmList = "/jmList";
+  static const String tachiSource = "/tachiSource";
+  static const String tachiExtensions = "/tachiExtensions";
+  static const String tachiSourceSettings = "/tachiSourceSettings";
   static const String logList = "/setting_advanced/logList";
   static const String log = "/setting_advanced/logList/log";
 
@@ -532,6 +538,24 @@ class Routes {
       page: () => JmListPage(),
       transition: defaultTransition,
       side: Side.left,
+    ),
+    EHPage(
+      name: tachiSource,
+      page: () => TachiSourcePage(),
+      transition: defaultTransition,
+      side: Side.left,
+    ),
+    EHPage(
+      name: tachiExtensions,
+      page: () => const TachiExtensionsPage(),
+      transition: defaultTransition,
+      side: Side.left,
+    ),
+    EHPage(
+      name: tachiSourceSettings,
+      page: () => const TachiSourceSettingsPage().withEscOrFifthButton2BackRightRoute(),
+      transition: defaultTransition,
+      offAllBefore: false,
     ),
     EHPage(
       name: jmSetting,

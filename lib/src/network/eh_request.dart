@@ -45,6 +45,10 @@ import 'package:jhentai/src/utils/eh_spider_parser.dart';
 import 'package:jhentai/src/network/jm/jm_api.dart';
 import 'package:jhentai/src/network/jm/jm_image.dart';
 import 'package:jhentai/src/network/jm/jm_source.dart';
+import 'package:jhentai/src/network/tachi/tachi_models.dart';
+import 'package:jhentai/src/network/tachi/tachi_client.dart';
+import 'package:jhentai/src/network/tachi/tachi_host.dart';
+import 'package:jhentai/src/network/tachi/tachi_source.dart';
 import 'package:jhentai/src/setting/jm_setting.dart';
 import 'package:jhentai/src/setting/jm_account_setting.dart';
 import 'package:jhentai/src/utils/proxy_util.dart';
@@ -100,6 +104,9 @@ class EHRequest with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   /// JM requests; their own Dio, because the shared one caches responses and
   /// JM responses are encrypted per request time.
   late final JmSource jmSource;
+
+  /// Tachiyomi sources, through the extension host.
+  final TachiSource tachiSource = TachiSource();
 
   @override
   Future<void> doInitBean() async {
@@ -610,6 +617,16 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     SearchConfig? searchConfig,
     required HtmlParser<T> parser,
   }) async {
+    if (searchConfig?.isTachiSearch ?? false) {
+      return await tachiSource.list(
+            source: searchConfig!.tachiSource!,
+            query: searchConfig.keyword,
+            filters: searchConfig.tachiFilters == null ? null : TachiFilter.listFromJson(searchConfig.tachiFilters!),
+            pageToken: nextGid ?? prevGid,
+          )
+          as T;
+    }
+
     if (_shouldUseJmSearch(searchConfig: searchConfig)) {
       return await jmSource.galleryPage(
             keyword: searchConfig!.computeFullKeywords(),
@@ -656,6 +673,14 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     required HtmlParser<T> parser,
   }) async {
     final GalleryUrl? jmUrl = GalleryUrl.tryParse(galleryUrl);
+    if (jmUrl != null && jmUrl.isTachi) {
+      return tachiSource.detailPage(
+        galleryUrl: jmUrl,
+        thumbnailsPageIndex: thumbnailsPageIndex,
+        parser: parser,
+        useCache: useCacheIfAvailable,
+      );
+    }
     if (jmUrl != null && jmUrl.isJM) {
       return jmSource.detailPage(
         galleryUrl: jmUrl,
@@ -876,6 +901,10 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
       return jmSource.imagePage(href: href, parser: parser);
     }
 
+    if (href.startsWith('tachi://')) {
+      return tachiSource.imagePage(href: href, parser: parser);
+    }
+
     if (href.startsWith('wn://') || _isWnacgUrl(href)) {
       return _requestWnImagePage(href: href, parser: parser);
     }
@@ -1094,6 +1123,14 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     bool deleteOnError = true,
     HtmlParser<T>? parser,
   }) async {
+    // A Tachiyomi page comes from the extension host, which applies the
+    // source's headers and interceptors.
+    Map<String, String>? hostHeaders;
+    if (TachiImages.isTachi(url)) {
+      final TachiClient client = await tachiHost.client();
+      hostHeaders = client.authHeaders;
+      url = TachiImages.resolve(client, url).uri.toString();
+    }
     Response response = await _dio.download(
       // JM image urls carry their strip count as a fragment.
       JmImage.requestUrl(url),
@@ -1104,7 +1141,10 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
       deleteOnError: deleteOnError,
       options: Options(
         preserveHeaderCase: preserveHeaderCase,
-        headers: range == null ? null : {'Range': range},
+        headers: {
+          ...?hostHeaders,
+          if (range != null) 'Range': range,
+        },
         receiveTimeout: Duration(milliseconds: receiveTimeout ?? 0),
       ),
     );

@@ -12,7 +12,10 @@ enum CloudConfigTypeEnum {
   eh2telegraphSetting(11, 'eh2telegraphSetting'),
   jmFavorite(12, 'jmFavorite'),
   jmAccount(13, 'jmAccount'),
-  ehAccount(14, 'ehAccount');
+  ehAccount(14, 'ehAccount'),
+  tachiExtensionList(15, 'tachiExtensionList'),
+  tachiSourceSettings(16, 'tachiSourceSettings'),
+  tachiFavorite(17, 'tachiFavorite');
 
   final int code;
 
@@ -60,6 +63,12 @@ enum CloudConfigTypeEnum {
         return CloudConfigTypeEnum.jmAccount;
       case 14:
         return CloudConfigTypeEnum.ehAccount;
+      case 15:
+        return CloudConfigTypeEnum.tachiExtensionList;
+      case 16:
+        return CloudConfigTypeEnum.tachiSourceSettings;
+      case 17:
+        return CloudConfigTypeEnum.tachiFavorite;
       default:
         throw Exception('Unknown CloudConfigTypeEnum code: $code');
     }

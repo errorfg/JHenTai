@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:jhentai/src/exception/internal_exception.dart';
 import 'package:jhentai/src/setting/eh_setting.dart';
 
@@ -6,7 +8,16 @@ class GalleryUrl {
   final bool isNH;
   final bool isWN;
   final bool isJM;
+
+  /// A Tachiyomi manga or chapter, see [GalleryUrl.tachiManga].
+  final bool isTachi;
   final String? sourceHost;
+
+  /// Tachiyomi source id, and the source's own URLs of the manga and, for a
+  /// chapter, of the chapter.
+  final String? tachiSource;
+  final String? tachiMangaPath;
+  final String? tachiChapterPath;
 
   final int gid;
 
@@ -19,8 +30,12 @@ class GalleryUrl {
     this.isNH = false,
     this.isWN = false,
     this.isJM = false,
+    this.isTachi = false,
     this.sourceHost,
-  }) : assert(isWN || isNH || isJM || token.length == 10);
+    this.tachiSource,
+    this.tachiMangaPath,
+    this.tachiChapterPath,
+  }) : assert(isWN || isNH || isJM || isTachi || token.length == 10);
 
   /// JM ids share their range with E-Hentai gids; tables keyed by gid
   /// (downloads, history) would mix them up, so JM gids are shifted.
@@ -36,7 +51,70 @@ class GalleryUrl {
 
   int get jmChapterId => gid - jmGidOffset;
 
+  /// Tachiyomi gids: a hash of the source and the source's URL, in
+  /// [tachiGidOffset, 2 * tachiGidOffset). Above JM's range, and below 2^53
+  /// so that JavaScript (the sync server) reads them exactly.
+  static const int tachiGidOffset = 1000000000000000;
+
+  /// A Tachiyomi manga, as the history and favorites keep it.
+  factory GalleryUrl.tachiManga(String source, String mangaPath) => GalleryUrl(
+        isEH: true,
+        isTachi: true,
+        gid: tachiGid('m', source, mangaPath),
+        token: 'tachiyomi',
+        tachiSource: source,
+        tachiMangaPath: mangaPath,
+      );
+
+  /// A chapter of a Tachiyomi manga; read progress and downloads are kept
+  /// per chapter.
+  factory GalleryUrl.tachiChapter(String source, String mangaPath, String chapterPath) => GalleryUrl(
+        isEH: true,
+        isTachi: true,
+        gid: tachiGid('c', source, chapterPath),
+        token: 'tachiyomi',
+        tachiSource: source,
+        tachiMangaPath: mangaPath,
+        tachiChapterPath: chapterPath,
+      );
+
+  bool get isTachiChapter => isTachi && tachiChapterPath != null;
+
+  /// The manga of a Tachiyomi chapter (or the manga itself).
+  GalleryUrl get tachiMangaUrl => GalleryUrl.tachiManga(tachiSource!, tachiMangaPath!);
+
+  /// FNV-1a (64 bit) of `kind|source|path` in UTF-8, folded into
+  /// [tachiGidOffset]'s range. Every device computes the same gid.
+  static int tachiGid(String kind, String source, String path) {
+    int hash = 0xcbf29ce484222325;
+    for (final int byte in utf8.encode('$kind|$source|$path')) {
+      hash ^= byte;
+      hash = hash * 0x100000001b3;
+    }
+    return tachiGidOffset + (hash & 0x3FFFFFFFFFFFF) % tachiGidOffset;
+  }
+
+  static bool isTachiGid(int gid) => gid >= tachiGidOffset && gid < 2 * tachiGidOffset;
+
+  static GalleryUrl? _tryParseTachi(String url) {
+    if (!url.startsWith('tachiyomi://')) {
+      return null;
+    }
+    final Uri? uri = Uri.tryParse(url);
+    final String? manga = uri?.queryParameters['m'];
+    if (uri == null || uri.host.isEmpty || manga == null) {
+      return null;
+    }
+    final String? chapter = uri.queryParameters['c'];
+    return uri.path == '/chapter' && chapter != null ? GalleryUrl.tachiChapter(uri.host, manga, chapter) : GalleryUrl.tachiManga(uri.host, manga);
+  }
+
   static GalleryUrl? tryParse(String url) {
+    GalleryUrl? tachi = _tryParseTachi(url);
+    if (tachi != null) {
+      return tachi;
+    }
+
     RegExp regExp =
         RegExp(r'https://e([-x])hentai\.org/g/(\d+)/([a-z0-9]{10})');
     Match? match = regExp.firstMatch(url);
@@ -146,6 +224,14 @@ class GalleryUrl {
   }
 
   String get url {
+    if (isTachi) {
+      return Uri(
+        scheme: 'tachiyomi',
+        host: tachiSource,
+        path: tachiChapterPath == null ? '/manga' : '/chapter',
+        queryParameters: <String, String>{'m': tachiMangaPath!, if (tachiChapterPath != null) 'c': tachiChapterPath!},
+      ).toString();
+    }
     if (isJM) {
       return 'https://18comic.vip/photo/$jmChapterId';
     }
@@ -174,14 +260,18 @@ class GalleryUrl {
       isNH: isNH ?? this.isNH,
       isWN: isWN ?? this.isWN,
       isJM: isJM ?? this.isJM,
+      isTachi: isTachi,
       sourceHost: sourceHost ?? this.sourceHost,
       gid: gid ?? this.gid,
       token: token ?? this.token,
+      tachiSource: tachiSource,
+      tachiMangaPath: tachiMangaPath,
+      tachiChapterPath: tachiChapterPath,
     );
   }
 
   @override
   String toString() {
-    return 'GalleryUrl{isEH: $isEH, isNH: $isNH, isWN: $isWN, isJM: $isJM, sourceHost: $sourceHost, gid: $gid, token: $token}';
+    return 'GalleryUrl{isEH: $isEH, isNH: $isNH, isWN: $isWN, isJM: $isJM, isTachi: $isTachi, sourceHost: $sourceHost, gid: $gid, token: $token, tachiSource: $tachiSource, tachiMangaPath: $tachiMangaPath, tachiChapterPath: $tachiChapterPath}';
   }
 }

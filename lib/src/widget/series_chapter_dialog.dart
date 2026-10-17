@@ -3,33 +3,33 @@ import 'dart:math';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:jhentai/src/model/gallery_url.dart';
-import 'package:jhentai/src/network/jm/jm_models.dart';
-import 'package:jhentai/src/network/jm/jm_source.dart';
+import 'package:jhentai/src/model/series.dart';
 import 'package:jhentai/src/service/gallery_download_service.dart';
-import 'package:jhentai/src/service/jm_reading_service.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
+import 'package:jhentai/src/service/series_reading_service.dart';
 import 'package:jhentai/src/utils/route_util.dart';
 import 'package:jhentai/src/widget/eh_wheel_speed_controller.dart';
 
 /// Builds with the reading progress of [chapterIds], again whenever read
 /// progress changes: reading, marking, or a cloud sync.
-class JmChapterProgressBuilder extends StatefulWidget {
-  const JmChapterProgressBuilder({
+class SeriesChapterProgressBuilder extends StatefulWidget {
+  const SeriesChapterProgressBuilder({
     super.key,
+    required this.reading,
     required this.chapterIds,
     required this.builder,
   });
 
+  final SeriesReadingService reading;
   final List<int> chapterIds;
-  final Widget Function(BuildContext context, Map<int, JmChapterProgress> progress) builder;
+  final Widget Function(BuildContext context, Map<int, SeriesChapterProgress> progress) builder;
 
   @override
-  State<JmChapterProgressBuilder> createState() => _JmChapterProgressBuilderState();
+  State<SeriesChapterProgressBuilder> createState() => _SeriesChapterProgressBuilderState();
 }
 
-class _JmChapterProgressBuilderState extends State<JmChapterProgressBuilder> {
-  Map<int, JmChapterProgress> _progress = const <int, JmChapterProgress>{};
+class _SeriesChapterProgressBuilderState extends State<SeriesChapterProgressBuilder> {
+  Map<int, SeriesChapterProgress> _progress = const <int, SeriesChapterProgress>{};
   int _generation = 0;
 
   @override
@@ -40,7 +40,7 @@ class _JmChapterProgressBuilderState extends State<JmChapterProgressBuilder> {
   }
 
   @override
-  void didUpdateWidget(JmChapterProgressBuilder oldWidget) {
+  void didUpdateWidget(SeriesChapterProgressBuilder oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!listEquals(oldWidget.chapterIds, widget.chapterIds)) {
       _load();
@@ -55,7 +55,7 @@ class _JmChapterProgressBuilderState extends State<JmChapterProgressBuilder> {
 
   Future<void> _load() async {
     final int generation = ++_generation;
-    final Map<int, JmChapterProgress> progress = await jmReadingService.progressOf(widget.chapterIds);
+    final Map<int, SeriesChapterProgress> progress = await widget.reading.progressOf(widget.chapterIds);
     if (mounted && generation == _generation) {
       setState(() => _progress = progress);
     }
@@ -65,28 +65,27 @@ class _JmChapterProgressBuilderState extends State<JmChapterProgressBuilder> {
   Widget build(BuildContext context) => widget.builder(context, _progress);
 }
 
-/// `P15/30`, or `P15` while the page count is unknown.
-String jmChapterPageText(JmChapterProgress progress) => progress.pageText;
-
-/// Builds with how far the multi-chapter album [albumId] has been read
+/// Builds with how far the multi-chapter series [seriesId] has been read
 /// (null when it is not known as one, or untouched), again whenever read
 /// progress changes.
-class JmAlbumProgressBuilder extends StatefulWidget {
-  const JmAlbumProgressBuilder({
+class SeriesProgressBuilder extends StatefulWidget {
+  const SeriesProgressBuilder({
     super.key,
-    required this.albumId,
+    required this.reading,
+    required this.seriesId,
     required this.builder,
   });
 
-  final int albumId;
-  final Widget Function(BuildContext context, JmAlbumProgress? progress) builder;
+  final SeriesReadingService reading;
+  final int seriesId;
+  final Widget Function(BuildContext context, SeriesProgress? progress) builder;
 
   @override
-  State<JmAlbumProgressBuilder> createState() => _JmAlbumProgressBuilderState();
+  State<SeriesProgressBuilder> createState() => _SeriesProgressBuilderState();
 }
 
-class _JmAlbumProgressBuilderState extends State<JmAlbumProgressBuilder> {
-  JmAlbumProgress? _progress;
+class _SeriesProgressBuilderState extends State<SeriesProgressBuilder> {
+  SeriesProgress? _progress;
   int _generation = 0;
 
   @override
@@ -97,9 +96,9 @@ class _JmAlbumProgressBuilderState extends State<JmAlbumProgressBuilder> {
   }
 
   @override
-  void didUpdateWidget(JmAlbumProgressBuilder oldWidget) {
+  void didUpdateWidget(SeriesProgressBuilder oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.albumId != widget.albumId) {
+    if (oldWidget.seriesId != widget.seriesId || !identical(oldWidget.reading, widget.reading)) {
       _progress = null;
       _load();
     }
@@ -113,7 +112,7 @@ class _JmAlbumProgressBuilderState extends State<JmAlbumProgressBuilder> {
 
   Future<void> _load() async {
     final int generation = ++_generation;
-    final JmAlbumProgress? progress = await jmReadingService.albumProgress(widget.albumId);
+    final SeriesProgress? progress = await widget.reading.albumProgress(widget.seriesId);
     if (mounted && generation == _generation) {
       setState(() => _progress = progress);
     }
@@ -125,19 +124,21 @@ class _JmAlbumProgressBuilderState extends State<JmAlbumProgressBuilder> {
 
 enum _ChapterAction { markRead, markUnread, markPreviousRead }
 
-/// Chapters of a JM album with how far each has been read; tapping one
-/// opens it. Albums can have hundreds of chapters, so the list starts at
-/// the current one.
-class JmChapterDialog extends StatefulWidget {
-  final List<JmChapterRef> chapters;
+/// Chapters of a series with how far each has been read; tapping one opens
+/// it. Series can have hundreds of chapters, so the list starts at the
+/// current one.
+class SeriesChapterDialog extends StatefulWidget {
+  final SeriesReadingService reading;
+  final List<SeriesChapter> chapters;
   final int currentChapterId;
-  final ValueChanged<JmChapterRef> onTap;
+  final ValueChanged<SeriesChapter> onTap;
 
   /// After a chapter was marked read or unread here.
   final VoidCallback? onMarked;
 
-  const JmChapterDialog({
+  const SeriesChapterDialog({
     super.key,
+    required this.reading,
     required this.chapters,
     required this.currentChapterId,
     required this.onTap,
@@ -145,13 +146,13 @@ class JmChapterDialog extends StatefulWidget {
   });
 
   @override
-  State<JmChapterDialog> createState() => _JmChapterDialogState();
+  State<SeriesChapterDialog> createState() => _SeriesChapterDialogState();
 }
 
-class _JmChapterDialogState extends State<JmChapterDialog> {
+class _SeriesChapterDialogState extends State<SeriesChapterDialog> {
   static const double _itemExtent = 56;
 
-  late final List<int> _chapterIds = widget.chapters.map((JmChapterRef c) => c.id).toList();
+  late final List<int> _chapterIds = widget.chapters.map((SeriesChapter c) => c.id).toList();
 
   late final ScrollController _controller = ScrollController(
     initialScrollOffset: max(0, _chapterIds.indexOf(widget.currentChapterId) - 2) * _itemExtent,
@@ -166,21 +167,22 @@ class _JmChapterDialogState extends State<JmChapterDialog> {
   Future<void> _act(_ChapterAction action, int index) async {
     switch (action) {
       case _ChapterAction.markRead:
-        await jmReadingService.markRead(<int>[_chapterIds[index]]);
+        await widget.reading.markRead(<int>[_chapterIds[index]]);
       case _ChapterAction.markUnread:
-        await jmReadingService.markUnread(<int>[_chapterIds[index]]);
+        await widget.reading.markUnread(<int>[_chapterIds[index]]);
       case _ChapterAction.markPreviousRead:
-        await jmReadingService.markRead(_chapterIds.sublist(0, index));
+        await widget.reading.markRead(_chapterIds.sublist(0, index));
     }
     widget.onMarked?.call();
   }
 
   @override
   Widget build(BuildContext context) {
-    return JmChapterProgressBuilder(
+    return SeriesChapterProgressBuilder(
+      reading: widget.reading,
       chapterIds: _chapterIds,
-      builder: (BuildContext context, Map<int, JmChapterProgress> progress) {
-        final int finished = progress.values.where((JmChapterProgress p) => p.finished).length;
+      builder: (BuildContext context, Map<int, SeriesChapterProgress> progress) {
+        final int finished = progress.values.where((SeriesChapterProgress p) => p.finished).length;
         return AlertDialog(
           title: Text(
             '${'chapters'.tr} (${widget.chapters.length}) · ${'chaptersReadCount'.trParams(<String, String>{'count': '$finished'})}',
@@ -196,7 +198,7 @@ class _JmChapterDialogState extends State<JmChapterDialog> {
                 itemExtent: _itemExtent,
                 itemCount: widget.chapters.length,
                 itemBuilder: (BuildContext context, int index) =>
-                    _buildChapter(context, index, progress[_chapterIds[index]] ?? const JmChapterProgress()),
+                    _buildChapter(context, index, progress[_chapterIds[index]] ?? const SeriesChapterProgress()),
               ),
             ),
           ),
@@ -205,19 +207,19 @@ class _JmChapterDialogState extends State<JmChapterDialog> {
     );
   }
 
-  Widget _buildChapter(BuildContext context, int index, JmChapterProgress progress) {
-    final JmChapterRef chapter = widget.chapters[index];
+  Widget _buildChapter(BuildContext context, int index, SeriesChapterProgress progress) {
+    final SeriesChapter chapter = widget.chapters[index];
     // Finished chapters fade, so what is left to read stands out.
     final Color? faded = progress.finished ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4) : null;
     final double? fraction = progress.inProgress ? progress.fraction : null;
 
     return ListTile(
-      key: ValueKey<String>('jmChapter:${chapter.id}'),
+      key: ValueKey<String>('seriesChapter:${chapter.id}'),
       dense: true,
       selected: chapter.id == widget.currentChapterId,
       leading: Text('${index + 1}', style: TextStyle(color: faded)),
       title: Text(
-        JmSource.chapterName(chapter),
+        chapter.name,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(color: faded),
@@ -234,14 +236,14 @@ class _JmChapterDialogState extends State<JmChapterDialog> {
           if (progress.finished)
             Icon(Icons.check, size: 18, color: faded)
           else if (progress.inProgress)
-            Text(jmChapterPageText(progress), style: Theme.of(context).textTheme.bodySmall),
-          if (galleryDownloadService.containGallery(GalleryUrl.jm(chapter.id).gid))
+            Text(progress.pageText, style: Theme.of(context).textTheme.bodySmall),
+          if (galleryDownloadService.containGallery(chapter.url.gid))
             const Padding(
               padding: EdgeInsets.only(left: 8),
               child: Icon(Icons.download_done, size: 18),
             ),
           PopupMenuButton<_ChapterAction>(
-            key: ValueKey<String>('jmChapterMenu:${chapter.id}'),
+            key: ValueKey<String>('seriesChapterMenu:${chapter.id}'),
             icon: const Icon(Icons.more_vert, size: 20),
             onSelected: (_ChapterAction action) => _act(action, index),
             itemBuilder: (_) => <PopupMenuEntry<_ChapterAction>>[
