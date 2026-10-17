@@ -44,6 +44,9 @@ class FavoritePageLogic extends BasePageLogic {
 
   Worker? _schemeWorker;
 
+  /// The account's nhentai favorites listed since its first page loaded.
+  final Set<int> _listedNhAccountGids = <int>{};
+
   /// Opens on the favorites of the current scheme's site and follows
   /// scheme switches.
   @override
@@ -321,15 +324,10 @@ class FavoritePageLogic extends BasePageLogic {
     if (state.showNhFavorites && ehRequest.hasNhentaiApiKey) {
       await state.searchConfigInitCompleter.future;
       int pageNo = int.tryParse(nextGid ?? prevGid ?? '') ?? 1;
+      GalleryPageInfo remotePage;
       try {
-        GalleryPageInfo remotePage = await ehRequest.requestNhFavoritePage(
+        remotePage = await ehRequest.requestNhFavoritePage(
           pageNo: pageNo,
-          searchConfig: state.searchConfig,
-        );
-        return nhentaiFavoriteService.mergeRemoteFavoritePage(
-          remotePage: remotePage,
-          includeLocalFavorites: pageNo == 1,
-          sortOrder: state.favoriteSortOrder,
           searchConfig: state.searchConfig,
         );
       } catch (e) {
@@ -341,13 +339,22 @@ class FavoritePageLogic extends BasePageLogic {
           'Load native nhentai favorites failed; keeping synced favorites visible',
           e,
         );
-        return nhentaiFavoriteService.mergeRemoteFavoritePage(
-          remotePage: GalleryPageInfo(gallerys: const <Gallery>[]),
-          includeLocalFavorites: true,
-          sortOrder: state.favoriteSortOrder,
-          searchConfig: state.searchConfig,
-        );
+        remotePage = GalleryPageInfo(gallerys: const <Gallery>[]);
       }
+
+      if (pageNo == 1) {
+        _listedNhAccountGids.clear();
+      }
+      GalleryPageInfo page = nhentaiFavoriteService.mergeRemoteFavoritePage(
+        remotePage: remotePage,
+        listedGids: _listedNhAccountGids,
+        sortOrder: state.favoriteSortOrder,
+        searchConfig: state.searchConfig,
+      );
+      _listedNhAccountGids.addAll(
+        remotePage.gallerys.map((Gallery gallery) => gallery.gid),
+      );
+      return page;
     }
     return super.getGalleryPage(prevGid: prevGid, nextGid: nextGid, seek: seek);
   }

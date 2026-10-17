@@ -126,9 +126,14 @@ class NHentaiFavoriteService
         .toList();
   }
 
+  /// A page of the account's favorites, in the account's order: nhentai
+  /// keeps them in the order they were added, though it gives no time.
+  /// The favorites kept on this device that the account does not have
+  /// follow its last page, newest first. [listedGids]: the account's
+  /// favorites already listed from its other pages.
   GalleryPageInfo mergeRemoteFavoritePage({
     required GalleryPageInfo remotePage,
-    required bool includeLocalFavorites,
+    Set<int> listedGids = const <int>{},
     FavoriteSortOrder? sortOrder,
     SearchConfig? searchConfig,
   }) {
@@ -136,18 +141,18 @@ class NHentaiFavoriteService
       sortOrder: sortOrder,
       searchConfig: searchConfig,
     );
-    final Set<int> localGids = localFavorites
-        .map((Gallery gallery) => gallery.gid)
-        .toSet();
-    final List<Gallery> remoteOnly = remotePage.gallerys
-        .where((Gallery gallery) => !localGids.contains(gallery.gid))
-        .toList(growable: false);
+    final Set<int> accountGids = <int>{
+      ...listedGids,
+      ...remotePage.gallerys.map((Gallery gallery) => gallery.gid),
+    };
+    final List<Gallery> localOnly = remotePage.nextGid != null
+        ? const <Gallery>[]
+        : localFavorites
+              .where((Gallery gallery) => !accountGids.contains(gallery.gid))
+              .toList(growable: false);
 
     return GalleryPageInfo(
-      gallerys: <Gallery>[
-        if (includeLocalFavorites) ...localFavorites,
-        ...remoteOnly,
-      ],
+      gallerys: <Gallery>[...remotePage.gallerys, ...localOnly],
       favoriteSortOrder: sortOrder ?? remotePage.favoriteSortOrder,
       // The API total does not include local-only synced favorites. Avoid
       // presenting an incorrect count whenever the union contains local data.
