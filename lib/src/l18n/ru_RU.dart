@@ -801,6 +801,7 @@ class ru_RU {
       'watchedGapOlder': 'До @day: не прочитано',
       'watchedGapBetween': '@span: не прочитано',
       'watchedContinueBelow': 'Продолжить отсюда вниз',
+      'showInWatched': 'Отслеживаемое',
       'history': 'История',
       'keyword': 'Ключевое слово',
       'orderBy': 'Сортировать по',

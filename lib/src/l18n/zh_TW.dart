@@ -751,6 +751,7 @@ class zh_TW {
       'watchedGapOlder': '@day 之前：未讀',
       'watchedGapBetween': '@span：未讀',
       'watchedContinueBelow': '從這裡往下繼續',
+      'showInWatched': '關注位置',
       'history': '歷史紀錄',
       'keyword': '關鍵字',
       'orderBy': '排序',

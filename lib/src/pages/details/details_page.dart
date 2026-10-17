@@ -41,6 +41,8 @@ import '../../network/jm/jm_source.dart';
 import '../../service/gallery_download_service.dart';
 import '../../setting/preference_setting.dart';
 import '../../setting/style_setting.dart';
+import '../../setting/user_setting.dart';
+import '../watched/show_in_watched.dart';
 import '../../utils/date_util.dart';
 import '../../utils/route_util.dart';
 import '../../utils/search_util.dart';
@@ -1179,7 +1181,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
               actions.addAll([
                 _buildRatingButton(context),
                 _buildArchiveButton(context),
-                _buildHHButton(context),
+                _buildShowInWatchedButton(context),
                 _buildTorrentButton(context),
                 // _buildStatisticButton(context),
               ]);
@@ -1191,6 +1193,13 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
             }
 
             actions.add(_buildTelegraphButton(context));
+
+            // Last: the least used.
+            if (!state.galleryUrl.isNH &&
+                !state.galleryUrl.isWN &&
+                !state.galleryUrl.isJM) {
+              actions.add(_buildHHButton(context));
+            }
 
             return ListView(
               scrollDirection: Axis.horizontal,
@@ -1619,6 +1628,34 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
           onPressed: disabled ? null : logic.handleTapHH,
         );
       },
+    );
+  }
+
+  /// Opens the watched list at this gallery: where it is among the
+  /// galleries of the tags watched. Needs the E-Hentai login the list
+  /// needs.
+  Widget _buildShowInWatchedButton(BuildContext context) {
+    final bool disabled = !userSetting.hasLoggedIn();
+    return IconTextButton(
+      key: const Key('showInWatchedButton'),
+      width: UIConfig.detailsPageActionExtent,
+      icon: Icon(
+        Icons.visibility_outlined,
+        color: disabled
+            ? UIConfig.detailsPageActionDisabledIconColor(context)
+            : UIConfig.detailsPageActionIconColor(context),
+      ),
+      text: Text(
+        'showInWatched'.tr,
+        style: TextStyle(
+          fontSize: UIConfig.detailsPageActionTextSize,
+          color: disabled
+              ? UIConfig.detailsPageActionDisabledIconColor(context)
+              : UIConfig.detailsPageActionTextColor(context),
+          height: 1,
+        ),
+      ),
+      onPressed: disabled ? null : () => showInWatched(state.galleryUrl.gid),
     );
   }
 
