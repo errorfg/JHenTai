@@ -59,3 +59,5 @@ CLAUDE.md
 # Upscaler tests with the real programs (copy from sr_e2e.example.json); toolsRoot holds
 # the unpacked releases as realesrgan/ and realcugan/
 /test/e2e/sr_e2e.json
+# The upscaling service of sr_server/ (copy from sr_server_e2e.example.json)
+/test/e2e/sr_server_e2e.json

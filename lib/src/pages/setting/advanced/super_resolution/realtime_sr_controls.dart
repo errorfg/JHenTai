@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/service/sr/realtime_sr_service.dart';
+import 'package:jhentai/src/service/sr/sr_server_client.dart';
 import 'package:jhentai/src/service/sr/sr_tools.dart';
 import 'package:jhentai/src/setting/super_resolution_setting.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
@@ -79,12 +80,87 @@ Widget _buildSwitch() {
     value: superResolutionSetting.realtimeEnabled.value,
     onChanged: (bool value) {
       if (value && !realtimeSrService.available) {
-        toast('realtimeSrNotInstalled'.tr, isShort: false);
+        toast(realtimeSrService.unavailableMessage, isShort: false);
         return;
       }
       superResolutionSetting.saveRealtimeEnabled(value);
     },
   );
+}
+
+/// Where the pages are upscaled: on a desktop, whether through the
+/// upscaling service; the service's address, and a test of it. To be built
+/// inside an [Obx].
+List<Widget> realtimeSrServerTiles(BuildContext context) {
+  final String url = superResolutionSetting.realtimeServerUrl.value;
+  return <Widget>[
+    if (GetPlatform.isDesktop)
+      SwitchListTile(
+        key: const Key('realtimeSrOnServer'),
+        title: Text('realtimeSrOnServer'.tr),
+        subtitle: Text('realtimeSrOnServerHint'.tr),
+        value: superResolutionSetting.realtimeOnServer.value,
+        onChanged: superResolutionSetting.saveRealtimeOnServer,
+      ),
+    ListTile(
+      key: const Key('realtimeSrServerUrl'),
+      title: Text('realtimeSrServerUrl'.tr),
+      subtitle: Text(url.isEmpty ? 'realtimeSrServerNotSet'.tr : url),
+      trailing: const Icon(Icons.keyboard_arrow_right),
+      onTap: _editServerUrl,
+    ),
+    ListTile(
+      key: const Key('realtimeSrTestServer'),
+      title: Text('realtimeSrTestServer'.tr),
+      enabled: url.isNotEmpty,
+      onTap: url.isEmpty ? null : () => _testServer(context),
+    ),
+  ];
+}
+
+Future<void> _editServerUrl() async {
+  final TextEditingController controller = TextEditingController(text: superResolutionSetting.realtimeServerUrl.value);
+  try {
+    final String? value = await Get.dialog<String>(
+      AlertDialog(
+        title: Text('realtimeSrServerUrl'.tr),
+        content: TextField(
+          key: const Key('realtimeSrServerUrlField'),
+          controller: controller,
+          autofocus: true,
+          autocorrect: false,
+          enableSuggestions: false,
+          keyboardType: TextInputType.url,
+          decoration: InputDecoration(hintText: 'realtimeSrServerUrlHint'.tr),
+        ),
+        actions: [
+          TextButton(onPressed: Get.back, child: Text('cancel'.tr)),
+          TextButton(onPressed: () => Get.back(result: controller.text), child: Text('OK'.tr)),
+        ],
+      ),
+    );
+    if (value != null) {
+      await superResolutionSetting.saveRealtimeServerUrl(value);
+    }
+  } finally {
+    controller.dispose();
+  }
+}
+
+Future<void> _testServer(BuildContext context) async {
+  String message;
+  try {
+    final SrServerInfo info = await SrServerClient(superResolutionSetting.realtimeServerUrl.value).info();
+    message = 'realtimeSrServerOk'.trParams(<String, String>{
+      'gpus': info.gpus.isEmpty ? '-' : info.gpus.join(', '),
+      'count': '${info.availableModels.length}',
+    });
+  } catch (e) {
+    message = 'realtimeSrServerFailed'.trParams(<String, String>{'error': e is SrServerException ? e.message : '$e'});
+  }
+  if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
 }
 
 /// Keeps the scale and denoise level when the model has them, else its
@@ -108,7 +184,7 @@ Widget _buildModel(BuildContext context, SrConfig config) {
     // Nothing is upscaled with a model whose program is missing.
     subtitle: realtimeSrService.available
         ? null
-        : Text('realtimeSrNotInstalled'.tr, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+        : Text(realtimeSrService.unavailableMessage, style: TextStyle(color: Theme.of(context).colorScheme.error)),
     trailing: DropdownButton<String>(
       key: const Key('realtimeSrModel'),
       value: config.model.id,

@@ -64,6 +64,52 @@ Future<SrInput?> prepareSrInput(Uint8List encoded, {int strips = 0, int maxWidth
   return SrInput(png: encodeOpaquePng(rgba.buffer.asUint8List(), width, height), width: width, height: height);
 }
 
+/// A page as sent to an upscaling service: the file itself when the service
+/// reads it as it is (JPEG, PNG, WebP; it puts transparent parts on white
+/// as [encodeOpaquePng] does), which is far smaller than the PNG; else, as
+/// for the programs here, the PNG of [prepareSrInput] (a JM page with its
+/// strips back in order, any other format).
+///
+/// Null for the pages [prepareSrInput] leaves out.
+Future<Uint8List?> prepareSrUpload(Uint8List encoded, {int strips = 0, int maxWidth = 0}) async {
+  if (strips > 0 || !_readByService(encoded)) {
+    return (await prepareSrInput(encoded, strips: strips, maxWidth: maxWidth))?.png;
+  }
+  // The size and the frame count, without decoding the page.
+  final ui.ImmutableBuffer buffer = await ui.ImmutableBuffer.fromUint8List(encoded);
+  try {
+    final ui.ImageDescriptor descriptor = await ui.ImageDescriptor.encoded(buffer);
+    if (maxWidth > 0 && descriptor.width >= maxWidth) {
+      descriptor.dispose();
+      return null;
+    }
+    final ui.Codec codec = await descriptor.instantiateCodec();
+    final bool animated = codec.frameCount > 1;
+    codec.dispose();
+    return animated ? null : encoded;
+  } finally {
+    buffer.dispose();
+  }
+}
+
+bool _readByService(Uint8List bytes) {
+  bool startsWith(List<int> magic, [int offset = 0]) {
+    if (bytes.length < offset + magic.length) {
+      return false;
+    }
+    for (int i = 0; i < magic.length; i++) {
+      if (bytes[offset + i] != magic[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  return startsWith(const <int>[0xFF, 0xD8, 0xFF]) ||
+      startsWith(const <int>[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) ||
+      (startsWith('RIFF'.codeUnits) && startsWith('WEBP'.codeUnits, 8));
+}
+
 /// An RGB PNG of [width] x [height] premultiplied RGBA pixels, shown on
 /// white where they are transparent. Compressed lightly: the file is read
 /// once by the upscaler and deleted.

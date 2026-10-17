@@ -7,6 +7,7 @@ import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/pages/setting/advanced/super_resolution/realtime_sr_controls.dart';
 import 'package:jhentai/src/pages/setting/keyboard_shortcuts/setting_keyboard_shortcuts_page.dart';
 import 'package:jhentai/src/pages/setting/read/tap_zone/setting_tap_zone_page.dart';
+import 'package:jhentai/src/service/sr/realtime_sr_service.dart';
 import 'package:jhentai/src/setting/preference_setting.dart';
 import 'package:jhentai/src/setting/read_setting.dart';
 import 'package:jhentai/src/setting/style_setting.dart';
@@ -39,7 +40,7 @@ class SettingReadPage extends StatelessWidget {
                 children: [
                   // First, where it is at hand from the reader: a change
                   // shows on the page being read.
-                  if (GetPlatform.isDesktop) ...[
+                  if (realtimeSrService.supported) ...[
                     SrSectionHeader(
                       key: const Key('readRealtimeSrSection'),
                       title: 'realtimeSr'.tr,
