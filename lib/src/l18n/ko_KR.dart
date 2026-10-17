@@ -765,6 +765,7 @@ class ko_KR {
       'watchedGapOlder': '@day 이전: 안 읽음',
       'watchedGapBetween': '@span: 안 읽음',
       'watchedContinueBelow': '여기서부터 아래로 계속',
+      'showInWatched': '시청 기록',
       'history': '방문 기록',
       'keyword': '키워드',
       'orderBy': 'Order by',

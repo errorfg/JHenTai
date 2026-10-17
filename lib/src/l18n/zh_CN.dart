@@ -875,6 +875,7 @@ class zh_CN {
       'watchedGapOlder': '@day 之前：未读',
       'watchedGapBetween': '@span：未读',
       'watchedContinueBelow': '从这里往下继续',
+      'showInWatched': '关注位置',
       'history': '历史',
       'keyword': '关键词',
       'orderBy': '排序',

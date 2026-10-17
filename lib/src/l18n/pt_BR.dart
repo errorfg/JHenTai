@@ -801,6 +801,7 @@ class pt_BR {
       'watchedGapOlder': 'Antes de @day: não lidas',
       'watchedGapBetween': '@span: não lidas',
       'watchedContinueBelow': 'Continuar daqui para baixo',
+      'showInWatched': 'Assistido',
       'history': 'História',
       'keyword': 'Palavra-chave',
       'orderBy': 'Order by',

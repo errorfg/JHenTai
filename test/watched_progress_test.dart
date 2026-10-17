@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
 
@@ -8,6 +9,7 @@ import 'package:get/get.dart';
 import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/model/gallery.dart';
 import 'package:jhentai/src/model/gallery_image.dart';
+import 'package:jhentai/src/model/gallery_page.dart';
 import 'package:jhentai/src/model/gallery_tag.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/pages/read/brightness_lock.dart';
@@ -43,6 +45,28 @@ class _ListAtHand extends WatchedPageLogic {
 
   @override
   Future<void> jumpToGallery(int gid) async => openedAt.add(gid);
+}
+
+/// The watched list's logic with pages made up here: each page asked for
+/// is written down, and can be held back.
+class _PagedList extends WatchedPageLogic {
+  final List<String?> asked = <String?>[];
+  Completer<void>? hold;
+
+  @override
+  // ignore: must_call_super
+  Future<void> onInit() async {}
+
+  @override
+  Future<GalleryPageInfo> getGalleryPage({String? prevGid, String? nextGid, DateTime? seek}) async {
+    asked.add(nextGid);
+    await hold?.future;
+    final int first = nextGid == null ? 3500000 : int.parse(nextGid) - 1;
+    return GalleryPageInfo(gallerys: _list(5, newestGid: first), nextGid: '${first - 4}', prevGid: nextGid == null ? null : '$first');
+  }
+
+  @override
+  Future<List<Gallery>> postHandleNewGallerys(List<Gallery> gallerys, {bool cleanDuplicate = true}) async => gallerys;
 }
 
 /// The watched list: [count] galleries, newest (highest gid) first, about
@@ -167,6 +191,23 @@ void main() {
     logic.onCardVisibilityChanged(list[27], 0.3);
     expect(read().last, 24);
     expect(_stretches(), hasLength(1));
+  });
+
+  test('opened at a gallery while its first page loads, the list goes to the gallery once that is done', () async {
+    final _PagedList logic = _PagedList()..hold = Completer<void>();
+    final Future<void> firstPage = logic.loadMore();
+    await logic.showFrom(3400000);
+    expect(logic.asked, <String?>[null], reason: 'waits for the first page');
+
+    logic.hold!.complete();
+    await firstPage;
+    expect(logic.asked, <String?>[null, '3400001']);
+    expect(logic.state.gallerys.first.gid, 3400000);
+
+    // Free: at once.
+    await logic.showFrom(3300000);
+    expect(logic.asked.last, '3300001');
+    expect(logic.state.gallerys.first.gid, 3300000);
   });
 
   group('the watched list', () {

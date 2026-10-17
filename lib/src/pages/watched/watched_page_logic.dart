@@ -16,6 +16,7 @@ import '../../service/watched_progress_service.dart';
 import '../../utils/route_util.dart';
 import '../../utils/toast_util.dart';
 import '../../widget/eh_context_menu.dart';
+import '../../widget/loading_state_indicator.dart';
 import '../base/base_page_logic.dart';
 import 'watched_card.dart';
 
@@ -155,6 +156,31 @@ class WatchedPageLogic extends BasePageLogic {
   Future<void> jumpToGallery(int gid) async {
     _forgetStretch();
     await super.jumpToGallery(gid);
+  }
+
+  /// Asked to list from a gallery while a load was under way.
+  int? _pendingGid;
+
+  /// Lists from the gallery [gid] on as soon as the list is free: at once,
+  /// or when the load under way (the first one, when the page has only
+  /// just been opened) is done.
+  Future<void> showFrom(int gid) async {
+    if (state.loadingState == LoadingState.loading) {
+      _pendingGid = gid;
+      return;
+    }
+    _pendingGid = null;
+    await jumpToGallery(gid);
+  }
+
+  @override
+  Future<void> loadMore({bool checkLoadingState = true}) async {
+    await super.loadMore(checkLoadingState: checkLoadingState);
+    final int? pending = _pendingGid;
+    if (pending != null && state.loadingState != LoadingState.loading) {
+      _pendingGid = null;
+      await jumpToGallery(pending);
+    }
   }
 
   @override

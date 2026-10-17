@@ -304,7 +304,10 @@ abstract class BasePageLogic extends GetxController with Scroll2TopLogicMixin {
     state.loadingState = LoadingState.loading;
     updateSafely();
 
-    state.scrollController.jumpTo(0);
+    // Not yet shown when the list is opened at a gallery from elsewhere.
+    if (state.scrollController.hasClients) {
+      state.scrollController.jumpTo(0);
+    }
 
     GalleryPageInfo galleryPage;
     try {

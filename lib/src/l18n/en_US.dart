@@ -928,6 +928,7 @@ class en_US {
       'watchedGapOlder': 'Before @day: unread',
       'watchedGapBetween': '@span: unread',
       'watchedContinueBelow': 'Continue down from here',
+      'showInWatched': 'In Watched',
       'history': 'History',
       'keyword': 'Keyword',
       'orderBy': 'Order by',
