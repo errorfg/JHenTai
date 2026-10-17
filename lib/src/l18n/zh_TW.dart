@@ -919,6 +919,7 @@ favnote：配對收藏備註
       'save2Local': '儲存至本機',
       'readIndexRecord': '閱讀進度',
       'quickSearch': '快速搜尋設定',
+      'syncSetting': '同步設定',
       'blockRules': '本機隱藏規則',
       'searchHistory': '搜尋紀錄',
       'galleryHistory': '畫廊瀏覽紀錄',
@@ -928,6 +929,7 @@ favnote：配對收藏備註
       'wnacgFavorite': 'wnacg 收藏',
       'jmFavorite': 'JM 收藏',
       'wnacgDomain': 'wnacg 域名',
+      'wnacgDomainHint': 'wnacg 目前可以存取的網域，例如 www.wn07.ru。可以直接貼上連結，只保留其中的網域；留空則恢復預設。',
       'mixedModeUnavailable': '混合模式不可用：當前佈局不提供收藏時間',
 
       /// block rule page

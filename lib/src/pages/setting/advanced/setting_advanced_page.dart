@@ -81,6 +81,7 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
             _buildCheckUpdate(),
             _buildCheckClipboard(),
             _buildNhentaiDomains(),
+            _buildWnacgDomain(),
             _buildJmSetting(),
             _buildEh2Telegraph(),
             if (GetPlatform.isAndroid) _buildVerifyAppLinks(),
@@ -251,6 +252,44 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
       trailing: const Icon(Icons.keyboard_arrow_right).marginOnly(right: 4),
       onTap: () => toRoute(Routes.nhentaiDomains),
     );
+  }
+
+  Widget _buildWnacgDomain() {
+    return ListTile(
+      key: const Key('wnacgDomainTile'),
+      title: Text('wnacgDomain'.tr),
+      subtitle: Obx(() => Text(ehSetting.wnacgDomain.value)),
+      trailing: const Icon(Icons.keyboard_arrow_right).marginOnly(right: 4),
+      onTap: _editWnacgDomain,
+    );
+  }
+
+  Future<void> _editWnacgDomain() async {
+    final TextEditingController controller = TextEditingController(text: ehSetting.wnacgDomain.value);
+    try {
+      final String? value = await Get.dialog<String>(
+        AlertDialog(
+          title: Text('wnacgDomain'.tr),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            autocorrect: false,
+            enableSuggestions: false,
+            keyboardType: TextInputType.url,
+            decoration: InputDecoration(hintText: EHSetting.defaultWnacgDomain, helperText: 'wnacgDomainHint'.tr, helperMaxLines: 3),
+          ),
+          actions: [
+            TextButton(onPressed: Get.back, child: Text('cancel'.tr)),
+            TextButton(onPressed: () => Get.back(result: controller.text), child: Text('OK'.tr)),
+          ],
+        ),
+      );
+      if (value != null) {
+        await ehSetting.saveWnacgDomain(value);
+      }
+    } finally {
+      controller.dispose();
+    }
   }
 
   Widget _buildJmSetting() {

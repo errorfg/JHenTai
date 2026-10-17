@@ -64,6 +64,24 @@ class ReadProgressService extends GetxController
     return getReadProgressByKey(gid.toString());
   }
 
+  /// A gallery that replaces an older version of itself ([olderGid]; an
+  /// E-Hentai update gets another gid) and has no progress of its own
+  /// starts where the older one was read, within its [pageCount]: 15 of 20
+  /// read, the new version with 25 pages starts at 15. Completes with
+  /// whether it took over.
+  Future<bool> takeOverFromOlderVersion({required int gid, required int olderGid, required int pageCount}) async {
+    if (gid == olderGid || await getReadProgressEntryByKey('$gid') != null) {
+      return false;
+    }
+    final ReadProgressEntry? older = await getReadProgressEntryByKey('$olderGid');
+    if (older == null) {
+      return false;
+    }
+    final int index = pageCount > 0 ? older.pageIndex.clamp(0, pageCount - 1) : older.pageIndex;
+    await updateReadProgress('$gid', index);
+    return true;
+  }
+
   /// Get read progress for a namespaced reader-source record.
   Future<int> getReadProgressByKey(String recordKey) async {
     return (await getReadProgressEntryByKey(recordKey))?.pageIndex ?? 0;

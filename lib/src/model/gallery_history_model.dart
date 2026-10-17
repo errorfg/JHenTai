@@ -45,7 +45,7 @@ class GalleryHistoryModel {
 
   factory GalleryHistoryModel.fromJson(Map<String, dynamic> json) {
     return GalleryHistoryModel(
-      galleryUrl: GalleryUrl.parse(json["galleryUrl"]),
+      galleryUrl: GalleryUrl.parseStored(json["galleryUrl"]),
       title: json["title"],
       category: json["category"],
       coverUrl: json["coverUrl"],

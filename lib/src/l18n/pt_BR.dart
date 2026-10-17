@@ -977,6 +977,7 @@ class pt_BR {
       'save2Local': 'Save to Local',
       'readIndexRecord': 'Read Progress',
       'quickSearch': 'Quick Search Config',
+      'syncSetting': 'Configurações de sincronização',
       'blockRules': 'Block Rules',
       'searchHistory': 'Search History',
       'galleryHistory': 'Gallery History',
@@ -986,6 +987,7 @@ class pt_BR {
       'wnacgFavorite': 'Favoritos wnacg',
       'jmFavorite': 'Favoritos JM',
       'wnacgDomain': 'Domínio wnacg',
+      'wnacgDomainHint': 'Um domínio do wnacg que funcione agora, ex.: www.wn07.ru. Um link colado mantém só o domínio; vazio restaura o padrão.',
       'mixedModeUnavailable':
           'Modo misto indisponível: o layout atual não fornece o horário de favoritação',
 

@@ -14,7 +14,8 @@ class EHSetting
     implements JHLifeCircleBean {
   RxString site = 'EH'.obs;
   RxBool redirect2Eh = true.obs;
-  RxString wnacgDomain = 'www.wn07.ru'.obs;
+  static const String defaultWnacgDomain = 'www.wn07.ru';
+  RxString wnacgDomain = defaultWnacgDomain.obs;
   RxList<String> nhentaiDomains = <String>['nhentai.net', 'nhentai.to'].obs;
   String legacyNhentaiApiKey = '';
 
@@ -86,10 +87,22 @@ class EHSetting
     await saveBeanConfig();
   }
 
+  /// [domain] as typed, a link on it included, is kept as its host
+  /// (`www.wn07.ru`); nothing typed goes back to the default.
   Future<void> saveWnacgDomain(String domain) async {
-    log.debug('saveWnacgDomain:$domain');
-    wnacgDomain.value = domain;
+    final String host = normalizeDomain(domain);
+    log.debug('saveWnacgDomain:$host');
+    wnacgDomain.value = host.isEmpty ? defaultWnacgDomain : host;
     await saveBeanConfig();
+  }
+
+  /// The host of [input]: `https://www.wn07.ru/albums.html` gives
+  /// `www.wn07.ru`.
+  static String normalizeDomain(String input) {
+    String value = input.trim().toLowerCase();
+    value = value.replaceFirst(RegExp(r'^[a-z][a-z0-9+.-]*://'), '');
+    final int end = value.indexOf(RegExp(r'[/?#]'));
+    return end >= 0 ? value.substring(0, end) : value;
   }
 
   Future<void> addNhentaiDomain(String domain) async {

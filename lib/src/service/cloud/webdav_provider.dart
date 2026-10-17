@@ -19,8 +19,19 @@ class WebDavProvider implements CloudProvider {
     required this.serverUrl,
     required this.username,
     required this.password,
-    required this.remotePath,
-  });
+    required String remotePath,
+  }) : remotePath = normalizeRemotePath(remotePath);
+
+  /// `/JHenTaiConfig` for ` JHenTaiConfig/ ` and the like: files are put at
+  /// `<remotePath>/<name>`, so a slash at the end would make `//`. The
+  /// server's root is the empty string.
+  static String normalizeRemotePath(String path) {
+    final String trimmed = path.trim().replaceFirst(RegExp(r'/+$'), '');
+    if (trimmed.isEmpty) {
+      return '';
+    }
+    return trimmed.startsWith('/') ? trimmed : '/$trimmed';
+  }
 
   @override
   String get name => 'webdav';

@@ -244,10 +244,71 @@ class KomgaDownloadService extends ChangeNotifier
       await dir.delete(recursive: true);
     }
     await dir.create(recursive: true);
-    final String archivePath = '${dir.path}${Platform.pathSeparator}book.part';
 
     task.state = KomgaDownloadState.downloading;
     notifyListeners();
+    final List<String> images = isZipBook(book)
+        ? await _downloadArchive(client, task, pages, dir)
+        : await _downloadPages(client, task, pages, dir);
+
+    final KomgaDownloadedBook downloaded = KomgaDownloadedBook(
+      connectionId: client.connectionId,
+      book: KomgaBook.fromJson(bookJson),
+      bookJson: bookJson,
+      imagePaths: images,
+      downloadedAt: DateTime.now(),
+    );
+    await File(
+      '${dir.path}${Platform.pathSeparator}$_manifestName',
+    ).writeAsString(jsonEncode(downloaded.toJson()));
+    _downloaded[downloaded.recordKey] = downloaded;
+  }
+
+  /// Whether Komga keeps [book] as a ZIP (CBZ, EPUB), whose file is fetched
+  /// whole and unpacked here. Other books (CBR, 7z, PDF) are fetched page by
+  /// page, as the server serves them to the reader.
+  static bool isZipBook(KomgaBook book) =>
+      book.mediaType.startsWith('application/zip') || book.mediaType.startsWith('application/epub+zip');
+
+  /// Pages as the reader is served them, one request each: the server
+  /// unpacks a CBR or 7z book and renders a PDF's pages, and converts to
+  /// PNG what the reader cannot decode.
+  Future<List<String>> _downloadPages(
+    KomgaClient client,
+    KomgaDownloadTask task,
+    List<KomgaBookPage> pages,
+    Directory dir,
+  ) async {
+    final List<String> images = <String>[];
+    for (int i = 0; i < pages.length; i++) {
+      final KomgaBookPage page = pages[i];
+      final String path =
+          '${dir.path}${Platform.pathSeparator}${(i + 1).toString().padLeft(4, '0')}.${_extensionOf(page.mediaType)}';
+      await client.downloadPageImage(task.book.id, page, path);
+      images.add(path);
+      task.progress = (i + 1) / pages.length;
+      notifyListeners();
+    }
+    return images;
+  }
+
+  static String _extensionOf(String mediaType) => switch (mediaType) {
+        'image/jpeg' => 'jpg',
+        'image/gif' => 'gif',
+        'image/webp' => 'webp',
+        'image/bmp' => 'bmp',
+        // PNG as it is, and what the server converts to PNG.
+        _ => 'png',
+      };
+
+  Future<List<String>> _downloadArchive(
+    KomgaClient client,
+    KomgaDownloadTask task,
+    List<KomgaBookPage> pages,
+    Directory dir,
+  ) async {
+    final KomgaBook book = task.book;
+    final String archivePath = '${dir.path}${Platform.pathSeparator}book.part';
     await client.downloadBookFile(
       book.id,
       archivePath,
@@ -279,18 +340,7 @@ class KomgaDownloadService extends ChangeNotifier
       images[i] = '${images[i].substring(0, images[i].lastIndexOf('.'))}.png';
       await client.downloadPageImage(book.id, pages[i], images[i]);
     }
-
-    final KomgaDownloadedBook downloaded = KomgaDownloadedBook(
-      connectionId: client.connectionId,
-      book: KomgaBook.fromJson(bookJson),
-      bookJson: bookJson,
-      imagePaths: images,
-      downloadedAt: DateTime.now(),
-    );
-    await File(
-      '${dir.path}${Platform.pathSeparator}$_manifestName',
-    ).writeAsString(jsonEncode(downloaded.toJson()));
-    _downloaded[downloaded.recordKey] = downloaded;
+    return images;
   }
 }
 

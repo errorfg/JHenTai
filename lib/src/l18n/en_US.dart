@@ -665,6 +665,7 @@ class en_US {
       'invalidValue': 'Invalid Value',
       'readingProgress': 'Reading Progress',
       'quickSearch': 'Quick Search',
+      'syncSetting': 'Sync settings',
       'searchHistory': 'Search History',
       'blockRules': 'Block Rules',
       'galleryHistory': 'Gallery History',
@@ -1116,6 +1117,7 @@ class en_US {
       'wnacgFavorite': 'wnacg Favorites',
       'jmFavorite': 'JM Favorites',
       'wnacgDomain': 'wnacg Domain',
+      'wnacgDomainHint': 'A wnacg domain that works now, e.g. www.wn07.ru. A pasted link keeps only its domain; empty restores the default.',
       'mixedModeUnavailable':
           'Mixed mode unavailable: current layout does not provide favorited time',
 

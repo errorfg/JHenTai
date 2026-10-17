@@ -330,6 +330,8 @@ class DetailsPageLogic extends GetxController
       state.galleryDetails!.comments,
     );
 
+    await _carryProgressFromOlderVersion();
+
     state.loadingState = LoadingState.success;
     updateSafely(_judgeUpdateIds());
 
@@ -2269,6 +2271,26 @@ class DetailsPageLogic extends GetxController
       return null;
     }
     return null;
+  }
+
+  /// E-Hentai gives a gallery updated by its uploader another gid: the new
+  /// version takes over the progress of the one it replaces, see
+  /// [ReadProgressService.takeOverFromOlderVersion].
+  Future<void> _carryProgressFromOlderVersion() async {
+    final GalleryUrl? parent = state.galleryDetails?.parentGalleryUrl;
+    final GalleryUrl url = state.galleryUrl;
+    if (parent == null || url.isNH || url.isWN || url.isJM) {
+      return;
+    }
+    try {
+      await readProgressService.takeOverFromOlderVersion(
+        gid: url.gid,
+        olderGid: parent.gid,
+        pageCount: state.galleryDetails!.pageCount,
+      );
+    } catch (e) {
+      log.warning('Carry progress from the older version failed', e);
+    }
   }
 
   Future<int> getReadIndexRecord() async {
