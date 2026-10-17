@@ -45,6 +45,7 @@ import 'package:jhentai/src/pages/setting/read/setting_read_page.dart';
 import 'package:jhentai/src/pages/setting/security/setting_security_page.dart';
 import 'package:jhentai/src/pages/setting/setting_page.dart';
 import 'package:jhentai/src/pages/setting/style/setting_style_page.dart';
+import 'package:jhentai/src/pages/watched/progress/watched_progress_page.dart';
 import 'package:jhentai/src/pages/watched/watched_page.dart';
 import 'package:jhentai/src/pages/webview/webview_page.dart';
 import 'package:jhentai/src/setting/preference_setting.dart';
@@ -89,6 +90,7 @@ class Routes {
   static const String ranklist = "/ranklist";
   static const String favorite = "/favorite";
   static const String watched = "/watched";
+  static const String watchedProgress = "/watched/progress";
   static const String history = "/history";
   static const String download = "/download";
   static const String setting = "/setting";
@@ -272,6 +274,12 @@ class Routes {
       page: () => const WatchedPage(),
       transition: defaultTransition,
       side: Side.left,
+    ),
+    EHPage(
+      name: watchedProgress,
+      page: () => const WatchedProgressPage(),
+      transition: defaultTransition,
+      side: Side.fullScreen,
     ),
     EHPage(
       name: history,
