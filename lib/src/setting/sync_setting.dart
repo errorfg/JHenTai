@@ -12,7 +12,7 @@ SyncSetting syncSetting = SyncSetting();
 class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBean {
   // ==================== 通用设置 ====================
 
-  /// 当前使用的同步提供商 ('s3' 或 'webdav')
+  /// 当前使用的同步提供商 ('s3'、'webdav' 或 'server')
   RxString currentProvider = 's3'.obs; // 默认使用 S3 (Cloudflare R2)
 
   /// 是否启用同步功能（整体开关）
@@ -58,6 +58,14 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
   /// WebDAV 远程路径
   RxString webdavRemotePath = '/JHenTaiConfig'.obs;
 
+  // ==================== 同步服务设置 ====================
+
+  /// 同步服务地址（sync_server 目录中的 Cloudflare Worker，或其他实现同一协议的服务）
+  RxString syncServerUrl = ''.obs;
+
+  /// 同步服务令牌
+  RxString syncServerToken = ''.obs;
+
   // ==================== 历史版本设置 ====================
 
   /// 是否启用历史版本保存（默认关闭）
@@ -71,6 +79,22 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
 
   @override
   ConfigEnum get configEnum => ConfigEnum.syncSetting;
+
+  /// How this device syncs, and whether it does: its own choice, which sync
+  /// settings taken from another device do not change. A bucket sync still
+  /// running when the user switched to the sync server used to switch the
+  /// device back.
+  static const List<String> deviceFields = ['currentProvider', 'enableSync', 'autoSync'];
+
+  /// [configString] of another device, with this device's [deviceFields].
+  String withDeviceFields(String configString) {
+    Map map = jsonDecode(configString);
+    Map own = jsonDecode(toConfigString());
+    for (String field in deviceFields) {
+      map[field] = own[field];
+    }
+    return jsonEncode(map);
+  }
 
   @override
   void applyBeanConfig(String configString) {
@@ -95,6 +119,10 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
     webdavUsername.value = map['webdavUsername'] ?? webdavUsername.value;
     webdavPassword.value = map['webdavPassword'] ?? webdavPassword.value;
     webdavRemotePath.value = map['webdavRemotePath'] ?? webdavRemotePath.value;
+
+    // 同步服务设置
+    syncServerUrl.value = map['syncServerUrl'] ?? syncServerUrl.value;
+    syncServerToken.value = map['syncServerToken'] ?? syncServerToken.value;
 
     // 历史版本设置
     enableHistory.value = map['enableHistory'] ?? enableHistory.value;
@@ -124,6 +152,10 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
       'webdavUsername': webdavUsername.value,
       'webdavPassword': webdavPassword.value,
       'webdavRemotePath': webdavRemotePath.value,
+
+      // 同步服务设置
+      'syncServerUrl': syncServerUrl.value,
+      'syncServerToken': syncServerToken.value,
 
       // 历史版本设置
       'enableHistory': enableHistory.value,
@@ -225,6 +257,20 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
   Future<void> saveWebdavRemotePath(String remotePath) async {
     log.debug('saveWebdavRemotePath: $remotePath');
     webdavRemotePath.value = remotePath;
+    await saveBeanConfig();
+  }
+
+  // ==================== 同步服务设置保存方法 ====================
+
+  Future<void> saveSyncServerUrl(String url) async {
+    log.debug('saveSyncServerUrl: $url');
+    syncServerUrl.value = url;
+    await saveBeanConfig();
+  }
+
+  Future<void> saveSyncServerToken(String token) async {
+    log.debug('saveSyncServerToken');
+    syncServerToken.value = token;
     await saveBeanConfig();
   }
 

@@ -1,0 +1,10 @@
+# Copy to wrangler.toml (ignored by git) and fill in database_id with the id
+# printed by `npx wrangler d1 create gallery-sync`.
+name = "gallery-sync"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "gallery-sync"
+database_id = "<your D1 database id>"

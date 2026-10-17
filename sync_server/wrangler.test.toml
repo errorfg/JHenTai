@@ -1,0 +1,10 @@
+# Local only: used by the tests and by `wrangler dev --config wrangler.test.toml`.
+# The database lives in .wrangler/ on this machine.
+name = "gallery-sync-test"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "gallery-sync-test"
+database_id = "local"

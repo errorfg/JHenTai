@@ -26,13 +26,14 @@ class UserSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
   void applyBeanConfig(String configString) {
     Map map = jsonDecode(configString);
 
-    userName = RxnString(map['userName']);
-    ipbMemberId = RxnInt(map['ipbMemberId']);
-    ipbPassHash = RxnString(map['ipbPassHash']);
-    avatarImgUrl = RxnString(map['avatarImgUrl']);
-    nickName = RxnString(map['nickName']);
-    defaultFavoriteIndex = RxnInt(map['defaultFavoriteIndex']);
-    defaultTagSetNo = RxnInt(map['defaultTagSetNo']);
+    // Values set in place: a login taken from sync shows on pages already open.
+    userName.value = map['userName'];
+    ipbMemberId.value = map['ipbMemberId'];
+    ipbPassHash.value = map['ipbPassHash'];
+    avatarImgUrl.value = map['avatarImgUrl'];
+    nickName.value = map['nickName'];
+    defaultFavoriteIndex.value = map['defaultFavoriteIndex'];
+    defaultTagSetNo.value = map['defaultTagSetNo'];
   }
 
   @override

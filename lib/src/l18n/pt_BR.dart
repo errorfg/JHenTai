@@ -1170,6 +1170,7 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'jmApiLine': 'Linha da API',
       'jmImageLine': 'Linha de imagens',
       'jmAccount': 'Conta JM',
+      'ehAccount': 'Conta E-Hentai',
       'jmMeasureLines': 'Medir linhas',
       'jmLineAutoHint': 'Automático mede as linhas uma vez por dia e usa a mais rápida aqui',
       'jmLineNotMeasured': 'Não medida',

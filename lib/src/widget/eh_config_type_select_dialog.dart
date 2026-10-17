@@ -22,23 +22,26 @@ class _EHConfigTypeSelectDialogState extends State<EHConfigTypeSelectDialog> {
     return AlertDialog(
       title: Text(widget.title),
       contentPadding: const EdgeInsets.only(top: 24, left: 24, right: 24),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: CloudConfigTypeEnum.values
-            .map((e) => CheckboxListTile(
-                  title: Text(e.name.tr),
-                  value: selected.contains(e),
-                  onChanged: (bool? value) {
-                    setStateSafely(() {
-                      if (value ?? false) {
-                        selected.add(e);
-                      } else {
-                        selected.remove(e);
-                      }
-                    });
-                  },
-                ))
-            .toList(),
+      /// The list scrolls on short screens; title and buttons stay in view
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: CloudConfigTypeEnum.values
+              .map((e) => CheckboxListTile(
+                    title: Text(e.name.tr),
+                    value: selected.contains(e),
+                    onChanged: (bool? value) {
+                      setStateSafely(() {
+                        if (value ?? false) {
+                          selected.add(e);
+                        } else {
+                          selected.remove(e);
+                        }
+                      });
+                    },
+                  ))
+              .toList(),
+        ),
       ),
       actions: [
         TextButton(onPressed: backRoute, child: Text('cancel'.tr)),

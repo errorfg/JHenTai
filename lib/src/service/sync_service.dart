@@ -8,6 +8,8 @@ import 'package:jhentai/src/service/cloud/hot_data_sync_engine.dart';
 import 'package:jhentai/src/service/cloud/s3_provider.dart';
 import 'package:jhentai/src/service/cloud/webdav_provider.dart';
 import 'package:jhentai/src/service/history_service.dart';
+import 'package:jhentai/src/service/record_sync/record_backend.dart';
+import 'package:jhentai/src/service/record_sync/record_sync_engine.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
@@ -31,6 +33,8 @@ typedef SyncRunner =
 
 typedef CloudProviderFactory = CloudProvider? Function(String providerName);
 
+typedef RecordBackendFactory = RecordBackend? Function();
+
 class _QueuedReadProgressSync {
   _QueuedReadProgressSync({required this.requireAutoSync});
 
@@ -50,17 +54,24 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   SyncService({
     SyncRunner? executeSync,
     CloudProviderFactory? providerFactory,
+    RecordBackendFactory? recordBackendFactory,
     DateTime Function()? now,
     Duration progressCooldown = const Duration(seconds: 5),
   }) : _syncRunner = executeSync,
        _providerFactory = providerFactory,
+       _recordBackendFactory = recordBackendFactory,
        _now = now ?? DateTime.now,
        _readProgressSyncCooldown = progressCooldown;
+
+  /// Provider name of a sync server (record by record), as opposed to the
+  /// buckets 's3' and 'webdav'.
+  static const String serverProvider = 'server';
 
   final Map<String, CloudProvider> _providers = {};
   final HotDataSyncEngine _hotEngine = HotDataSyncEngine();
   final SyncRunner? _syncRunner;
   final CloudProviderFactory? _providerFactory;
+  final RecordBackendFactory? _recordBackendFactory;
   final DateTime Function() _now;
   final Duration _readProgressSyncCooldown;
   Future<void>? _inFlightSync;
@@ -415,6 +426,9 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       reportProgress(0.03);
 
       String provider = providerName ?? syncSetting.currentProvider.value;
+      if (provider == serverProvider) {
+        return await _doRecordSync(types: types, onProgress: reportProgress);
+      }
       CloudProvider? cloudProvider = _createProvider(provider);
       if (cloudProvider == null) {
         return SyncResult(
@@ -490,6 +504,11 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
             stack,
           );
         }
+      }
+      if (hotResult != null) {
+        // History and read progress changes went to the bucket, not to a
+        // sync server: should the device use one again, it reads them whole.
+        await recordSyncEngine.forgetRowChanges();
       }
       reportProgress(0.5);
 
@@ -572,6 +591,35 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       log.error('Sync failed', e);
       return SyncResult(success: false, message: e.toString(), statistics: {});
     }
+  }
+
+  /// Sync with the sync server, record by record. Every kind's records are
+  /// pulled and written; [types] limits which kinds' local changes are
+  /// looked for (history and read progress always are, from their pending set).
+  Future<SyncResult> _doRecordSync({
+    required List<CloudConfigTypeEnum> types,
+    required void Function(double progress) onProgress,
+  }) async {
+    try {
+      RecordBackend? backend = _recordBackendFactory != null ? _recordBackendFactory() : _createRecordBackend();
+      if (backend == null) {
+        return SyncResult(success: false, message: 'The sync server address is not set', statistics: {});
+      }
+      log.info('🔄 Starting sync with the sync server');
+      await recordSyncEngine.sync(backend, types: types.toSet(), onProgress: onProgress);
+      log.info('Sync completed successfully');
+      return SyncResult(success: true, message: 'Sync completed successfully', statistics: {});
+    } catch (e, stack) {
+      log.error('Sync failed', e, stack);
+      return SyncResult(success: false, message: e.toString(), statistics: {});
+    }
+  }
+
+  RecordBackend? _createRecordBackend() {
+    if (syncSetting.syncServerUrl.value.trim().isEmpty) {
+      return null;
+    }
+    return HttpRecordBackend(url: syncSetting.syncServerUrl.value, token: syncSetting.syncServerToken.value);
   }
 
   /// List history versions
@@ -690,10 +738,21 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   }
 
   /// Test connection for a specific provider
-  /// [providerName]: Provider name ('s3' or 'webdav')
+  /// [providerName]: Provider name ('s3', 'webdav' or 'server')
   Future<bool> testConnection(String providerName) async {
     try {
       log.info('Testing connection for provider: $providerName');
+
+      if (providerName == serverProvider) {
+        RecordBackend? backend = _recordBackendFactory != null ? _recordBackendFactory() : _createRecordBackend();
+        if (backend == null) {
+          log.warning('Sync server address is empty');
+          return false;
+        }
+        RecordServerInfo info = await backend.info();
+        log.info('Connection test result for the sync server: database ${info.database}');
+        return true;
+      }
 
       // Create provider dynamically with latest settings
       // Note: Always pass enabled=true for testConnection, we just want to test the connection itself

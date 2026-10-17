@@ -1095,6 +1095,7 @@ favnote：配對收藏備註
       'jmApiLine': 'API 線路',
       'jmImageLine': '圖片線路',
       'jmAccount': 'JM 帳號',
+      'ehAccount': 'E-Hentai 帳號',
       'jmMeasureLines': '測速',
       'jmLineAutoHint': '自動：每天測速一次，使用本機最快的線路',
       'jmLineNotMeasured': '未測速',

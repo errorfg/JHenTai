@@ -5,6 +5,7 @@ import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/model/config.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
+import 'package:jhentai/src/service/eh_account_sync.dart';
 import 'package:jhentai/src/service/jm_favorite_service.dart';
 import 'package:jhentai/src/setting/jm_account_setting.dart';
 import 'package:jhentai/src/service/nhentai_favorite_service.dart';
@@ -43,6 +44,7 @@ class CloudConfigService
     CloudConfigTypeEnum.eh2telegraphSetting: '1.0.0',
     CloudConfigTypeEnum.jmFavorite: '1.0.0',
     CloudConfigTypeEnum.jmAccount: '1.0.0',
+    CloudConfigTypeEnum.ehAccount: '1.0.0',
   };
 
   static const int localConfigId = -1;
@@ -150,7 +152,7 @@ class CloudConfigService
       case CloudConfigTypeEnum.syncSetting:
         await localConfigService.write(
           configKey: ConfigEnum.syncSetting,
-          value: config.config,
+          value: syncSetting.withDeviceFields(config.config),
         );
         await syncSetting.refreshBean();
         log.info('  ✅ Sync setting imported and refreshed');
@@ -226,6 +228,10 @@ class CloudConfigService
         ]);
         await jmAccountSetting.refreshBean();
         log.info('  ✅ JM account imported and refreshed');
+        break;
+      case CloudConfigTypeEnum.ehAccount:
+        await ehAccountSync.apply(config.config, SyncTimeUtil.format(config.ctime));
+        log.info('  ✅ E-Hentai account imported');
         break;
     }
   }
@@ -349,6 +355,14 @@ class CloudConfigService
         }
         configValue = records.first.value;
         localConfigTime = SyncTimeUtil.tryParse(records.first.utime);
+        break;
+      case CloudConfigTypeEnum.ehAccount:
+        EhAccountValue? account = await ehAccountSync.export();
+        if (account == null) {
+          return null;
+        }
+        configValue = account.value;
+        localConfigTime = SyncTimeUtil.parse(account.time);
         break;
     }
 
