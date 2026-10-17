@@ -28,6 +28,7 @@ import 'package:jhentai/src/service/komga_progress_sync_service.dart';
 import 'package:jhentai/src/service/komga_download_service.dart';
 import 'package:jhentai/src/service/schedule_service.dart';
 import 'package:jhentai/src/service/search_history_service.dart';
+import 'package:jhentai/src/service/watched_progress_service.dart';
 import 'package:jhentai/src/service/nhentai_favorite_service.dart';
 import 'package:jhentai/src/service/nhentai_tag_id_service.dart';
 import 'package:jhentai/src/service/wnacg_favorite_service.dart';
@@ -96,6 +97,7 @@ List<JHLifeCircleBean> lifeCircleBeans = [
   quickSearchService,
   scheduleService,
   searchHistoryService,
+  watchedProgressService,
   nhentaiFavoriteService,
   nhentaiTagIdService,
   wnacgFavoriteService,

@@ -283,21 +283,35 @@ abstract class BasePageLogic extends GetxController with Scroll2TopLogicMixin {
   }
 
   Future<void> jumpPage(DateTime dateTime) async {
+    log.info('Jump page to $dateTime');
+    await _jump(nextGid: state.nextGid, prevGid: state.prevGid, seek: dateTime);
+  }
+
+  /// Lists from the gallery [gid] on: it first, then the ones after it;
+  /// pulling down loads the ones before it.
+  Future<void> jumpToGallery(int gid) async {
+    log.info('Jump page to gallery $gid');
+    // `next` lists what comes after the given id, without it.
+    await _jump(nextGid: '${gid + 1}');
+  }
+
+  Future<void> _jump({String? nextGid, String? prevGid, DateTime? seek}) async {
     if (state.loadingState == LoadingState.loading) {
       return;
     }
-
-    log.info('Jump page to $dateTime');
 
     state.gallerys.clear();
     state.loadingState = LoadingState.loading;
     updateSafely();
 
-    state.scrollController.jumpTo(0);
+    // Not yet shown when the list is opened at a gallery from elsewhere.
+    if (state.scrollController.hasClients) {
+      state.scrollController.jumpTo(0);
+    }
 
     GalleryPageInfo galleryPage;
     try {
-      galleryPage = await getGalleryPage(nextGid: state.nextGid, prevGid: state.prevGid, seek: dateTime);
+      galleryPage = await getGalleryPage(nextGid: nextGid, prevGid: prevGid, seek: seek);
     } on DioException catch (e) {
       log.error('getGallerysFailed'.tr, e.errorMsg);
       snack('getGallerysFailed'.tr, e.errorMsg ?? '', isShort: true);
@@ -331,7 +345,9 @@ abstract class BasePageLogic extends GetxController with Scroll2TopLogicMixin {
     state.favoriteSortOrder = galleryPage.favoriteSortOrder;
     state.galleryCollectionKey = Key(newUUID());
 
-    state.seek = dateTime;
+    if (seek != null) {
+      state.seek = seek;
+    }
 
     if (state.nextGid == null && state.prevGid == null && state.gallerys.isEmpty) {
       state.loadingState = LoadingState.noData;
@@ -389,6 +405,9 @@ abstract class BasePageLogic extends GetxController with Scroll2TopLogicMixin {
   }
 
   void handleLongPressCard(BuildContext context, Gallery gallery, {Offset? position}) async {}
+
+  /// Wraps each card of the list, e.g. to follow what is seen; none here.
+  Widget Function(Gallery gallery, Widget card)? get cardWrapper => null;
 
   void handleSecondaryTapCard(BuildContext context, Gallery gallery, {Offset? position}) async {}
 

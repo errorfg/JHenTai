@@ -88,6 +88,11 @@ enum ConfigEnum {
   ),
   displayBlockingRulesGroup('displayBlockingRulesGroup'),
 
+  /// The galleries of the E-Hentai watched list scrolled past (one row per
+  /// gallery), and the bookmarks in it. On this device only: not synced.
+  watchedRead('watchedRead'),
+  watchedBookmarks('watchedBookmarks'),
+
   /// cache
   isSpreadPage('isSpreadPage'),
   galleryImageHash('galleryImageHash');
