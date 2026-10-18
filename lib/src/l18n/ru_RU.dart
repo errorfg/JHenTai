@@ -615,6 +615,7 @@ class ru_RU {
       'showThumbnails': 'Показывать миниатюры',
       'showScrollBar': 'Показывать полосу прокрутки',
       'showStatusInfo': 'Показывать статус внизу',
+      'autoMode': 'Автоматическое перелистывание',
       'autoModeInterval': 'Интервал авто-режима',
       'autoModeStyle': 'Стиль авто-режима',
       'brightnessLocked': 'Яркость зафиксирована на @percent%',

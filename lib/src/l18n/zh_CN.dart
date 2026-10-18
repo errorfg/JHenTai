@@ -704,6 +704,7 @@ class zh_CN {
       'showThumbnails': '显示缩略图',
       'showScrollBar': '显示滚动条',
       'showStatusInfo': '底部显示状态信息',
+      'autoMode': '自动翻页',
       'autoModeInterval': '自动模式翻页时间',
       'autoModeStyle': '自动模式风格',
       'brightnessLocked': '亮度已锁定为 @percent%',
