@@ -66,9 +66,12 @@ if ! git -C mobile apply --reverse --check "$HERE/jdk-ios.patch" 2>/dev/null; th
 fi
 cd mobile
 
-# iOS: static libraries, Zero VM, and the classes of the runtime's other
-# modules. static-libs-image compiles only some of those; the modules' full
-# targets would also link a dynamic libjvm, which iOS cannot.
+# iOS: static libraries, Zero VM, the classes of the runtime's other
+# modules, and the modules' data and configuration files (java.base's
+# tzdb.dat, cacerts, java.security; java.logging's logging.properties).
+# static-libs-image compiles only some of the classes and none of those
+# files; the modules' full targets would also link a dynamic libjvm, which
+# iOS cannot.
 if [ ! -f build/ios-aarch64-zero-release/spec.gmk ]; then
   sh configure --disable-warnings-as-errors --openjdk-target=aarch64-macos-ios --with-boot-jdk="$BOOT" \
     --with-libffi-include="$WORK/libffi-ios/include" --with-libffi-lib="$WORK/libffi-ios/lib" \
@@ -76,11 +79,13 @@ if [ ! -f build/ios-aarch64-zero-release/spec.gmk ]; then
     --with-sysroot="$(xcrun --sdk iphoneos --show-sdk-path)" --with-debug-level=release \
     --with-native-debug-symbols=none --with-version-opt=$VERSION_OPT
 fi
-CLASS_TARGETS=""
+MODULE_TARGETS=""
 for m in ${MODULES//,/ }; do
-  [ "$m" = java.base ] || CLASS_TARGETS="$CLASS_TARGETS $m-java"
+  [ "$m" = java.base ] || MODULE_TARGETS="$MODULE_TARGETS $m-java"
+  [ ! -f "make/modules/$m/Gendata.gmk" ] || MODULE_TARGETS="$MODULE_TARGETS $m-gendata"
+  [ ! -f "make/modules/$m/Copy.gmk" ] || MODULE_TARGETS="$MODULE_TARGETS $m-copy"
 done
-make CONF=ios-aarch64-zero-release static-libs-image $CLASS_TARGETS
+make CONF=ios-aarch64-zero-release static-libs-image $MODULE_TARGETS
 
 # macOS: jlink and jmod of the same build. Xcode 26 no longer ships the
 # Metal compiler; the modules built here do not need it.
@@ -102,10 +107,20 @@ rm -rf "$WORK/jmods/libs/zero" "$WORK/jmods/libs/"_the.* "$WORK/jmods/libs/jrt-f
 "$HOSTBIN/jmod" create --class-path "$IOS/jdk/modules/java.base" --config "$IOS/support/modules_conf/java.base" \
   --libs "$WORK/jmods/libs" --target-platform macos-aarch64 "$WORK/jmods/java.base.jmod"
 for m in ${MODULES//,/ }; do
-  [ "$m" = java.base ] || "$HOSTBIN/jmod" create --class-path "$IOS/jdk/modules/$m" --target-platform macos-aarch64 "$WORK/jmods/$m.jmod"
+  [ "$m" != java.base ] || continue
+  FILES=()
+  [ ! -d "$IOS/support/modules_conf/$m" ] || FILES+=(--config "$IOS/support/modules_conf/$m")
+  [ ! -d "$IOS/support/modules_libs/$m" ] || FILES+=(--libs "$IOS/support/modules_libs/$m")
+  "$HOSTBIN/jmod" create --class-path "$IOS/jdk/modules/$m" ${FILES[@]+"${FILES[@]}"} \
+    --target-platform macos-aarch64 "$WORK/jmods/$m.jmod"
 done
 "$HOSTBIN/jlink" --module-path "$WORK/jmods" --add-modules "$MODULES" --output "$WORK/runtime" \
   --compress zip-6 --strip-debug --no-header-files --no-man-pages
+# Files the runtime opens by path: without them classes fail to initialize
+# on the device (TimeZone, TLS, security providers), not in this build.
+for f in lib/tzdb.dat lib/security/cacerts conf/security/java.security conf/logging.properties; do
+  [ -f "$WORK/runtime/$f" ] || { echo "The runtime image lacks $f" >&2; exit 1; }
+done
 
 # Host jar.
 (cd "$EXT_HOST" && ./gradlew -q :jvm:hostJar)
