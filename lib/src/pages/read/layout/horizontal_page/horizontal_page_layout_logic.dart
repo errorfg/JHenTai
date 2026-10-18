@@ -1,10 +1,11 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
+import 'package:jhentai/src/extension/get_logic_extension.dart';
 import 'package:jhentai/src/setting/read_setting.dart';
 
+import '../../spread_pages.dart';
 import '../base/base_layout_logic.dart';
 import 'horizontal_page_layout_state.dart';
 
@@ -13,14 +14,101 @@ class HorizontalPageLayoutLogic extends BaseLayoutLogic {
 
   late PageController pageController;
 
+  /// Done once [pageController] is made: after the wide images found in
+  /// earlier readings are read, so that a book opens on the right page.
+  final Completer<void> initCompleter = Completer<void>();
+
+  /// The pages: one per image, two for an image that is split.
+  PageParts parts = PageParts.unsplit(0);
+
   @override
   void onInit() {
     super.onInit();
+    _init();
+  }
 
-    pageController = PageController(initialPage: readPageState.readPageInfo.currentImageIndex);
+  Future<void> _init() async {
+    await readPageState.spreadPages.loaded;
+    parts = _computeParts();
+    pageController = PageController(initialPage: parts.firstPageOf(readPageState.readPageInfo.currentImageIndex));
 
     /// record reading progress and sync thumbnails list index
     pageController.addListener(_readProgressListener);
+    initCompleter.complete();
+  }
+
+  @override
+  bool get splitsWideImages => true;
+
+  /// A half is a page on screen, whole; fitting the width, it scrolls as a
+  /// page does there.
+  @override
+  Size fitHalf(Size half) => readPageLogic.isInFitWidthReadDirection
+      ? super.fitHalf(half)
+      : applyBoxFit(BoxFit.contain, half, readPageState.displayRegionSize).destination;
+
+  List<bool> _splitImages() => <bool>[for (int i = 0; i < readPageState.readPageInfo.pageCount; i++) isSplit(i)];
+
+  PageParts _computeParts() => PageParts(_splitImages());
+
+  int get _currentPage => pageController.hasClients ? pageController.page!.toInt() : parts.firstPageOf(readPageState.readPageInfo.currentImageIndex);
+
+  /// The layout is built for the reading direction: wide images found
+  /// while another layout was shown, or a change of the setting, change the
+  /// pages, and the image being read stays.
+  void syncParts() {
+    if (!initCompleter.isCompleted) {
+      return;
+    }
+    final List<bool> split = _splitImages();
+    if (parts.splitAs(split)) {
+      return;
+    }
+    parts = PageParts(split);
+    final int target = parts.firstPageOf(readPageState.readPageInfo.currentImageIndex);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (pageController.hasClients && _currentPage != target) {
+        pageController.jumpToPage(target);
+      }
+    });
+  }
+
+  /// Lays the pages out again, staying on the part of the image being read.
+  void _relayout() {
+    if (!initCompleter.isCompleted) {
+      return;
+    }
+    final int page = _currentPage;
+    final int image = parts.imageOf(page);
+    final ImagePart part = parts.partOf(page);
+    parts = _computeParts();
+    updateSafely([BaseLayoutLogic.pageId]);
+    final int target = parts.pageOf(image, part);
+    if (target != page) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (pageController.hasClients) {
+          pageController.jumpToPage(target);
+        }
+      });
+    }
+  }
+
+  @override
+  void onSpreadFound(int index) {
+    if (isSplit(index)) {
+      _relayout();
+    }
+  }
+
+  @override
+  void onSplitSettingChanged() => _relayout();
+
+  @override
+  void onPagesAppended() {
+    if (initCompleter.isCompleted) {
+      parts = _computeParts();
+    }
+    super.onPagesAppended();
   }
 
   @override
@@ -42,31 +130,40 @@ class HorizontalPageLayoutLogic extends BaseLayoutLogic {
   }
 
   @override
-  void toPrev() {
-    int targetIndex = (pageController.page! - 1).toInt();
-    toImageIndex(max(targetIndex, 0));
+  void toPrev() => _toPage(_currentPage - 1);
+
+  @override
+  void toNext() => _toPage(_currentPage + 1);
+
+  void _toPage(int page) {
+    if (!initCompleter.isCompleted || !pageController.hasClients) {
+      return;
+    }
+    final int target = page.clamp(0, parts.length - 1);
+    if (readSetting.enablePageTurnAnime.isFalse) {
+      pageController.jumpToPage(target);
+    } else {
+      pageController.animateToPage(target, duration: const Duration(milliseconds: 200), curve: Curves.ease);
+    }
+    readPageLogic.update([readPageLogic.sliderId]);
   }
 
   @override
-  void toNext() {
-    int targetIndex = (pageController.page! + 1).toInt();
-    toImageIndex(min(targetIndex, readPageState.readPageInfo.pageCount - 1));
+  Future<void> jump2ImageIndex(int imageIndex) async {
+    await initCompleter.future;
+    pageController.jumpToPage(parts.firstPageOf(imageIndex));
+    super.jump2ImageIndex(imageIndex);
   }
 
   @override
-  void jump2ImageIndex(int pageIndex) {
-    pageController.jumpToPage(pageIndex);
-    super.jump2ImageIndex(pageIndex);
-  }
-
-  @override
-  void scroll2ImageIndex(int pageIndex, [Duration? duration]) {
+  Future<void> scroll2ImageIndex(int imageIndex, [Duration? duration]) async {
+    await initCompleter.future;
     pageController.animateToPage(
-      pageIndex,
+      parts.firstPageOf(imageIndex),
       duration: duration ?? const Duration(milliseconds: 200),
       curve: Curves.ease,
     );
-    super.scroll2ImageIndex(pageIndex, duration);
+    super.scroll2ImageIndex(imageIndex, duration);
   }
 
   @override
@@ -90,7 +187,7 @@ class HorizontalPageLayoutLogic extends BaseLayoutLogic {
         }
 
         /// stop when at last
-        if (readPageState.readPageInfo.currentImageIndex == readPageState.readPageInfo.pageCount - 1) {
+        if (_currentPage >= parts.length - 1) {
           Get.engine.addPostFrameCallback((_) {
             readPageLogic.closeAutoMode();
           });
@@ -104,8 +201,8 @@ class HorizontalPageLayoutLogic extends BaseLayoutLogic {
   }
 
   void _readProgressListener() {
-    int currentPage = pageController.page!.toInt();
-    readPageLogic.recordReadProgress(currentPage);
-    readPageLogic.syncThumbnails(currentPage);
+    final int image = parts.imageOf(pageController.page!.toInt());
+    readPageLogic.recordReadProgress(image);
+    readPageLogic.syncThumbnails(image);
   }
 }

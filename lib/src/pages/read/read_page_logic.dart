@@ -305,6 +305,8 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   late Worker portraitDisplayFirstPageAloneListener;
   late Worker landscapeDisplayFirstPageAloneListener;
   late Worker autoDetectWebtoonListener;
+  late Worker splitWidePagesListener;
+  late Worker invertSplitOrderListener;
   late Worker tapZoneConfigListener;
 
   /// Tracks the last known portrait state for orientation-specific read direction
@@ -555,6 +557,10 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   void onReady() {
     super.onReady();
 
+    // Before the layouts are built: the single-page layout splits the wide
+    // images found in earlier readings from the start.
+    unawaited(state.spreadPages.load());
+
     WidgetsBinding.instance.addObserver(this);
 
     Timer(const Duration(milliseconds: 120), () {
@@ -641,6 +647,14 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       }
     });
     autoDetectWebtoonListener = ever(readSetting.autoDetectWebtoon, (_) => onEffectiveSettingChanged());
+    splitWidePagesListener = ever(readSetting.splitWidePages, (_) {
+      onEffectiveSettingChanged();
+      // The single-page layout's pages change; it stays on the image read.
+      if (Get.isRegistered<HorizontalPageLayoutLogic>()) {
+        Get.find<HorizontalPageLayoutLogic>().onSplitSettingChanged();
+      }
+    });
+    invertSplitOrderListener = ever(readSetting.invertSplitOrder, (_) => updateSafely([layoutId]));
     portraitImageRegionWidthRatioLister = ever(readSetting.portraitImageRegionWidthRatio, (_) {
       if (readSetting.enableOrientationSpecificReadDirection.isTrue && isPortrait) {
         updateSafely([layoutId]);
@@ -778,6 +792,8 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     portraitDisplayFirstPageAloneListener.dispose();
     landscapeDisplayFirstPageAloneListener.dispose();
     autoDetectWebtoonListener.dispose();
+    splitWidePagesListener.dispose();
+    invertSplitOrderListener.dispose();
     tapZoneConfigListener.dispose();
 
     restoreVolumeListener();
@@ -1221,14 +1237,26 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   }
 
   void _onPagesAppended() {
-    for (final BaseLayoutLogic logic in <BaseLayoutLogic?>[
-      if (Get.isRegistered<VerticalListLayoutLogic>()) Get.find<VerticalListLayoutLogic>(),
-      if (Get.isRegistered<HorizontalListLayoutLogic>()) Get.find<HorizontalListLayoutLogic>(),
-      if (Get.isRegistered<HorizontalPageLayoutLogic>()) Get.find<HorizontalPageLayoutLogic>(),
-      if (Get.isRegistered<HorizontalDoubleColumnLayoutLogic>()) Get.find<HorizontalDoubleColumnLayoutLogic>(),
-    ].whereType<BaseLayoutLogic>()) {
-      logic.onPagesAppended();
+    void notifyLayouts() {
+      for (final BaseLayoutLogic logic in <BaseLayoutLogic?>[
+        if (Get.isRegistered<VerticalListLayoutLogic>()) Get.find<VerticalListLayoutLogic>(),
+        if (Get.isRegistered<HorizontalListLayoutLogic>()) Get.find<HorizontalListLayoutLogic>(),
+        if (Get.isRegistered<HorizontalPageLayoutLogic>()) Get.find<HorizontalPageLayoutLogic>(),
+        if (Get.isRegistered<HorizontalDoubleColumnLayoutLogic>()) Get.find<HorizontalDoubleColumnLayoutLogic>(),
+      ].whereType<BaseLayoutLogic>()) {
+        logic.onPagesAppended();
+      }
     }
+
+    // The new pages count as not wide until what earlier readings found
+    // about them is read; then the layouts look again.
+    final Future<void> spreadsRead = state.spreadPages.onPagesAppended();
+    notifyLayouts();
+    unawaited(spreadsRead.then((_) {
+      if (!isClosed) {
+        notifyLayouts();
+      }
+    }));
     updateSafely([sliderId, pageNoId, thumbnailNoId, bottomMenuId]);
   }
 
@@ -1333,6 +1361,12 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
   bool get isInRight2LeftDirection =>
       ReadSetting.isRight2LeftDirection(effectiveReadDirection);
+
+  /// Of a wide image that is split, whether the right half is read first:
+  /// so from right to left, and from top to bottom (manga are read from
+  /// right to left); [ReadSetting.invertSplitOrder] turns it around.
+  bool get splitRightHalfFirst =>
+      (isInRight2LeftDirection || effectiveReadDirection == ReadDirection.top2bottomList) != readSetting.invertSplitOrder.value;
 
   void toggleMenu() {
     state.isMenuOpen = !state.isMenuOpen;
