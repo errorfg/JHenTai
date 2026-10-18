@@ -1,0 +1,54 @@
+plugins {
+    id 'com.android.library'
+    id 'org.jetbrains.kotlin.android'
+}
+
+group 'com.gallery.reader.exthost'
+version '1.0'
+
+// Library versions of the host, kept in one place for the JVM build too.
+def hostVersions = [:]
+def inVersions = false
+file('../../gradle/libs.versions.toml').eachLine { line ->
+    def trimmed = line.trim()
+    if (trimmed.startsWith('[')) {
+        inVersions = trimmed == '[versions]'
+    } else if (inVersions && trimmed.contains('=')) {
+        def parts = trimmed.split('=', 2)
+        hostVersions[parts[0].trim()] = parts[1].trim().replaceAll('"', '')
+    }
+}
+
+android {
+    namespace 'com.gallery.reader.exthost.android'
+    compileSdk 36
+
+    defaultConfig {
+        minSdk 24
+        consumerProguardFiles 'consumer-rules.pro'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    sourceSets {
+        // The host itself is shared with the JVM build (ext_host/core).
+        main.java.srcDirs += ['src/main/kotlin', '../../core/src/main/kotlin']
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${hostVersions.coroutines}"
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:${hostVersions.serialization}"
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json-okio:${hostVersions.serialization}"
+    implementation "com.squareup.okhttp3:okhttp:${hostVersions.okhttp}"
+    implementation "org.jsoup:jsoup:${hostVersions.jsoup}"
+    implementation "io.reactivex:rxjava:${hostVersions.rxjava}"
+    implementation "androidx.preference:preference:${hostVersions.preference}"
+}

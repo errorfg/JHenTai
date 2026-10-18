@@ -50,6 +50,9 @@ class GalleryDetail {
   List<GalleryThumbnail> thumbnails;
   int thumbnailsPageCount;
 
+  /// A summary of the work, from sources that give one (Tachiyomi).
+  String? description;
+
   bool get isFavorite => favoriteTagIndex != null || favoriteTagName != null;
 
   GalleryUrl? get newVersionGalleryUrl => childrenGallerys?.lastOrNull?.galleryUrl;
@@ -86,6 +89,7 @@ class GalleryDetail {
     this.nhentaiTagSuggestionCount = 0,
     required this.thumbnails,
     required this.thumbnailsPageCount,
+    this.description,
   });
 
   Gallery toGallery() {

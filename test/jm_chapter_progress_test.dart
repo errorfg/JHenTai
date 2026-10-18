@@ -31,8 +31,10 @@ import 'package:jhentai/src/service/jm_reading_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
-import 'package:jhentai/src/widget/jm_chapter_dialog.dart';
-import 'package:jhentai/src/widget/jm_chapter_download_dialog.dart';
+import 'package:jhentai/src/model/gallery_url.dart';
+import 'package:jhentai/src/model/series.dart';
+import 'package:jhentai/src/widget/series_chapter_dialog.dart';
+import 'package:jhentai/src/widget/series_chapter_download_dialog.dart';
 
 class _SilentLogService extends LogService {
   @override
@@ -121,7 +123,7 @@ Future<Map<int, String>> _states() async {
       id: progress[id]!.finished
           ? 'finished'
           : progress[id]!.inProgress
-              ? jmChapterPageText(progress[id]!)
+              ? progress[id]!.pageText
               : 'unread',
   };
 }
@@ -398,8 +400,8 @@ void main() {
     tester.view.physicalSize = const Size(900, 1400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    final List<JmChapterRef> chapters = <JmChapterRef>[
-      for (int i = 0; i < 30; i++) JmChapterRef(id: 300 + i, name: 'Chapter ${i + 1}', sort: i + 1),
+    final List<SeriesChapter> chapters = <SeriesChapter>[
+      for (int i = 0; i < 30; i++) SeriesChapter(id: 300 + i, url: GalleryUrl.jm(300 + i), name: 'Chapter ${i + 1}'),
     ];
 
     await tester.pumpWidget(const GetMaterialApp(home: Scaffold()));
@@ -407,7 +409,7 @@ void main() {
     // Reading chapter 5; chapters 5 and 6 are in the download list already.
     unawaited(
       Get.dialog<List<int>>(
-        JmChapterDownloadDialog(
+        SeriesChapterDownloadDialog(
           chapters: chapters,
           currentChapterId: 304,
           isDownloaded: (int id) => id == 304 || id == 305,
@@ -416,25 +418,25 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    TextButton confirm() => tester.widget<TextButton>(find.byKey(const Key('jmDownloadConfirm')));
+    TextButton confirm() => tester.widget<TextButton>(find.byKey(const Key('seriesDownloadConfirm')));
     expect(confirm().onPressed, isNull, reason: 'nothing picked yet');
 
-    await tester.tap(find.byKey(const Key('jmDownloadAll')));
+    await tester.tap(find.byKey(const Key('seriesDownloadAll')));
     await tester.pump();
     expect(find.text('download (28)'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('jmDownloadNext20')));
+    await tester.tap(find.byKey(const Key('seriesDownloadNext20')));
     await tester.pump();
     expect(find.text('download (20)'), findsOneWidget);
 
-    await tester.tap(find.byKey(const Key('jmDownloadNext10')));
+    await tester.tap(find.byKey(const Key('seriesDownloadNext10')));
     await tester.pump();
     expect(find.text('download (10)'), findsOneWidget);
     // One chapter more, picked by hand.
-    await tester.tap(find.byKey(const ValueKey<String>('jmDownloadChapter:303')));
+    await tester.tap(find.byKey(const ValueKey<String>('seriesDownloadChapter:303')));
     await tester.pump();
 
-    await tester.tap(find.byKey(const Key('jmDownloadConfirm')));
+    await tester.tap(find.byKey(const Key('seriesDownloadConfirm')));
     await tester.pumpAndSettle();
     // Chapter 4, then the ten after the downloaded 5 and 6: 7 to 16.
     expect(picked, <int>[303, for (int id = 306; id <= 315; id++) id]);
@@ -482,8 +484,8 @@ void main() {
     // Opened on real time: the database schedules its opening on the zone
     // it is created in.
     final _Device device = (await tester.runAsync(() async => _Device()..activate()))!;
-    final List<JmChapterRef> chapters = <JmChapterRef>[
-      for (int i = 0; i < 4; i++) JmChapterRef(id: 200 + i, name: 'Chapter ${i + 1}', sort: i + 1),
+    final List<SeriesChapter> chapters = <SeriesChapter>[
+      for (int i = 0; i < 4; i++) SeriesChapter(id: 200 + i, url: GalleryUrl.jm(200 + i), name: 'Chapter ${i + 1}'),
     ];
 
     await tester.runAsync(() async {
@@ -497,7 +499,8 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: JmChapterDialog(
+            body: SeriesChapterDialog(
+              reading: jmReadingService,
               chapters: chapters,
               currentChapterId: 201,
               onTap: (_) {},
@@ -510,7 +513,7 @@ void main() {
     });
     await tester.pump();
 
-    Finder row(int id) => find.byKey(ValueKey<String>('jmChapter:$id'));
+    Finder row(int id) => find.byKey(ValueKey<String>('seriesChapter:$id'));
     expect(find.descendant(of: row(200), matching: find.byIcon(Icons.check)), findsOneWidget);
     expect(find.descendant(of: row(201), matching: find.text('P15/30')), findsOneWidget);
     expect(find.descendant(of: row(201), matching: find.byType(LinearProgressIndicator)), findsOneWidget);
@@ -518,7 +521,7 @@ void main() {
     expect(find.textContaining('chaptersReadCount'), findsOneWidget);
 
     // From chapter 4: everything before it is read.
-    await tester.tap(find.byKey(const ValueKey<String>('jmChapterMenu:203')));
+    await tester.tap(find.byKey(const ValueKey<String>('seriesChapterMenu:203')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('markPreviousChaptersRead'));
     // The marks are written and the list reloads from the database.

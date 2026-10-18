@@ -97,6 +97,22 @@ abstract class LocalSourceFavoriteService
     await saveBeanConfig();
   }
 
+  /// Adds many favorites with one write, keeping what is already there.
+  Future<void> addFavorites(List<({Gallery gallery, int favoriteCategoryIndex, DateTime? favoritedTime})> favorites) async {
+    for (final ({Gallery gallery, int favoriteCategoryIndex, DateTime? favoritedTime}) f in favorites) {
+      if (!isSourceGallery(f.gallery.galleryUrl) || _favoritesByGid.containsKey(f.gallery.gid)) {
+        continue;
+      }
+      final Gallery snapshot = _normalizeGallerySnapshot(f.gallery);
+      _favoritesByGid[snapshot.gid] = _LocalSourceFavoriteEntry(
+        gallery: snapshot,
+        favoritedTime: (f.favoritedTime ?? DateTime.now()).toUtc(),
+        favoriteCategoryIndex: _normalizeCategoryIndex(f.favoriteCategoryIndex),
+      );
+    }
+    await saveBeanConfig();
+  }
+
   Future<void> removeFavorite(int gid) async {
     if (_favoritesByGid.remove(gid) == null) {
       return;

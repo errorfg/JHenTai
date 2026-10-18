@@ -32,6 +32,9 @@ import 'package:jhentai/src/pages/download/download_base_page.dart';
 import 'package:jhentai/src/pages/favorite/favorite_page_logic.dart';
 import 'package:jhentai/src/pages/read/read_page_logic.dart';
 import 'package:jhentai/src/service/jm_reading_service.dart';
+import 'package:jhentai/src/model/series.dart';
+import 'package:jhentai/src/network/tachi/tachi_source.dart';
+import 'package:jhentai/src/service/tachi/tachi_favorite_service.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/service/sync_service.dart';
 import 'package:jhentai/src/service/super_resolution_service.dart';
@@ -95,7 +98,7 @@ import '../../widget/re_unlock_dialog.dart';
 import '../../widget/nhentai_archive_dialog.dart';
 import '../../widget/nhentai_related_dialog.dart';
 import '../../widget/nhentai_tag_suggestions_dialog.dart';
-import '../../widget/jm_chapter_download_dialog.dart';
+import '../../widget/series_chapter_download_dialog.dart';
 import 'details_page_state.dart';
 
 class DetailsPageArgument {
@@ -153,6 +156,21 @@ class DetailsPageLogic extends GetxController
   /// successful load has moved on to the chapter being read.
   int? _jmEntryId;
 
+  /// Likewise a Tachiyomi manga, which opens on the chapter to read.
+  GalleryUrl? _tachiEntry;
+
+  /// The source of a JM or Tachiyomi gallery: chapters of series.
+  SeriesSource? get _seriesSource => _seriesSourceOf(state.galleryUrl);
+
+  static SeriesSource? _seriesSourceOf(GalleryUrl url) => url.isJM
+      ? ehRequest.jmSource
+      : url.isTachi
+      ? ehRequest.tachiSource
+      : null;
+
+  /// Reading state of the chapters of this page's series.
+  SeriesReadingService get seriesReading => _seriesSource?.reading ?? jmReadingService;
+
   /// With the nhentai API: whether the account has this gallery, as the
   /// details or the last change said.
   bool _nhAccountFavorite = false;
@@ -186,6 +204,9 @@ class DetailsPageLogic extends GetxController
     state.apikey = argument.detailsPageInfo?.apikey;
     if (argument.galleryUrl.isJM && !argument.jmExactChapter) {
       _jmEntryId = argument.galleryUrl.jmChapterId;
+    }
+    if (argument.galleryUrl.isTachi && !argument.galleryUrl.isTachiChapter) {
+      _tachiEntry = argument.galleryUrl;
     }
 
     _syncNhFavoriteStatus();
@@ -258,6 +279,8 @@ class DetailsPageLogic extends GetxController
     try {
       detailPageInfo = _jmEntryId != null
           ? await _getJmEntryDetails(_jmEntryId!, useCache: useCacheIfAvailable)
+          : _tachiEntry != null
+          ? await _getTachiEntryDetails(_tachiEntry!, useCache: useCacheIfAvailable)
           : await _getDetailsWithRedirectAndFallback(
               useCache: useCacheIfAvailable,
             );
@@ -294,24 +317,21 @@ class DetailsPageLogic extends GetxController
     state.galleryDetails = detailPageInfo.galleryDetails;
     state.apikey = detailPageInfo.apikey;
     state.nextPageIndexToLoadThumbnails = 1;
-    if (state.galleryUrl.isJM) {
+    final SeriesSource? series = _seriesSource;
+    if (series != null) {
       // Served from the cache the detail request just filled.
-      state.jmChapterBundle = await ehRequest.jmSource.bundle(
-        state.galleryUrl.jmChapterId,
-      );
+      state.seriesBundle = await series.bundle(state.galleryUrl);
       // The list entry describes the album; from here on the chapter's own
       // details (its title, pages) are what the page, the reader and
       // downloads use.
       state.gallery = null;
-      final JmChapterBundle bundle = state.jmChapterBundle!;
+      final SeriesBundle bundle = state.seriesBundle!;
       if (bundle.isMultiChapter) {
         unawaited(
-          jmReadingService.remember(
-            albumId: bundle.album.id,
-            pageCounts: {bundle.chapter.id: bundle.pageCount},
-            chapterIds: bundle.album.chapters
-                .map((JmChapterRef c) => c.id)
-                .toList(),
+          series.reading.remember(
+            albumId: bundle.seriesId,
+            pageCounts: {bundle.chapterId: bundle.pageCount},
+            chapterIds: bundle.chapters.map((SeriesChapter c) => c.id).toList(),
           ),
         );
       }
@@ -955,6 +975,8 @@ class DetailsPageLogic extends GetxController
       ? wnacgFavoriteService
       : state.galleryUrl.isJM
       ? jmFavoriteService
+      : state.galleryUrl.isTachi
+      ? tachiFavoriteService
       : null;
 
   void _syncLocalSourceFavoriteStatus() {
@@ -965,7 +987,7 @@ class DetailsPageLogic extends GetxController
 
     _applyLocalFavoriteStatus(
       favoriteCategoryIndex: service.getFavoriteCategoryIndex(
-        state.galleryUrl.gid,
+        _localFavoriteGid,
       ),
     );
   }
@@ -983,7 +1005,7 @@ class DetailsPageLogic extends GetxController
     }
 
     int? currentFavIndex = service.getFavoriteCategoryIndex(
-      state.galleryUrl.gid,
+      _localFavoriteGid,
     );
     ({bool isDelete, int favIndex, String note, bool remember}) operation;
 
@@ -1017,7 +1039,7 @@ class DetailsPageLogic extends GetxController
 
     try {
       if (operation.isDelete) {
-        await service.removeFavorite(state.galleryUrl.gid);
+        await service.removeFavorite(_localFavoriteGid);
         _applyLocalFavoriteStatus(favoriteCategoryIndex: null);
       } else {
         await service.addFavorite(
@@ -1063,7 +1085,14 @@ class DetailsPageLogic extends GetxController
     );
   }
 
+  /// A Tachiyomi manga is one favorite, whichever chapter is open.
+  int get _localFavoriteGid => state.galleryUrl.isTachi ? state.galleryUrl.tachiMangaUrl.gid : state.galleryUrl.gid;
+
   Gallery? _getLocalFavoriteGallerySnapshot() {
+    final SeriesBundle? bundle = state.seriesBundle;
+    if (bundle is TachiChapterBundle) {
+      return ehRequest.tachiSource.galleryOf(bundle.source, bundle.entry.manga);
+    }
     if (state.gallery != null) {
       return state.gallery;
     }
@@ -1110,7 +1139,8 @@ class DetailsPageLogic extends GetxController
   Future<void> handleTapRating() async {
     if (state.galleryUrl.isNH ||
         state.galleryUrl.isWN ||
-        state.galleryUrl.isJM) {
+        state.galleryUrl.isJM ||
+        state.galleryUrl.isTachi) {
       return;
     }
 
@@ -1196,6 +1226,7 @@ class DetailsPageLogic extends GetxController
   Future<void> handleTapArchive(BuildContext context) async {
     if (state.galleryUrl.isWN ||
         state.galleryUrl.isJM ||
+        state.galleryUrl.isTachi ||
         (state.galleryUrl.isNH && !hasNhentaiOfficialApi)) {
       return;
     }
@@ -1374,7 +1405,8 @@ class DetailsPageLogic extends GetxController
   Future<void> handleTapHH() async {
     if (state.galleryUrl.isNH ||
         state.galleryUrl.isWN ||
-        state.galleryUrl.isJM) {
+        state.galleryUrl.isJM ||
+        state.galleryUrl.isTachi) {
       return;
     }
 
@@ -1463,6 +1495,11 @@ class DetailsPageLogic extends GetxController
         rewriteSearchConfig: SearchConfig(keyword: keyword, isJmSearch: true),
         forceNewRoute: true,
       );
+    } else if (state.galleryUrl.isTachi) {
+      newSearch(
+        rewriteSearchConfig: SearchConfig(keyword: keyword, tachiSource: state.galleryUrl.tachiSource),
+        forceNewRoute: true,
+      );
     } else {
       newSearch(keyword: keyword, forceNewRoute: true, site: ContentScheme.ehentai);
     }
@@ -1476,6 +1513,8 @@ class DetailsPageLogic extends GetxController
       ? ContentScheme.wnacg
       : state.galleryUrl.isJM
       ? ContentScheme.jm
+      : state.galleryUrl.isTachi
+      ? ContentScheme.tachiyomi
       : ContentScheme.ehentai;
 
   /// The "EH" action of a gallery from another site: its title, searched on
@@ -1483,7 +1522,8 @@ class DetailsPageLogic extends GetxController
   void searchInEhByNhTitle() {
     if (!state.galleryUrl.isNH &&
         !state.galleryUrl.isWN &&
-        !state.galleryUrl.isJM) {
+        !state.galleryUrl.isJM &&
+        !state.galleryUrl.isTachi) {
       return;
     }
 
@@ -1521,6 +1561,11 @@ class DetailsPageLogic extends GetxController
         rewriteSearchConfig: SearchConfig(keyword: keyword, isJmSearch: true),
         forceNewRoute: true,
       );
+    } else if (state.galleryUrl.isTachi) {
+      newSearch(
+        rewriteSearchConfig: SearchConfig(keyword: keyword, tachiSource: state.galleryUrl.tachiSource),
+        forceNewRoute: true,
+      );
     } else {
       newSearch(keyword: keyword, forceNewRoute: true, site: ContentScheme.ehentai);
     }
@@ -1547,7 +1592,7 @@ class DetailsPageLogic extends GetxController
       return;
     }
 
-    if (state.galleryUrl.isWN || state.galleryUrl.isJM) {
+    if (state.galleryUrl.isWN || state.galleryUrl.isJM || state.galleryUrl.isTachi) {
       return;
     }
 
@@ -1585,7 +1630,8 @@ class DetailsPageLogic extends GetxController
   Future<void> handleTapStatistic() async {
     if (state.galleryUrl.isNH ||
         state.galleryUrl.isWN ||
-        state.galleryUrl.isJM) {
+        state.galleryUrl.isJM ||
+        state.galleryUrl.isTachi) {
       return;
     }
 
@@ -1741,6 +1787,7 @@ class DetailsPageLogic extends GetxController
     if (state.galleryUrl.isNH ||
         state.galleryUrl.isWN ||
         state.galleryUrl.isJM ||
+        state.galleryUrl.isTachi ||
         state.apikey == null) {
       return;
     }
@@ -1804,7 +1851,8 @@ class DetailsPageLogic extends GetxController
   Future<void> handleAddTag(BuildContext context) async {
     if (state.galleryUrl.isNH ||
         state.galleryUrl.isWN ||
-        state.galleryUrl.isJM) {
+        state.galleryUrl.isJM ||
+        state.galleryUrl.isTachi) {
       return;
     }
 
@@ -1972,13 +2020,13 @@ class DetailsPageLogic extends GetxController
   Future<void> goToReadPage([int? forceIndex]) async {
     ReadDirection? webtoonReadDirection = _detectWebtoonReadDirection();
 
-    // A chapter of a JM series reads on into the next chapters, downloaded
-    // or not.
-    JmChapterBundle? jmChapter = state.jmChapterBundle;
-    if (jmChapter != null && jmChapter.isMultiChapter) {
+    // A chapter of a series reads on into the next chapters, downloaded or
+    // not. A Tachiyomi chapter always reads this way: its pages are known.
+    SeriesBundle? seriesChapter = state.seriesBundle;
+    if (seriesChapter != null && (seriesChapter.isMultiChapter || state.galleryUrl.isTachi)) {
       unawaited(
         _openReader(
-          await _jmChapterSession(jmChapter, initialIndex: forceIndex),
+          await _seriesChapterSession(seriesChapter, initialIndex: forceIndex),
         ),
       );
       return;
@@ -2039,9 +2087,9 @@ class DetailsPageLogic extends GetxController
     );
   }
 
-  /// Opens the reader. In a multi-chapter JM album the reader can close
-  /// with the previous or next chapter as its result, which then opens in
-  /// turn, the way Komga moves between books of a series.
+  /// Opens the reader. In a multi-chapter series the reader can close with
+  /// the previous or next chapter as its result, which then opens in turn,
+  /// the way Komga moves between books of a series.
   Future<void> _openReader(ReadPageInfo info) async {
     ReadPageInfo? session = info;
     while (session != null) {
@@ -2057,53 +2105,57 @@ class DetailsPageLogic extends GetxController
 
     await Future.delayed(const Duration(milliseconds: 800));
     updateSafely([readButtonId]);
-    await _showJmChapterRead();
+    await _showSeriesChapterRead();
   }
 
   /// After reading on into later chapters, the page shows the chapter read
   /// last, with its progress.
-  Future<void> _showJmChapterRead() async {
-    JmChapterBundle? current = state.jmChapterBundle;
-    if (current == null || !current.isMultiChapter || isClosed) {
+  Future<void> _showSeriesChapterRead() async {
+    SeriesBundle? current = state.seriesBundle;
+    SeriesSource? source = _seriesSource;
+    if (current == null || source == null || !current.isMultiChapter || isClosed) {
       return;
     }
-    int? last = await jmReadingService.lastOpenedChapter(current.album.id);
-    if (last == null || last == current.chapter.id || isClosed) {
+    int? last = await source.reading.lastOpenedChapter(current.seriesId);
+    if (last == null || last == current.chapterId || isClosed) {
       return;
     }
-    if (!current.album.chapters.any((JmChapterRef c) => c.id == last)) {
+    SeriesChapter? chapter = current.chapters.firstWhereOrNull((SeriesChapter c) => c.id == last);
+    if (chapter == null) {
       return;
     }
-    state.galleryUrl = GalleryUrl.jm(last);
+    state.galleryUrl = chapter.url;
     await getDetails(refreshPageImmediately: true);
   }
 
-  Future<ReadPageInfo?> Function({required bool next}) _jmSiblingLoader(
-    int chapterId,
+  Future<ReadPageInfo?> Function({required bool next}) _seriesSiblingLoader(
+    SeriesSource source,
+    GalleryUrl chapterUrl,
   ) {
     return ({required bool next}) async {
-      JmChapterBundle current = await ehRequest.jmSource.bundle(chapterId);
+      SeriesBundle current = await source.bundle(chapterUrl);
       int index = current.chapterIndex + (next ? 1 : -1);
       if (current.chapterIndex < 0 ||
           index < 0 ||
-          index >= current.album.chapters.length) {
+          index >= current.chapters.length) {
         return null;
       }
-      return _jmChapterSession(
-        await ehRequest.jmSource.bundle(current.album.chapters[index].id),
+      return _seriesChapterSession(
+        await source.bundle(current.chapters[index].url),
       );
     };
   }
 
-  /// A reader session for a JM chapter: online, with the pages already
-  /// downloaded read from their files, so that the next chapters can follow
-  /// in the same reader (see [ReadSegment]). Opens at the chapter's progress
-  /// unless [initialIndex] is given.
-  Future<ReadPageInfo> _jmChapterSession(
-    JmChapterBundle chapter, {
+  /// A reader session for a chapter of a series: online, with the pages
+  /// already downloaded read from their files, so that the next chapters can
+  /// follow in the same reader (see [ReadSegment]). Opens at the chapter's
+  /// progress unless [initialIndex] is given.
+  Future<ReadPageInfo> _seriesChapterSession(
+    SeriesBundle chapter, {
     int? initialIndex,
   }) async {
     GalleryUrl url = chapter.galleryUrl;
+    SeriesSource source = _seriesSourceOf(url)!;
     List<GalleryImage?>? downloaded = galleryDownloadService
         .galleryDownloadInfos[url.gid]
         ?.images
@@ -2123,31 +2175,28 @@ class DetailsPageLogic extends GetxController
       readProgressRecordStorageKey: url.gid.toString(),
       pageCount: chapter.pageCount,
       images: downloaded,
-      thumbnails: JmSource.pageThumbnails(
-        chapter,
-        ehRequest.jmSource.imageDomain(),
-      ),
-      // The chapter being read, which the album then opens on.
-      onShown: () => jmReadingService.remember(
-        albumId: chapter.album.id,
-        pageCounts: {chapter.chapter.id: chapter.pageCount},
-        openedChapterId: chapter.chapter.id,
+      thumbnails: chapter.pageThumbnails(),
+      // The chapter being read, which the series then opens on.
+      onShown: () => source.reading.remember(
+        albumId: chapter.seriesId,
+        pageCounts: {chapter.chapterId: chapter.pageCount},
+        openedChapterId: chapter.chapterId,
       ),
       useSuperResolution: false,
       readDirection: _detectWebtoonReadDirection(),
-      loadSiblingBook: _jmSiblingLoader(chapter.chapter.id),
+      loadSiblingBook: _seriesSiblingLoader(source, url),
       siblingsAreChapters: true,
     );
   }
 
-  void openJmChapter(JmChapterRef chapter) {
-    if (chapter.id == state.galleryUrl.jmChapterId) {
+  void openSeriesChapter(SeriesChapter chapter) {
+    if (chapter.url.gid == state.galleryUrl.gid) {
       return;
     }
     toRoute(
       Routes.details,
       arguments: DetailsPageArgument(
-        galleryUrl: GalleryUrl.jm(chapter.id),
+        galleryUrl: chapter.url,
         jmExactChapter: true,
       ),
       offAllBefore: false,
@@ -2155,19 +2204,19 @@ class DetailsPageLogic extends GetxController
     );
   }
 
-  /// Queues the chapters of the album the user picks, in a group named
-  /// after the album unless the user picks another.
-  Future<void> handleDownloadJmChapters() async {
-    JmChapterBundle? current = state.jmChapterBundle;
-    if (current == null) {
+  /// Queues the chapters of the series the user picks, in a group named
+  /// after the series unless the user picks another.
+  Future<void> handleDownloadSeriesChapters() async {
+    SeriesBundle? current = state.seriesBundle;
+    SeriesSource? source = _seriesSource;
+    if (current == null || source == null) {
       return;
     }
-    JmAlbum album = current.album;
 
     List<int>? chapterIds = await Get.dialog<List<int>>(
-      JmChapterDownloadDialog(
-        chapters: album.chapters,
-        currentChapterId: current.chapter.id,
+      SeriesChapterDownloadDialog(
+        chapters: current.chapters,
+        currentChapterId: current.chapterId,
       ),
     );
     if (chapterIds == null || chapterIds.isEmpty) {
@@ -2177,7 +2226,7 @@ class DetailsPageLogic extends GetxController
     ({String group, bool downloadOriginalImage})? result = await Get.dialog(
       EHDownloadDialog(
         title: 'downloadChapters'.tr,
-        currentGroup: album.name,
+        currentGroup: current.seriesTitle,
         candidates: galleryDownloadService.allGroups,
         showDownloadOriginalImageCheckBox: false,
         downloadOriginalImage: false,
@@ -2189,11 +2238,9 @@ class DetailsPageLogic extends GetxController
     }
 
     List<int> pending = [
-      for (int i = 0; i < album.chapters.length; i++)
-        if (chapterIds.contains(album.chapters[i].id) &&
-            !galleryDownloadService.containGallery(
-              GalleryUrl.jm(album.chapters[i].id).gid,
-            ))
+      for (int i = 0; i < current.chapters.length; i++)
+        if (chapterIds.contains(current.chapters[i].id) &&
+            !galleryDownloadService.containGallery(current.chapters[i].url.gid))
           i,
     ];
     if (pending.isEmpty) {
@@ -2205,13 +2252,14 @@ class DetailsPageLogic extends GetxController
     int failed = 0;
     final Map<int, int> pageCounts = {};
     for (int index in pending) {
-      GalleryUrl url = GalleryUrl.jm(album.chapters[index].id);
+      SeriesChapter chapter = current.chapters[index];
+      GalleryUrl url = chapter.url;
       int pageCount;
       try {
-        pageCount = await ehRequest.jmSource.chapterPageCount(url.jmChapterId);
-        pageCounts[url.jmChapterId] = pageCount;
+        pageCount = await source.chapterPageCount(url);
+        pageCounts[chapter.id] = pageCount;
       } catch (e) {
-        log.error('Get JM chapter failed: ${url.jmChapterId}', e);
+        log.error('Get chapter failed: ${url.url}', e);
         failed++;
         continue;
       }
@@ -2222,11 +2270,11 @@ class DetailsPageLogic extends GetxController
         GalleryDownloadedData(
           gid: url.gid,
           token: url.token,
-          title: JmSource.chapterTitle(album, index),
+          title: source.chapterTitle(current, index),
           category: state.galleryDetails?.category ?? 'Manga',
           pageCount: pageCount,
           galleryUrl: url.url,
-          uploader: album.authors.firstOrNull,
+          uploader: current.author,
           publishTime: state.galleryDetails?.publishTime ?? '',
           downloadStatusIndex: DownloadStatus.downloading.index,
           downloadOriginalImage: false,
@@ -2244,7 +2292,7 @@ class DetailsPageLogic extends GetxController
 
     updateGlobalGalleryStatus();
     unawaited(
-      jmReadingService.remember(albumId: album.id, pageCounts: pageCounts),
+      source.reading.remember(albumId: current.seriesId, pageCounts: pageCounts),
     );
     if (failed > 0) {
       snack('failed'.tr, '${'downloadAllChaptersFailed'.tr}: $failed', isShort: true);
@@ -2279,7 +2327,7 @@ class DetailsPageLogic extends GetxController
   Future<void> _carryProgressFromOlderVersion() async {
     final GalleryUrl? parent = state.galleryDetails?.parentGalleryUrl;
     final GalleryUrl url = state.galleryUrl;
-    if (parent == null || url.isNH || url.isWN || url.isJM) {
+    if (parent == null || url.isNH || url.isWN || url.isJM || url.isTachi) {
       return;
     }
     try {
@@ -2297,20 +2345,20 @@ class DetailsPageLogic extends GetxController
     return readProgressService.getReadProgress(state.galleryUrl.gid);
   }
 
-  /// The history entry of this page. A multi-chapter JM album is one entry,
-  /// whichever of its chapters is open: under the album's id, with the
-  /// album's title and page count.
+  /// The history entry of this page. A multi-chapter series is one entry,
+  /// whichever of its chapters is open: under the series' id, with its title
+  /// and page count. A Tachiyomi manga is always one entry.
   GalleryHistoryModel _historyModel() {
     GalleryHistoryModel model = galleryDetail2GalleryHistoryModel(
       state.galleryDetails!,
     );
-    JmChapterBundle? bundle = state.jmChapterBundle;
-    if (bundle != null && bundle.isMultiChapter) {
+    SeriesBundle? bundle = state.seriesBundle;
+    if (bundle != null && (bundle.isMultiChapter || bundle.galleryUrl.isTachi)) {
       model
-        ..galleryUrl = GalleryUrl.jm(bundle.album.id)
-        ..title = bundle.album.name;
-      if (bundle.album.totalPhotos > 0) {
-        model.pageCount = bundle.album.totalPhotos;
+        ..galleryUrl = bundle.seriesUrl
+        ..title = bundle.seriesTitle;
+      if (bundle.seriesPageCount > 0) {
+        model.pageCount = bundle.seriesPageCount;
       }
     }
     return model;
@@ -2351,7 +2399,7 @@ class DetailsPageLogic extends GetxController
       details = await _getDetailsWithRedirectAndFallback(useCache: useCache);
     }
 
-    final JmChapterBundle bundle = await ehRequest.jmSource.bundle(
+    final JmChapterBundle bundle = await ehRequest.jmSource.chapterBundle(
       state.galleryUrl.jmChapterId,
     );
     // A chapter of its own (not the album's first) opens as is.
@@ -2376,11 +2424,44 @@ class DetailsPageLogic extends GetxController
     return details;
   }
 
+  /// Details of a Tachiyomi manga opened from a list, the history or the
+  /// favorites: the chapter to continue with (see
+  /// [SeriesReadingService.resumeChapter]), with progress from other devices
+  /// fetched alongside the manga's chapters.
+  Future<({GalleryDetail galleryDetails, String apikey})> _getTachiEntryDetails(
+    GalleryUrl manga, {
+    bool useCache = true,
+  }) async {
+    final Future<void> progressSync = syncService
+        .syncReadProgress()
+        .then<void>((_) {}, onError: (Object _) {});
+    final TachiMangaEntry entry = await ehRequest.tachiSource.manga(manga, refresh: !useCache);
+    final List<SeriesChapter> chapters = entry.readingOrder;
+    if (chapters.isEmpty) {
+      throw EHSiteException(
+        type: EHSiteExceptionType.galleryDeleted,
+        message: 'noChapters'.tr,
+        shouldPauseAllDownloadTasks: false,
+      );
+    }
+    await progressSync.timeout(const Duration(seconds: 5), onTimeout: () {});
+    final List<int> ids = chapters.map((SeriesChapter c) => c.id).toList();
+    final int target = SeriesReadingService.resumeChapter(
+      ids,
+      await tachiReadingService.progressOf(ids),
+    );
+    state.galleryUrl = chapters.firstWhere((SeriesChapter c) => c.id == target).url;
+    final ({GalleryDetail galleryDetails, String apikey}) details = await _getDetailsWithRedirectAndFallback(useCache: useCache);
+    _tachiEntry = null;
+    return details;
+  }
+
   Future<({GalleryDetail galleryDetails, String apikey})>
   _getDetailsWithRedirectAndFallback({bool useCache = true}) async {
     if (state.galleryUrl.isNH ||
         state.galleryUrl.isWN ||
-        state.galleryUrl.isJM) {
+        state.galleryUrl.isJM ||
+        state.galleryUrl.isTachi) {
       return ehRequest
           .requestDetailPage<({GalleryDetail galleryDetails, String apikey})>(
             galleryUrl: state.galleryUrl.url,
@@ -2627,6 +2708,13 @@ class DetailsPageLogic extends GetxController
     }
     if (state.galleryUrl.isJM) {
       searchConfig.isJmSearch = true;
+    }
+    if (state.galleryUrl.isTachi) {
+      // A Tachiyomi source searches plain text.
+      searchConfig
+        ..keyword = state.selectedTags.map((t) => t.tagData.key).join(' ')
+        ..tags = null
+        ..tachiSource = state.galleryUrl.tachiSource;
     }
 
     newSearch(rewriteSearchConfig: searchConfig, forceNewRoute: true);

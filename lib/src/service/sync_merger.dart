@@ -5,6 +5,9 @@ import 'package:jhentai/src/service/isolate_service.dart';
 
 import 'jh_service.dart';
 import 'log.dart';
+import 'dart:convert';
+import 'package:collection/collection.dart';
+import 'package:jhentai/src/service/tachi/tachi_source_setting_service.dart';
 
 SyncMerger syncMerger = SyncMerger();
 
@@ -202,7 +205,12 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         return await _mergeNhentaiFavorite(local, remote);
       case CloudConfigTypeEnum.wnacgFavorite:
       case CloudConfigTypeEnum.jmFavorite:
+      case CloudConfigTypeEnum.tachiFavorite:
         return await _mergeLocalSourceFavorite(type, local, remote);
+      case CloudConfigTypeEnum.tachiExtensionList:
+        return _mergeLatestConfig(local, remote);
+      case CloudConfigTypeEnum.tachiSourceSettings:
+        return _mergeTachiSourceSettings(local, remote);
       case CloudConfigTypeEnum.komgaSetting:
         return _mergeLatestConfig(local, remote);
       case CloudConfigTypeEnum.nhentaiApiSetting:
@@ -214,6 +222,30 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       case CloudConfigTypeEnum.ehAccount:
         return _mergeLatestConfig(local, remote);
     }
+  }
+
+  /// Source by source, the later change of each winning.
+  MergeConfigResult _mergeTachiSourceSettings(CloudConfig local, CloudConfig remote) {
+    final String merged = TachiSourceSettingService.merge(local.config, remote.config);
+    bool same(String a, String b) => const DeepCollectionEquality().equals(jsonDecode(a), jsonDecode(b));
+    if (same(merged, remote.config)) {
+      return MergeConfigResult(remote, MergeStatistics(1, 1, 1, 1, 0));
+    }
+    if (same(merged, local.config)) {
+      return MergeConfigResult(local, MergeStatistics(1, 1, 1, 0, 1));
+    }
+    return MergeConfigResult(
+      CloudConfig(
+        id: local.id,
+        shareCode: local.shareCode,
+        identificationCode: local.identificationCode,
+        type: local.type,
+        version: local.version,
+        config: merged,
+        ctime: remote.ctime.isAfter(local.ctime) ? remote.ctime : local.ctime,
+      ),
+      MergeStatistics(1, 1, 1, 1, 1),
+    );
   }
 
   MergeConfigResult _mergeLatestConfig(CloudConfig local, CloudConfig remote) {

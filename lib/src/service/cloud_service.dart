@@ -24,6 +24,10 @@ import 'jh_service.dart';
 import 'local_block_rule_service.dart';
 import 'log.dart';
 import 'read_progress_service.dart';
+import 'dart:async';
+import 'package:jhentai/src/service/tachi/tachi_extension_service.dart';
+import 'package:jhentai/src/service/tachi/tachi_favorite_service.dart';
+import 'package:jhentai/src/service/tachi/tachi_source_setting_service.dart';
 
 CloudConfigService cloudConfigService = CloudConfigService();
 
@@ -45,6 +49,9 @@ class CloudConfigService
     CloudConfigTypeEnum.jmFavorite: '1.0.0',
     CloudConfigTypeEnum.jmAccount: '1.0.0',
     CloudConfigTypeEnum.ehAccount: '1.0.0',
+    CloudConfigTypeEnum.tachiExtensionList: '1.0.0',
+    CloudConfigTypeEnum.tachiSourceSettings: '1.0.0',
+    CloudConfigTypeEnum.tachiFavorite: '1.0.0',
   };
 
   static const int localConfigId = -1;
@@ -233,6 +240,41 @@ class CloudConfigService
         await ehAccountSync.apply(config.config, SyncTimeUtil.format(config.ctime));
         log.info('  ✅ E-Hentai account imported');
         break;
+      case CloudConfigTypeEnum.tachiExtensionList:
+        await localConfigService.batchWrite([
+          LocalConfigCompanion(
+            configKey: Value(ConfigEnum.tachiExtensionSetting.key),
+            subConfigKey: const Value(LocalConfigService.defaultSubConfigKey),
+            value: Value(config.config),
+            utime: Value(SyncTimeUtil.format(config.ctime)),
+          ),
+        ]);
+        await tachiExtensionService.refreshBean();
+        // Installs what arrived, when the host runs already.
+        unawaited(tachiExtensionService.applyInstalledList());
+        log.info('  ✅ Tachiyomi extensions imported');
+        break;
+      case CloudConfigTypeEnum.tachiSourceSettings:
+        await localConfigService.batchWrite([
+          LocalConfigCompanion(
+            configKey: Value(ConfigEnum.tachiSourceSetting.key),
+            subConfigKey: const Value(LocalConfigService.defaultSubConfigKey),
+            value: Value(config.config),
+            utime: Value(SyncTimeUtil.format(config.ctime)),
+          ),
+        ]);
+        await tachiSourceSettingService.refreshBean();
+        unawaited(tachiSourceSettingService.applyToHost());
+        log.info('  ✅ Tachiyomi source settings imported');
+        break;
+      case CloudConfigTypeEnum.tachiFavorite:
+        await localConfigService.write(
+          configKey: ConfigEnum.tachiFavorite,
+          value: config.config,
+        );
+        await tachiFavoriteService.refreshBean();
+        log.info('  ✅ Tachiyomi favorites imported and refreshed');
+        break;
     }
   }
 
@@ -315,6 +357,26 @@ class CloudConfigService
           return null;
         }
         configValue = jmFavoriteConfig;
+        break;
+      case CloudConfigTypeEnum.tachiFavorite:
+        String? tachiFavoriteConfig = await localConfigService.read(
+          configKey: ConfigEnum.tachiFavorite,
+        );
+        if (tachiFavoriteConfig == null) {
+          return null;
+        }
+        configValue = tachiFavoriteConfig;
+        break;
+      case CloudConfigTypeEnum.tachiExtensionList:
+      case CloudConfigTypeEnum.tachiSourceSettings:
+        List<LocalConfig> tachiRecords = await localConfigService.readWithAllSubKeys(
+          configKey: type == CloudConfigTypeEnum.tachiExtensionList ? ConfigEnum.tachiExtensionSetting : ConfigEnum.tachiSourceSetting,
+        );
+        if (tachiRecords.isEmpty) {
+          return null;
+        }
+        configValue = tachiRecords.first.value;
+        localConfigTime = SyncTimeUtil.tryParse(tachiRecords.first.utime);
         break;
       case CloudConfigTypeEnum.komgaSetting:
         List<LocalConfig> records = await localConfigService.readWithAllSubKeys(

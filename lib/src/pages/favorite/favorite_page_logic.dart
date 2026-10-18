@@ -21,6 +21,7 @@ import '../../model/search_config.dart';
 import '../../service/local_config_service.dart';
 import '../../service/nhentai_favorite_service.dart';
 import '../../service/jm_favorite_service.dart';
+import '../../service/tachi/tachi_favorite_service.dart';
 import '../../service/local_source_favorite_service.dart';
 import '../../service/wnacg_favorite_service.dart';
 import '../../setting/scheme_setting.dart';
@@ -77,6 +78,7 @@ class FavoritePageLogic extends BasePageLogic {
     ContentScheme.nhentai => 'NH',
     ContentScheme.wnacg => 'WN',
     ContentScheme.jm => 'JM',
+    ContentScheme.tachiyomi => 'TACHI',
     _ => 'EH',
   };
 
@@ -84,6 +86,7 @@ class FavoritePageLogic extends BasePageLogic {
     state.showNhFavorites = source == 'NH';
     state.showWnFavorites = source == 'WN';
     state.showJmFavorites = source == 'JM';
+    state.showTachiFavorites = source == 'TACHI';
   }
 
   @override
@@ -181,6 +184,7 @@ class FavoritePageLogic extends BasePageLogic {
       if (state.mixedMode) {
         state.showWnFavorites = false;
         state.showJmFavorites = false;
+        state.showTachiFavorites = false;
         state.favoriteSortOrder = result.sortOrder;
         handleRefresh();
         return;
@@ -363,6 +367,8 @@ class FavoritePageLogic extends BasePageLogic {
       ? wnacgFavoriteService
       : state.showJmFavorites
           ? jmFavoriteService
+          : state.showTachiFavorites
+          ? tachiFavoriteService
           : null;
 
   Future<void> _loadLocalSourceFavorites() async {
@@ -417,7 +423,12 @@ class FavoritePageLogic extends BasePageLogic {
       searchConfig: state.searchConfig,
     );
 
-    List<Gallery> localFavorites = [...nhFavorites, ...wnFavorites, ...jmFavorites];
+    List<Gallery> tachiFavorites = tachiFavoriteService.getDisplayFavorites(
+      sortOrder: state.favoriteSortOrder,
+      searchConfig: state.searchConfig,
+    );
+
+    List<Gallery> localFavorites = [...nhFavorites, ...wnFavorites, ...jmFavorites, ...tachiFavorites];
     if (localFavorites.isEmpty) {
       return;
     }

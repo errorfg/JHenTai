@@ -72,6 +72,14 @@ enum ConfigEnum {
   nhentaiFavorite('nhentaiFavorite'),
   wnacgFavorite('wnacgFavorite'),
   jmFavorite('jmFavorite'),
+  tachiFavorite('tachiFavorite'),
+
+  /// Tachiyomi: extension repositories and installed extensions; source
+  /// settings; chapters seen, for the updates list.
+  tachiExtensionSetting('tachiExtensionSetting'),
+  tachiSourceSetting('tachiSourceSetting'),
+  tachiUpdates('tachiUpdates'),
+  tachiRecentSources('tachiRecentSources'),
   myTagsSetting('MyTagsSetting'),
   builtInBlockedUser('builtInBlockedUser'),
 

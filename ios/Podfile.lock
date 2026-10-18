@@ -11,6 +11,8 @@ PODS:
     - Flutter
   - system_network_proxy (0.0.1):
     - Flutter
+  - tachi_host (1.0.0):
+    - Flutter
   - Toast (4.1.1)
   - volume_button_override (0.0.1):
     - Flutter
@@ -22,6 +24,7 @@ DEPENDENCIES:
   - pdfx (from `.symlinks/plugins/pdfx/ios`)
   - receive_sharing_intent (from `.symlinks/plugins/receive_sharing_intent/ios`)
   - system_network_proxy (from `.symlinks/plugins/system_network_proxy/ios`)
+  - tachi_host (from `.symlinks/plugins/tachi_host/ios`)
   - volume_button_override (from `.symlinks/plugins/volume_button_override/ios`)
 
 SPEC REPOS:
@@ -41,6 +44,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/receive_sharing_intent/ios"
   system_network_proxy:
     :path: ".symlinks/plugins/system_network_proxy/ios"
+  tachi_host:
+    :path: ".symlinks/plugins/tachi_host/ios"
   volume_button_override:
     :path: ".symlinks/plugins/volume_button_override/ios"
 
@@ -51,6 +56,7 @@ SPEC CHECKSUMS:
   pdfx: 77f4dddc48361fbb01486fa2bdee4532cbb97ef3
   receive_sharing_intent: 222384f00ffe7e952bbfabaa9e3967cb87e5fe00
   system_network_proxy: c0b2ba3a6d877b4861e22300ecfb60df4d200382
+  tachi_host: 62e4a8a7eea3a61d50740d987fc24bbc6fd9aa0b
   Toast: 1f5ea13423a1e6674c4abdac5be53587ae481c4e
   volume_button_override: 591c34d9d1542294e099948b4100dc5810721741
 

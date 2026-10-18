@@ -39,6 +39,8 @@ import '../../setting/super_resolution_setting.dart';
 import '../../service/sr/realtime_sr_service.dart';
 import '../../service/gallery_download_service.dart';
 import '../../network/jm/jm_image.dart';
+import '../../network/tachi/tachi_host.dart';
+import '../../network/tachi/tachi_source.dart';
 import '../../model/read_page_info.dart';
 import '../../network/eh_request.dart';
 import '../../routes/routes.dart';
@@ -430,6 +432,19 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       // archive, a downloaded Komga book, a local gallery.
       final String path = GalleryDownloadService.computeImageDownloadAbsolutePathFromRelativePath(image.path!);
       return (key: path, strips: 0, load: () => io.File(path).readAsBytes());
+    }
+    if (TachiImages.isTachi(image.url)) {
+      // Served by the extension host at an address that changes with every
+      // start: named by the page's own, read as the reader shows it.
+      return (
+        key: image.url,
+        strips: 0,
+        load: () async {
+          final ({String url, Map<String, String> headers, String cacheKey}) request =
+              TachiImages.request(await tachiHost.client(), image.url, headers: image.headers, cacheKey: image.cacheKey);
+          return ExtendedNetworkImageProvider(request.url, headers: request.headers, cacheKey: request.cacheKey, cache: true).getNetworkImageData();
+        },
+      );
     }
     final String requestUrl = JmImage.requestUrl(image.url);
     // From the image cache when the page was shown, else downloaded into it:

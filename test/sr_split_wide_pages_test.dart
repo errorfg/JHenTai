@@ -14,6 +14,10 @@ import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/model/gallery_image.dart';
 import 'package:jhentai/src/model/gallery_thumbnail.dart';
 import 'package:jhentai/src/model/read_page_info.dart';
+import 'package:jhentai/src/network/tachi/tachi_client.dart';
+import 'package:jhentai/src/network/tachi/tachi_host.dart';
+import 'package:jhentai/src/network/tachi/tachi_models.dart';
+import 'package:jhentai/src/network/tachi/tachi_source.dart';
 import 'package:jhentai/src/pages/read/layout/horizontal_page/horizontal_page_layout_logic.dart';
 import 'package:jhentai/src/pages/read/read_page.dart';
 import 'package:jhentai/src/pages/read/read_page_logic.dart';
@@ -70,6 +74,51 @@ class _FakeSite {
   }
 
   Future<void> stop() => _server.close(force: true);
+}
+
+/// The extension host: serves a source's page images, to the app's token
+/// only.
+class _FakeHost {
+  static const String token = 'host-token';
+
+  late HttpServer _server;
+
+  /// The pages asked for, by index.
+  final List<int> served = <int>[];
+
+  int get port => _server.port;
+
+  Future<void> start() async {
+    _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    _server.listen((HttpRequest request) async {
+      if (request.uri.path != '/image' || request.headers.value(HttpHeaders.authorizationHeader) != 'Bearer $token') {
+        request.response.statusCode = HttpStatus.unauthorized;
+        await request.response.close();
+        return;
+      }
+      final int index = int.parse(request.uri.queryParameters['index']!);
+      served.add(index);
+      request.response
+        ..headers.contentType = ContentType('image', 'png')
+        ..add(_page(index));
+      await request.response.close();
+    });
+  }
+
+  Future<void> stop() => _server.close(force: true);
+}
+
+/// The host running, without starting one.
+class _RunningHost extends TachiHost {
+  _RunningHost(this._running);
+
+  final TachiClient _running;
+
+  @override
+  TachiClient? get clientIfRunning => _running;
+
+  @override
+  Future<TachiClient> client() async => _running;
 }
 
 /// The upscaling service of sr_server/, a plain resize for a model.
@@ -257,6 +306,29 @@ void main() {
     await waitFor(tester, () => reader.upscaledPage(1) != null);
     expect(upscaled(reader), <int>[0, 1, 2]);
     expect(service.sentWidths.last, <int>[600]);
+
+    await close(tester);
+  });
+
+  testWidgets('a Tachiyomi page is read from the extension host, with its token, and upscaled', (WidgetTester tester) async {
+    final _FakeHost host = _FakeHost();
+    await tester.runAsync(host.start);
+    tachiHost = _RunningHost(TachiClient(port: host.port, token: _FakeHost.token));
+    addTearDown(() async {
+      tachiHost = TachiHost();
+      await host.stop();
+    });
+
+    // Kept as tachi-image:// addresses; the host's port and token are
+    // worked out when a page is shown or upscaled.
+    await open(tester, _book((int i) => TachiImages.page('2001', TachiPage(index: i, url: '', imageUrl: 'https://site.test/p$i.png'))), split: true);
+    await settle(tester);
+    final ReadPageLogic reader = Get.find<ReadPageLogic>();
+
+    await waitFor(tester, () => upscaled(reader).length == _wide.length);
+    expect(upscaled(reader), <int>[0, 1, 2]);
+    expect(service.sentWidths.expand((List<int> w) => w), <int>[300, 600, 300]);
+    expect(host.served, containsAll(<int>[0, 1, 2]));
 
     await close(tester);
   });

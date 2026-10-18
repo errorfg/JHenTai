@@ -118,6 +118,35 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      # The extension host (ext_host/): see build_publish.yml.
+      - name: Setup JDK 21 (extension host)
+        if: matrix.target != 'Android'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Cache iOS JDK
+        if: matrix.target == 'iOS'
+        id: ios_jdk
+        uses: actions/cache@v4
+        with:
+          key: exthost-ios-jdk-${{ hashFiles('ext_host/ios/build-jdk.sh', 'ext_host/ios/jdk-ios.patch') }}
+          path: ext_host/flutter/ios/jdk
+
+      - name: Build iOS JDK
+        if: matrix.target == 'iOS' && steps.ios_jdk.outputs.cache-hit != 'true'
+        run: |
+          brew install autoconf
+          bash ext_host/ios/build-jdk.sh "$RUNNER_TEMP/ios-jdk"
+
+      - name: Build host jar (iOS)
+        if: matrix.target == 'iOS'
+        run: |
+          cd ext_host
+          ./gradlew -q --no-daemon :jvm:hostJar
+          cp build/dist/exthost.jar flutter/ios/jdk/exthost.jar
+
       - name: Flutter Pub Get
         run: |
           git config --global core.longpaths true

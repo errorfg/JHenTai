@@ -20,6 +20,7 @@ import screen_retriever_macos
 import share_plus
 import sqflite_darwin
 import sqlite3_flutter_libs
+import tachi_host
 import url_launcher_macos
 import video_player_avfoundation
 import wakelock_plus
@@ -42,6 +43,7 @@ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   SharePlusMacosPlugin.register(with: registry.registrar(forPlugin: "SharePlusMacosPlugin"))
   SqflitePlugin.register(with: registry.registrar(forPlugin: "SqflitePlugin"))
   Sqlite3FlutterLibsPlugin.register(with: registry.registrar(forPlugin: "Sqlite3FlutterLibsPlugin"))
+  TachiHostPlugin.register(with: registry.registrar(forPlugin: "TachiHostPlugin"))
   UrlLauncherPlugin.register(with: registry.registrar(forPlugin: "UrlLauncherPlugin"))
   VideoPlayerPlugin.register(with: registry.registrar(forPlugin: "VideoPlayerPlugin"))
   WakelockPlusMacosPlugin.register(with: registry.registrar(forPlugin: "WakelockPlusMacosPlugin"))

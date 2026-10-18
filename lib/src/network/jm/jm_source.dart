@@ -14,6 +14,8 @@ import 'package:jhentai/src/model/gallery_tag.dart';
 import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'package:jhentai/src/model/gallery_thumbnail.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
+import 'package:jhentai/src/model/series.dart';
+import 'package:jhentai/src/service/jm_reading_service.dart';
 import 'package:jhentai/src/utils/eh_spider_parser.dart';
 
 import 'jm_api.dart';
@@ -21,27 +23,63 @@ import 'jm_image.dart';
 import 'jm_models.dart';
 
 /// A chapter with its album and the scramble threshold for its images.
-class JmChapterBundle {
-  const JmChapterBundle({
+class JmChapterBundle implements SeriesBundle {
+  JmChapterBundle({
     required this.album,
     required this.chapter,
     required this.scrambleId,
+    this.imageDomain = '',
   });
 
   final JmAlbum album;
   final JmChapter chapter;
   final int scrambleId;
 
+  /// For [pageThumbnails].
+  final String imageDomain;
+
+  @override
+  int get seriesId => album.id;
+
+  /// An album's first chapter has the album's id.
+  @override
+  GalleryUrl get seriesUrl => GalleryUrl.jm(album.id);
+
+  @override
+  String get seriesTitle => album.name;
+
+  @override
+  late final List<SeriesChapter> chapters = <SeriesChapter>[
+    for (final JmChapterRef ref in album.chapters) SeriesChapter(id: ref.id, url: GalleryUrl.jm(ref.id), name: JmSource.chapterName(ref)),
+  ];
+
+  @override
+  int get seriesPageCount => album.totalPhotos;
+
+  @override
+  String? get author => album.authors.firstOrNull;
+
+  @override
+  List<GalleryThumbnail> pageThumbnails() => JmSource.pageThumbnails(this, imageDomain);
+
+  @override
   int get chapterIndex => album.chapters.indexWhere(
     (JmChapterRef ref) => ref.id == chapter.id,
   );
 
+  @override
   bool get isMultiChapter => album.chapters.length > 1;
 
+  @override
   GalleryUrl get galleryUrl => GalleryUrl.jm(chapter.id);
 
-  String get title => JmSource.chapterTitle(album, chapterIndex);
+  @override
+  int get chapterId => chapter.id;
 
+  @override
+  String get title => JmSource.titleOfChapter(album, chapterIndex);
+
+  @override
   int get pageCount => chapter.images.length;
 
   String imageUrl(String imageDomain, int index) {
@@ -94,8 +132,20 @@ typedef JmHomeSection = ({String title, List<Gallery> gallerys, JmListQuery? mor
 
 /// Serves the app's gallery requests (list, detail, image page) from the
 /// JM API, in the shapes the E-Hentai parsers would produce.
-class JmSource {
+class JmSource implements SeriesSource {
   JmSource({required this.api, required this.imageDomain});
+
+  @override
+  SeriesReadingService get reading => jmReadingService;
+
+  @override
+  Future<SeriesBundle> bundle(GalleryUrl chapter, {bool refresh = false}) => chapterBundle(chapter.jmChapterId, refresh: refresh);
+
+  @override
+  Future<int> chapterPageCount(GalleryUrl chapter) => pageCountOf(chapter.jmChapterId);
+
+  @override
+  String chapterTitle(SeriesBundle bundle, int index) => titleOfChapter((bundle as JmChapterBundle).album, index);
 
   static const int thumbnailsPerPage = 40;
 
@@ -265,7 +315,7 @@ class JmSource {
 
   /// [refresh] drops the cached chapter and album first, so a manual
   /// refresh shows newly added chapters.
-  Future<JmChapterBundle> bundle(int chapterId, {bool refresh = false}) async {
+  Future<JmChapterBundle> chapterBundle(int chapterId, {bool refresh = false}) async {
     if (refresh) {
       _chapters.remove(chapterId);
       _albums.remove(_albumIdOfChapter[chapterId]);
@@ -287,6 +337,7 @@ class JmSource {
       album: album,
       chapter: chapter,
       scrambleId: await scrambleRequest,
+      imageDomain: imageDomain(),
     );
   }
 
@@ -302,7 +353,7 @@ class JmSource {
         parser == EHSpiderParser.detailPage2GalleryAndDetailAndApikey && knownAlbum != null
         ? _commentsOrEmpty(knownAlbum)
         : null;
-    final JmChapterBundle b = await bundle(
+    final JmChapterBundle b = await chapterBundle(
       galleryUrl.jmChapterId,
       refresh: !useCache,
     );
@@ -345,7 +396,7 @@ class JmSource {
     if (parser == EHSpiderParser.imagePage2GalleryUrl) {
       return GalleryUrl.jm(chapterId) as T;
     }
-    final JmChapterBundle b = await bundle(chapterId);
+    final JmChapterBundle b = await chapterBundle(chapterId);
     if (pageNo < 1 || pageNo > b.pageCount) {
       throw EHSiteException(
         type: EHSiteExceptionType.internalError,
@@ -364,10 +415,10 @@ class JmSource {
 
   /// Pages of chapter [chapterId], without the extra request for the
   /// scramble threshold that [bundle] makes.
-  Future<int> chapterPageCount(int chapterId) async =>
+  Future<int> pageCountOf(int chapterId) async =>
       (await _chapter(chapterId)).images.length;
 
-  static String chapterTitle(JmAlbum album, int chapterIndex) {
+  static String titleOfChapter(JmAlbum album, int chapterIndex) {
     if (album.chapters.length <= 1 || chapterIndex < 0) {
       return album.name;
     }

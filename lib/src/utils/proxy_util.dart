@@ -36,7 +36,11 @@ Future<String Function(Uri)> findProxySettingFunc(ValueGetter<String> systemProx
     return configAddress;
   }
 
-  return (_) {
+  return (Uri uri) {
+    // The extension host listens on this device; a proxy cannot reach it.
+    if (isLoopbackHost(uri.host)) {
+      return 'DIRECT';
+    }
     switch (networkSetting.proxyType.value) {
       case JProxyType.system:
         return isEmptyOrNull(systemProxyAddress.call()) ? 'DIRECT' : 'PROXY ${systemProxyAddress.call()}; DIRECT';
@@ -51,3 +55,5 @@ Future<String Function(Uri)> findProxySettingFunc(ValueGetter<String> systemProx
     }
   };
 }
+
+bool isLoopbackHost(String host) => host == 'localhost' || host == '127.0.0.1' || host == '::1' || host == '[::1]';

@@ -2,27 +2,25 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:jhentai/src/model/gallery_url.dart';
-import 'package:jhentai/src/network/jm/jm_models.dart';
-import 'package:jhentai/src/network/jm/jm_source.dart';
+import 'package:jhentai/src/model/series.dart';
 import 'package:jhentai/src/service/gallery_download_service.dart';
 import 'package:jhentai/src/utils/route_util.dart';
 import 'package:jhentai/src/widget/eh_wheel_speed_controller.dart';
 
-/// Picks the chapters of a JM album to download; closes with their ids in
+/// Picks the chapters of a series to download; closes with their ids in
 /// reading order, or with null when cancelled. Chapters already in the
 /// download list cannot be picked. The shortcuts replace the selection:
 /// every chapter, or the next 10 or 20 from the current chapter on that are
 /// not downloaded yet.
-class JmChapterDownloadDialog extends StatefulWidget {
-  final List<JmChapterRef> chapters;
+class SeriesChapterDownloadDialog extends StatefulWidget {
+  final List<SeriesChapter> chapters;
   final int currentChapterId;
 
   /// Whether a chapter is already in the download list; the download
   /// service by default.
   final bool Function(int chapterId)? isDownloaded;
 
-  const JmChapterDownloadDialog({
+  const SeriesChapterDownloadDialog({
     super.key,
     required this.chapters,
     required this.currentChapterId,
@@ -30,15 +28,15 @@ class JmChapterDownloadDialog extends StatefulWidget {
   });
 
   @override
-  State<JmChapterDownloadDialog> createState() => _JmChapterDownloadDialogState();
+  State<SeriesChapterDownloadDialog> createState() => _SeriesChapterDownloadDialogState();
 }
 
-class _JmChapterDownloadDialogState extends State<JmChapterDownloadDialog> {
+class _SeriesChapterDownloadDialogState extends State<SeriesChapterDownloadDialog> {
   static const double _itemExtent = 44;
 
   late final int _currentIndex = max(
     0,
-    widget.chapters.indexWhere((JmChapterRef c) => c.id == widget.currentChapterId),
+    widget.chapters.indexWhere((SeriesChapter c) => c.id == widget.currentChapterId),
   );
 
   late final ScrollController _controller = ScrollController(
@@ -49,8 +47,8 @@ class _JmChapterDownloadDialogState extends State<JmChapterDownloadDialog> {
   final Set<int> _selected = <int>{};
 
   bool _downloaded(int index) {
-    final int id = widget.chapters[index].id;
-    return widget.isDownloaded?.call(id) ?? galleryDownloadService.containGallery(GalleryUrl.jm(id).gid);
+    final SeriesChapter chapter = widget.chapters[index];
+    return widget.isDownloaded?.call(chapter.id) ?? galleryDownloadService.containGallery(chapter.url.gid);
   }
 
   @override
@@ -93,18 +91,18 @@ class _JmChapterDownloadDialogState extends State<JmChapterDownloadDialog> {
               spacing: 8,
               children: [
                 ActionChip(
-                  key: const Key('jmDownloadAll'),
+                  key: const Key('seriesDownloadAll'),
                   label: Text('selectAll'.tr),
                   onPressed: () => _select(_all),
                 ),
                 for (final int count in const <int>[10, 20])
                   ActionChip(
-                    key: Key('jmDownloadNext$count'),
+                    key: Key('seriesDownloadNext$count'),
                     label: Text('nextChapters'.trParams(<String, String>{'count': '$count'})),
                     onPressed: () => _select(_next(count)),
                   ),
                 ActionChip(
-                  key: const Key('jmDownloadNone'),
+                  key: const Key('seriesDownloadNone'),
                   label: Text('clearSelection'.tr),
                   onPressed: () => _select(const <int>[]),
                 ),
@@ -129,7 +127,7 @@ class _JmChapterDownloadDialogState extends State<JmChapterDownloadDialog> {
       actions: [
         TextButton(onPressed: backRoute, child: Text('cancel'.tr)),
         TextButton(
-          key: const Key('jmDownloadConfirm'),
+          key: const Key('seriesDownloadConfirm'),
           onPressed: _selected.isEmpty
               ? null
               : () => backRoute(
@@ -142,10 +140,10 @@ class _JmChapterDownloadDialogState extends State<JmChapterDownloadDialog> {
   }
 
   Widget _buildChapter(BuildContext context, int index) {
-    final JmChapterRef chapter = widget.chapters[index];
+    final SeriesChapter chapter = widget.chapters[index];
     final bool downloaded = _downloaded(index);
     return CheckboxListTile(
-      key: ValueKey<String>('jmDownloadChapter:${chapter.id}'),
+      key: ValueKey<String>('seriesDownloadChapter:${chapter.id}'),
       dense: true,
       controlAffinity: ListTileControlAffinity.leading,
       value: downloaded || _selected.contains(index),
@@ -154,7 +152,7 @@ class _JmChapterDownloadDialogState extends State<JmChapterDownloadDialog> {
           : (bool? value) => setState(() => value == true ? _selected.add(index) : _selected.remove(index)),
       selected: index == _currentIndex,
       title: Text(
-        '${index + 1}  ${JmSource.chapterName(chapter)}',
+        '${index + 1}  ${chapter.name}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

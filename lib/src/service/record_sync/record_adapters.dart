@@ -24,6 +24,10 @@ import 'package:jhentai/src/setting/komga_setting.dart';
 import 'package:jhentai/src/setting/nhentai_api_setting.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
+import 'dart:async';
+import 'package:jhentai/src/service/tachi/tachi_extension_service.dart';
+import 'package:jhentai/src/service/tachi/tachi_favorite_service.dart';
+import 'package:jhentai/src/service/tachi/tachi_source_setting_service.dart';
 
 /// Translates between the app's data of one kind and records.
 abstract class RecordAdapter {
@@ -111,6 +115,12 @@ List<RecordAdapter> defaultRecordAdapters() => [
         configKey: ConfigEnum.jmFavorite,
         refresh: () => jmFavoriteService.refreshBean(),
       ),
+      ConfigListRecords(
+        kind: 'tachiFavorite',
+        type: CloudConfigTypeEnum.tachiFavorite,
+        configKey: ConfigEnum.tachiFavorite,
+        refresh: () => tachiFavoriteService.refreshBean(),
+      ),
       QuickSearchRecords(),
       SearchHistoryRecords(),
       BlockRuleRecords(),
@@ -146,6 +156,24 @@ List<RecordAdapter> defaultRecordAdapters() => [
         refresh: () => jmAccountSetting.refreshBean(),
       ),
       EhAccountRecords(),
+      SingleConfigRecords(
+        kind: 'tachiExtensionList',
+        type: CloudConfigTypeEnum.tachiExtensionList,
+        configKey: ConfigEnum.tachiExtensionSetting,
+        refresh: () async {
+          await tachiExtensionService.refreshBean();
+          unawaited(tachiExtensionService.applyInstalledList());
+        },
+      ),
+      SingleConfigRecords(
+        kind: 'tachiSourceSettings',
+        type: CloudConfigTypeEnum.tachiSourceSettings,
+        configKey: ConfigEnum.tachiSourceSetting,
+        refresh: () async {
+          await tachiSourceSettingService.refreshBean();
+          unawaited(tachiSourceSettingService.applyToHost());
+        },
+      ),
     ];
 
 class HistoryRecords extends RowKindAdapter {

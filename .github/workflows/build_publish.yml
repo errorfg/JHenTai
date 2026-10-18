@@ -125,6 +125,35 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
           cache: gradle
+      # The extension host (ext_host/): its jar on every platform, and the
+      # Java runtime desktop builds carry.
+      - name: Setup JDK 21 (extension host)
+        if: matrix.target != 'Android'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+      # iOS: OpenJDK for iOS (Zero VM, static libraries) and its runtime image,
+      # built by ext_host/ios/build-jdk.sh (about 45 minutes) and kept in the
+      # cache until that script changes. The host jar is built every time.
+      - name: Cache iOS JDK
+        if: matrix.target == 'iOS'
+        id: ios_jdk
+        uses: actions/cache@v4
+        with:
+          key: exthost-ios-jdk-${{ hashFiles('ext_host/ios/build-jdk.sh', 'ext_host/ios/jdk-ios.patch') }}
+          path: ext_host/flutter/ios/jdk
+      - name: Build iOS JDK
+        if: matrix.target == 'iOS' && steps.ios_jdk.outputs.cache-hit != 'true'
+        run: |
+          brew install autoconf
+          bash ext_host/ios/build-jdk.sh "$RUNNER_TEMP/ios-jdk"
+      - name: Build host jar (iOS)
+        if: matrix.target == 'iOS'
+        run: |
+          cd ext_host
+          ./gradlew -q --no-daemon :jvm:hostJar
+          cp build/dist/exthost.jar flutter/ios/jdk/exthost.jar
       # Flutter Pub Get
       - name: Flutter Pub Get
         run: |
@@ -183,6 +212,7 @@ jobs:
           New-Item -Path $DestDir -ItemType Directory
           Copy-Item $SrcDir\* -Recurse $DestDir
           Copy-Item -Filter *.dll -Path windows\* -Destination $DestDir -Force
+          bash ext_host/desktop/package.sh "$DestDir"
           Compress-Archive $DestDir build\windows\JHenTai_${{ steps.get_version.outputs.version }}_Windows.zip
       # Build Linux .deb
       - name: Build Linux deb
@@ -202,6 +232,7 @@ jobs:
           mkdir -p usr/share/applications
           mkdir -p usr/share/icons/hicolor/512x512/apps
           cp -r ../${{ steps.get_version.outputs.arch }}/release/bundle/* opt/jhentai
+          bash ../../../ext_host/desktop/package.sh opt/jhentai
           cp -r ../../../linux/assets/DEBIAN .
           chmod 0755 DEBIAN/postinst
           chmod 0755 DEBIAN/postrm

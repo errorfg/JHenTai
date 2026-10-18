@@ -7,7 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/service/jm_reading_service.dart';
-import 'package:jhentai/src/widget/jm_chapter_dialog.dart';
+import 'package:jhentai/src/widget/series_chapter_dialog.dart';
+import 'package:jhentai/src/network/tachi/tachi_source.dart';
 import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/model/gallery.dart';
@@ -200,17 +201,25 @@ class EHGalleryListCard extends StatelessWidget {
   }
 
   Widget buildGalleryInfoFooter(BuildContext context) {
-    // A multi-chapter JM album shows how far the album has been read.
+    // A multi-chapter JM album or Tachiyomi manga shows how far it has been read.
     if (gallery.galleryUrl.isJM) {
-      return JmAlbumProgressBuilder(
-        albumId: gallery.galleryUrl.jmChapterId,
-        builder: (BuildContext context, JmAlbumProgress? album) => _buildGalleryInfoFooter(context, album),
+      return SeriesProgressBuilder(
+        reading: jmReadingService,
+        seriesId: gallery.galleryUrl.jmChapterId,
+        builder: (BuildContext context, SeriesProgress? album) => _buildGalleryInfoFooter(context, album),
+      );
+    }
+    if (gallery.galleryUrl.isTachi) {
+      return SeriesProgressBuilder(
+        reading: tachiReadingService,
+        seriesId: TachiSource.idOf(gallery.galleryUrl.tachiMangaUrl),
+        builder: (BuildContext context, SeriesProgress? album) => _buildGalleryInfoFooter(context, album),
       );
     }
     return _buildGalleryInfoFooter(context, null);
   }
 
-  Widget _buildGalleryInfoFooter(BuildContext context, JmAlbumProgress? album) {
+  Widget _buildGalleryInfoFooter(BuildContext context, SeriesProgress? album) {
     Widget? timeWidget = _buildTime(context);
 
     return Column(

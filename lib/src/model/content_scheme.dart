@@ -8,6 +8,7 @@ enum ContentScheme {
   nhentai('nhentai', Icons.collections_bookmark_outlined, LoginSite.nh),
   wnacg('wnacg', Icons.auto_stories_outlined, null),
   jm('JM', Icons.local_library_outlined, LoginSite.jm),
+  tachiyomi('Tachiyomi', Icons.extension_outlined, null),
   komga('Komga', Icons.dns_outlined, null),
   pdf('PDF', Icons.picture_as_pdf_outlined, null);
 
@@ -20,5 +21,5 @@ enum ContentScheme {
   const ContentScheme(this.title, this.icon, this.loginSite);
 
   /// A site whose pages fill the app's navigation.
-  bool get isSite => index <= jm.index;
+  bool get isSite => index <= tachiyomi.index;
 }

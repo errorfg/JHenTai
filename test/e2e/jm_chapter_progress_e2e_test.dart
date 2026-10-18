@@ -177,7 +177,7 @@ void main() {
 
     // The chapter list shows each chapter's state.
     await tester.runAsync(() async {
-      await tester.tap(find.byKey(const Key('jmChapterRow')));
+      await tester.tap(find.byKey(const Key('seriesChapterRow')));
       await Future<void>.delayed(const Duration(milliseconds: 300));
     });
     // Loading thumbnails keep animating, so the page never settles.
