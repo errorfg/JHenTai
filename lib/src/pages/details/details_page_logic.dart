@@ -2598,6 +2598,20 @@ class DetailsPageLogic extends GetxController
     updateSafely([detailsId]);
   }
 
+  /// The selected tags written as searched for, as a single tag is copied
+  /// (namespace:"key"), one after another: pasted into a search, they find
+  /// galleries with all of them. The selection stays.
+  Future<void> copySelectedTags() async {
+    if (state.selectedTags.isEmpty) {
+      return;
+    }
+    final String text = state.selectedTags
+        .map((GalleryTag t) => t.tagData.namespace.isEmpty ? '"${t.tagData.key}"' : '${t.tagData.namespace}:"${t.tagData.key}"')
+        .join(' ');
+    await FlutterClipboard.copy(text);
+    toast('hasCopiedToClipboard'.tr);
+  }
+
   void searchWithSelectedTags() {
     if (state.selectedTags.isEmpty) {
       return;

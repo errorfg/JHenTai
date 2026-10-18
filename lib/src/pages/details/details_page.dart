@@ -1873,13 +1873,25 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                     ),
                   ),
                   if (state.isTagSelectionMode && state.selectedTags.isNotEmpty)
-                    ElevatedButton.icon(
-                      onPressed: logic.searchWithSelectedTags,
-                      icon: const Icon(Icons.search, size: 18),
-                      label: Text(
-                        '${'searchSelectedTags'.tr} (${state.selectedTags.length})',
-                        style: const TextStyle(fontSize: 14),
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          key: const Key('copySelectedTags'),
+                          onPressed: logic.copySelectedTags,
+                          icon: const Icon(Icons.copy, size: 18),
+                          tooltip: 'copySelectedTags'.tr,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        ElevatedButton.icon(
+                          onPressed: logic.searchWithSelectedTags,
+                          icon: const Icon(Icons.search, size: 18),
+                          label: Text(
+                            '${'searchSelectedTags'.tr} (${state.selectedTags.length})',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                      ],
                     ),
                 ],
               ),
