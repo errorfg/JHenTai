@@ -23,6 +23,7 @@ class _Task {
     required this.config,
     required this.position,
     required this.strips,
+    required this.splitWide,
     required this.loadEncoded,
   });
 
@@ -30,6 +31,7 @@ class _Task {
   final SrConfig config;
   final int position;
   final int strips;
+  final bool splitWide;
   final Future<Uint8List?> Function() loadEncoded;
   final Completer<Uint8List?> done = Completer<Uint8List?>();
 }
@@ -170,12 +172,15 @@ class RealtimeSrService {
   /// bytes [loadEncoded] gives. Completes with the upscaled image, encoded;
   /// with null when the page is left as it is (animated, wide enough
   /// already), cannot be read, the program fails, or the queue was cleared
-  /// first. [position] is the page's place in the reader.
+  /// first. [position] is the page's place in the reader; [splitWide]: the
+  /// reader shows a page wider than tall in halves, and a half's width is
+  /// what is compared with the width limit.
   Future<Uint8List?> upscale({
     required String sourceKey,
     required int position,
     required Future<Uint8List?> Function() loadEncoded,
     int strips = 0,
+    bool splitWide = false,
   }) {
     final Uint8List? hit = cached(sourceKey);
     if (hit != null) {
@@ -186,7 +191,7 @@ class RealtimeSrService {
     if (known != null) {
       return known;
     }
-    final _Task task = _Task(key: key, config: config, position: position, strips: strips, loadEncoded: loadEncoded);
+    final _Task task = _Task(key: key, config: config, position: position, strips: strips, splitWide: splitWide, loadEncoded: loadEncoded);
     _pending.add(task);
     // A block body: returning the removed future (this very request) from
     // whenComplete would make it wait for itself.
@@ -264,7 +269,7 @@ class RealtimeSrService {
     final List<Uint8List?> pages = await Future.wait(
       batch.map((_Task task) async {
         final Uint8List? encoded = await task.loadEncoded();
-        return encoded == null ? null : prepareSrUpload(encoded, strips: task.strips, maxWidth: maxWidth);
+        return encoded == null ? null : prepareSrUpload(encoded, strips: task.strips, maxWidth: maxWidth, splitWide: task.splitWide);
       }),
     );
     if (pages.every((Uint8List? page) => page == null)) {
@@ -306,7 +311,7 @@ class RealtimeSrService {
     final List<SrInput?> inputs = await Future.wait(
       batch.map((_Task task) async {
         final Uint8List? encoded = await task.loadEncoded();
-        return encoded == null ? null : prepareSrInput(encoded, strips: task.strips, maxWidth: maxWidth);
+        return encoded == null ? null : prepareSrInput(encoded, strips: task.strips, maxWidth: maxWidth, splitWide: task.splitWide);
       }),
     );
     if (inputs.every((SrInput? input) => input == null)) {

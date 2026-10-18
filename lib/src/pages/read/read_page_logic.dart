@@ -341,9 +341,11 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   static const int _appendAhead = 3;
 
   /// Pages whose upscaled copy is being made, and pages left as they are
-  /// (animated, wide enough, failed), which are not asked for again.
+  /// (animated, wide enough, failed), which are not asked for again while
+  /// wide pages are split as they were then ([splitsWidePages]): split or
+  /// not, a wide page is shown at another width.
   final Set<int> _srInFlight = <int>{};
-  final Set<int> _srSkipped = <int>{};
+  final Map<int, bool> _srSkipped = <int, bool>{};
 
   /// Counts the changes of the upscaling settings: what was asked for under
   /// earlier settings is not waited for.
@@ -448,7 +450,8 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   /// made, or the page is left as it is; the page is rebuilt with it once
   /// it is ready and decoded.
   void requestRealtimeSr(int index) {
-    if (!realtimeSrOn || _srSkipped.contains(index) || _srInFlight.contains(index)) {
+    final bool splitWide = splitsWidePages;
+    if (!realtimeSrOn || _srSkipped[index] == splitWide || _srInFlight.contains(index)) {
       return;
     }
     final ({String key, int strips, Future<Uint8List?> Function() load})? source = _srSource(index);
@@ -459,7 +462,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     final int generation = _srGeneration;
     _srInFlight.add(index);
     unawaited(
-      realtimeSrService.upscale(sourceKey: source.key, position: index, strips: source.strips, loadEncoded: source.load).then(
+      realtimeSrService.upscale(sourceKey: source.key, position: index, strips: source.strips, splitWide: splitWide, loadEncoded: source.load).then(
         (Uint8List? bytes) async {
           // The settings changed since: the page was asked for anew.
           if (isClosed || generation != _srGeneration) {
@@ -467,7 +470,11 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
           }
           _srInFlight.remove(index);
           if (bytes == null) {
-            _srSkipped.add(index);
+            _srSkipped[index] = splitWide;
+            // Wide pages were split or joined meanwhile: judged again.
+            if (splitWide != splitsWidePages) {
+              requestRealtimeSr(index);
+            }
             return;
           }
           // Decoded before the page switches to it, so the switch does not
@@ -1137,6 +1144,9 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     state.readPageInfo.initialIndex = state.readPageInfo.currentImageIndex;
     _syncDisplayFirstPageAloneToState();
     updateSafely([layoutId]);
+    // Wide pages split or joined: the pages ahead left as they are are
+    // judged again at the width they are shown at.
+    requestRealtimeSrAhead();
   }
 
   void _syncDisplayFirstPageAloneToState() {
@@ -1367,6 +1377,10 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   /// right to left); [ReadSetting.invertSplitOrder] turns it around.
   bool get splitRightHalfFirst =>
       (isInRight2LeftDirection || effectiveReadDirection == ReadDirection.top2bottomList) != readSetting.invertSplitOrder.value;
+
+  /// Whether a wide image is shown in halves now: splitting is on, and the
+  /// reading direction's layout splits ([BaseLayoutLogic.isSplit]).
+  bool get splitsWidePages => readSetting.splitWidePages.isTrue && ReadSetting.canSplitWidePagesIn(effectiveReadDirection);
 
   void toggleMenu() {
     state.isMenuOpen = !state.isMenuOpen;
