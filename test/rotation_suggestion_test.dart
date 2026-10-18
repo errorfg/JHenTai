@@ -69,6 +69,51 @@ void main() {
       expect(screenOrientationFor(HeldOrientation.landscapeTopRight, ios: true), DeviceOrientation.landscapeLeft);
       expect(screenOrientationFor(HeldOrientation.portraitUp, ios: true), DeviceOrientation.portraitUp);
     });
+
+    test('of an iOS screen follows UIInterfaceOrientation, whose landscapeRight has the Home button on the right', () {
+      expect(heldOrientationOfInterface(1), HeldOrientation.portraitUp);
+      expect(heldOrientationOfInterface(2), HeldOrientation.portraitDown);
+      expect(heldOrientationOfInterface(3), HeldOrientation.landscapeTopLeft);
+      expect(heldOrientationOfInterface(4), HeldOrientation.landscapeTopRight);
+      expect(heldOrientationOfInterface(0), isNull);
+      expect(heldOrientationOfInterface(null), isNull);
+    });
+  });
+
+  group('the interface turned within the app', () {
+    test('is turned against the device', () {
+      // Device turned counterclockwise: the interface turns clockwise.
+      expect(quarterTurnsBetween(HeldOrientation.portraitUp, HeldOrientation.landscapeTopLeft), 1);
+      expect(quarterTurnsBetween(HeldOrientation.portraitUp, HeldOrientation.landscapeTopRight), 3);
+      expect(quarterTurnsBetween(HeldOrientation.portraitUp, HeldOrientation.portraitDown), 2);
+      expect(quarterTurnsBetween(HeldOrientation.landscapeTopLeft, HeldOrientation.portraitUp), 3);
+      expect(quarterTurnsBetween(HeldOrientation.landscapeTopRight, HeldOrientation.landscapeTopRight), 0);
+    });
+
+    test('sees the window turned, and the bars and keyboard on the sides they fall on', () {
+      const MediaQueryData screen = MediaQueryData(
+        size: Size(800, 1200),
+        padding: EdgeInsets.fromLTRB(0, 24, 0, 20),
+        viewInsets: EdgeInsets.only(bottom: 300),
+      );
+
+      // Turned clockwise: the screen's top is on the interface's left.
+      final MediaQueryData clockwise = turnedMediaQuery(screen, 1);
+      expect(clockwise.size, const Size(1200, 800));
+      expect(clockwise.orientation, Orientation.landscape);
+      expect(clockwise.padding, const EdgeInsets.fromLTRB(24, 0, 20, 0));
+      expect(clockwise.viewInsets, const EdgeInsets.only(right: 300));
+
+      final MediaQueryData counterclockwise = turnedMediaQuery(screen, 3);
+      expect(counterclockwise.padding, const EdgeInsets.fromLTRB(20, 0, 24, 0));
+      expect(counterclockwise.viewInsets, const EdgeInsets.only(left: 300));
+
+      final MediaQueryData upsideDown = turnedMediaQuery(screen, 2);
+      expect(upsideDown.size, screen.size);
+      expect(upsideDown.padding, const EdgeInsets.fromLTRB(0, 20, 0, 24));
+
+      expect(turnedMediaQuery(screen, 0), same(screen));
+    });
   });
 
   group('the offer to turn the screen', () {
@@ -139,6 +184,23 @@ void main() {
       expect(suggester.offer.value, isNull);
     });
 
+    testWidgets('where the interface is turned within the app, is made for each way up, upside down too', (WidgetTester tester) async {
+      HeldOrientation shown = HeldOrientation.landscapeTopLeft;
+      suggester = RotationSuggester(events: () => sensor.stream, shownUp: () => shown, recheck: () async {}, supported: true);
+
+      await hold(tester, HeldOrientation.landscapeTopLeft, for_: const Duration(seconds: 1));
+      expect(suggester.offer.value, isNull, reason: 'shown as held');
+      await hold(tester, HeldOrientation.landscapeTopRight, for_: const Duration(seconds: 1));
+      expect(suggester.offer.value, HeldOrientation.landscapeTopRight, reason: 'landscape, but the other way up');
+      await hold(tester, HeldOrientation.portraitDown, for_: const Duration(seconds: 1));
+      expect(suggester.offer.value, HeldOrientation.portraitDown);
+
+      shown = HeldOrientation.portraitDown;
+      await hold(tester, HeldOrientation.portraitDown);
+      expect(suggester.offer.value, isNull);
+      await tester.pump(const Duration(seconds: 5));
+    });
+
     testWidgets('on a landscape screen, is made for upright', (WidgetTester tester) async {
       screenIsPortrait = false;
       await hold(tester, HeldOrientation.landscapeTopRight, for_: const Duration(seconds: 1));
@@ -166,6 +228,7 @@ void main() {
       await appDb.close();
       styleSetting.showRotationFAB.value = false;
       styleSetting.lockedOrientations = const <DeviceOrientation>[];
+      interfaceRotation = InterfaceRotation();
       rotationSuggester.stop();
       sensor.close();
       Get.reset();
@@ -193,6 +256,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(opacity(tester), 1);
       expect(find.byIcon(Icons.screen_lock_landscape), findsOneWidget);
+      // Named on the button itself, which assistive technology and UI tests
+      // find where it is, rather than on the whole screen.
+      final SemanticsHandle semantics = tester.ensureSemantics();
+      final Finder named = find.bySemanticsLabel('rotateToLandscape');
+      expect(named, findsOneWidget);
+      expect(tester.getSemantics(named).rect.size, const Size(40, 40));
+      semantics.dispose();
 
       await tester.tap(find.byKey(const Key('rotationFAB')));
       await tester.pump(const Duration(milliseconds: 300));
@@ -206,6 +276,77 @@ void main() {
       await tester.pump();
       expect(rotationSuggester.running, isFalse);
       expect(orientationRequests.last, <String>[]);
+    });
+
+    testWidgets('on an iPad, in the tablet layout, turns the interface within the window', (WidgetTester tester) async {
+      int screen = 1;
+      int queries = 0;
+      interfaceRotation = InterfaceRotation(query: () async {
+        queries++;
+        return <Object?, Object?>{'pad': true, 'orientation': screen};
+      });
+      rotationSuggester = RotationSuggester(events: () => sensor.stream, supported: true);
+      styleSetting.actualLayout = LayoutMode.tabletV2;
+
+      Size? seen;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (MethodCall call) async {
+        if (call.method == 'SystemChrome.setPreferredOrientations') {
+          orientationRequests.add(call.arguments);
+        }
+        return null;
+      });
+      await tester.pumpWidget(GetMaterialApp(
+        builder: (_, Widget? child) => AppManager(child: child!),
+        home: Scaffold(body: Builder(builder: (BuildContext context) {
+          seen = MediaQuery.sizeOf(context);
+          return const SizedBox();
+        })),
+      ));
+      await tester.pump();
+      expect(interfaceRotation.active, isTrue);
+      final Size window = seen!;
+
+      int turns() => tester.widget<RotatedBox>(find.byType(RotatedBox)).quarterTurns;
+
+      Future<void> turnAndTap(HeldOrientation held) async {
+        sensor.add(_reading(held));
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(opacity(tester), 1, reason: 'offered for $held');
+        await tester.tap(find.byKey(const Key('rotationFAB')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+      }
+
+      await turnAndTap(HeldOrientation.landscapeTopLeft);
+      expect(turns(), 1, reason: 'turned counterclockwise: the interface turns clockwise');
+      expect(seen, window.flipped);
+      expect(opacity(tester), 0);
+      expect(find.byIcon(Icons.screen_lock_landscape), findsOneWidget);
+
+      await turnAndTap(HeldOrientation.portraitUp);
+      expect(turns(), 0);
+      expect(seen, window);
+
+      await turnAndTap(HeldOrientation.portraitDown);
+      expect(turns(), 2);
+      expect(orientationRequests, isEmpty, reason: 'the screen is not asked to turn');
+
+      // The system turns the screen (its rotation lock let go): the
+      // interface follows the screen again.
+      screen = 3;
+      final int before = queries;
+      tester.binding.handleMetricsChanged();
+      await tester.pump();
+      expect(queries, greaterThan(before));
+      expect(turns(), 0);
+
+      await turnAndTap(HeldOrientation.portraitUp);
+      expect(turns(), 3, reason: 'the screen shows landscape, Home button on the right');
+      await tester.runAsync(() => styleSetting.saveShowRotationFAB(false));
+      await tester.pump();
+      expect(find.byType(RotatedBox), findsNothing);
+      expect(interfaceRotation.turns.value, 0);
     });
 
     testWidgets('hides by itself after 5 seconds', (WidgetTester tester) async {

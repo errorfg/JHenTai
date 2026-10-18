@@ -345,7 +345,7 @@ class en_US {
       'layoutMode': 'Layout Mode',
       'showRotationFAB': 'Show Rotation Button',
       'showRotationFABHint':
-          'When the device is turned away from the screen\'s orientation, a button shows at the bottom left for 5 seconds; tap it to turn the screen with the device',
+          'When the device is turned away from the screen\'s orientation, a button shows at the bottom left for 5 seconds; tap it to turn the screen with the device. On iPad only the app\'s interface turns; the status bar stays',
       'rotateToLandscape': 'Turn to landscape',
       'rotateToPortrait': 'Turn to portrait',
       'mobileLayoutV2Name': 'Mobile',

@@ -10,6 +10,7 @@ import 'package:jhentai/src/service/jh_service.dart';
 import 'package:jhentai/src/service/log.dart';
 
 import '../model/jh_layout.dart';
+import '../widget/rotation_suggestion.dart';
 
 StyleSetting styleSetting = StyleSetting();
 
@@ -191,6 +192,7 @@ class StyleSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircl
     showRotationFAB.value = value;
     if (!value) {
       lockOrientation(const <DeviceOrientation>[]);
+      interfaceRotation.reset();
     }
     await saveBeanConfig();
   }

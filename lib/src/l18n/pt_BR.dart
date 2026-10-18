@@ -351,7 +351,7 @@ class pt_BR {
       'layoutMode': 'Modo de layout',
       'showRotationFAB': 'Mostrar botão de rotação',
       'showRotationFABHint':
-          'Quando o dispositivo é girado para uma orientação diferente da tela, um botão aparece no canto inferior esquerdo por 5 segundos; toque nele para girar a tela junto com o dispositivo',
+          'Quando o dispositivo é girado para uma orientação diferente da tela, um botão aparece no canto inferior esquerdo por 5 segundos; toque nele para girar a tela junto com o dispositivo. No iPad, só a interface do app gira; a barra de status fica como está',
       'rotateToLandscape': 'Girar para paisagem',
       'rotateToPortrait': 'Girar para retrato',
       'mobileLayoutV2Name': 'Celular',
