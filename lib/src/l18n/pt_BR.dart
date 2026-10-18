@@ -351,7 +351,9 @@ class pt_BR {
       'layoutMode': 'Modo de layout',
       'showRotationFAB': 'Mostrar botão de rotação',
       'showRotationFABHint':
-          'Mostrar um botão flutuante para alternar entre retrato e paisagem',
+          'Quando o dispositivo é girado para uma orientação diferente da tela, um botão aparece no canto inferior esquerdo por 5 segundos; toque nele para girar a tela junto com o dispositivo',
+      'rotateToLandscape': 'Girar para paisagem',
+      'rotateToPortrait': 'Girar para retrato',
       'mobileLayoutV2Name': 'Celular',
       'mobileLayoutV2Desc': 'Uma coluna',
       'mobileLayoutName': 'Celular(antigo)',

@@ -26,8 +26,10 @@ class StyleSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircl
   RxBool moveCover2RightSide = false.obs;
   RxBool showRotationFAB = false.obs;
 
-  /// Non-persisted runtime state for the current orientation toggle
-  RxBool isLandscape = false.obs;
+  /// The screen orientation chosen with the rotation button, for this run
+  /// of the app; empty: the system's. The reader returns to it when it
+  /// leaves an orientation of its own.
+  List<DeviceOrientation> lockedOrientations = const <DeviceOrientation>[];
 
   Rx<LayoutMode> layout = PlatformDispatcher.instance.views.first.physicalSize.width / PlatformDispatcher.instance.views.first.devicePixelRatio < 600
       ? LayoutMode.mobileV2.obs
@@ -188,14 +190,15 @@ class StyleSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircl
     log.debug('saveShowRotationFAB:$value');
     showRotationFAB.value = value;
     if (!value) {
-      isLandscape.value = false;
-      SystemChrome.setPreferredOrientations([]);
+      lockOrientation(const <DeviceOrientation>[]);
     }
     await saveBeanConfig();
   }
 
-  void toggleOrientation() {
-    isLandscape.value = !isLandscape.value;
+  void lockOrientation(List<DeviceOrientation> orientations) {
+    log.debug('lockOrientation:$orientations');
+    lockedOrientations = orientations;
+    SystemChrome.setPreferredOrientations(orientations);
   }
 
   Future<void> saveLayoutMode(LayoutMode layoutMode) async {

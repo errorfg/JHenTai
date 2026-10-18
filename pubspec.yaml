@@ -136,6 +136,7 @@ dependencies:
       url: https://github.com/jiangtian616/volume_button_override
   webdav_client: ^1.2.2
   minio: ^3.5.8
+  sensors_plus: ^7.1.1
 
 dependency_overrides:
   # Flutter 3.44 tool no longer tolerates the legacy `pluginClass: none` declaration

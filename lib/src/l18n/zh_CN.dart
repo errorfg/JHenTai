@@ -340,7 +340,9 @@ class zh_CN {
       /// style setting page
       'layoutMode': '布局模式',
       'showRotationFAB': '显示旋转按钮',
-      'showRotationFABHint': '显示一个浮动按钮来切换竖屏和横屏',
+      'showRotationFABHint': '设备转到与屏幕不同的方向时，左下角显示按钮 5 秒，点按后屏幕转到设备的方向',
+      'rotateToLandscape': '转为横屏',
+      'rotateToPortrait': '转为竖屏',
       'enableTagZHTranslation': '开启标签中文翻译',
       'version': '版本',
       'downloadTagTranslationHint': '下载数据中... 已下载: ',
