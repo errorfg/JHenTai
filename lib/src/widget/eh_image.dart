@@ -240,10 +240,10 @@ class _EHImageState extends State<EHImage> {
                   : Center(child: UIConfig.loadingAnimation(context)),
         );
       }
-      final ({Uri uri, String cacheKey}) resolved = TachiImages.resolve(client, url);
-      url = resolved.uri.toString();
-      headers = <String, String>{...?headers, ...client.authHeaders};
-      cacheKey ??= resolved.cacheKey;
+      final ({String url, Map<String, String> headers, String cacheKey}) request = TachiImages.request(client, url, headers: headers, cacheKey: cacheKey);
+      url = request.url;
+      headers = request.headers;
+      cacheKey = request.cacheKey;
     }
     final bool useGate = widget.animateOnlyWhenVisible && !widget.disableAnimation;
     final int jmStrips = JmImage.stripsOf(url);

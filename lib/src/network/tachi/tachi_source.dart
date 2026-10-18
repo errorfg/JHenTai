@@ -66,6 +66,19 @@ class TachiImages {
       cacheKey: key('tachi-image|$source|${q['u'] ?? q['p']}'),
     );
   }
+
+  /// What the image cache fetches [url] with, from the running host: its
+  /// address, [headers] with the host's token, and [cacheKey] or the key of
+  /// [resolve]. The reader shows a page so, and the upscaler reads it so.
+  static ({String url, Map<String, String> headers, String cacheKey}) request(
+    TachiClient client,
+    String url, {
+    Map<String, String>? headers,
+    String? cacheKey,
+  }) {
+    final ({Uri uri, String cacheKey}) resolved = resolve(client, url);
+    return (url: resolved.uri.toString(), headers: <String, String>{...?headers, ...client.authHeaders}, cacheKey: cacheKey ?? resolved.cacheKey);
+  }
 }
 
 /// A manga with its chapters in the order the source lists them (newest
