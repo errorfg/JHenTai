@@ -9,6 +9,8 @@ import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/network/tachi/tachi_models.dart';
 import 'package:jhentai/src/network/tachi/tachi_source.dart';
+import 'package:jhentai/src/pages/favorite/favorite_page_logic.dart';
+import 'package:jhentai/src/pages/history/history_page_logic.dart';
 import 'package:jhentai/src/service/history_service.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
@@ -122,7 +124,8 @@ class TachiBackup {
   final List<BackupCategory> categories = <BackupCategory>[];
   final Map<int, String> sources = <int, String>{};
 
-  /// Repository base URLs (Mihon).
+  /// Repositories: their base URLs (Mihon up to 0.21, Tachimanga does not
+  /// keep them) or the URLs of their `index.min.json` (later Mihon).
   final List<String> repos = <String>[];
 
   static TachiBackup parse(List<int> file) {
@@ -239,6 +242,10 @@ class TachiBackup {
 
 class TachiBackupImportResult {
   int favorites = 0;
+
+  /// Manga of Tachiyomi's local source, whose files are on the device that
+  /// made the backup.
+  int localSkipped = 0;
   int chaptersRead = 0;
   int chaptersInProgress = 0;
   int history = 0;
@@ -248,6 +255,9 @@ class TachiBackupImportResult {
   /// Sources in the backup that no installed extension or repository has.
   final Set<String> missingSources = <String>{};
 
+  /// Whether the backup named repositories (Tachimanga's do not).
+  bool hadRepos = false;
+
   String describe() => 'tachiImportSummary'.trParams(<String, String>{
         'favorites': '$favorites',
         'read': '$chaptersRead',
@@ -256,15 +266,21 @@ class TachiBackupImportResult {
         'repos': '$reposAdded',
         'extensions': '$extensionsInstalled',
       }) +
-      (missingSources.isEmpty ? '' : '\n${'tachiImportMissingSources'.tr}: ${missingSources.join(', ')}');
+      (localSkipped == 0 ? '' : '\n${'tachiImportLocalSkipped'.trParams(<String, String>{'count': '$localSkipped'})}') +
+      (missingSources.isEmpty ? '' : '\n${'tachiImportMissingSources'.tr}: ${missingSources.join(', ')}') +
+      (missingSources.isEmpty || hadRepos ? '' : '\n${'tachiImportAddRepos'.tr}');
 }
 
 /// Takes a Tachiyomi-family backup into this app: the library becomes
 /// Tachiyomi favorites (categories by their order, the eleventh on in the
 /// last one), read chapters and pages become read progress, reading history
 /// becomes history; the backup's repositories are added and the extensions
-/// of its sources installed from them.
+/// of its sources installed from them. Manga of the local source are left
+/// out.
 class TachiBackupImport {
+  /// Tachiyomi's local source: files on the device.
+  static const int localSourceId = 0;
+
   Future<TachiBackupImportResult> importFile(String path) async => importBytes(await File(path).readAsBytes());
 
   Future<TachiBackupImportResult> importBytes(List<int> bytes) async {
@@ -277,6 +293,10 @@ class TachiBackupImport {
     final Map<String, String> progress = <String, String>{};
 
     for (final BackupManga m in backup.mangas) {
+      if (m.source == localSourceId) {
+        result.localSkipped++;
+        continue;
+      }
       final String source = '${m.source}';
       final TachiManga manga = TachiManga(
         url: m.url,
@@ -312,7 +332,11 @@ class TachiBackupImport {
           result.chaptersInProgress++;
         }
       }
-      if (ids.length > 1) {
+      // Mihon keeps every chapter, Tachimanga only those read or begun: the
+      // chapters are the manga's when their orders leave no gap, else they
+      // are learnt from its site when it is opened, rather than a part being
+      // shown as the whole, read to the end.
+      if (ids.length > 1 && _withoutGaps(chapters)) {
         progress[tachiReadingService.keyOfChapters(TachiSource.idOf(gallery.galleryUrl))] = ids.join(',');
       }
 
@@ -344,20 +368,39 @@ class TachiBackupImport {
       await readProgressService.writeProgressValues(progress);
     }
 
-    for (final String base in backup.repos) {
-      final String repo = '${base.replaceFirst(RegExp(r'/+$'), '')}/index.min.json';
-      if (!tachiExtensionService.repos.contains(repo)) {
-        await tachiExtensionService.addRepo(repo);
-        result.reposAdded++;
-      }
+    result.hadRepos = backup.repos.isNotEmpty;
+    for (final String repo in backup.repos) {
+      final int before = tachiExtensionService.repos.length;
+      await tachiExtensionService.addRepo(repo);
+      result.reposAdded += tachiExtensionService.repos.length - before;
     }
     await _installExtensionsOf(backup, result);
+
+    // Lists already open show what came in.
+    if (Get.isRegistered<FavoritePageLogic>()) {
+      await Get.find<FavoritePageLogic>().reloadLocalSourceFavoriteGallerys();
+    }
+    if (Get.isRegistered<HistoryPageLogic>()) {
+      await Get.find<HistoryPageLogic>().handleClearAndRefresh();
+    }
     return result;
+  }
+
+  /// Whether [chapters], newest last, are numbered 0 to n - 1 by their order
+  /// in the source.
+  static bool _withoutGaps(List<BackupChapter> chapters) {
+    for (int i = 0; i < chapters.length; i++) {
+      if (chapters[i].sourceOrder != chapters.length - 1 - i) {
+        return false;
+      }
+    }
+    return true;
   }
 
   Future<void> _installExtensionsOf(TachiBackup backup, TachiBackupImportResult result) async {
     final Set<String> wanted = <String>{
-      for (final BackupManga m in backup.mangas) '${m.source}',
+      for (final BackupManga m in backup.mangas)
+        if (m.source != localSourceId) '${m.source}',
     };
     await tachiExtensionService.refreshInstalled();
     await tachiExtensionService.refreshRepos();
