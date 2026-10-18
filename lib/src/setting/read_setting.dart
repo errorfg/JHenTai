@@ -52,6 +52,11 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
           : true.obs;
   RxInt maxImageKilobyte = (1024 * 5).obs;
   RxBool autoDetectWebtoon = false.obs;
+  /// Wider-than-tall images (two pages scanned as one) shown as two pages:
+  /// in single page, a page each; from top to bottom, one above the other.
+  RxBool splitWidePages = false.obs;
+  /// The left half of a split image first where the right one would be, and the other way round.
+  RxBool invertSplitOrder = false.obs;
 
   static bool isListDirection(ReadDirection d) =>
       d == ReadDirection.top2bottomList ||
@@ -111,6 +116,16 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
     return isDoubleColumnDirection(readDirection.value);
   }
 
+  static bool canSplitWidePagesIn(ReadDirection d) => isSinglePageDirection(d) || d == ReadDirection.top2bottomList;
+
+  /// Whether the reading directions chosen are ones that split wide pages.
+  bool get canSplitWidePages {
+    if (enableOrientationSpecificReadDirection.isTrue && GetPlatform.isMobile) {
+      return canSplitWidePagesIn(portraitReadDirection.value) || canSplitWidePagesIn(landscapeReadDirection.value);
+    }
+    return canSplitWidePagesIn(readDirection.value);
+  }
+
   bool get isInRight2LeftDirection {
     if (enableOrientationSpecificReadDirection.isTrue && GetPlatform.isMobile) {
       return isRight2LeftDirection(portraitReadDirection.value) || isRight2LeftDirection(landscapeReadDirection.value);
@@ -167,6 +182,8 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
     maxImageKilobyte.value = map['maxImageKilobyte'] ?? maxImageKilobyte.value;
     enableOrientationSpecificReadDirection.value = map['enableOrientationSpecificReadDirection'] ?? enableOrientationSpecificReadDirection.value;
     autoDetectWebtoon.value = map['autoDetectWebtoon'] ?? autoDetectWebtoon.value;
+    splitWidePages.value = map['splitWidePages'] ?? splitWidePages.value;
+    invertSplitOrder.value = map['invertSplitOrder'] ?? invertSplitOrder.value;
     /// On first load, migrate existing readDirection to both portrait and landscape
     portraitReadDirection.value = ReadDirection.values[map['portraitReadDirection'] ?? map['readDirection']];
     landscapeReadDirection.value = ReadDirection.values[map['landscapeReadDirection'] ?? map['readDirection']];
@@ -211,6 +228,8 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
       'maxImageKilobyte': maxImageKilobyte.value,
       'enableOrientationSpecificReadDirection': enableOrientationSpecificReadDirection.value,
       'autoDetectWebtoon': autoDetectWebtoon.value,
+      'splitWidePages': splitWidePages.value,
+      'invertSplitOrder': invertSplitOrder.value,
       'portraitReadDirection': portraitReadDirection.value.index,
       'landscapeReadDirection': landscapeReadDirection.value.index,
     });
@@ -454,6 +473,18 @@ class ReadSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
   Future<void> saveAutoDetectWebtoon(bool value) async {
     log.debug('saveAutoDetectWebtoon:$value');
     autoDetectWebtoon.value = value;
+    await saveBeanConfig();
+  }
+
+  Future<void> saveSplitWidePages(bool value) async {
+    log.debug('saveSplitWidePages:$value');
+    splitWidePages.value = value;
+    await saveBeanConfig();
+  }
+
+  Future<void> saveInvertSplitOrder(bool value) async {
+    log.debug('saveInvertSplitOrder:$value');
+    invertSplitOrder.value = value;
     await saveBeanConfig();
   }
 

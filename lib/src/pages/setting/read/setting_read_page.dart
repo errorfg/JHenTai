@@ -76,6 +76,8 @@ class SettingReadPage extends StatelessWidget {
                     _buildLandscapeReadDirection().fadeIn(const Key('landscapeReadDirection')).center(),
                   if (!GetPlatform.isMobile || readSetting.enableOrientationSpecificReadDirection.isFalse) _buildReadDirection().center(),
                   _buildAutoDetectWebtoon().center(),
+                  if (readSetting.canSplitWidePages) _buildSplitWidePages().fadeIn(const Key('splitWidePages')).center(),
+                  if (readSetting.canSplitWidePages && readSetting.splitWidePages.isTrue) _buildInvertSplitOrder().fadeIn(const Key('invertSplitOrder')).center(),
                   if (GetPlatform.isMobile && readSetting.enableOrientationSpecificReadDirection.isTrue
                       ? (readSetting.portraitReadDirection.value == ReadDirection.top2bottomList ||
                       readSetting.landscapeReadDirection.value == ReadDirection.top2bottomList)
@@ -395,6 +397,24 @@ class SettingReadPage extends StatelessWidget {
       subtitle: Text('autoDetectWebtoonHint'.tr),
       value: readSetting.autoDetectWebtoon.value,
       onChanged: readSetting.saveAutoDetectWebtoon,
+    );
+  }
+
+  Widget _buildSplitWidePages() {
+    return SwitchListTile(
+      title: Text('splitWidePages'.tr),
+      subtitle: Text('splitWidePagesHint'.tr),
+      value: readSetting.splitWidePages.value,
+      onChanged: readSetting.saveSplitWidePages,
+    );
+  }
+
+  Widget _buildInvertSplitOrder() {
+    return SwitchListTile(
+      title: Text('invertSplitOrder'.tr),
+      subtitle: Text('invertSplitOrderHint'.tr),
+      value: readSetting.invertSplitOrder.value,
+      onChanged: readSetting.saveInvertSplitOrder,
     );
   }
 

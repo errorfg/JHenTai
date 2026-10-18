@@ -1,11 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
-import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
-import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/utils/screen_size_util.dart';
 
 import '../../../../service/gallery_download_service.dart';
@@ -22,17 +19,8 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
   Future<void> onInit() async {
     super.onInit();
 
-    String? cacheString = await localConfigService.read(
-      configKey: ConfigEnum.isSpreadPage,
-      subConfigKey: readPageState.readPageInfo.readProgressRecordStorageKey,
-    );
-    if (cacheString == null) {
-      state.isSpreadPage = List.generate(readPageState.readPageInfo.pageCount, (_) => false);
-    } else {
-      List list = jsonDecode(cacheString);
-      state.isSpreadPage = list.map((e) => e == 1).toList();
-    }
-    state.isSpreadPageCompleter.complete();
+    // Wide images found in earlier readings take a page of their own from the start.
+    await readPageState.spreadPages.loaded;
 
     state.pageCount = computePageCount();
 
@@ -46,11 +34,7 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
 
   @override
   void onPagesAppended() {
-    if (state.isSpreadPageCompleter.isCompleted) {
-      state.isSpreadPage = <bool>[
-        ...state.isSpreadPage,
-        for (int i = state.isSpreadPage.length; i < readPageState.readPageInfo.pageCount; i++) false,
-      ];
+    if (initCompleter.isCompleted) {
       state.pageCount = computePageCount();
     }
     super.onPagesAppended();
@@ -98,7 +82,7 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
 
   @override
   Future<void> jump2ImageIndex(int imageIndex) async {
-    await state.isSpreadPageCompleter.future;
+    await readPageState.spreadPages.loaded;
 
     state.pageController.jumpToPage(computePageIndexOfImage(imageIndex));
     super.jump2ImageIndex(imageIndex);
@@ -106,7 +90,7 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
 
   @override
   Future<void> scroll2ImageIndex(int imageIndex, [Duration? duration]) async {
-    await state.isSpreadPageCompleter.future;
+    await readPageState.spreadPages.loaded;
 
     state.pageController.animateToPage(
       computePageIndexOfImage(imageIndex),
@@ -118,7 +102,7 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
 
   @override
   Future<void> toggleDisplayFirstPageAlone() async {
-    await state.isSpreadPageCompleter.future;
+    await readPageState.spreadPages.loaded;
 
     state.pageCount = computePageCount();
     updateSafely([BaseLayoutLogic.pageId]);
@@ -190,31 +174,24 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
   }
 
   Future<void> updateSpreadPage(int imageIndex) async {
-    await state.isSpreadPageCompleter.future;
+    await readPageState.spreadPages.loaded;
 
     /// has recognized from cache
-    if (state.isSpreadPage[imageIndex]) {
+    if (!readPageState.spreadPages.mark(imageIndex)) {
       galleryDownloadService.updateSafely(['${galleryDownloadService.downloadImageId}::${readPageState.readPageInfo.gid}::$imageIndex']);
       return;
     }
 
-    state.isSpreadPage[imageIndex] = true;
     state.pageCount = computePageCount();
 
     updateSafely([BaseLayoutLogic.pageId]);
     if (computePageIndexOfImage(imageIndex) <= state.pageController.page!.toInt()) {
       jump2ImageIndex(readPageState.readPageInfo.currentImageIndex);
     }
-
-    await localConfigService.write(
-      configKey: ConfigEnum.isSpreadPage,
-      subConfigKey: readPageState.readPageInfo.gid.toString(),
-      value: jsonEncode(state.isSpreadPage.map((e) => e ? 1 : 0).toList()),
-    );
   }
 
   int computePageCount() {
-    return computePageIndexOfImage(state.isSpreadPage.length - 1) + 1;
+    return computePageIndexOfImage(readPageState.readPageInfo.pageCount - 1) + 1;
   }
 
   /// provide a page index, compute which images we should display in this page
@@ -230,7 +207,7 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
     bool nextIsAlone = readPageState.displayFirstPageAlone;
 
     while (currentPageIndex < pageIndex) {
-      bool isSpreadPage = state.isSpreadPage[currentImageIndex];
+      bool isSpreadPage = readPageState.spreadPages[currentImageIndex];
 
       if (isSpreadPage && !hasLeftColumn) {
         currentImageIndex++;
@@ -269,15 +246,15 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
       return [currentImageIndex - 1];
     }
 
-    if (state.isSpreadPage[currentImageIndex]) {
+    if (readPageState.spreadPages[currentImageIndex]) {
       return [currentImageIndex];
     }
 
-    if (currentImageIndex == state.isSpreadPage.length - 1) {
+    if (currentImageIndex == readPageState.readPageInfo.pageCount - 1) {
       return [currentImageIndex];
     }
 
-    if (state.isSpreadPage[currentImageIndex + 1]) {
+    if (readPageState.spreadPages[currentImageIndex + 1]) {
       return [currentImageIndex];
     }
 
@@ -296,7 +273,7 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
     bool nextIsAlone = readPageState.displayFirstPageAlone;
 
     while (currentImageIndex < imageIndex) {
-      bool isSpreadPage = state.isSpreadPage[currentImageIndex];
+      bool isSpreadPage = readPageState.spreadPages[currentImageIndex];
 
       if (isSpreadPage && !hasLeftColumn) {
         currentImageIndex++;
@@ -331,7 +308,7 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
       hasLeftColumn = true;
     }
 
-    if (state.isSpreadPage[imageIndex] && hasLeftColumn) {
+    if (readPageState.spreadPages[imageIndex] && hasLeftColumn) {
       return pageIndex + 1;
     }
 

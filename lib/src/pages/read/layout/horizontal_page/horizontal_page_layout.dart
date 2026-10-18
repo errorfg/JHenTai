@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:jhentai/src/model/read_page_info.dart';
 import 'package:jhentai/src/widget/eh_wheel_scroll_listener.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 
@@ -28,42 +27,50 @@ class HorizontalPageLayout extends BaseLayout {
       onPointerScroll: logic.readPageLogic.isInFitWidthReadDirection
           ? null
           : logic.onPointerScroll,
-      child: PhotoViewGallery.builder(
-        enableCtrlScrollZoom: true,
-        itemCount: readPageState.readPageInfo.pageCount,
-        scrollPhysics: const ClampingScrollPhysics(),
-        pageController: logic.pageController,
-        cacheExtent: readPagePreloadExtent(
-          mode: readPageState.readPageInfo.mode,
-          networkPageCount: readSetting.preloadPageCount.value,
-          localPageCount: readSetting.preloadPageCountLocal.value,
-        ),
-        reverse: logic.readPageLogic.isInRight2LeftDirection,
-        builder: (context, index) => PhotoViewGalleryPageOptions.customChild(
-          initialScale: 1.0,
-          minScale: 1.0,
-          maxScale: 2.5,
-          scaleStateCycle: readSetting.enableDoubleTapToScaleUp.isTrue
-              ? logic.scaleStateCycle
-              : null,
-          enableTapDragZoom: readSetting.enableTapDragToScaleUp.isTrue,
-          child: Obx(() {
-            Widget item = readPageState.readPageInfo.mode == ReadMode.online
-                ? buildItemInOnlineMode(context, index)
-                : buildItemInLocalMode(context, index);
+      child: FutureBuilder(
+        future: logic.initCompleter.future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return Container();
+          }
+          logic.syncParts();
+          return PhotoViewGallery.builder(
+            enableCtrlScrollZoom: true,
+            itemCount: logic.parts.length,
+            scrollPhysics: const ClampingScrollPhysics(),
+            pageController: logic.pageController,
+            cacheExtent: readPagePreloadExtent(
+              mode: readPageState.readPageInfo.mode,
+              networkPageCount: readSetting.preloadPageCount.value,
+              localPageCount: readSetting.preloadPageCountLocal.value,
+            ),
+            reverse: logic.readPageLogic.isInRight2LeftDirection,
+            builder: (context, index) => PhotoViewGalleryPageOptions.customChild(
+              initialScale: 1.0,
+              minScale: 1.0,
+              maxScale: 2.5,
+              scaleStateCycle: readSetting.enableDoubleTapToScaleUp.isTrue
+                  ? logic.scaleStateCycle
+                  : null,
+              enableTapDragZoom: readSetting.enableTapDragToScaleUp.isTrue,
+              child: Obx(() {
+                // A page of each half of a wide image when wide pages are split.
+                Widget item = buildPagePart(context, logic.parts.imageOf(index), logic.parts.partOf(index));
 
-            if (logic.readPageLogic.isInFitWidthReadDirection) {
-              item = Center(
-                child: SingleChildScrollView(
-                  controller: ScrollController(),
-                  child: item,
-                ),
-              );
-            }
+                if (logic.readPageLogic.isInFitWidthReadDirection) {
+                  item = Center(
+                    child: SingleChildScrollView(
+                      controller: ScrollController(),
+                      child: item,
+                    ),
+                  );
+                }
 
-            return item;
-          }),
-        ),
+                return item;
+              }),
+            ),
+          );
+        },
       ),
     );
   }
