@@ -20,9 +20,11 @@ class SrInput {
 /// The PNG has no alpha channel: given one, the programs upscale it as
 /// well and write a PNG whatever output was asked for.
 ///
-/// Null when the image is animated, or at least [maxWidth] pixels wide
-/// (0: no limit): such pages are large enough as they are.
-Future<SrInput?> prepareSrInput(Uint8List encoded, {int strips = 0, int maxWidth = 0}) async {
+/// Null when the image is animated, or when what is shown of it as a page
+/// is at least [maxWidth] pixels wide (0: no limit): such pages are large
+/// enough as they are. With [splitWide] (the reader splits wide pages) a
+/// page wider than tall is shown in halves, so half its width counts.
+Future<SrInput?> prepareSrInput(Uint8List encoded, {int strips = 0, int maxWidth = 0, bool splitWide = false}) async {
   final ui.Codec codec = await ui.instantiateImageCodec(encoded);
   if (codec.frameCount > 1) {
     codec.dispose();
@@ -32,7 +34,7 @@ Future<SrInput?> prepareSrInput(Uint8List encoded, {int strips = 0, int maxWidth
   codec.dispose();
   final int width = image.width;
   final int height = image.height;
-  if (maxWidth > 0 && width >= maxWidth) {
+  if (_wideEnough(width, height, maxWidth: maxWidth, splitWide: splitWide)) {
     image.dispose();
     return null;
   }
@@ -71,15 +73,15 @@ Future<SrInput?> prepareSrInput(Uint8List encoded, {int strips = 0, int maxWidth
 /// strips back in order, any other format).
 ///
 /// Null for the pages [prepareSrInput] leaves out.
-Future<Uint8List?> prepareSrUpload(Uint8List encoded, {int strips = 0, int maxWidth = 0}) async {
+Future<Uint8List?> prepareSrUpload(Uint8List encoded, {int strips = 0, int maxWidth = 0, bool splitWide = false}) async {
   if (strips > 0 || !_readByService(encoded)) {
-    return (await prepareSrInput(encoded, strips: strips, maxWidth: maxWidth))?.png;
+    return (await prepareSrInput(encoded, strips: strips, maxWidth: maxWidth, splitWide: splitWide))?.png;
   }
   // The size and the frame count, without decoding the page.
   final ui.ImmutableBuffer buffer = await ui.ImmutableBuffer.fromUint8List(encoded);
   try {
     final ui.ImageDescriptor descriptor = await ui.ImageDescriptor.encoded(buffer);
-    if (maxWidth > 0 && descriptor.width >= maxWidth) {
+    if (_wideEnough(descriptor.width, descriptor.height, maxWidth: maxWidth, splitWide: splitWide)) {
       descriptor.dispose();
       return null;
     }
@@ -90,6 +92,14 @@ Future<Uint8List?> prepareSrUpload(Uint8List encoded, {int strips = 0, int maxWi
   } finally {
     buffer.dispose();
   }
+}
+
+/// Whether a page of [width] x [height] is shown at least [maxWidth] wide.
+/// Split, an image wider than tall (the reader's spread, see SpreadPages)
+/// is shown a half at a time.
+bool _wideEnough(int width, int height, {required int maxWidth, required bool splitWide}) {
+  final int shown = splitWide && width > height ? width ~/ 2 : width;
+  return maxWidth > 0 && shown >= maxWidth;
 }
 
 bool _readByService(Uint8List bytes) {
