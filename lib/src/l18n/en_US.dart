@@ -948,6 +948,7 @@ class en_US {
       'multiSelectTags': 'Multi-Select Tags',
       'cancelMultiSelect': 'Cancel Multi-Select',
       'searchSelectedTags': 'Search Selected Tags',
+      'copySelectedTags': 'Copy Selected Tags',
       'searchGalleryDescription': 'Search Gallery Description',
       'onlySearchExpungedGalleries': "Only Search Expunged Galleries",
       'onlyShowGalleriesWithTorrents': 'Only Show Galleries With Torrents',

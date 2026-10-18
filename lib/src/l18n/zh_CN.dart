@@ -895,6 +895,7 @@ class zh_CN {
       'multiSelectTags': '多选标签',
       'cancelMultiSelect': '取消多选',
       'searchSelectedTags': '搜索所选标签',
+      'copySelectedTags': '复制所选标签',
       'searchGalleryDescription': '搜索画廊描述',
       'onlySearchExpungedGalleries': '仅搜索移除了的画廊',
       'onlyShowGalleriesWithTorrents': '只显示有种子的画廊',
