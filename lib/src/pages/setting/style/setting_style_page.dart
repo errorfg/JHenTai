@@ -29,7 +29,7 @@ class SettingStylePage extends StatelessWidget {
             _buildCrossAxisCountInDetailPage(),
             if (!styleSetting.isInWaterFlowListMode) _buildMoveCover2RightSide().fadeIn(),
             _buildLayout(context),
-            if (styleSetting.isInMobileLayout) _buildShowRotationFAB().fadeIn(),
+            if (GetPlatform.isMobile) _buildShowRotationFAB().fadeIn(),
           ],
         ).withListTileTheme(context),
       ),

@@ -14,6 +14,7 @@ import '../setting/security_setting.dart';
 import '../setting/style_setting.dart';
 import '../service/log.dart';
 import '../utils/route_util.dart';
+import 'rotation_suggestion.dart';
 
 typedef DidChangePlatformBrightnessCallback = void Function();
 typedef DidChangeAppLifecycleStateCallback = void Function(AppLifecycleState state);
@@ -72,7 +73,9 @@ class _AppManagerState extends State<AppManager> with WidgetsBindingObserver {
   DateTime? lastInactiveTime;
   bool inBlur = false;
 
-  late AppLifecycleState _currentState;
+  late AppLifecycleState _currentState = WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed;
+
+  late final Worker _rotationSettingListener;
 
   @override
   void initState() {
@@ -83,8 +86,14 @@ class _AppManagerState extends State<AppManager> with WidgetsBindingObserver {
     _listener = AppLifecycleListener(
       onInactive: _onInactive,
       onResume: _onResume,
-      onStateChange: (AppLifecycleState state) => _currentState = state,
+      onStateChange: (AppLifecycleState state) {
+        _currentState = state;
+        _syncRotationSensor();
+      },
     );
+
+    _rotationSettingListener = ever(styleSetting.showRotationFAB, (_) => _syncRotationSensor());
+    _syncRotationSensor();
 
     AppManager.registerAppLaunchCallback(_addSecureFlagForAndroid);
     AppManager.registerDidChangePlatformBrightnessCallback(_changeTheme);
@@ -99,6 +108,8 @@ class _AppManagerState extends State<AppManager> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _listener.dispose();
+    _rotationSettingListener.dispose();
+    rotationSuggester.stop();
     AppManager.unRegisterAppLaunchCallback(_addSecureFlagForAndroid);
     AppManager.unRegisterDidChangePlatformBrightnessCallback(_changeTheme);
     AppManager.unRegisterDidHaveMemoryPressureCallback(_logMemoryPressure);
@@ -119,6 +130,15 @@ class _AppManagerState extends State<AppManager> with WidgetsBindingObserver {
       callback.call(state);
     }
     super.didChangeAppLifecycleState(state);
+  }
+
+  @override
+  void didChangeMetrics() {
+    // The system may have turned the screen.
+    if (styleSetting.showRotationFAB.isTrue) {
+      interfaceRotation.refresh();
+    }
+    super.didChangeMetrics();
   }
 
   @override
@@ -145,56 +165,86 @@ class _AppManagerState extends State<AppManager> with WidgetsBindingObserver {
     return ScrollConfiguration(
       behavior: UIConfig.scrollBehaviourWithScrollBar,
       child: Obx(() {
-        if (styleSetting.showRotationFAB.isTrue && styleSetting.isInMobileLayout) {
-          return Stack(
-            children: [
-              child,
-              Positioned(
-                left: 16,
-                bottom: MediaQuery.of(context).padding.bottom + 16,
-                child: _buildRotationFAB(),
-              ),
-            ],
-          );
+        if (styleSetting.showRotationFAB.isFalse) {
+          return child;
         }
-        return child;
+        // Where the app may not turn the screen, its interface is turned
+        // within the window, the button with it.
+        final int turns = interfaceRotation.turns.value;
+        final MediaQueryData media = turnedMediaQuery(MediaQuery.of(context), turns);
+        return MediaQuery(
+          data: media,
+          child: RotatedBox(
+            quarterTurns: turns,
+            child: Stack(
+              children: [
+                child,
+                Positioned(
+                  left: 16,
+                  bottom: media.padding.bottom + 16,
+                  child: _buildRotationFAB(),
+                ),
+              ],
+            ),
+          ),
+        );
       }),
     );
   }
 
+  /// The device's way up is followed while the button is wanted and the app
+  /// is in front.
+  void _syncRotationSensor() {
+    if (styleSetting.showRotationFAB.isTrue && _currentState == AppLifecycleState.resumed) {
+      interfaceRotation.refresh();
+      rotationSuggester.start();
+    } else {
+      rotationSuggester.stop();
+    }
+  }
+
+  /// Shown for a while when the device is turned another way than the
+  /// screen: tapped, the screen turns to the device's way up.
   Widget _buildRotationFAB() {
     return Obx(() {
-      bool isLandscape = styleSetting.isLandscape.value;
-      return SizedBox(
-        width: 40,
-        height: 40,
-        child: FloatingActionButton(
-          heroTag: 'rotationFAB',
-          onPressed: _toggleOrientation,
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
-          elevation: 2,
-          child: Icon(
-            isLandscape ? Icons.screen_lock_portrait : Icons.screen_lock_landscape,
-            size: 20,
-            color: Theme.of(context).colorScheme.onPrimaryContainer,
+      final HeldOrientation? offer = rotationSuggester.offer.value;
+      final HeldOrientation? shownOffer = offer ?? rotationSuggester.lastOffer;
+      final bool toPortrait = shownOffer == HeldOrientation.portraitUp || shownOffer == HeldOrientation.portraitDown;
+      return IgnorePointer(
+        ignoring: offer == null,
+        child: AnimatedOpacity(
+          opacity: offer == null ? 0 : 1,
+          duration: const Duration(milliseconds: 200),
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: FloatingActionButton(
+              key: const Key('rotationFAB'),
+              heroTag: 'rotationFAB',
+              onPressed: offer == null ? null : () => _rotateTo(offer),
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
+              elevation: 2,
+              // Named by its icon: above the navigator, there is no overlay
+              // for a tooltip.
+              child: Icon(
+                toPortrait ? Icons.screen_lock_portrait : Icons.screen_lock_landscape,
+                size: 20,
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                semanticLabel: toPortrait ? 'rotateToPortrait'.tr : 'rotateToLandscape'.tr,
+              ),
+            ),
           ),
         ),
       );
     });
   }
 
-  void _toggleOrientation() {
-    styleSetting.toggleOrientation();
-    if (styleSetting.isLandscape.value) {
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]);
+  void _rotateTo(HeldOrientation held) {
+    rotationSuggester.dismiss();
+    if (interfaceRotation.active) {
+      interfaceRotation.turnTo(held);
     } else {
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-        DeviceOrientation.portraitDown,
-      ]);
+      styleSetting.lockOrientation(<DeviceOrientation>[screenOrientationFor(held, ios: GetPlatform.isIOS)]);
     }
   }
 

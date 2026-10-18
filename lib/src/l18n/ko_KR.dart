@@ -338,7 +338,9 @@ class ko_KR {
       /// Layout
       'layoutMode': '레이아웃 모드',
       'showRotationFAB': '회전 버튼 표시',
-      'showRotationFABHint': '세로 및 가로 모드를 전환하는 플로팅 버튼 표시',
+      'showRotationFABHint': '기기를 화면과 다른 방향으로 돌리면 왼쪽 아래에 버튼이 5초간 표시되며, 누르면 화면이 기기 방향으로 회전합니다. iPad에서는 앱 화면만 회전하고 상태 표시줄은 그대로입니다',
+      'rotateToLandscape': '가로로 전환',
+      'rotateToPortrait': '세로로 전환',
       'mobileLayoutV2Name': '모바일',
       'mobileLayoutV2Desc': '단일 리스트',
       'mobileLayoutName': '모바일(구형)',

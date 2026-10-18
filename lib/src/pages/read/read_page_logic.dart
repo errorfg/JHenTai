@@ -55,6 +55,7 @@ import '../../widget/auto_mode_interval_dialog.dart';
 import 'brightness_lock.dart';
 import '../../widget/eh_image.dart';
 import '../../widget/loading_state_indicator.dart';
+import '../../widget/rotation_suggestion.dart';
 import '../home_page.dart';
 import '../setting/read/tap_zone/setting_tap_zone_page.dart';
 import '../setting/keyboard_shortcuts/setting_keyboard_shortcuts_page.dart';
@@ -290,6 +291,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   late Worker toggleCurrentImmersiveModeLister;
   late Worker toggleDeviceOrientationLister;
   late Worker readDirectionLister;
+  late Worker interfaceTurnsListener;
   late Worker imageSpaceLister;
   late Worker displayFirstPageAloneListener;
   late Worker enableCustomBrightnessListener;
@@ -601,6 +603,9 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       (_) => updateDeviceOrientation(),
     );
 
+    /// The interface turned within the app is as the screen turned
+    interfaceTurnsListener = ever(interfaceRotation.turns, (_) => didChangeMetrics());
+
     /// Listen to read direction change
     readDirectionLister = ever(
       readSetting.readDirection,
@@ -782,6 +787,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     toggleTurnPageByVolumeKeyLister.dispose();
     toggleCurrentImmersiveModeLister.dispose();
     readDirectionLister.dispose();
+    interfaceTurnsListener.dispose();
     imageSpaceLister.dispose();
     flushReadProgressTimer.cancel();
     displayFirstPageAloneListener.dispose();
@@ -1090,12 +1096,14 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     }
   }
 
+  /// Back to the app's screen orientation: the system's, or the one chosen
+  /// with the rotation button.
   void restoreDeviceOrientation() {
     if (!GetPlatform.isMobile) {
       return;
     }
 
-    SystemChrome.setPreferredOrientations([]);
+    SystemChrome.setPreferredOrientations(styleSetting.lockedOrientations);
   }
 
   @override
@@ -1112,8 +1120,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       return;
     }
 
-    final Size size =
-        WidgetsBinding.instance.platformDispatcher.views.first.physicalSize;
+    final Size size = interfaceRotation.turnedSize(WidgetsBinding.instance.platformDispatcher.views.first.physicalSize);
     final bool isPortrait = size.height >= size.width;
 
     if (_lastIsPortrait == null) {
@@ -1165,8 +1172,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     if (readSetting.deviceDirection.value == DeviceDirection.landscape) {
       return false;
     }
-    final size =
-        WidgetsBinding.instance.platformDispatcher.views.first.physicalSize;
+    final Size size = interfaceRotation.turnedSize(WidgetsBinding.instance.platformDispatcher.views.first.physicalSize);
     return size.height >= size.width;
   }
 
