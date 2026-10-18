@@ -312,7 +312,7 @@ void main() {
     expect((await source.albumOfChapter(secondRef.id)).id, multiChapterAlbum.id);
     expect(second.title, startsWith(multiChapterAlbum.name));
     expect(second.title, isNot(firstChapter.title));
-    expect(await source.chapterPageCount(secondRef.id), second.pageCount);
+    expect(await source.chapterPageCount(GalleryUrl.jm(secondRef.id)), second.pageCount);
 
     final ({GalleryDetail galleryDetails, String apikey}) info = await source.detailPage(
       galleryUrl: GalleryUrl.jm(secondRef.id),
