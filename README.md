@@ -273,6 +273,14 @@ Projects this fork learned from (approaches were studied and reimplemented in JH
 - [wnacg-downloader](https://github.com/lanyeeee/wnacg-downloader): wnacg.
 - [Komga](https://github.com/gotson/komga): the media server behind the Komga source.
 - [eh2telegraph](https://github.com/qini7-sese/eh2telegraph): the bot behind "Send to Telegraph".
+- [Tachimanga](https://github.com/tachimanga/Tachidesk-Server): running Tachiyomi extensions on iOS with an embedded OpenJDK and native networking.
+
+The Tachiyomi source runs on:
+
+- [Tachiyomi](https://tachiyomi.org) and [Mihon](https://github.com/mihonapp/mihon): the extension format and source API, and the extensions themselves.
+- [Suwayomi-Server](https://github.com/Suwayomi/Suwayomi-Server): the Tachiyomi source interface and network helpers in `ext_host/core`, taken from its Tachiyomi code (Apache-2.0) and adapted.
+- [openjdk/mobile](https://github.com/openjdk/mobile): the OpenJDK (Zero interpreter) embedded in the iOS app.
+- [dex2jar](https://github.com/ThexXTURBOXx/dex2jar): converting extension code to JVM classes on iOS and desktop.
 
 Upstream JHenTai's references and contributors:
 

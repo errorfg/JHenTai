@@ -171,6 +171,14 @@ sudo dnf install -y jhentai
 - [wnacg-downloader](https://github.com/lanyeeee/wnacg-downloader): wnacg.
 - [Komga](https://github.com/gotson/komga): Komga 소스가 연결하는 미디어 서버.
 - [eh2telegraph](https://github.com/qini7-sese/eh2telegraph): "Telegraph 봇으로 보내기"가 연결하는 봇.
+- [Tachimanga](https://github.com/tachimanga/Tachidesk-Server): iOS에서 OpenJDK를 내장하고 네이티브 네트워크로 Tachiyomi 확장을 실행하는 방식.
+
+Tachiyomi 소스가 기반으로 하는 프로젝트:
+
+- [Tachiyomi](https://tachiyomi.org)와 [Mihon](https://github.com/mihonapp/mihon): 확장 형식과 소스 API, 그리고 확장 자체.
+- [Suwayomi-Server](https://github.com/Suwayomi/Suwayomi-Server): `ext_host/core`의 Tachiyomi 소스 인터페이스와 네트워크 보조 코드는 그 안의 Tachiyomi 코드(Apache-2.0)에서 가져와 수정했습니다.
+- [openjdk/mobile](https://github.com/openjdk/mobile): iOS 앱에 내장한 OpenJDK(Zero 인터프리터).
+- [dex2jar](https://github.com/ThexXTURBOXx/dex2jar): iOS와 데스크톱에서 확장 코드를 JVM 클래스로 변환.
 
 업스트림 JHenTai의 참조 프로젝트와 기여자:
 

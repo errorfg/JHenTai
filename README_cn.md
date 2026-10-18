@@ -263,6 +263,14 @@ Linux更新（不维护）： 直接删除旧包后，下载最新的包使用�
 - [wnacg-downloader](https://github.com/lanyeeee/wnacg-downloader)：wnacg。
 - [Komga](https://github.com/gotson/komga)：Komga 来源所对接的媒体服务器。
 - [eh2telegraph](https://github.com/qini7-sese/eh2telegraph)：「发送到 Telegraph 机器人」所对接的机器人。
+- [Tachimanga](https://github.com/tachimanga/Tachidesk-Server)：在 iOS 上内嵌 OpenJDK、以原生网络运行 Tachiyomi 扩展的做法。
+
+Tachiyomi 来源所依靠的项目：
+
+- [Tachiyomi](https://tachiyomi.org) 与 [Mihon](https://github.com/mihonapp/mihon)：扩展格式与源接口，以及扩展本身。
+- [Suwayomi-Server](https://github.com/Suwayomi/Suwayomi-Server)：`ext_host/core` 中的 Tachiyomi 源接口与网络辅助代码取自其中的 Tachiyomi 代码（Apache-2.0），并做了修改。
+- [openjdk/mobile](https://github.com/openjdk/mobile)：iOS 应用内嵌的 OpenJDK（Zero 解释器）。
+- [dex2jar](https://github.com/ThexXTURBOXx/dex2jar)：在 iOS 与桌面端把扩展代码转换为 JVM 类。
 
 上游 JHenTai 的参考项目与贡献者：
 
