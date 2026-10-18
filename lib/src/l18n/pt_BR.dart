@@ -612,6 +612,7 @@ class pt_BR {
       'showThumbnails': 'Mostrar miniaturas',
       'showScrollBar': 'Show Scroll Bar',
       'showStatusInfo': 'Mostrar status na parte inferior',
+      'autoMode': 'Virar páginas automaticamente',
       'autoModeInterval': 'Intervalo de virada de página',
       'autoModeStyle': 'Estilo do modo automático',
       'brightnessLocked': 'Brilho travado em @percent%',

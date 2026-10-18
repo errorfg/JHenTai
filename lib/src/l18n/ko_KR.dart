@@ -582,6 +582,7 @@ class ko_KR {
       'showThumbnails': '섬네일 보기',
       'showStatusInfo': '하단에 상태 보기',
       'showScrollBar': 'Show Scroll Bar',
+      'autoMode': '자동 페이지 넘김',
       'autoModeInterval': '자동 넘기기 간격',
       'autoModeStyle': '자동 넘기기 스타일',
       'brightnessLocked': '밝기를 @percent%로 고정했습니다',

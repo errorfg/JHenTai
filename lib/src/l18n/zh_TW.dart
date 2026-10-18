@@ -573,6 +573,7 @@ class zh_TW {
       'showThumbnails': '顯示縮圖',
       'showScrollBar': '顯示滾動條',
       'showStatusInfo': '底部顯示狀態資訊',
+      'autoMode': '自動翻頁',
       'autoModeInterval': '自動模式翻頁時間',
       'autoModeStyle': '自動模式風格',
       'brightnessLocked': '亮度已鎖定為 @percent%',
