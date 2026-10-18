@@ -4,11 +4,14 @@ PODS:
   - FlutterMacOS (1.0.0)
   - pdfx (1.0.0):
     - FlutterMacOS
+  - tachi_host (1.0.0):
+    - FlutterMacOS
 
 DEPENDENCIES:
   - desktop_webview_window (from `Flutter/ephemeral/.symlinks/plugins/desktop_webview_window/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
   - pdfx (from `Flutter/ephemeral/.symlinks/plugins/pdfx/macos`)
+  - tachi_host (from `Flutter/ephemeral/.symlinks/plugins/tachi_host/macos`)
 
 EXTERNAL SOURCES:
   desktop_webview_window:
@@ -17,11 +20,14 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral
   pdfx:
     :path: Flutter/ephemeral/.symlinks/plugins/pdfx/macos
+  tachi_host:
+    :path: Flutter/ephemeral/.symlinks/plugins/tachi_host/macos
 
 SPEC CHECKSUMS:
   desktop_webview_window: 7e37af677d6d19294cb433d9b1d878ef78dffa4d
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
   pdfx: 1e79f57f7a6ce2f4a4c30f21fa54d3dc82441b51
+  tachi_host: 1a29ea5607311176fe6607f393661a0dc1bb2ecf
 
 PODFILE CHECKSUM: 0d3963a09fc94f580682bd88480486da345dc3f0
 

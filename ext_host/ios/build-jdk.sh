@@ -60,24 +60,30 @@ if [ ! -d mobile ]; then
 fi
 cd mobile
 
-# iOS: static libraries, Zero VM.
-if [ ! -f build/ios-aarch64-zero-release/images/static-libs/lib/zero/libjvm.a ]; then
+# iOS: static libraries, Zero VM, and the classes of the runtime's other
+# modules. static-libs-image compiles only some of those; the modules' full
+# targets would also link a dynamic libjvm, which iOS cannot.
+if [ ! -f build/ios-aarch64-zero-release/spec.gmk ]; then
   sh configure --disable-warnings-as-errors --openjdk-target=aarch64-macos-ios --with-boot-jdk="$BOOT" \
     --with-libffi-include="$WORK/libffi-ios/include" --with-libffi-lib="$WORK/libffi-ios/lib" \
     --with-cups-include="$(xcrun --sdk macosx --show-sdk-path)/usr/include" \
     --with-sysroot="$(xcrun --sdk iphoneos --show-sdk-path)" --with-debug-level=release \
     --with-native-debug-symbols=none --with-version-opt=$VERSION_OPT
-  make CONF=ios-aarch64-zero-release static-libs-image
 fi
+CLASS_TARGETS=""
+for m in ${MODULES//,/ }; do
+  [ "$m" = java.base ] || CLASS_TARGETS="$CLASS_TARGETS $m-java"
+done
+make CONF=ios-aarch64-zero-release static-libs-image $CLASS_TARGETS
 
 # macOS: jlink and jmod of the same build. Xcode 26 no longer ships the
 # Metal compiler; the modules built here do not need it.
-if [ ! -x build/macos-host/jdk/bin/jlink ]; then
+if [ ! -f build/macos-host/spec.gmk ]; then
   sh configure --disable-warnings-as-errors --with-boot-jdk="$BOOT" --with-debug-level=release \
     --with-native-debug-symbols=none --with-jvm-variants=server --with-conf-name=macos-host \
     --with-version-opt=$VERSION_OPT METAL=/usr/bin/true METALLIB=/usr/bin/true
-  make CONF=macos-host java.base jdk.jlink jdk.zipfs java.logging jdk.unsupported jdk.jlink-launchers java.base-launchers
 fi
+make CONF=macos-host java.base jdk.jlink jdk.zipfs java.logging jdk.unsupported jdk.jlink-launchers java.base-launchers
 
 IOS=build/ios-aarch64-zero-release
 HOSTBIN=build/macos-host/jdk/bin

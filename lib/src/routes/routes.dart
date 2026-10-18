@@ -16,6 +16,7 @@ import 'package:jhentai/src/pages/komga/komga_page.dart';
 import 'package:jhentai/src/pages/tachi/tachi_extensions_page.dart';
 import 'package:jhentai/src/pages/tachi/tachi_source_page.dart';
 import 'package:jhentai/src/pages/tachi/tachi_source_settings_page.dart';
+import 'package:jhentai/src/pages/tachi/tachi_webview_page.dart';
 import 'package:jhentai/src/pages/komga/komga_settings_page.dart';
 import 'package:jhentai/src/pages/pdf/pdf_library_page.dart';
 import 'package:jhentai/src/pages/popular/popular_page.dart';
@@ -155,6 +156,7 @@ class Routes {
   static const String tachiSource = "/tachiSource";
   static const String tachiExtensions = "/tachiExtensions";
   static const String tachiSourceSettings = "/tachiSourceSettings";
+  static const String tachiWebView = "/tachiWebView";
   static const String logList = "/setting_advanced/logList";
   static const String log = "/setting_advanced/logList/log";
 
@@ -554,6 +556,12 @@ class Routes {
     EHPage(
       name: tachiSourceSettings,
       page: () => const TachiSourceSettingsPage().withEscOrFifthButton2BackRightRoute(),
+      transition: defaultTransition,
+      offAllBefore: false,
+    ),
+    EHPage(
+      name: tachiWebView,
+      page: () => const TachiWebViewPage().withEscOrFifthButton2BackRightRoute(),
       transition: defaultTransition,
       offAllBefore: false,
     ),

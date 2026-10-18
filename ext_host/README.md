@@ -13,9 +13,19 @@
 | 目录 | 内容 |
 |---|---|
 | `core/` | Tachiyomi 的源接口（`eu.kanade.tachiyomi.*`）、扩展用的 Injekt 查找、宿主本体（扩展安装与加载、HTTP 接口、筛选和设置项的转换）。Android 应用也编译这些源码 |
-| `compat/` | 扩展在 JVM 上用到的 Android 类：SharedPreferences、androidx.preference、Uri、Handler、Base64、CookieManager、org.json 等 |
+| `compat/` | 扩展在 JVM 上用到的 Android 类：SharedPreferences、androidx.preference、Uri、Handler、Base64、CookieManager、WebView、org.json 等 |
 | `jvm/` | JVM 上的入口：dex 转换、类加载、桌面子进程与 iOS 的启动方法 |
 | `testext/` | 测试用的扩展，按真实扩展的方式编译成 APK（`jvm/src/test/resources/testext.apk`） |
+
+## WebView
+
+扩展用的 `android.webkit.WebView`：
+
+- **Android**：系统的 WebView，与宿主的请求共用系统的 Cookie 存储。
+- **iOS、macOS**：应用的 WKWebView。`compat/` 的 WebView 把加载、执行脚本、销毁等操作作为命令放进 `jvm/` 的 BrowserRelay；应用经 `GET /browser/poll` 取走命令，交给插件的 `TachiBrowser.swift` 驱动一个不显示的 WKWebView，再把页面开始、结束、出错、页面发出的请求、JavaScript 接口调用和执行结果经 `POST /browser/events` 交回（`lib/src/network/tachi/tachi_browser.dart`）。加载时带上宿主对该地址的 Cookie，页面结束时把页面的 Cookie（含 HttpOnly）存回宿主。页面发出的请求只能观察：`shouldInterceptRequest` 的返回值不生效；JavaScript 接口的方法会执行，但页面拿不到返回值。
+- **Windows、Linux**：暂无，加载页面立即报错给扩展。
+
+需要用户操作的步骤（登录、人机验证）在应用的“在网页中打开”页面完成；iOS、macOS 关闭页面时把站点的 Cookie 交给宿主（`/cookies/import`）。
 
 扩展调用了宿主没有实现的 Android 类时，那一次调用失败并在应用中显示错误；扩展的其他功能不受影响（JVM 以 `-XX:-BytecodeVerificationRemote` 加载扩展类，用到时才解析）。
 
@@ -43,6 +53,9 @@
 | GET | `/image`、`/cover` | 页面图片与封面，经来源的请求头和拦截器取得 |
 | POST | `/source/preferences`、`/source/preferences/set` | 来源声明的设置项；设置时先经扩展的变更监听 |
 | POST | `/source/preference-store`、`/source/preference-store/set` | 来源保存的全部偏好，供云同步 |
+| POST | `/source/web` | `{"source"}`：来源站点的地址与 User-Agent，供“在网页中打开” |
+| POST | `/cookies/get`、`/cookies/import`、`/cookies/clear` | 宿主的 Cookie，每条为 `{"url", "setCookie"}` |
+| GET、POST | `/browser/poll`、`/browser/events` | WebView 的命令与事件（仅 iOS、macOS） |
 | POST | `/config` | 应用的代理设置 |
 
 ## 来源与许可

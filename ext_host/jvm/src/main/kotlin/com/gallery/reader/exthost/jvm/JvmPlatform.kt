@@ -5,8 +5,11 @@ import android.content.SharedPreferences
 import androidx.preference.PreferenceScreen
 import com.gallery.reader.exthost.HostPlatform
 import com.gallery.reader.exthost.compat.Bridges
+import com.gallery.reader.exthost.compat.Browser
 import com.gallery.reader.exthost.net.PersistentCookieJar
 import com.gallery.reader.exthost.net.HostProxySelector
+import com.gallery.reader.exthost.server.Request
+import com.gallery.reader.exthost.server.Response
 import okhttp3.CookieJar
 import okhttp3.OkHttpClient
 import java.io.File
@@ -17,6 +20,8 @@ open class JvmPlatform(
     final override val dataDir: File,
     /** Carries requests outside the JVM (iOS); OkHttp's own when null. */
     private val transport: Transport? = null,
+    /** Whether the app lends its browser engine for WebView (iOS and macOS). */
+    browser: Boolean = false,
 ) : HostPlatform {
     final override val application = Application(dataDir)
 
@@ -24,7 +29,11 @@ open class JvmPlatform(
 
     final override val cookieJar: CookieJar = cookies
 
+    /** Present when the app lends its browser engine. */
+    val browserRelay = if (browser) BrowserRelay(cookies) else null
+
     init {
+        Browser.link = browserRelay
         Bridges.cookies =
             object : Bridges.Cookies {
                 override fun get(url: String): String? = cookies.header(url)
@@ -66,6 +75,8 @@ open class JvmPlatform(
     ) {
         if (transport != null) builder.addInterceptor(NativeTransportSwitch(transport) { proxy.spec })
     }
+
+    override fun route(request: Request): Response? = browserRelay?.route(request)
 
     override fun createPreferenceScreen(
         name: String,

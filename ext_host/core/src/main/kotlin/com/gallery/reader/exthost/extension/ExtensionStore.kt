@@ -114,6 +114,9 @@ class ExtensionStore(
     private val sourcePackage = ConcurrentHashMap<Long, String>()
     private val loaded = ConcurrentHashMap<String, Loaded>()
 
+    /** Code kept open after [refresh], for the next source objects of the same extension. */
+    private val retained = ConcurrentHashMap<String, ClassLoader>()
+
     private class Loaded(
         val loader: ClassLoader,
         val sources: Map<Long, Source>,
@@ -211,9 +214,20 @@ class ExtensionStore(
         File(root, pkg).deleteRecursively()
     }
 
-    /** Drops the loaded code of [pkg]; the next use creates fresh source objects. */
+    /** Drops the loaded code of [pkg]; the next use loads it again. */
     fun unload(pkg: String) {
         loaded.remove(pkg)?.let { platform.releaseClassLoader(it.loader) }
+        retained.remove(pkg)?.let(platform::releaseClassLoader)
+    }
+
+    /**
+     * Drops the source objects of [pkg] after its settings changed (sources
+     * read them when created); the next use creates fresh ones from the same
+     * code. The code stays open: a change may have started work that is
+     * still loading classes, such as a login in a WebView on its own thread.
+     */
+    fun refresh(pkg: String) {
+        loaded.remove(pkg)?.let { retained.putIfAbsent(pkg, it.loader) }
     }
 
     fun source(id: Long): CatalogueSource {
@@ -231,7 +245,7 @@ class ExtensionStore(
             ZipFile(apk).use { zip ->
                 ApkManifest.parse(zip.getInputStream(zip.getEntry("AndroidManifest.xml")).readBytes()).metaData[METADATA_SOURCE_CLASS]
             } ?: throw ExtensionException("$pkg declares no source class")
-        val loader = platform.classLoader(apk, dir)
+        val loader = retained.remove(pkg) ?: platform.classLoader(apk, dir)
         val started = System.currentTimeMillis()
         val sources = instantiate(pkg, classes, loader).associateBy { it.id }
         platform.log("loaded $pkg in ${System.currentTimeMillis() - started} ms")

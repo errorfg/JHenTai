@@ -44,6 +44,20 @@ void main() {
           r.write('["$base/img/0.png","$base/page/1"]');
         case '/page/1':
           r.write('$base/img/1.png');
+        case '/h5':
+          // For the WebView probe: an HttpOnly cookie, a request with a
+          // header, a call into the extension's JavaScript interface.
+          r.headers.add('Set-Cookie', 'token=abc; Path=/; HttpOnly');
+          r.headers.contentType = ContentType.html;
+          r.write("""<!doctype html><html><head><title>Probe</title><script>
+var x = new XMLHttpRequest();
+x.open('GET', '/api/v3/system/config/2020/1');
+x.setRequestHeader('Authorization', 'Token xyz');
+x.send();
+window.Native.sendToken('from-js');
+</script></head><body>ok</body></html>""");
+        case '/api/v3/system/config/2020/1':
+          r.write('{}');
         case '/img/0.png' || '/img/1.png' || '/cover/1':
           r.headers.contentType = ContentType('image', 'png');
           r.add(png);
@@ -97,6 +111,12 @@ void main() {
     expect(preferences.map((TachiPreference p) => p.type), <String>['list', 'switch']);
     final List<TachiPreference> changed = await client.setPreference(source, 'sort', 'new');
     expect(changed.first.value, 'new');
+
+    // The extension's own WebView: the system's on Android, the app's
+    // WKWebView on iOS (tachi_browser.dart).
+    final List<String> probe = (await client.search(source, 1, 'webview:http://127.0.0.1:${site.port}/h5')).mangas.map((TachiManga m) => m.title).toList();
+    expect(probe, containsAll(<String>['auth:Token xyz', 'eval:"Probe"', 'js:from-js']));
+    expect(probe.firstWhere((String t) => t.startsWith('cookie:')), contains('token=abc'));
 
     await client.uninstall(extension.pkg);
     expect(await client.extensions(), isEmpty);

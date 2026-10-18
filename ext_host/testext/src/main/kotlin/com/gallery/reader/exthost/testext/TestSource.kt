@@ -2,6 +2,15 @@ package com.gallery.reader.exthost.testext
 
 import android.app.Application
 import android.content.SharedPreferences
+import android.os.Handler
+import android.os.Looper
+import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
@@ -25,6 +34,7 @@ import okhttp3.Response
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * A Tachiyomi extension written for the host's tests. It is built like a
@@ -73,6 +83,72 @@ class TestSource :
     }
 
     override fun searchMangaParse(response: Response): MangasPage = parseList(response)
+
+    override suspend fun getSearchManga(
+        page: Int,
+        query: String,
+        filters: FilterList,
+    ): MangasPage = if (query.startsWith(WEBVIEW)) webViewProbe(query.removePrefix(WEBVIEW)) else super.getSearchManga(page, query, filters)
+
+    /**
+     * Loads [url] in a WebView the way CopyManga's login does and lists what
+     * the page gave, one title each: "cookie:" its cookies, "auth:" the
+     * Authorization header of a request it made, "js:" what it passed to a
+     * JavaScript interface, "eval:" the result of a script, "error:" a
+     * loading error.
+     */
+    private fun webViewProbe(url: String): MangasPage {
+        val found = ConcurrentHashMap<String, String>()
+        val main = Handler(Looper.getMainLooper())
+        var view: WebView? = null
+        main.post {
+            view =
+                WebView(Injekt.get<Application>()).apply {
+                    settings.javaScriptEnabled = true
+                    addJavascriptInterface(Bridge(found), "Native")
+                    webViewClient =
+                        object : WebViewClient() {
+                            override fun shouldInterceptRequest(
+                                view: WebView,
+                                request: WebResourceRequest,
+                            ): WebResourceResponse? {
+                                request.requestHeaders.entries.firstOrNull { it.key.equals("Authorization", ignoreCase = true) }?.let { found["auth"] = it.value }
+                                return super.shouldInterceptRequest(view, request)
+                            }
+
+                            override fun onPageFinished(
+                                view: WebView,
+                                url: String,
+                            ) {
+                                CookieManager.getInstance().getCookie(url)?.let { found["cookie"] = it }
+                                view.evaluateJavascript("document.title") { found["eval"] = it }
+                            }
+
+                            override fun onReceivedError(
+                                view: WebView,
+                                request: WebResourceRequest,
+                                error: WebResourceError,
+                            ) {
+                                if (request.isForMainFrame) found["error"] = error.description.toString()
+                            }
+                        }
+                    loadUrl(url)
+                }
+        }
+        val deadline = System.currentTimeMillis() + 20_000
+        while (System.currentTimeMillis() < deadline && !found.containsKey("error") && !found.keys.containsAll(listOf("cookie", "auth", "js", "eval"))) Thread.sleep(50)
+        main.post { view?.destroy() }
+        return MangasPage(found.entries.sortedBy { it.key }.map { (key, value) -> SManga.create().apply { this.url = "/probe/$key"; title = "$key:$value" } }, false)
+    }
+
+    class Bridge(
+        private val found: MutableMap<String, String>,
+    ) {
+        @JavascriptInterface
+        fun sendToken(token: String) {
+            found["js"] = token
+        }
+    }
 
     private fun parseList(response: Response): MangasPage {
         val root = json.parseToJsonElement(response.body.string()).jsonObject
@@ -165,5 +241,8 @@ class TestSource :
         const val BASE_URL = "base_url"
         const val SORT = "sort"
         const val LOCKED = "locked"
+
+        /** A search for "webview:<url>" loads the URL in a WebView instead (webViewProbe). */
+        const val WEBVIEW = "webview:"
     }
 }

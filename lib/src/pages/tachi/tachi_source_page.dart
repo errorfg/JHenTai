@@ -16,6 +16,7 @@ import '../base/base_page.dart';
 import '../base/base_page_logic.dart';
 import '../base/base_page_state.dart';
 import 'tachi_filter_sheet.dart';
+import 'tachi_webview_page.dart';
 
 class TachiSourcePageArgument {
   const TachiSourcePageArgument({required this.sourceId, this.query, this.latest = false});
@@ -58,6 +59,12 @@ class TachiSourcePage extends BasePage<TachiSourcePageLogic, TachiSourcePageStat
     return [
       IconButton(icon: const Icon(Icons.search), tooltip: 'search'.tr, onPressed: () => logic.askQuery(Get.context!)),
       IconButton(icon: const Icon(Icons.filter_alt_outlined), tooltip: 'filter'.tr, onPressed: () => logic.editFilters(Get.context!)),
+      if (TachiWebViewPage.supported && info?.baseUrl != null)
+        IconButton(
+          icon: const Icon(Icons.public),
+          tooltip: 'tachiOpenInWebView'.tr,
+          onPressed: () => toRoute(Routes.tachiWebView, arguments: state.sourceId),
+        ),
       if (info?.configurable ?? false)
         IconButton(
           icon: const Icon(Icons.settings_outlined),

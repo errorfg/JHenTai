@@ -1280,6 +1280,7 @@ class ru_RU {
       'tachiFavorite': 'Избранное Tachiyomi',
       'tachiExtensionList': 'Расширения и репозитории Tachiyomi',
       'tachiSourceSettings': 'Настройки источников Tachiyomi',
+      'tachiOpenInWebView': 'Открыть в WebView',
       'noTachiSources': 'Расширения не установлены',
       'tachiExtensionCount': 'Расширений: @count',
       'noChapters': 'Нет глав',

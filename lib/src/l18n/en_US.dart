@@ -1395,6 +1395,7 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'tachiFavorite': 'Tachiyomi Favorites',
       'tachiExtensionList': 'Tachiyomi extensions and repositories',
       'tachiSourceSettings': 'Tachiyomi source settings',
+      'tachiOpenInWebView': 'Open in WebView',
       'noTachiSources': 'No extensions installed',
       'tachiExtensionCount': '@count extensions',
       'noChapters': 'No chapters',

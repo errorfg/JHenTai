@@ -1329,6 +1329,7 @@ favnote：匹配收藏备注
       'tachiFavorite': 'Tachiyomi 收藏',
       'tachiExtensionList': 'Tachiyomi 插件与仓库',
       'tachiSourceSettings': 'Tachiyomi 插件设置',
+      'tachiOpenInWebView': '在网页中打开',
       'noTachiSources': '还没有安装插件',
       'tachiExtensionCount': '@count 个插件',
       'noChapters': '没有章节',

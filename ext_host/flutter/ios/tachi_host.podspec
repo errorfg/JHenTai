@@ -23,7 +23,7 @@ Pod::Spec.new do |s|
   s.vendored_libraries = 'jdk/lib/*.a'
   s.resources        = ['jdk/home/lib', 'jdk/exthost.jar']
   s.libraries        = 'c++', 'z'
-  s.frameworks       = 'Foundation', 'CFNetwork', 'Security', 'SystemConfiguration'
+  s.frameworks       = 'Foundation', 'CFNetwork', 'Security', 'SystemConfiguration', 'WebKit'
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
     'HEADER_SEARCH_PATHS' => '"${PODS_TARGET_SRCROOT}/jdk/include" "${PODS_TARGET_SRCROOT}/jdk/include/ios"',

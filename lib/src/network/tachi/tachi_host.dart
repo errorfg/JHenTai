@@ -10,6 +10,7 @@ import 'package:jhentai/src/setting/network_setting.dart';
 import 'package:jhentai/src/utils/proxy_util.dart';
 import 'package:path/path.dart' as p;
 
+import 'tachi_browser.dart';
 import 'tachi_client.dart';
 
 TachiHost tachiHost = TachiHost();
@@ -45,6 +46,7 @@ class TachiHost {
     }
     return _starting ??= _start().then((TachiClient client) {
       _client = client;
+      tachiBrowser.relay();
       return client;
     }).whenComplete(() => _starting = null);
   }
@@ -99,6 +101,8 @@ class TachiHost {
       'proxy': await proxySpecForHost(),
       // iOS carries requests with NSURLSession (see NativeTransport.kt).
       'platform': Platform.operatingSystem,
+      // WebView in extensions is the app's WKWebView (tachi_browser.dart).
+      'browser': TachiBrowser.supported,
     });
     final Stopwatch watch = Stopwatch()..start();
     final int port;

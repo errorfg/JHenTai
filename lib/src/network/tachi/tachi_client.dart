@@ -119,6 +119,24 @@ class TachiClient {
 
   Future<void> clearCookies() => _post('/cookies/clear', const <String, Object?>{});
 
+  /// The host's cookies for [url], each `{"url", "setCookie"}`.
+  Future<List<dynamic>> cookies(String url) async => (await _post('/cookies/get', <String, Object?>{'url': url}))['cookies'] as List;
+
+  Future<void> importCookies(List<dynamic> cookies) => _post('/cookies/import', <String, Object?>{'cookies': cookies});
+
+  /// Where [source]'s site is and the user agent it uses.
+  Future<({String url, String? userAgent})> sourceWeb(String source) async {
+    final Map<String, dynamic> json = await _post('/source/web', <String, Object?>{'source': source});
+    return (url: json['url'] as String, userAgent: json['userAgent'] as String?);
+  }
+
+  /// Commands for the browser engine the app lends the host (see
+  /// tachi_browser.dart); waits up to [wait] for some.
+  Future<List<dynamic>> browserCommands({Duration wait = const Duration(seconds: 25)}) async =>
+      ((await _send('GET', '/browser/poll', query: <String, String>{'wait': '${wait.inMilliseconds}'})) as Map<String, dynamic>)['commands'] as List;
+
+  Future<void> browserEvents(List<Object?> events) => _post('/browser/events', <String, Object?>{'events': events});
+
   /// A page image through the source (its headers and interceptors apply).
   Uri imageUri(String source, {String? imageUrl, String pageUrl = '', int index = 0}) => _uri('/image', <String, String>{
         'source': source,

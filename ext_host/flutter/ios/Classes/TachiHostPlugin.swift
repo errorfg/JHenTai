@@ -1,11 +1,13 @@
 import Flutter
 import UIKit
 
-/// Starts the extension host on the JVM in the app's process.
+/// Starts the extension host on the JVM in the app's process, and lends it
+/// WKWebView (TachiBrowser).
 public class TachiHostPlugin: NSObject, FlutterPlugin {
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "com.gallery.reader/exthost", binaryMessenger: registrar.messenger())
     registrar.addMethodCallDelegate(TachiHostPlugin(), channel: channel)
+    TachiBrowser.register(with: registrar)
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

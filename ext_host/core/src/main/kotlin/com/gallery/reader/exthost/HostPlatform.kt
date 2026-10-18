@@ -4,6 +4,8 @@ import android.app.Application
 import android.content.SharedPreferences
 import androidx.preference.PreferenceScreen
 import com.gallery.reader.exthost.net.HostProxySelector
+import com.gallery.reader.exthost.server.Request
+import com.gallery.reader.exthost.server.Response
 import okhttp3.CookieJar
 import okhttp3.OkHttpClient
 import java.io.File
@@ -45,6 +47,9 @@ interface HostPlatform {
         builder: OkHttpClient.Builder,
         proxy: HostProxySelector,
     ) {}
+
+    /** Answers the routes the platform serves itself (the JVM's browser relay); null for the others. */
+    fun route(request: Request): Response? = null
 
     fun log(message: String) {
         System.err.println("ExtHost: $message")

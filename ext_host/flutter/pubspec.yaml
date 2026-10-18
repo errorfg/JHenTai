@@ -1,5 +1,5 @@
 name: tachi_host
-description: Starts the extension host (ext_host/) inside the app on Android and iOS.
+description: Starts the extension host (ext_host/) inside the app on Android and iOS, and lends it WKWebView on iOS and macOS.
 version: 1.0.0
 publish_to: none
 
@@ -18,4 +18,6 @@ flutter:
         package: com.gallery.reader.exthost.android
         pluginClass: TachiHostPlugin
       ios:
+        pluginClass: TachiHostPlugin
+      macos:
         pluginClass: TachiHostPlugin

@@ -28,6 +28,7 @@ fun androidSdk(): File {
 val testApk by tasks.registering {
     dependsOn(tasks.jar)
     val output = rootProject.file("jvm/src/test/resources/testext.apk")
+    inputs.files(tasks.jar, file("src/main/res-manifest/AndroidManifest.xml"))
     outputs.file(output)
     doLast {
         val sdk = androidSdk()

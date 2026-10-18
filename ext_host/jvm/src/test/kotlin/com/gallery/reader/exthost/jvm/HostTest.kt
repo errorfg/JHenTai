@@ -3,6 +3,7 @@ package com.gallery.reader.exthost.jvm
 import android.webkit.CookieManager
 import com.gallery.reader.exthost.ExtHost
 import com.gallery.reader.exthost.compat.Bridges
+import com.gallery.reader.exthost.compat.Browser
 import com.gallery.reader.exthost.extension.ApkManifest
 import com.gallery.reader.exthost.extension.ExtensionStore
 import kotlinx.serialization.json.Json
@@ -11,10 +12,12 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -27,6 +30,8 @@ import java.io.File
 import java.net.URLEncoder
 import java.nio.file.Files
 import java.util.Collections
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.thread
 import java.util.zip.ZipFile
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -287,12 +292,79 @@ class HostTest {
         call("/extensions/icon?pkg=$TEST_PKG").use { assertEquals(404, it.code) }
     }
 
+    /**
+     * The extension's WebView (converted dex calling android.webkit) on an
+     * engine that answers like TachiBrowser.swift, over the HTTP API as the app
+     * relays it: the page's cookie, a request header, a JavaScript interface
+     * call and a script result all reach the extension.
+     */
+    @Test
+    fun `an extension's WebView runs on the app's browser engine`() {
+        Browser.link = platform.browserRelay
+        val stop = AtomicBoolean()
+        val loads = Collections.synchronizedList(mutableListOf<JsonObject>())
+        fun event(
+            type: String,
+            view: Int,
+            vararg fields: Pair<String, JsonElement>,
+        ) = JsonObject(mapOf("type" to JsonPrimitive(type), "view" to JsonPrimitive(view)) + fields)
+        fun send(vararg events: JsonObject) = post("/browser/events", JsonObject(mapOf("events" to JsonArray(events.toList()))).toString())
+        val engine =
+            thread(isDaemon = true, name = "test-engine") {
+                while (!stop.get()) {
+                    val commands = call("/browser/poll?wait=500").use { Json.parseToJsonElement(it.body.string()).jsonObject["commands"]!!.jsonArray }
+                    for (command in commands.map { it.jsonObject }) {
+                        val view = command["view"]!!.jsonPrimitive.int
+                        when (command.str("op")) {
+                            "load" -> {
+                                loads += command
+                                val url = command.str("url")
+                                send(
+                                    event("started", view, "url" to JsonPrimitive(url)),
+                                    event(
+                                        "request",
+                                        view,
+                                        "url" to JsonPrimitive("https://api.site.test/system/config/2020/1"),
+                                        "mainFrame" to JsonPrimitive(false),
+                                        "headers" to buildJsonObject { put("authorization", "Token abc") },
+                                    ),
+                                    event("js", view, "interface" to JsonPrimitive("Native"), "method" to JsonPrimitive("sendToken"), "args" to JsonArray(listOf(JsonPrimitive("abc")))),
+                                    event(
+                                        "finished",
+                                        view,
+                                        "url" to JsonPrimitive(url),
+                                        "title" to JsonPrimitive("Probe"),
+                                        "cookies" to JsonArray(listOf(buildJsonObject { put("url", "https://site.test/"); put("setCookie", "token=abc; Path=/; Secure") })),
+                                    ),
+                                )
+                            }
+                            "eval" -> send(event("eval", view, "call" to command["call"]!!, "value" to JsonPrimitive("\"Probe\"")))
+                        }
+                    }
+                }
+            }
+        try {
+            val found = post("/source/search", source(""","page":1,"query":"webview:https://site.test/h5""""))
+            assertEquals(
+                listOf("auth:Token abc", "cookie:token=abc", "eval:\"Probe\"", "js:abc"),
+                found["mangas"]!!.jsonArray.map { it.str("title") },
+            )
+            val load = loads.single()
+            assertEquals(true, load["javaScript"]!!.jsonPrimitive.boolean)
+            assertEquals(listOf("sendToken"), load["interfaces"]!!.jsonObject["Native"]!!.jsonArray.map { it.jsonPrimitive.content })
+        } finally {
+            stop.set(true)
+            engine.join(5_000)
+            Browser.link = null
+        }
+    }
+
     companion object {
         const val TOKEN = "test-token"
         const val TEST_PKG = "com.gallery.reader.exthost.testext"
 
         private val dataDir: File = Files.createTempDirectory("exthost-test").toFile()
-        val platform = JvmPlatform(dataDir)
+        val platform = JvmPlatform(dataDir, browser = true)
         val host: ExtHost.Running by lazy { ExtHost.start(platform, TOKEN) }
 
         val testApk: File by lazy {

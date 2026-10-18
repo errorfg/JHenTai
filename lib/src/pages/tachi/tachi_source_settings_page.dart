@@ -3,9 +3,13 @@ import 'package:get/get.dart';
 import 'package:jhentai/src/network/tachi/tachi_client.dart';
 import 'package:jhentai/src/network/tachi/tachi_host.dart';
 import 'package:jhentai/src/network/tachi/tachi_models.dart';
+import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/service/tachi/tachi_extension_service.dart';
 import 'package:jhentai/src/service/tachi/tachi_source_setting_service.dart';
+import 'package:jhentai/src/utils/route_util.dart';
 import 'package:jhentai/src/utils/snack_util.dart';
+
+import 'tachi_webview_page.dart';
 
 /// The settings a Tachiyomi source declares, edited the way its Android
 /// settings screen would: the source may refuse a value.
@@ -30,12 +34,16 @@ class _TachiSourceSettingsPageState extends State<TachiSourceSettingsPage> {
   Future<void> _load() async {
     try {
       final List<TachiPreference> preferences = await tachiHost.run((TachiClient c) => c.preferences(sourceId));
-      setState(() {
-        _preferences = preferences;
-        _error = null;
-      });
+      if (mounted) {
+        setState(() {
+          _preferences = preferences;
+          _error = null;
+        });
+      }
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted) {
+        setState(() => _error = e.toString());
+      }
     }
   }
 
@@ -54,7 +62,25 @@ class _TachiSourceSettingsPageState extends State<TachiSourceSettingsPage> {
   Widget build(BuildContext context) {
     final List<TachiPreference>? preferences = _preferences;
     return Scaffold(
-      appBar: AppBar(title: Text(tachiExtensionService.source(sourceId)?.name ?? 'tachiSourceSettings'.tr), centerTitle: true),
+      appBar: AppBar(
+        title: Text(tachiExtensionService.source(sourceId)?.name ?? 'tachiSourceSettings'.tr),
+        centerTitle: true,
+        actions: [
+          // A login made on the site shows in settings that report it.
+          if (TachiWebViewPage.supported && tachiExtensionService.source(sourceId)?.baseUrl != null)
+            IconButton(
+              icon: const Icon(Icons.public),
+              tooltip: 'tachiOpenInWebView'.tr,
+              onPressed: () async {
+                await toRoute(Routes.tachiWebView, arguments: sourceId);
+                if (mounted) {
+                  await _load();
+                }
+              },
+            ),
+          IconButton(icon: const Icon(Icons.refresh), tooltip: 'refresh'.tr, onPressed: _load),
+        ],
+      ),
       body: _error != null
           ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
           : preferences == null

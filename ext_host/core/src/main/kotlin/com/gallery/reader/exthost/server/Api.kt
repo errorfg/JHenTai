@@ -9,6 +9,7 @@ import com.gallery.reader.exthost.codec.asObject
 import com.gallery.reader.exthost.codec.string
 import com.gallery.reader.exthost.extension.ExtensionException
 import com.gallery.reader.exthost.extension.ExtensionStore
+import com.gallery.reader.exthost.net.CookieCodec
 import com.gallery.reader.exthost.net.HostProxySelector
 import com.gallery.reader.exthost.net.PersistentCookieJar
 import eu.kanade.tachiyomi.network.GET
@@ -61,6 +62,7 @@ class Api(
         }
 
     private fun route(request: Request): Response {
+        platform.route(request)?.let { return it }
         val get = request.method == "GET" || request.method == "HEAD"
         return when {
             get && request.path == "/ping" -> ok(buildJsonObject { put("ok", true); put("api", API_VERSION) })
@@ -149,12 +151,31 @@ class Api(
             "/source/preference-store/set" -> {
                 val source = source(body) as? ConfigurableSource ?: throw IllegalArgumentException("source has no settings")
                 PreferenceStore.write(source.getSourcePreferences(), body["values"].asObject())
-                store.extensionOf(source.id)?.let { store.unload(it.pkg) }
+                store.extensionOf(source.id)?.let { store.refresh(it.pkg) }
                 ok(JsonObject(emptyMap()))
             }
             "/cookies/clear" -> {
                 (network.cookieJar as? PersistentCookieJar)?.clear()
                 ok(JsonObject(emptyMap()))
+            }
+            // Between the host and the app's own web page (logging in to a site).
+            "/cookies/get" -> {
+                val url = body.string("url") ?: throw IllegalArgumentException("url is required")
+                ok(JsonObject(mapOf("cookies" to CookieCodec.export(network.cookieJar, url))))
+            }
+            "/cookies/import" -> {
+                val cookies = body["cookies"] as? JsonArray ?: throw IllegalArgumentException("cookies is required")
+                ok(buildJsonObject { put("imported", CookieCodec.import(network.cookieJar, cookies)) })
+            }
+            // Where the app opens a source's site, and as what browser.
+            "/source/web" -> {
+                val source = source(body) as? HttpSource ?: throw IllegalArgumentException("not a web source")
+                ok(
+                    buildJsonObject {
+                        put("url", source.baseUrl)
+                        put("userAgent", source.headers["User-Agent"])
+                    },
+                )
             }
             else -> error(404, "no route POST $path", "request")
         }
@@ -169,7 +190,7 @@ class Api(
         source.setupPreferenceScreen(screen)
         if (change != null && PreferenceCodec.set(screen, change.first, change.second)) {
             // Extensions read their settings when created; the next request gets new source objects.
-            store.extensionOf(source.id)?.let { store.unload(it.pkg) }
+            store.extensionOf(source.id)?.let { store.refresh(it.pkg) }
         }
         return PreferenceCodec.encode(screen)
     }
