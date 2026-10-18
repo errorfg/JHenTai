@@ -9,7 +9,7 @@
 
 [English](./README.md) | [简体中文](./README_cn.md) | 한국어
 
-[JHenTai](https://github.com/jiangtian616/JHenTai)를 바탕으로 한 다중 소스 만화 뷰어로, Android, iOS, Windows, macOS, Linux를 지원합니다. E-Hentai를 중심으로 nhentai, wnacg, JM, Komga 서버와 로컬 도서를 같은 뷰어, 다운로드, 즐겨찾기, 기록, 클라우드 동기화로 읽습니다.
+[JHenTai](https://github.com/jiangtian616/JHenTai)를 바탕으로 한 다중 소스 만화 뷰어로, Android, iOS, Windows, macOS, Linux를 지원합니다. E-Hentai를 중심으로 nhentai, wnacg, JM, Tachiyomi/Mihon 확장, Komga 서버와 로컬 도서를 같은 뷰어, 다운로드, 즐겨찾기, 기록, 클라우드 동기화로 읽습니다.
 
 E-Hentai 관련 질문은 업스트림의 [Q&A](https://github.com/jiangtian616/JHenTai/wiki/Common-Questions)를 참고하세요.
 
@@ -25,16 +25,17 @@ E-Hentai 관련 질문은 업스트림의 [Q&A](https://github.com/jiangtian616/
 | nhentai | nhentai.net과 설정 가능한 미러 도메인에서 검색, 상세, 온라인 보기, 다운로드, 로컬 즐겨찾기. nhentai.net 계정 설정에서 만든 API 키로 로그인하면(공식 API v2) 더 자세한 메타데이터, 댓글, 관련 갤러리, 태그 제안, 클라우드 즐겨찾기, 태그 차단 목록, ZIP/CBZ와 토렌트 다운로드. |
 | wnacg | 검색, 둘러보기, 상세, 온라인 보기, 다운로드, 로컬 즐겨찾기. 도메인 설정과 링크 이동 지원. |
 | JM (18comic) | 홈 추천, 카테고리별 둘러보기(한국 웹툰 포함), 일·주·월·전체 랭킹, 주간 추천, 검색, 작품 번호 이동, 챕터 목록이 있는 상세, 읽기 전용 댓글과 관련 작품, 이미지 복원 온라인 보기, 뷰어에서 이전·다음 챕터, 다운로드(챕터 하나 또는 전체), 로컬 즐겨찾기, 계정 로그인, API·이미지 회선 선택. |
+| Tachiyomi / Mihon 확장 | 앱 안에서 확장을 실행: 확장 저장소를 추가해 확장을 설치(APK 파일 설치도 가능), 소스별 인기·최신 목록, 소스의 필터로 검색하거나 모든 소스에서 검색, 즐겨찾기의 새 챕터 확인, 웹 페이지 로그인, Tachiyomi/Mihon 백업(`.tachibk`) 가져오기. Android는 시스템이 확장을 직접 불러오고, iOS는 앱 안에서 Java 환경을 실행하며, 데스크톱은 런타임을 함께 제공합니다(macOS는 Apple 실리콘만, Windows·Linux에서는 아직 확장이 웹 페이지를 쓸 수 없음). |
 | Komga | 라이브러리·시리즈·책의 서버 측 페이지 나눔, 정렬, 필터, 전문 검색, 홈, 오프라인 다운로드, 읽기 진행 상황 양방향 동기화. |
 | 로컬 | 다운로드한 갤러리와 아카이브(아카이브 미리보기), 로컬 이미지 폴더, PDF 서재. |
 
 소스 공통 기능:
 
-- 내비게이션 서랍 맨 위(데스크톱은 사이드바 맨 위)의 소스 선택 메뉴로 E-Hentai, nhentai, wnacg, JM, Komga, PDF 사이에서 앱 전체를 전환하고, 선택한 사이트의 계정을 표시합니다. 검색 페이지의 사이트 전환은 그대로 유지됩니다.
+- 내비게이션 서랍 맨 위(데스크톱은 사이드바 맨 위)의 소스 선택 메뉴로 E-Hentai, nhentai, wnacg, JM, Tachiyomi, Komga, PDF 사이에서 앱 전체를 전환하고, 선택한 사이트의 계정을 표시합니다. 검색 페이지의 사이트 전환은 그대로 유지됩니다.
 - nhentai, wnacg, JM 상세 페이지의 `EH` 버튼으로 같은 제목을 E-Hentai에서 검색합니다.
 - 하나의 로그인 페이지에서 E-Hentai, nhentai, JM 중 사이트를 고릅니다.
 - 모든 소스의 즐겨찾기를 E-Hentai 즐겨찾기와 섞어서 또는 따로 표시할 수 있습니다.
-- 설정, 로컬 즐겨찾기, 기록, 읽기 진행 상황을 WebDAV 또는 S3 호환 저장소로 클라우드 동기화합니다.
+- 설정, 로컬 즐겨찾기, 기록, 읽기 진행 상황, Tachiyomi 확장과 확장 설정을 WebDAV 또는 S3 호환 저장소로 클라우드 동기화합니다.
 - 직접 배포한 eh2telegraph 서비스로 보내는 "Telegraph 봇으로 보내기" 버튼.
 
 업스트림 대비 자세한 변경 사항은 [English README](./README.md#changes-compared-with-upstream)를 참고하세요.

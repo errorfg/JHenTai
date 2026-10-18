@@ -9,7 +9,7 @@
 
 [English](./README.md) | 简体中文 | [한국어](./README_kr.md)
 
-基于 [JHenTai](https://github.com/jiangtian616/JHenTai) 的多来源漫画阅读器，支持 Android、iOS、Windows、macOS 和 Linux。以 E-Hentai 为中心，nhentai、wnacg、JM、Komga 服务器和本地书籍都使用同一套阅读器、下载、收藏、历史与云同步。
+基于 [JHenTai](https://github.com/jiangtian616/JHenTai) 的多来源漫画阅读器，支持 Android、iOS、Windows、macOS 和 Linux。以 E-Hentai 为中心，nhentai、wnacg、JM、Tachiyomi/Mihon 扩展、Komga 服务器和本地书籍都使用同一套阅读器、下载、收藏、历史与云同步。
 
 E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jiangtian616/JHenTai/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98)。
 
@@ -25,16 +25,17 @@ E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jian
 | nhentai | 搜索、详情、在线阅读、下载和本地收藏，支持 nhentai.net 与可配置的镜像域名。在 nhentai.net 账户设置中生成 API 密钥并登录后（官方 API v2），另有更完整的元数据、评论、相关画廊、标签建议、云端收藏、标签黑名单，以及 ZIP/CBZ 与种子下载。 |
 | wnacg | 搜索、浏览、详情、在线阅读、下载和本地收藏，可配置域名并支持链接跳转。 |
 | JM（禁漫天堂） | 首页推荐、按分类浏览（含韩漫）、日/周/月/总排行、每周必看、搜索、车号跳转、带章节列表的详情、只读评论和相关本子、在线阅读（图片自动还原）、阅读器内切换上一章与下一章、下载（单章或全部章节）、本地收藏、账号登录，可选择接口线路与图片线路。 |
+| Tachiyomi / Mihon 扩展 | 在应用内运行扩展：添加扩展仓库并安装插件（也可以从文件安装 APK），浏览各来源的热门与最新、按来源的筛选项搜索或在全部来源中搜索，检查收藏漫画的新章节，在网页中登录，导入 Tachiyomi/Mihon 备份（`.tachibk`）。Android 由系统直接加载扩展，iOS 在应用内运行 Java 环境，桌面端随应用附带运行环境（macOS 版只支持 Apple 芯片；Windows、Linux 上插件暂时不能使用网页）。 |
 | Komga | 书库、系列与书的服务器端分页、排序和筛选，全文搜索，首页，离线下载，以及阅读进度双向同步。 |
 | 本地 | 已下载的画廊与归档（支持归档预览）、本地图片文件夹、PDF 书库。 |
 
 跨来源的功能：
 
-- 侧边栏顶部（桌面布局为侧栏顶部）的来源下拉菜单在 E-Hentai、nhentai、wnacg、JM、Komga、PDF 之间切换整个应用，并显示所选站点的账号；搜索页内单独切换站点的功能保留；
+- 侧边栏顶部（桌面布局为侧栏顶部）的来源下拉菜单在 E-Hentai、nhentai、wnacg、JM、Tachiyomi、Komga、PDF 之间切换整个应用，并显示所选站点的账号；搜索页内单独切换站点的功能保留；
 - nhentai、wnacg、JM 的详情页有 `EH` 按钮，用标题在 E-Hentai 上搜索同一画廊；
 - 统一的登录页，可在 E-Hentai、nhentai、JM 之间选择；
 - 各来源的收藏可以与 E-Hentai 收藏混合显示，也可以分开显示；
-- 设置、本地收藏、历史、阅读进度和登录通过 WebDAV、S3 兼容存储或自行部署的同步服务云同步；
+- 设置、本地收藏、历史、阅读进度、登录以及 Tachiyomi 插件与插件设置通过 WebDAV、S3 兼容存储或自行部署的同步服务云同步；
 - 「发送到 Telegraph 机器人」按钮，配合自行部署的 eh2telegraph 服务。
 
 ## 相对上游的改动
@@ -58,8 +59,13 @@ E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jian
   - 配置同步原样保留无法识别的远端条目（由更新版本写入）以及本次未同步的类型；远端文件无法读取时中止同步，不再上传。
   - 同步服务（自行部署 `sync_server/` 中的 Cloudflare Worker 与 D1 数据库）：按条同步，删除也会同步到其他设备；见 [wiki](https://github.com/errorfg/JHenTai/wiki/%E5%90%8C%E6%AD%A5%E6%9C%8D%E5%8A%A1%E9%83%A8%E7%BD%B2)。
   - E-Hentai 登录纳入同步（igneous 由每台设备自行获取）；同步方式与开关由每台设备各自决定。
+- Tachiyomi 扩展：
+  - 宿主（`ext_host/`）在应用内运行 Tachiyomi/Mihon 扩展：Android 由系统加载扩展 APK；iOS 内嵌 OpenJDK（Zero 解释器），扩展经 dex2jar 转换后运行，兼容层提供扩展用到的 Android 类，网络请求交给原生实现；桌面端随应用附带 Java 运行环境。
+  - Tachiyomi 作为与 E-Hentai、nhentai、wnacg、JM 并列的站点，有来源、全部来源搜索、更新（手动刷新）与插件页；漫画与章节沿用详情页、阅读器、收藏、历史、进度与下载，与 JM 的章节相同，阅读时也可以实时超分。
+  - 需要网页（登录）的插件，iOS 与 macOS 上由应用的 WKWebView 承载，Android 用系统 WebView，Cookie 双向同步；「在网页中打开」可以自己完成这类步骤。
+  - 可以导入 Tachiyomi/Mihon 备份（`.tachibk`）；插件与仓库、插件设置、Tachiyomi 收藏纳入云同步（所有同步的设备都需要 8.0.28 或更新的版本）。
 - 画廊与检索体验：
-  - 详情页支持多 Tag 选择搜索。
+  - 详情页支持多 Tag 选择，可搜索或复制所选标签。
   - Popular / Ranklist 页支持客户端过滤。
   - 增加 `nhentai` 备选链路（搜索/详情/图片页）。
   - `nhentai` 搜索支持 EH/NH 模式切换（NH 模式下可直接非 `nh:` 前缀输入），并兼容 `nh:` 关键词前缀与 NH 标签翻译。
@@ -78,10 +84,11 @@ E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jian
   - 翻过的画廊记为已读并在下次淡化显示；进度页面以时间轴显示读过的部分、上次停留的位置与书签；详情页的「关注位置」按钮从这本画廊开始打开关注页。
 - 阅读：
   - 阅读时实时超分（实验性）：桌面端使用本机的超分程序，也可以通过另一台有显卡的电脑上的超分服务（`sr_server/`），手机和平板同样可用；见 [wiki](https://github.com/errorfg/JHenTai/wiki/%E5%AE%9E%E6%97%B6%E8%B6%85%E5%88%86)。
-  - 手机和平板上，阅读器顶栏可以锁定亮度。
+  - 切分双页：宽大于高的图片从中间切开，单页模式下分成两页，从上至下模式下两半上下排列。
+  - 手机和平板上，阅读器顶栏可以锁定亮度；自动翻页在阅读设置中开启和停止。
   - E-Hentai 画廊的新版本沿用它所替换的旧版本的阅读进度。
 - 折叠屏设备支持：
-  - 移动端布局新增全局悬浮按钮，可一键切换竖屏 / 横屏方向。
+  - 旋转按钮：设备转到与屏幕不同的方向时显示 5 秒，各种布局下都有；iPad 不允许应用自行转动屏幕，改为在应用窗口内转动界面。
 - 本地书库与下载：
   - 归档预览页，可浏览已下载归档中的图片。
   - JHenTai、Komga、PDF 三种阅读来源可切换，共用同一阅读器。

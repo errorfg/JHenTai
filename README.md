@@ -9,7 +9,7 @@
 
 English | [简体中文](./README_cn.md) | [한국어](./README_kr.md)
 
-A multi-source manga reader for Android, iOS, Windows, macOS and Linux, built on [JHenTai](https://github.com/jiangtian616/JHenTai). E-Hentai stays at its center; nhentai, wnacg, JM, Komga servers and local books are read with the same reader, downloads, favorites, history and cloud sync.
+A multi-source manga reader for Android, iOS, Windows, macOS and Linux, built on [JHenTai](https://github.com/jiangtian616/JHenTai). E-Hentai stays at its center; nhentai, wnacg, JM, Tachiyomi/Mihon extensions, Komga servers and local books are read with the same reader, downloads, favorites, history and cloud sync.
 
 For E-Hentai questions, the upstream [Q&A](https://github.com/jiangtian616/JHenTai/wiki/Common-Questions) still applies.
 
@@ -25,16 +25,17 @@ Image-search bots mostly answer with nhentai pages, while I mainly use E-Hentai.
 | nhentai | Search, details, online reading, downloads and local favorites, on nhentai.net and configurable mirror domains. With an API key from the nhentai.net account settings (official API v2): richer metadata, comments, related galleries, tag suggestions, remote favorites, tag blacklist, ZIP/CBZ and torrent downloads. |
 | wnacg | Search, browsing, details, online reading, downloads and local favorites, with a configurable domain and link jumping. |
 | JM (18comic) | Home sections, category browsing (including Korean webtoons), rankings by day/week/month/all time, weekly picks, search, album-number jump, details with chapter list, read-only comments and related albums, online reading with image descrambling, previous/next chapter in the reader, downloads (single chapters or all chapters), local favorites, account login, selectable API and image lines. |
+| Tachiyomi / Mihon extensions | Extensions run inside the app: add extension repositories and install extensions (or APK files), browse each source's popular and latest lists, search a source with its filters or all sources at once, check favorites for new chapters, log in through a web page, and import a Tachiyomi/Mihon backup (`.tachibk`). Android loads extensions directly, iOS runs a Java runtime inside the app, and desktop builds bundle one (macOS: Apple silicon only; on Windows and Linux, extensions cannot use a web view yet). |
 | Komga | Libraries, series and books with server-side paging, sorting and filters, full-text search, a home page, offline downloads and two-way read-progress sync. |
 | Local | Downloaded galleries and archives (with archive preview), local image folders, and a PDF library. |
 
 Across sources:
 
-- a source picker at the top of the navigation drawer (the top of the side bar on desktop) switches the whole app between E-Hentai, nhentai, wnacg, JM, Komga and PDF, and shows the account of the chosen site; search keeps its own per-search site switch;
+- a source picker at the top of the navigation drawer (the top of the side bar on desktop) switches the whole app between E-Hentai, nhentai, wnacg, JM, Tachiyomi, Komga and PDF, and shows the account of the chosen site; search keeps its own per-search site switch;
 - an `EH` button on nhentai, wnacg and JM details searches the same title on E-Hentai;
 - one login page with a site picker (E-Hentai, nhentai, JM);
 - favorites of all sources can be shown mixed with E-Hentai favorites or separately;
-- cloud sync (WebDAV, S3-compatible, or a self-hosted sync server) of settings, local favorites, history, reading progress and logins;
+- cloud sync (WebDAV, S3-compatible, or a self-hosted sync server) of settings, local favorites, history, reading progress, logins, and Tachiyomi extensions with their settings;
 - a "Send to Telegraph bot" button for a self-hosted eh2telegraph service.
 
 ## Changes Compared With Upstream
@@ -58,8 +59,13 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - config sync keeps remote entries it does not understand (written by newer versions) and the types it is not syncing, and aborts instead of uploading when the remote file cannot be read.
   - sync server provider (a Cloudflare Worker with a D1 database in `sync_server/`, deployed by yourself): item-by-item sync where deletions reach other devices too; see the [wiki](https://github.com/errorfg/JHenTai/wiki/Sync-Service).
   - E-Hentai login included in sync (each device fetches its own `igneous`); the sync provider and switches stay each device's own choice.
+- Tachiyomi extensions:
+  - a host (`ext_host/`) runs Tachiyomi/Mihon extensions inside the app: on Android the system loads the extension APKs; on iOS an embedded OpenJDK (Zero interpreter) runs them after dex2jar conversion, with a compatibility layer for the Android classes they use and native networking; desktop builds bundle a Java runtime.
+  - Tachiyomi is a site beside E-Hentai, nhentai, wnacg and JM, with sources, search across all sources, updates (manual refresh) and an extensions page; manga and chapters reuse the details page, reader, favorites, history, progress and downloads, as JM's chapters do, and pages can be upscaled while reading.
+  - extensions that need a web page (for logging in) get one from the app's WKWebView on iOS and macOS and the system WebView on Android, with cookies shared both ways; "Open in web view" lets you complete such steps yourself.
+  - Tachiyomi/Mihon backups (`.tachibk`) can be imported; extensions and repositories, extension settings and Tachiyomi favorites are included in cloud sync (all syncing devices need 8.0.28 or later).
 - Gallery and search UX:
-  - multi-tag selection in detail page.
+  - multi-tag selection in detail page, searching or copying the selected tags.
   - client-side filters for Popular and Ranklist pages.
   - `nhentai` fallback search/detail/image flow support.
   - `nhentai` search supports EH/NH mode toggle (non-prefix input works in NH mode), while keeping `nh:` keyword-prefix compatibility and NH tag translation.
@@ -78,10 +84,11 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - galleries scrolled past count as read and show faded next time; a progress page shows what was read on a timeline, with where you left off and bookmarks; an "In Watched" button on details pages opens the watched list at that gallery.
 - Reading:
   - upscale pages while reading (experimental): with the upscaler programs on a desktop, or through an upscaling service (`sr_server/`) on another computer with a GPU, which phones and tablets can use too; see the [wiki](https://github.com/errorfg/JHenTai/wiki/Real-time-Upscaling).
-  - brightness lock in the reader's top bar on phones and tablets.
+  - split wide pages: an image wider than tall is cut in two, shown as two pages in single-page mode or one above the other in top-to-bottom mode.
+  - brightness lock in the reader's top bar on phones and tablets; the auto page turn is switched on and off in the reader's settings there.
   - a new E-Hentai version of a gallery takes over the reading progress of the version it replaces.
 - Foldable device support:
-  - global floating button to toggle between portrait and landscape orientation (mobile layout only).
+  - a rotation button that shows for 5 seconds when the device is turned away from the screen's orientation, in every layout; on iPad, which does not let apps turn the screen, it turns the app's interface within its window.
 - Local library & downloads:
   - archive preview page for browsing images inside downloaded archives.
   - switchable JHenTai, Komga, and PDF reading sources with a shared reader.
