@@ -38,8 +38,8 @@ class _TachiExtensionsPageState extends State<TachiExtensionsPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
   }
 
-  Future<void> _refresh() async {
-    await Future.wait(<Future<void>>[tachiExtensionService.refreshInstalled(), tachiExtensionService.refreshRepos()]);
+  Future<void> _refresh({bool userAsked = false}) async {
+    await Future.wait(<Future<void>>[tachiExtensionService.refreshInstalled(userAsked: userAsked), tachiExtensionService.refreshRepos()]);
   }
 
   Future<void> _run(Future<void> Function() action, String failure) async {
@@ -97,7 +97,7 @@ class _TachiExtensionsPageState extends State<TachiExtensionsPage> {
           title: widget.showTitle ? Text(widget.name ?? 'tachiExtensions'.tr) : null,
           centerTitle: true,
           actions: [
-            IconButton(icon: const Icon(Icons.refresh), tooltip: 'refresh'.tr, onPressed: _refresh),
+            IconButton(icon: const Icon(Icons.refresh), tooltip: 'refresh'.tr, onPressed: () => _refresh(userAsked: true)),
             PopupMenuButton<_MenuAction>(
               onSelected: _menu,
               itemBuilder: (_) => [

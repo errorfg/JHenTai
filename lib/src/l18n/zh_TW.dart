@@ -1211,6 +1211,7 @@ favnote：配對收藏備註
       'tachiAllSources': '全部來源',
       'tachiSearchAllSources': '在全部來源中搜尋',
       'tachiHostUnavailable': '插件宿主沒有啟動',
+      'tachiHostEndedApp': '上次啟動插件宿主時應用意外退出，已停止自動啟動。點「重試」再啟動一次。',
       'tachiInstalled': '已安裝',
       'tachiAvailable': '可安裝',
       'tachiRepositories': '倉庫',

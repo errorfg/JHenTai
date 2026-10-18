@@ -1290,6 +1290,7 @@ class ru_RU {
       'tachiAllSources': 'Все источники',
       'tachiSearchAllSources': 'Искать во всех источниках',
       'tachiHostUnavailable': 'Хост расширений не запустился',
+      'tachiHostEndedApp': 'В прошлый раз приложение закрылось при запуске хоста расширений, поэтому он больше не запускается сам. Нажмите «Повторить», чтобы запустить его снова.',
       'tachiInstalled': 'Установлены',
       'tachiAvailable': 'Доступны',
       'tachiRepositories': 'Репозитории',

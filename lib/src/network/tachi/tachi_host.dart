@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/services.dart';
+import 'package:get/get.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/path_service.dart';
 import 'package:jhentai/src/setting/network_setting.dart';
@@ -12,6 +13,7 @@ import 'package:path/path.dart' as p;
 
 import 'tachi_browser.dart';
 import 'tachi_client.dart';
+import 'tachi_models.dart';
 
 TachiHost tachiHost = TachiHost();
 
@@ -49,6 +51,20 @@ class TachiHost {
       tachiBrowser.relay();
       return client;
     }).whenComplete(() => _starting = null);
+  }
+
+  /// On iOS the host starts in the app's process, where a failed start can
+  /// end the app. A start leaves this file until it returns; finding it
+  /// means the last start ended the app, and the host is not started on its
+  /// own again (otherwise an app opening on Tachiyomi would end at every
+  /// launch) until the user asks for it: [allowStartAfterFailure].
+  File get _startMarker => File(p.join(dataDir.path, '.starting'));
+
+  /// The user asked to start the host again after a start ended the app.
+  void allowStartAfterFailure() {
+    if (Platform.isIOS && _startMarker.existsSync()) {
+      _startMarker.deleteSync();
+    }
   }
 
   /// After the host stopped answering (iOS reclaims sockets of apps in the
@@ -106,7 +122,17 @@ class TachiHost {
     });
     final Stopwatch watch = Stopwatch()..start();
     final int port;
-    if (Platform.isAndroid || Platform.isIOS) {
+    if (Platform.isIOS) {
+      if (_startMarker.existsSync()) {
+        throw TachiHostException('tachiHostEndedApp'.tr);
+      }
+      _startMarker.writeAsStringSync(DateTime.now().toIso8601String(), flush: true);
+      try {
+        port = await _channel.invokeMethod<int>('start', config) ?? -1;
+      } finally {
+        _startMarker.deleteSync();
+      }
+    } else if (Platform.isAndroid) {
       port = await _channel.invokeMethod<int>('start', config) ?? -1;
     } else {
       port = await _startProcess(config);

@@ -151,7 +151,12 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
   }
 
   /// Asks the host what it has installed (starting it if needed).
-  Future<void> refreshInstalled() async {
+  /// [userAsked]: a tap on refresh or retry, which also starts the host
+  /// after a start of it ended the app (TachiHost.allowStartAfterFailure).
+  Future<void> refreshInstalled({bool userAsked = false}) async {
+    if (userAsked) {
+      tachiHost.allowStartAfterFailure();
+    }
     loadingInstalled.value = true;
     try {
       installed.value = await tachiHost.run((TachiClient c) => c.extensions());

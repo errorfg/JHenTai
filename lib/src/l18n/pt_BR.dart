@@ -1288,6 +1288,7 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'tachiAllSources': 'Todas as fontes',
       'tachiSearchAllSources': 'Pesquisar em todas as fontes',
       'tachiHostUnavailable': 'O host de extensões não iniciou',
+      'tachiHostEndedApp': 'O app fechou na última vez que iniciou o host de extensões, por isso ele não inicia mais sozinho. Toque em Tentar novamente para iniciá-lo.',
       'tachiInstalled': 'Instaladas',
       'tachiAvailable': 'Disponíveis',
       'tachiRepositories': 'Repositórios',

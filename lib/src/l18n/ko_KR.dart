@@ -1239,6 +1239,7 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'tachiAllSources': '모든 소스',
       'tachiSearchAllSources': '모든 소스에서 검색',
       'tachiHostUnavailable': '확장 호스트가 시작되지 않았습니다',
+      'tachiHostEndedApp': '지난번 확장 호스트를 시작할 때 앱이 종료되어 자동 시작을 멈췄습니다. 다시 시도를 눌러 다시 시작하세요.',
       'tachiInstalled': '설치됨',
       'tachiAvailable': '설치 가능',
       'tachiRepositories': '저장소',

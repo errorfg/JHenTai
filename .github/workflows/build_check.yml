@@ -131,7 +131,7 @@ jobs:
         id: ios_jdk
         uses: actions/cache@v4
         with:
-          key: exthost-ios-jdk-${{ hashFiles('ext_host/ios/build-jdk.sh') }}
+          key: exthost-ios-jdk-${{ hashFiles('ext_host/ios/build-jdk.sh', 'ext_host/ios/jdk-ios.patch') }}
           path: ext_host/flutter/ios/jdk
 
       - name: Build iOS JDK

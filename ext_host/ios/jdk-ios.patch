@@ -1,0 +1,32 @@
+diff --git a/src/hotspot/os/posix/os_posix.cpp b/src/hotspot/os/posix/os_posix.cpp
+index 91a881bca..15622b743 100644
+--- a/src/hotspot/os/posix/os_posix.cpp
++++ b/src/hotspot/os/posix/os_posix.cpp
+@@ -822,6 +822,12 @@ size_t os::reserve_memory_limit() {
+ 
+ void* os::get_default_process_handle() {
+ #ifdef __APPLE__
++  // A VM linked statically into an image other than the main executable
++  // (a framework of an iOS app) finds the JDK's symbols in that image;
++  // RTLD_FIRST would search the main executable only.
++  if (is_vm_statically_linked()) {
++    return RTLD_DEFAULT;
++  }
+   // MacOS X needs to use RTLD_FIRST instead of RTLD_LAZY
+   // to avoid finding unexpected symbols on second (or later)
+   // loads of a library.
+diff --git a/src/java.base/unix/native/libjava/jni_util_md.c b/src/java.base/unix/native/libjava/jni_util_md.c
+index 7195b3def..e61051992 100644
+--- a/src/java.base/unix/native/libjava/jni_util_md.c
++++ b/src/java.base/unix/native/libjava/jni_util_md.c
+@@ -44,7 +44,9 @@ void* getProcessHandle() {
+         return procHandle;
+     }
+ #ifdef __APPLE__
+-    procHandle = (void*)dlopen(NULL, RTLD_FIRST);
++    // As os::get_default_process_handle(): a statically linked JDK may sit
++    // in an image other than the main executable.
++    procHandle = JVM_IsStaticallyLinked() ? RTLD_DEFAULT : (void*)dlopen(NULL, RTLD_FIRST);
+ #else
+     procHandle = (void*)dlopen(NULL, RTLD_LAZY);
+ #endif

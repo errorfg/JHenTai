@@ -72,7 +72,7 @@ class _TachiSourcesPageState extends State<TachiSourcesPage> {
         title: widget.showTitle ? Text(widget.name ?? 'tachiSources'.tr) : null,
         centerTitle: true,
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), tooltip: 'refresh'.tr, onPressed: tachiExtensionService.refreshInstalled),
+          IconButton(icon: const Icon(Icons.refresh), tooltip: 'refresh'.tr, onPressed: () => tachiExtensionService.refreshInstalled(userAsked: true)),
         ],
       ),
       body: Obx(() {
@@ -84,7 +84,7 @@ class _TachiSourcesPageState extends State<TachiSourcesPage> {
           return _Message(
             icon: Icons.error_outline,
             text: '${'tachiHostUnavailable'.tr}\n$error',
-            action: TextButton(onPressed: tachiExtensionService.refreshInstalled, child: Text('retry'.tr)),
+            action: TextButton(onPressed: () => tachiExtensionService.refreshInstalled(userAsked: true), child: Text('retry'.tr)),
           );
         }
         final List<TachiSourceInfo> sources = tachiExtensionService.sources;

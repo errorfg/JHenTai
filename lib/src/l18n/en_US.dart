@@ -1405,6 +1405,7 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'tachiAllSources': 'All sources',
       'tachiSearchAllSources': 'Search all sources',
       'tachiHostUnavailable': 'The extension host did not start',
+      'tachiHostEndedApp': 'The app quit the last time it started the extension host, so the host no longer starts on its own. Tap Retry to start it again.',
       'tachiInstalled': 'Installed',
       'tachiAvailable': 'Available',
       'tachiRepositories': 'Repositories',

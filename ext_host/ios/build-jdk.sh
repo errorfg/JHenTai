@@ -2,8 +2,8 @@
 # Builds the OpenJDK the iOS app carries, and puts it where the tachi_host
 # pod takes it (ext_host/flutter/ios/jdk/):
 #   - libffi for iOS (Zero's calls into native code);
-#   - openjdk/mobile for iOS devices: the Zero VM and the JDK's native
-#     libraries as static archives;
+#   - openjdk/mobile for iOS devices, with jdk-ios.patch: the Zero VM and
+#     the JDK's native libraries as static archives;
 #   - a macOS JDK from the same source, only for its jlink and jmod;
 #   - the runtime image: java.base, java.logging, jdk.unsupported, jdk.zipfs;
 #   - the host jar (ext_host/jvm).
@@ -57,6 +57,12 @@ if [ ! -d mobile ]; then
   git -C mobile remote add origin "$MOBILE_REPO"
   git -C mobile fetch -q --depth 1 origin "$MOBILE_COMMIT"
   git -C mobile checkout -q FETCH_HEAD
+fi
+# jdk-ios.patch: the statically linked VM looks up the JDK's symbols in the
+# whole process, as it sits in the tachi_host framework rather than in the
+# app's executable.
+if ! git -C mobile apply --reverse --check "$HERE/jdk-ios.patch" 2>/dev/null; then
+  git -C mobile apply "$HERE/jdk-ios.patch"
 fi
 cd mobile
 
