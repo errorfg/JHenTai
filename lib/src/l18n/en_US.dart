@@ -751,6 +751,7 @@ class en_US {
       'showThumbnails': 'Show Thumbnails',
       'showScrollBar': 'Show Scroll Bar',
       'showStatusInfo': 'Show Status at Bottom',
+      'autoMode': 'Turn pages automatically',
       'autoModeInterval': 'Turn Page Interval',
       'autoModeStyle': 'Auto mode style',
       'brightnessLocked': 'Brightness locked at @percent%',

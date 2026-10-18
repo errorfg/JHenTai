@@ -18,6 +18,7 @@ import '../../../utils/route_util.dart';
 import '../../../utils/text_input_formatter.dart';
 import '../../../utils/toast_util.dart';
 import '../../home_page.dart';
+import '../../read/read_page_logic.dart';
 
 class SettingReadPage extends StatelessWidget {
   final TextEditingController imageRegionWidthRatioController = TextEditingController(text: readSetting.imageRegionWidthRatio.value.toString());
@@ -38,6 +39,12 @@ class SettingReadPage extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.only(top: 16),
                 children: [
+                  // Opened from the reader: its pages turn by themselves
+                  // from here, the menu's first row having no room for it.
+                  if (Get.isRegistered<ReadPageLogic>()) ...[
+                    _buildAutoMode(context).center(),
+                    const Divider(),
+                  ],
                   // First, where it is at hand from the reader: a change
                   // shows on the page being read.
                   if (realtimeSrService.supported) ...[
@@ -111,6 +118,26 @@ class SettingReadPage extends StatelessWidget {
                 ],
               ).withListTileTheme(context),
             ),
+      ),
+    );
+  }
+
+  /// Switched on, back on the page the interval is asked and pages turn
+  /// until switched off here, or the last page.
+  Widget _buildAutoMode(BuildContext context) {
+    final ReadPageLogic reader = Get.find<ReadPageLogic>();
+    return GetBuilder<ReadPageLogic>(
+      id: reader.autoModeId,
+      builder: (_) => SwitchListTile(
+        key: const Key('autoModeSwitch'),
+        title: Text('autoMode'.tr),
+        subtitle: Text('${'autoModeInterval'.tr}: ${readSetting.autoModeInterval.value} s'),
+        value: reader.state.autoMode,
+        onChanged: (_) {
+          // The settings are a page or a drawer over the reader.
+          Navigator.of(context, rootNavigator: true).pop();
+          reader.toggleAutoMode();
+        },
       ),
     );
   }
