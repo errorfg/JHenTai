@@ -342,7 +342,9 @@ class zh_TW {
       /// style setting page
       'layoutMode': '佈局模式',
       'showRotationFAB': '顯示旋轉按鈕',
-      'showRotationFABHint': '顯示一個浮動按鈕來切換直屏和橫屏',
+      'showRotationFABHint': '裝置轉到與螢幕不同的方向時，左下角顯示按鈕 5 秒，點按後螢幕轉到裝置的方向',
+      'rotateToLandscape': '轉為橫屏',
+      'rotateToPortrait': '轉為直屏',
       'enableTagZHTranslation': '開啟標籤中文翻譯',
       'version': '版本',
       'downloadTagTranslationHint': '下載資料中... 已下載: ',

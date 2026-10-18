@@ -345,7 +345,9 @@ class en_US {
       'layoutMode': 'Layout Mode',
       'showRotationFAB': 'Show Rotation Button',
       'showRotationFABHint':
-          'Show a floating button to toggle between portrait and landscape',
+          'When the device is turned away from the screen\'s orientation, a button shows at the bottom left for 5 seconds; tap it to turn the screen with the device',
+      'rotateToLandscape': 'Turn to landscape',
+      'rotateToPortrait': 'Turn to portrait',
       'mobileLayoutV2Name': 'Mobile',
       'mobileLayoutV2Desc': 'Single column',
       'mobileLayoutName': 'Mobile(old)',

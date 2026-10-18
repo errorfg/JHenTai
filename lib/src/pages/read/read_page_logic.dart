@@ -1105,12 +1105,14 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     }
   }
 
+  /// Back to the app's screen orientation: the system's, or the one chosen
+  /// with the rotation button.
   void restoreDeviceOrientation() {
     if (!GetPlatform.isMobile) {
       return;
     }
 
-    SystemChrome.setPreferredOrientations([]);
+    SystemChrome.setPreferredOrientations(styleSetting.lockedOrientations);
   }
 
   @override
