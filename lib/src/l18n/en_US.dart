@@ -1386,6 +1386,9 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'other': 'Other',
 
       /// Tachiyomi extensions
+      'sources': 'Sources',
+      'updates': 'Updates',
+      'extensions': 'Extensions',
       'tachiSources': 'Sources',
       'tachiUpdates': 'Updates',
       'tachiExtensions': 'Extensions',

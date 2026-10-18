@@ -1269,6 +1269,9 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'other': 'Outro',
 
       /// Tachiyomi extensions
+      'sources': 'Fontes',
+      'updates': 'Atualizações',
+      'extensions': 'Extensões',
       'tachiSources': 'Fontes',
       'tachiUpdates': 'Atualizações',
       'tachiExtensions': 'Extensões',

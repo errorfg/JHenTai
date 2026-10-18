@@ -1271,6 +1271,9 @@ class ru_RU {
       'other': 'Другое',
 
       /// Tachiyomi extensions
+      'sources': 'Источники',
+      'updates': 'Обновления',
+      'extensions': 'Расширения',
       'tachiSources': 'Источники',
       'tachiUpdates': 'Обновления',
       'tachiExtensions': 'Расширения',

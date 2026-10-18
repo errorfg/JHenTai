@@ -1320,6 +1320,9 @@ favnote：匹配收藏备注
       'other': '其他',
 
       /// Tachiyomi extensions
+      'sources': '来源',
+      'updates': '更新',
+      'extensions': '插件',
       'tachiSources': '来源',
       'tachiUpdates': '更新',
       'tachiExtensions': '插件',

@@ -71,7 +71,7 @@ List<TabBarIcon> siteSchemeIcons(
     case ContentScheme.tachiyomi:
       return [
         TabBarIcon(
-          name: TabBarIconNameEnum.home,
+          name: TabBarIconNameEnum.sources,
           routeName: '/scheme/tachiyomi/sources',
           selectedIcon: const Icon(Icons.explore),
           unselectedIcon: const Icon(Icons.explore_outlined),

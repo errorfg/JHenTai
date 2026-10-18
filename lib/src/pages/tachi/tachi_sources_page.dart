@@ -56,7 +56,7 @@ class _TachiSourcesPageState extends State<TachiSourcesPage> {
   void initState() {
     super.initState();
     if (tachiExtensionService.installed.isEmpty) {
-      tachiExtensionService.refreshInstalled();
+      WidgetsBinding.instance.addPostFrameCallback((_) => tachiExtensionService.refreshInstalled());
     }
   }
 

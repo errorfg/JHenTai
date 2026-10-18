@@ -1,4 +1,7 @@
 import 'dart:collection';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 
 import 'package:intl/intl.dart';
 import 'package:jhentai/src/database/database.dart';
@@ -53,12 +56,14 @@ class TachiImages {
     final Uri pseudo = Uri.parse(url);
     final String source = pseudo.host;
     final Map<String, String> q = pseudo.queryParameters;
+    // The image cache names its files by the key: a hash, not the URL.
+    String key(String text) => sha1.convert(utf8.encode(text)).toString();
     if (pseudo.scheme == _cover) {
-      return (uri: client.coverUri(source, q['u']!), cacheKey: 'tachi-cover:$source:${q['u']}');
+      return (uri: client.coverUri(source, q['u']!), cacheKey: key('tachi-cover|$source|${q['u']}'));
     }
     return (
       uri: client.imageUri(source, imageUrl: q['u'], pageUrl: q['p'] ?? '', index: int.tryParse(q['i'] ?? '') ?? 0),
-      cacheKey: 'tachi-image:$source:${q['u'] ?? q['p']}',
+      cacheKey: key('tachi-image|$source|${q['u'] ?? q['p']}'),
     );
   }
 }

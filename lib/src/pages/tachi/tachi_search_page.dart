@@ -51,7 +51,7 @@ class _TachiSearchPageState extends State<TachiSearchPage> {
   void initState() {
     super.initState();
     if (tachiExtensionService.installed.isEmpty) {
-      tachiExtensionService.refreshInstalled();
+      WidgetsBinding.instance.addPostFrameCallback((_) => tachiExtensionService.refreshInstalled());
     }
   }
 

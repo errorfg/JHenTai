@@ -17,6 +17,7 @@ enum TabBarIconNameEnum {
   weekly,
   updates,
   extensions,
+  sources,
 }
 
 class TabBarIcon {

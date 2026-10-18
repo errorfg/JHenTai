@@ -19,7 +19,7 @@ OUT="$EXT_HOST/flutter/ios/jdk"
 
 # Pinned sources.
 MOBILE_REPO=https://github.com/openjdk/mobile.git
-MOBILE_COMMIT=c1ed06aaef
+MOBILE_COMMIT=c1ed06aaef34c8dccf71e236d1ffa20918a77cfb
 LIBFFI_VERSION=3.8.0
 BOOT_JDK_URL=https://github.com/adoptium/temurin26-binaries/releases/download/jdk-26.0.2.1%2B1/OpenJDK26U-jdk_aarch64_mac_hotspot_26.0.2.1_1.tar.gz
 BOOT_JDK_SHA256=8c77a069a150c5b1c80280269ba062463053ebb7619ddef38dcfe3921fc60bdd

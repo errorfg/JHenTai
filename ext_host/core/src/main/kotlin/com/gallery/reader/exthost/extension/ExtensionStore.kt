@@ -136,7 +136,14 @@ class ExtensionStore(
 
     fun list(): List<InstalledExtension> = installed.values.sortedBy { it.name.lowercase() }
 
-    fun icon(pkg: String): File? = File(File(root, pkg), ICON).takeIf { it.isFile }
+    /** The extension's icon, taken from its APK the first time if needed. */
+    fun icon(pkg: String): File? {
+        val dir = File(root, pkg)
+        val icon = File(dir, ICON)
+        val apk = File(dir, APK)
+        if (!icon.isFile && apk.isFile) runCatching { extractIcon(apk, icon) }
+        return icon.takeIf { it.isFile }
+    }
 
     fun extensionOf(sourceId: Long): InstalledExtension? = sourcePackage[sourceId]?.let { installed[it] }
 
@@ -258,18 +265,20 @@ class ExtensionStore(
             }
 
     // The launcher icon: the largest ic_launcher PNG among the mipmap folders.
+    // Shrunk APKs rename resources (res/Ab.png); their PNGs are the launcher
+    // icon in its sizes, so then the largest PNG.
     private fun extractIcon(
         apk: File,
         target: File,
     ) {
         ZipFile(apk).use { zip ->
+            val pngs = zip.entries().asSequence().filter { it.name.startsWith("res/") && it.name.endsWith(".png") }.toList()
             val entry =
-                zip
-                    .entries()
-                    .asSequence()
-                    .filter { it.name.startsWith("res/mipmap") && it.name.endsWith(".png") && it.name.substringAfterLast('/').startsWith("ic_launcher") }
+                pngs
+                    .filter { it.name.substringAfterLast('/').startsWith("ic_launcher") }
                     .filterNot { it.name.contains("foreground") || it.name.contains("background") }
                     .maxByOrNull { it.size }
+                    ?: pngs.maxByOrNull { it.size }
                     ?: return
             zip.getInputStream(entry).use { input -> target.outputStream().use { input.copyTo(it) } }
         }
