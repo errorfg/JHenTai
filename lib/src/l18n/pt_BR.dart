@@ -575,6 +575,10 @@ class pt_BR {
       'enableOrientationSpecificReadDirectionHint': 'Definir direções de leitura diferentes para orientações retrato e paisagem',
       'autoDetectWebtoon': 'Detectar webtoon automaticamente',
       'autoDetectWebtoonHint': 'Usar automaticamente o modo de leitura contínua de cima para baixo para galerias com a tag webtoon',
+      'splitWidePages': 'Dividir páginas duplas',
+      'splitWidePagesHint': 'Corta ao meio as imagens mais largas que altas: duas páginas no modo de página única, uma metade sobre a outra de cima para baixo',
+      'invertSplitOrder': 'Inverter ordem da divisão',
+      'invertSplitOrderHint': 'Por padrão, a metade direita vem primeiro da direita para a esquerda e de cima para baixo, e a esquerda da esquerda para a direita',
       'portraitReadDirection': 'Direção de leitura (retrato)',
       'landscapeReadDirection': 'Direção de leitura (paisagem)',
       'autoSwitchedReadDirection':

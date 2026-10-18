@@ -18,6 +18,7 @@ import '../../../../widget/icon_text_button.dart';
 import '../../../../widget/loading_state_indicator.dart';
 import '../../read_page_logic.dart';
 import '../../read_page_state.dart';
+import '../../spread_pages.dart';
 import 'base_layout_logic.dart';
 
 class ScrollOffsetToScrollController extends ScrollController {
@@ -67,6 +68,81 @@ abstract class BaseLayout extends StatelessWidget {
   }
 
   Widget buildBody(BuildContext context);
+
+  /// Records image [index]'s container size from its loaded [info], and
+  /// whether it is wider than tall.
+  void _measure(int index, ImageInfo info) {
+    final Size imageSize = Size(info.image.width.toDouble(), info.image.height.toDouble());
+    final bool foundSpread = imageSize.width > imageSize.height && readPageState.spreadPages.mark(index);
+    logic.readPageState.imageContainerSizes[index] = logic.containerSizeOf(index, imageSize);
+    if (foundSpread) {
+      logic.onSpreadFound(index);
+    }
+  }
+
+  /// Image [index], as the mode of the book being read loads it.
+  Widget buildItem(BuildContext context, int index) =>
+      readPageState.readPageInfo.mode == ReadMode.online ? buildItemInOnlineMode(context, index) : buildItemInLocalMode(context, index);
+
+  /// [part] of image [index] as a page of the single-page layout. A half is
+  /// shown once the image's size is known; until then the page shows the
+  /// image loading.
+  Widget buildPagePart(BuildContext context, int index, ImagePart part) {
+    if (part == ImagePart.whole) {
+      return buildItem(context, index);
+    }
+    return GetBuilder<ReadPageLogic>(
+      id: '${readPageLogic.onlineImageId}::$index',
+      builder: (_) {
+        final Size? size = readPageState.imageContainerSizes[index];
+        if (size == null || !logic.isSplit(index)) {
+          return buildItem(context, index);
+        }
+        return Center(child: _half(context, index, size, right: (part == ImagePart.first) == readPageLogic.splitRightHalfFirst));
+      },
+    );
+  }
+
+  /// Image [index], or when it is split its halves one above the other, the
+  /// half read first on top.
+  Widget buildItemWithHalvesStacked(BuildContext context, int index) {
+    return GetBuilder<ReadPageLogic>(
+      id: '${readPageLogic.onlineImageId}::$index',
+      builder: (_) {
+        final Size? size = readPageState.imageContainerSizes[index];
+        if (size == null || !logic.isSplit(index)) {
+          return buildItem(context, index);
+        }
+        final bool rightFirst = readPageLogic.splitRightHalfFirst;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _half(context, index, size, right: rightFirst),
+            SizedBox(height: readSetting.imageSpace.value.toDouble()),
+            _half(context, index, size, right: !rightFirst),
+          ],
+        );
+      },
+    );
+  }
+
+  /// The [right] or left half of image [index], laid out at [whole] size.
+  Widget _half(BuildContext context, int index, Size whole, {required bool right}) {
+    return SizedBox(
+      width: whole.width / 2,
+      height: whole.height,
+      child: ClipRect(
+        child: OverflowBox(
+          minWidth: whole.width,
+          maxWidth: whole.width,
+          minHeight: whole.height,
+          maxHeight: whole.height,
+          alignment: right ? Alignment.centerRight : Alignment.centerLeft,
+          child: buildItem(context, index),
+        ),
+      ),
+    );
+  }
 
   /// online mode: parsing and loading automatically while scrolling
   Widget buildItemInOnlineMode(BuildContext context, int index) {
@@ -224,10 +300,7 @@ abstract class BaseLayout extends StatelessWidget {
       if (state.extendedImageInfo == null || logic.readPageState.imageContainerSizes[index] != null) {
         return;
       }
-      FittedSizes fittedSizes = logic.getImageFittedSize(
-        Size(state.extendedImageInfo!.image.width.toDouble(), state.extendedImageInfo!.image.height.toDouble()),
-      );
-      logic.readPageState.imageContainerSizes[index] = fittedSizes.destination;
+      _measure(index, state.extendedImageInfo!);
       logic.readPageLogic.updateSafely(['${readPageLogic.onlineImageId}::$index']);
     });
 
@@ -440,11 +513,10 @@ abstract class BaseLayout extends StatelessWidget {
       if (state.extendedImageInfo == null || logic.readPageState.imageContainerSizes[index] != null) {
         return;
       }
-      FittedSizes fittedSizes = logic.getImageFittedSize(
-        Size(state.extendedImageInfo!.image.width.toDouble(), state.extendedImageInfo!.image.height.toDouble()),
-      );
-      logic.readPageState.imageContainerSizes[index] = fittedSizes.destination;
+      _measure(index, state.extendedImageInfo!);
       galleryDownloadService.updateSafely(['${galleryDownloadService.downloadImageId}::${readPageState.readPageInfo.gid}::$index']);
+      // The halves of a split image are built around the page (buildPagePart).
+      logic.readPageLogic.updateSafely(['${readPageLogic.onlineImageId}::$index']);
     });
 
     return null;

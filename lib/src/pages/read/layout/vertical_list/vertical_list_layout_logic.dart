@@ -246,6 +246,9 @@ class VerticalListLayoutLogic extends BaseLayoutLogic {
     return screenHeight - Get.mediaQuery.padding.bottom - (readSetting.enableImmersiveMode.isTrue ? 0 : Get.mediaQuery.padding.top);
   }
 
+  @override
+  bool get splitsWideImages => true;
+
   /// Compute image container size when we haven't parsed image's size
   @override
   Size getPlaceHolderSize(int imageIndex) {

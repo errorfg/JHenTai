@@ -744,6 +744,34 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
     );
   }
 
+  /// Whether this layout splits wide images when splitting is on (single
+  /// page and top to bottom).
+  bool get splitsWideImages => false;
+
+  /// Whether image [index] is shown split: a wide image, in a layout that
+  /// splits them, with splitting on.
+  bool isSplit(int index) => splitsWideImages && readSetting.splitWidePages.isTrue && readPageState.spreadPages[index];
+
+  /// The size of image [index]'s container once the image's size is known.
+  /// A split image is laid out at twice the width of one half fitted as a
+  /// page, and each half shown clipped from it.
+  Size containerSizeOf(int index, Size imageSize) {
+    if (isSplit(index)) {
+      final Size half = fitHalf(Size(imageSize.width / 2, imageSize.height));
+      return Size(half.width * 2, half.height);
+    }
+    return getImageFittedSize(imageSize).destination;
+  }
+
+  /// One half of a split image, fitted as a page of this layout.
+  Size fitHalf(Size half) => getImageFittedSize(half).destination;
+
+  /// Image [index] was found to be wider than tall, the first time.
+  void onSpreadFound(int index) {}
+
+  /// Splitting wide pages was switched on or off.
+  void onSplitSettingChanged() {}
+
   Alignment _computeAlignmentByTapOffset(Offset offset) {
     return Alignment((offset.dx - Get.size.width / 2) / (Get.size.width / 2), (offset.dy - Get.size.height / 2) / (Get.size.height / 2));
   }

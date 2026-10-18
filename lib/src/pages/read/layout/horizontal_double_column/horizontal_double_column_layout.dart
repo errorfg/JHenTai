@@ -157,8 +157,8 @@ class HorizontalDoubleColumnLayout extends BaseLayout {
       );
       logic.readPageState.imageContainerSizes[index] = fittedSizes.destination;
 
-      await this.state.isSpreadPageCompleter.future;
-      if (isSpreadPage && !this.state.isSpreadPage[index]) {
+      await readPageState.spreadPages.loaded;
+      if (isSpreadPage && !readPageState.spreadPages[index]) {
         logic.updateSpreadPage(index);
       } else {
         logic.readPageLogic.updateSafely([
@@ -199,8 +199,8 @@ class HorizontalDoubleColumnLayout extends BaseLayout {
       );
       logic.readPageState.imageContainerSizes[index] = fittedSizes.destination;
 
-      await this.state.isSpreadPageCompleter.future;
-      if (isSpreadPage && !this.state.isSpreadPage[index]) {
+      await readPageState.spreadPages.loaded;
+      if (isSpreadPage && !readPageState.spreadPages[index]) {
         logic.updateSpreadPage(index);
       } else {
         galleryDownloadService.updateSafely([

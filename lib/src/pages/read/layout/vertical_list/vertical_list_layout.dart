@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:jhentai/src/model/read_page_info.dart';
 import 'package:jhentai/src/pages/read/layout/vertical_list/vertical_list_layout_state.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -76,9 +75,8 @@ class VerticalListLayout extends BaseLayout {
         ),
         Expanded(
           flex: logic.readPageLogic.effectiveImageRegionWidthRatio * 2,
-          child: readPageState.readPageInfo.mode == ReadMode.online
-              ? buildItemInOnlineMode(context, index)
-              : buildItemInLocalMode(context, index),
+          // The halves of a wide image one above the other when wide pages are split.
+          child: buildItemWithHalvesStacked(context, index),
         ),
         Expanded(
           flex: 100 - logic.readPageLogic.effectiveImageRegionWidthRatio,

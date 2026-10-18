@@ -11,6 +11,7 @@ import '../../model/gallery_thumbnail.dart';
 import '../../service/gallery_download_service.dart';
 import '../../setting/read_setting.dart';
 import '../../widget/loading_state_indicator.dart';
+import 'spread_pages.dart';
 
 class ReadPageState with ScrollStatusListerState {
   /// gallery info
@@ -45,6 +46,9 @@ class ReadPageState with ScrollStatusListerState {
   /// The books being read, in order; the first is the one the reader was
   /// opened with, later ones are appended as reading goes on.
   late final List<ReadSegment> segments;
+
+  /// Which images are wider than tall, as found while reading.
+  late final SpreadPages spreadPages = SpreadPages(this);
 
   ReadPageState() {
     segments = <ReadSegment>[ReadSegment(info: readPageInfo, start: 0, pageCount: readPageInfo.pageCount)];
