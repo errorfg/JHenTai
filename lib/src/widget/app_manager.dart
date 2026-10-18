@@ -133,6 +133,15 @@ class _AppManagerState extends State<AppManager> with WidgetsBindingObserver {
   }
 
   @override
+  void didChangeMetrics() {
+    // The system may have turned the screen.
+    if (styleSetting.showRotationFAB.isTrue) {
+      interfaceRotation.refresh();
+    }
+    super.didChangeMetrics();
+  }
+
+  @override
   void didHaveMemoryPressure() {
     if (_currentState == AppLifecycleState.resumed) {
       for (DidHaveMemoryPressureCallback callback in AppManager._didHaveMemoryPressureCallbacks) {
@@ -156,19 +165,29 @@ class _AppManagerState extends State<AppManager> with WidgetsBindingObserver {
     return ScrollConfiguration(
       behavior: UIConfig.scrollBehaviourWithScrollBar,
       child: Obx(() {
-        if (styleSetting.showRotationFAB.isTrue && styleSetting.isInMobileLayout) {
-          return Stack(
-            children: [
-              child,
-              Positioned(
-                left: 16,
-                bottom: MediaQuery.of(context).padding.bottom + 16,
-                child: _buildRotationFAB(),
-              ),
-            ],
-          );
+        if (styleSetting.showRotationFAB.isFalse) {
+          return child;
         }
-        return child;
+        // Where the app may not turn the screen, its interface is turned
+        // within the window, the button with it.
+        final int turns = interfaceRotation.turns.value;
+        final MediaQueryData media = turnedMediaQuery(MediaQuery.of(context), turns);
+        return MediaQuery(
+          data: media,
+          child: RotatedBox(
+            quarterTurns: turns,
+            child: Stack(
+              children: [
+                child,
+                Positioned(
+                  left: 16,
+                  bottom: media.padding.bottom + 16,
+                  child: _buildRotationFAB(),
+                ),
+              ],
+            ),
+          ),
+        );
       }),
     );
   }
@@ -177,6 +196,7 @@ class _AppManagerState extends State<AppManager> with WidgetsBindingObserver {
   /// is in front.
   void _syncRotationSensor() {
     if (styleSetting.showRotationFAB.isTrue && _currentState == AppLifecycleState.resumed) {
+      interfaceRotation.refresh();
       rotationSuggester.start();
     } else {
       rotationSuggester.stop();
@@ -188,29 +208,29 @@ class _AppManagerState extends State<AppManager> with WidgetsBindingObserver {
   Widget _buildRotationFAB() {
     return Obx(() {
       final HeldOrientation? offer = rotationSuggester.offer.value;
-      final bool toPortrait = (offer ?? rotationSuggester.lastOffer) == HeldOrientation.portraitUp;
+      final HeldOrientation? shownOffer = offer ?? rotationSuggester.lastOffer;
+      final bool toPortrait = shownOffer == HeldOrientation.portraitUp || shownOffer == HeldOrientation.portraitDown;
       return IgnorePointer(
         ignoring: offer == null,
         child: AnimatedOpacity(
           opacity: offer == null ? 0 : 1,
           duration: const Duration(milliseconds: 200),
-          // Above the navigator, where there is no overlay for a tooltip.
-          child: Semantics(
-            label: toPortrait ? 'rotateToPortrait'.tr : 'rotateToLandscape'.tr,
-            child: SizedBox(
-              width: 40,
-              height: 40,
-              child: FloatingActionButton(
-                key: const Key('rotationFAB'),
-                heroTag: 'rotationFAB',
-                onPressed: offer == null ? null : () => _rotateTo(offer),
-                backgroundColor: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
-                elevation: 2,
-                child: Icon(
-                  toPortrait ? Icons.screen_lock_portrait : Icons.screen_lock_landscape,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                ),
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: FloatingActionButton(
+              key: const Key('rotationFAB'),
+              heroTag: 'rotationFAB',
+              onPressed: offer == null ? null : () => _rotateTo(offer),
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.8),
+              elevation: 2,
+              // Named by its icon: above the navigator, there is no overlay
+              // for a tooltip.
+              child: Icon(
+                toPortrait ? Icons.screen_lock_portrait : Icons.screen_lock_landscape,
+                size: 20,
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                semanticLabel: toPortrait ? 'rotateToPortrait'.tr : 'rotateToLandscape'.tr,
               ),
             ),
           ),
@@ -220,8 +240,12 @@ class _AppManagerState extends State<AppManager> with WidgetsBindingObserver {
   }
 
   void _rotateTo(HeldOrientation held) {
-    styleSetting.lockOrientation(<DeviceOrientation>[screenOrientationFor(held, ios: GetPlatform.isIOS)]);
     rotationSuggester.dismiss();
+    if (interfaceRotation.active) {
+      interfaceRotation.turnTo(held);
+    } else {
+      styleSetting.lockOrientation(<DeviceOrientation>[screenOrientationFor(held, ios: GetPlatform.isIOS)]);
+    }
   }
 
   void _changeTheme() {

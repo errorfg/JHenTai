@@ -773,7 +773,7 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
   void onSplitSettingChanged() {}
 
   Alignment _computeAlignmentByTapOffset(Offset offset) {
-    return Alignment((offset.dx - Get.size.width / 2) / (Get.size.width / 2), (offset.dy - Get.size.height / 2) / (Get.size.height / 2));
+    return Alignment((offset.dx - uiSize.width / 2) / (uiSize.width / 2), (offset.dy - uiSize.height / 2) / (uiSize.height / 2));
   }
 
   Future<bool> _ensureSave2AlbumPermission() async {

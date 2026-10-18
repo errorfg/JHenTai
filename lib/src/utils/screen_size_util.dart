@@ -1,13 +1,19 @@
+import 'dart:ui';
+
 import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/setting/style_setting.dart';
+import 'package:jhentai/src/widget/rotation_suggestion.dart';
 
-double get fullScreenWidth => Get.width;
+/// The window's size as the interface sees it, turned within the app or not.
+Size get uiSize => interfaceRotation.turnedSize(Get.size);
+
+double get fullScreenWidth => uiSize.width;
 
 double get screenWidth => styleSetting.isInMobileLayout
-    ? Get.width
+    ? uiSize.width
     : styleSetting.isInTabletLayout
-        ? Get.width / 2
-        : (Get.width - UIConfig.desktopLeftTabBarWidth) / 2;
+        ? uiSize.width / 2
+        : (uiSize.width - UIConfig.desktopLeftTabBarWidth) / 2;
 
-double get screenHeight => Get.height;
+double get screenHeight => uiSize.height;
