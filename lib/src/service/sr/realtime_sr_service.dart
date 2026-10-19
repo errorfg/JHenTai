@@ -29,7 +29,7 @@ class _Task {
 
   final String key;
   final SrConfig config;
-  final int position;
+  int position;
   final int strips;
   final bool splitWide;
   final Future<Uint8List?> Function() loadEncoded;
@@ -209,6 +209,14 @@ class RealtimeSrService {
       task.done.complete(null);
     }
     _pending.clear();
+  }
+
+  /// [count] pages were put before the reader's first: the pages waiting
+  /// are that much further on.
+  void shiftPositions(int count) {
+    for (final _Task task in _pending) {
+      task.position += count;
+    }
   }
 
   /// The next batch: the waiting pages nearest ahead of the reader, pages

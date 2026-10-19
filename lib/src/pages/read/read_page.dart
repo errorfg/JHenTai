@@ -121,6 +121,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                     ),
                     buildRightBottomInfo(context),
                     buildNextBookButton(context),
+                    buildPreviousBookLoading(context),
                     buildTopMenu(context),
                     buildBottomMenu(context),
                   ],
@@ -315,12 +316,12 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                 IconButton(
                   tooltip: logic.previousSiblingLabel,
                   icon: const Icon(Icons.skip_previous, color: UIConfig.readPageButtonColor),
-                  onPressed: logic.openingSibling ? null : () => logic.openSiblingBook(next: false),
+                  onPressed: logic.openingSibling || logic.loadingPreviousBook ? null : () => logic.openSiblingBook(next: false),
                 ),
                 IconButton(
                   tooltip: logic.nextSiblingLabel,
                   icon: const Icon(Icons.skip_next, color: UIConfig.readPageButtonColor),
-                  onPressed: logic.openingSibling ? null : () => logic.openSiblingBook(next: true),
+                  onPressed: logic.openingSibling || logic.loadingPreviousBook ? null : () => logic.openSiblingBook(next: true),
                 ),
               ],
               if (logic.canUseRealtimeSr)
@@ -549,6 +550,27 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
             containerHeight: constraints.maxHeight,
             containerWidth: constraints.maxWidth,
             borderRadius: BorderRadius.circular(8),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Shown at the top while the book before the first one is fetched.
+  Widget buildPreviousBookLoading(BuildContext context) {
+    return GetBuilder<ReadPageLogic>(
+      id: logic.endOfBookId,
+      builder: (_) {
+        if (!logic.loadingPreviousBook) {
+          return const SizedBox();
+        }
+        return Positioned(
+          key: const Key('previousBookLoading'),
+          left: 0,
+          right: 0,
+          top: 12 + context.mediaQuery.padding.top,
+          child: const Center(
+            child: SizedBox.square(dimension: 24, child: CircularProgressIndicator(strokeWidth: 2)),
           ),
         );
       },

@@ -33,6 +33,7 @@ import 'package:path/path.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:saver_gallery/saver_gallery.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../exception/eh_image_exception.dart';
@@ -56,6 +57,9 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
   Worker? tapDragGestureSwitcherListener;
   Worker? showScrollBarListener;
 
+  /// Whether the list being dragged was pulled past its first page.
+  bool _pulledPastStart = false;
+
   @override
   void onInit() {
     doubleTapGestureSwitcherListener = ever(readSetting.enableDoubleTapToScaleUp, (value) => updateSafely([pageId]));
@@ -76,6 +80,31 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
   /// Pages of another book were added after the last page.
   void onPagesAppended() {
     updateSafely([pageId]);
+  }
+
+  /// [count] pages of another book were put before the first page: every
+  /// page is that much further on.
+  void onPagesPrepended(int count) => onPagesAppended();
+
+  /// For the scrolling layouts' list: whether it shows its first page from
+  /// the top (the left, or the right from right to left), so that turning
+  /// back fetches the book before.
+  bool listAtStart(List<ItemPosition> visible) =>
+      visible.isNotEmpty && visible.first.index == 0 && visible.first.itemLeadingEdge >= -0.001;
+
+  /// For the scrolling layouts' list: pulled past its first page.
+  bool onListNotification(ScrollNotification notification) {
+    if (notification.depth != 0) {
+      return false;
+    }
+    if (notification is ScrollStartNotification) {
+      _pulledPastStart = false;
+    } else if (notification is OverscrollNotification && notification.overscroll < 0 && !_pulledPastStart) {
+      // Once for each pull.
+      _pulledPastStart = true;
+      readPageLogic.onListStartReached();
+    }
+    return false;
   }
 
   /// Tap left region or click right arrow key. If read direction is right-to-left, we should call [toNext], otherwise [toPrev]
