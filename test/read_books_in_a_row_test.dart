@@ -16,6 +16,8 @@ import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/model/gallery_image.dart';
 import 'package:jhentai/src/model/gallery_thumbnail.dart';
 import 'package:jhentai/src/model/read_page_info.dart';
+import 'package:jhentai/src/pages/read/layout/horizontal_double_column/horizontal_double_column_layout_logic.dart';
+import 'package:jhentai/src/pages/read/layout/horizontal_page/horizontal_page_layout_logic.dart';
 import 'package:jhentai/src/pages/read/layout/vertical_list/vertical_list_layout_logic.dart';
 import 'package:jhentai/src/pages/read/read_page.dart';
 import 'package:jhentai/src/pages/read/read_page_logic.dart';
@@ -348,6 +350,47 @@ void main() {
     expect(reader.state.readPageInfo.currentImageIndex, 0);
     // The reader stays open: the chapter is read in it.
     expect(Get.isRegistered<ReadPageLogic>(), isTrue);
+
+    await tester.runAsync(() async {
+      Get.back();
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    await settle(tester);
+    await tester.runAsync(() async {
+      Get.reset();
+      await appDb.close();
+    });
+  });
+
+  testWidgets('a layout of pages shown again opens on the image read in the list, the chapter put before counted', (WidgetTester tester) async {
+    final ({ReadPageInfo info, List<String> shown, List<bool> asked}) opened = chapterTwo();
+    final ReadPageLogic reader = await openReader(tester, opened.info, direction: ReadDirection.left2rightDoubleColumn);
+    readSetting.readDirection.value = ReadDirection.left2rightSinglePage;
+    await settle(tester);
+    readSetting.readDirection.value = ReadDirection.top2bottomList;
+    await settle(tester);
+
+    // Chapter 1 put before chapter 2, then its third page read.
+    await tester.drag(find.byType(ScrollablePositionedList), const Offset(0, 300));
+    await settle(tester, 10);
+    expect(reader.state.segments, hasLength(2));
+    Get.find<VerticalListLayoutLogic>().state.itemScrollController.jumpTo(index: 2);
+    await settle(tester);
+    expect(reader.state.readPageInfo.currentImageIndex, 2);
+
+    // Both layouts were made when chapter 2 alone was read, at its first
+    // page.
+    readSetting.readDirection.value = ReadDirection.left2rightSinglePage;
+    await settle(tester);
+    expect(Get.find<HorizontalPageLayoutLogic>().pageController.page, 2);
+    expect(reader.state.readPageInfo.currentImageIndex, 2);
+    expect(reader.currentSegment.info.galleryTitle, 'Chapter 1');
+
+    readSetting.readDirection.value = ReadDirection.left2rightDoubleColumn;
+    await settle(tester);
+    final HorizontalDoubleColumnLayoutLogic columns = Get.find<HorizontalDoubleColumnLayoutLogic>();
+    expect(columns.computeImagesInPageIndex(columns.state.pageController.page!.toInt()), contains(2));
+    expect(reader.currentSegment.info.galleryTitle, 'Chapter 1');
 
     await tester.runAsync(() async {
       Get.back();
