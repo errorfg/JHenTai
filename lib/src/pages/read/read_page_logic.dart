@@ -1380,7 +1380,9 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
         log.warning('Book can not precede in this reader: ${previous.galleryTitle}');
         return null;
       }
-      while (state.isScrolling && !isClosed) {
+      // A scroll cut off without its end leaves the list marked scrolling:
+      // waited for ten seconds at most.
+      for (int waited = 0; state.isScrolling && !isClosed && waited < 100; waited++) {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
       // Turned to a layout of pages meanwhile, which would show other pages.
