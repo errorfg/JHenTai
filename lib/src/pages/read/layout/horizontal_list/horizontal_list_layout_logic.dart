@@ -40,9 +40,26 @@ class HorizontalListLayoutLogic extends BaseLayoutLogic {
     }
   }
 
+  /// The list is built anew with the image shown first at the place it was.
+  @override
+  void onPagesPrepended(int count) {
+    final ItemPosition? first = getCurrentVisibleItems().firstOrNull;
+    if (first != null && state.itemScrollController.isAttached) {
+      readPageState.readPageInfo.initialIndex = first.index + count;
+      state.initialAlignment = first.itemLeadingEdge;
+      state.listKey = UniqueKey();
+      // A list built later, after another layout, starts at its first image.
+      WidgetsBinding.instance.addPostFrameCallback((_) => state.initialAlignment = 0);
+    }
+    super.onPagesPrepended(count);
+  }
+
   /// to prev image or screen
   @override
   void toPrev() {
+    if (listAtStart(getCurrentVisibleItems())) {
+      readPageLogic.onListStartReached();
+    }
     switch (readSetting.turnPageMode.value) {
       case TurnPageMode.image:
         return _toPrevImage();

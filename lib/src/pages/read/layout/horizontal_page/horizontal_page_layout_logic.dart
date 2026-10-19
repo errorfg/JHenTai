@@ -55,17 +55,31 @@ class HorizontalPageLayoutLogic extends BaseLayoutLogic {
 
   /// The layout is built for the reading direction: wide images found
   /// while another layout was shown, or a change of the setting, change the
-  /// pages, and the image being read stays.
+  /// pages, and the image being read stays. Shown again after another
+  /// layout, it opens on the image read there: its controller, without a
+  /// view, would open on the page it was made with.
   void syncParts() {
     if (!initCompleter.isCompleted) {
       return;
     }
     final List<bool> split = _splitImages();
-    if (parts.splitAs(split)) {
+    final bool changed = !parts.splitAs(split);
+    if (changed) {
+      parts = PageParts(split);
+    }
+    final int target = parts.firstPageOf(readPageState.readPageInfo.currentImageIndex);
+    if (!pageController.hasClients) {
+      if (pageController.initialPage != target) {
+        pageController
+          ..removeListener(_readProgressListener)
+          ..dispose();
+        pageController = PageController(initialPage: target)..addListener(_readProgressListener);
+      }
       return;
     }
-    parts = PageParts(split);
-    final int target = parts.firstPageOf(readPageState.readPageInfo.currentImageIndex);
+    if (!changed) {
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (pageController.hasClients && _currentPage != target) {
         pageController.jumpToPage(target);

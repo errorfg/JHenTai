@@ -42,27 +42,32 @@ class HorizontalListLayout extends BaseLayout {
         child: EHWheelSpeedControllerForReadPage(
           scrollOffsetController: state.scrollOffsetController,
           stopScrollWhenCtrlPressed: true,
-          child: ScrollablePositionedList.separated(
-            scrollDirection: Axis.horizontal,
-            reverse: logic.readPageLogic.isInRight2LeftDirection,
-            physics: const ClampingScrollPhysics(),
-            minCacheExtent: readListPreloadExtent(
-              mode: readPageState.readPageInfo.mode,
-              networkDistance: readSetting.preloadDistance.value,
-              localDistance: readSetting.preloadDistanceLocal.value,
-              viewportExtent: screenHeight,
-            ),
-            initialScrollIndex: readPageState.readPageInfo.initialIndex,
-            itemCount: readPageState.readPageInfo.pageCount,
-            itemScrollController: state.itemScrollController,
-            itemPositionsListener: state.itemPositionsListener,
-            scrollOffsetController: state.scrollOffsetController,
-            itemBuilder: (context, index) =>
-                readPageState.readPageInfo.mode == ReadMode.online
-                ? buildItemInOnlineMode(context, index)
-                : buildItemInLocalMode(context, index),
-            separatorBuilder: (_, __) => Obx(
-              () => SizedBox(width: readSetting.imageSpace.value.toDouble()),
+          child: NotificationListener<ScrollNotification>(
+            onNotification: logic.onListNotification,
+            child: ScrollablePositionedList.separated(
+              key: state.listKey,
+              scrollDirection: Axis.horizontal,
+              reverse: logic.readPageLogic.isInRight2LeftDirection,
+              physics: const ClampingScrollPhysics(),
+              minCacheExtent: readListPreloadExtent(
+                mode: readPageState.readPageInfo.mode,
+                networkDistance: readSetting.preloadDistance.value,
+                localDistance: readSetting.preloadDistanceLocal.value,
+                viewportExtent: screenHeight,
+              ),
+              initialScrollIndex: readPageState.readPageInfo.initialIndex,
+              initialAlignment: state.initialAlignment,
+              itemCount: readPageState.readPageInfo.pageCount,
+              itemScrollController: state.itemScrollController,
+              itemPositionsListener: state.itemPositionsListener,
+              scrollOffsetController: state.scrollOffsetController,
+              itemBuilder: (context, index) =>
+                  readPageState.readPageInfo.mode == ReadMode.online
+                  ? buildItemInOnlineMode(context, index)
+                  : buildItemInLocalMode(context, index),
+              separatorBuilder: (_, __) => Obx(
+                () => SizedBox(width: readSetting.imageSpace.value.toDouble()),
+              ),
             ),
           ),
         ),

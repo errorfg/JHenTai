@@ -40,6 +40,23 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
     super.onPagesAppended();
   }
 
+  /// Shown again after another layout, the layout opens on the image read
+  /// there: its controller, without a view, would open on the page it was
+  /// made with.
+  void syncPage() {
+    if (!initCompleter.isCompleted || state.pageController.hasClients) {
+      return;
+    }
+    final int target = computePageIndexOfImage(readPageState.readPageInfo.currentImageIndex);
+    if (state.pageController.initialPage == target) {
+      return;
+    }
+    state.pageController
+      ..removeListener(_readProgressListener)
+      ..dispose();
+    state.pageController = PageController(initialPage: target)..addListener(_readProgressListener);
+  }
+
   @override
   void toLeft() {
     if (readPageLogic.isInRight2LeftDirection) {

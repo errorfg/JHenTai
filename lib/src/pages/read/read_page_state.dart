@@ -43,8 +43,8 @@ class ReadPageState with ScrollStatusListerState {
   final ItemScrollController thumbnailsScrollController = ItemScrollController();
   final ScrollOffsetController thumbnailsScrollOffsetController = ScrollOffsetController();
 
-  /// The books being read, in order; the first is the one the reader was
-  /// opened with, later ones are appended as reading goes on.
+  /// The books being read, in order: the one the reader was opened with,
+  /// later ones appended and earlier ones put before it as reading goes on.
   late final List<ReadSegment> segments;
 
   /// Which images are wider than tall, as found while reading.
@@ -88,8 +88,8 @@ class ReadPageState with ScrollStatusListerState {
     return segments.first;
   }
 
-  /// Whether [info] can follow the books being read in this reader: same
-  /// kind of source, its pages reachable by index.
+  /// Whether [info] can follow or precede the books being read in this
+  /// reader: same kind of source, its pages reachable by index.
   bool canAppend(ReadPageInfo info) {
     if (info.mode != readPageInfo.mode || info.pageCount <= 0) {
       return false;
@@ -114,6 +114,27 @@ class ReadPageState with ScrollStatusListerState {
     imageContainerSizes.addAll(List.generate(count, (_) => null));
     parseImageUrlErrorMsg.addAll(List.generate(count, (_) => null));
     readPageInfo.pageCount += count;
+    return segment;
+  }
+
+  /// Puts the pages of [info] before the first book; every page already
+  /// there moves on by their count, the page being read with them.
+  ReadSegment prependSegment(ReadPageInfo info) {
+    final int count = info.pageCount;
+    for (final ReadSegment segment in segments) {
+      segment.start += count;
+    }
+    final ReadSegment segment = ReadSegment(info: info, start: 0, pageCount: count);
+    segments.insert(0, segment);
+    thumbnails.insertAll(0, _pagesOf(info.thumbnails, count));
+    images.insertAll(0, _pagesOf(info.images, count));
+    parseImageHrefsStates.insertAll(0, List.generate(count, (_) => LoadingState.idle));
+    parseImageUrlStates.insertAll(0, List.generate(count, (_) => LoadingState.idle));
+    imageContainerSizes.insertAll(0, List.generate(count, (_) => null));
+    parseImageUrlErrorMsg.insertAll(0, List.generate(count, (_) => null));
+    readPageInfo.pageCount += count;
+    readPageInfo.initialIndex += count;
+    readPageInfo.currentImageIndex += count;
     return segment;
   }
 }

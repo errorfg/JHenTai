@@ -35,6 +35,7 @@ class HorizontalDoubleColumnLayout extends BaseLayout {
         future: logic.initCompleter.future,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
+            logic.syncPage();
             return PhotoViewGallery.builder(
               enableCtrlScrollZoom: true,
               scrollPhysics: const ClampingScrollPhysics(),

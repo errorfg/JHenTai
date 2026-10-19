@@ -42,22 +42,27 @@ class VerticalListLayout extends BaseLayout {
           child: EHWheelSpeedControllerForReadPage(
             scrollOffsetController: state.scrollOffsetController,
             stopScrollWhenCtrlPressed: true,
-            child: ScrollablePositionedList.separated(
-              physics: const ClampingScrollPhysics(),
-              minCacheExtent: readListPreloadExtent(
-                mode: readPageState.readPageInfo.mode,
-                networkDistance: readSetting.preloadDistance.value,
-                localDistance: readSetting.preloadDistanceLocal.value,
-                viewportExtent: screenHeight,
-              ),
-              initialScrollIndex: readPageState.readPageInfo.initialIndex,
-              itemCount: readPageState.readPageInfo.pageCount,
-              itemScrollController: state.itemScrollController,
-              itemPositionsListener: state.itemPositionsListener,
-              scrollOffsetController: state.scrollOffsetController,
-              itemBuilder: _imageBuilder,
-              separatorBuilder: (_, __) => Obx(
-                () => SizedBox(height: readSetting.imageSpace.value.toDouble()),
+            child: NotificationListener<ScrollNotification>(
+              onNotification: logic.onListNotification,
+              child: ScrollablePositionedList.separated(
+                key: state.listKey,
+                physics: const ClampingScrollPhysics(),
+                minCacheExtent: readListPreloadExtent(
+                  mode: readPageState.readPageInfo.mode,
+                  networkDistance: readSetting.preloadDistance.value,
+                  localDistance: readSetting.preloadDistanceLocal.value,
+                  viewportExtent: screenHeight,
+                ),
+                initialScrollIndex: readPageState.readPageInfo.initialIndex,
+                initialAlignment: state.initialAlignment,
+                itemCount: readPageState.readPageInfo.pageCount,
+                itemScrollController: state.itemScrollController,
+                itemPositionsListener: state.itemPositionsListener,
+                scrollOffsetController: state.scrollOffsetController,
+                itemBuilder: _imageBuilder,
+                separatorBuilder: (_, __) => Obx(
+                  () => SizedBox(height: readSetting.imageSpace.value.toDouble()),
+                ),
               ),
             ),
           ),

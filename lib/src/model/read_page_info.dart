@@ -35,7 +35,7 @@ class ReadPageInfo {
   int currentImageIndex;
 
   /// Pages of the whole reader: grows as later books are appended to a
-  /// running reader (see [ReadSegment]).
+  /// running reader, or earlier ones put before it (see [ReadSegment]).
   int pageCount;
 
   /// used for archive
@@ -97,11 +97,12 @@ class ReadPageInfo {
 
 /// One book of a reader that reads several in a row: [info] describes the
 /// book, whose pages are [start] to [start] + [pageCount] - 1 of the reader.
+/// [start] moves on when a book is put before the first.
 class ReadSegment {
   ReadSegment({required this.info, required this.start, required this.pageCount});
 
   final ReadPageInfo info;
-  final int start;
+  int start;
   final int pageCount;
 
   int get end => start + pageCount;

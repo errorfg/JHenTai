@@ -56,6 +56,15 @@ class SpreadPages {
     }
   }
 
+  /// The pages of [segment] were put before the first book.
+  Future<void> onPagesPrepended(ReadSegment segment) async {
+    _flags.insertAll(0, List<bool>.filled(segment.pageCount, false));
+    if (!_loaded.isCompleted) {
+      return;
+    }
+    await _read(segment);
+  }
+
   /// Records that image [index] is wider than tall; false when that was
   /// known, or before [load] finished.
   bool mark(int index) {

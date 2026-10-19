@@ -296,12 +296,15 @@ abstract class BaseLayout extends StatelessWidget {
       return null;
     }
 
+    final int prepended = readPageLogic.pagesPrepended;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (state.extendedImageInfo == null || logic.readPageState.imageContainerSizes[index] != null) {
+      // Where the page is by then: books put before it moved it on.
+      final int at = index + readPageLogic.pagesPrepended - prepended;
+      if (state.extendedImageInfo == null || logic.readPageState.imageContainerSizes[at] != null) {
         return;
       }
-      _measure(index, state.extendedImageInfo!);
-      logic.readPageLogic.updateSafely(['${readPageLogic.onlineImageId}::$index']);
+      _measure(at, state.extendedImageInfo!);
+      logic.readPageLogic.updateSafely(['${readPageLogic.onlineImageId}::$at']);
     });
 
     return null;
@@ -509,14 +512,17 @@ abstract class BaseLayout extends StatelessWidget {
       return null;
     }
 
+    final int prepended = readPageLogic.pagesPrepended;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (state.extendedImageInfo == null || logic.readPageState.imageContainerSizes[index] != null) {
+      // Where the page is by then: books put before it moved it on.
+      final int at = index + readPageLogic.pagesPrepended - prepended;
+      if (state.extendedImageInfo == null || logic.readPageState.imageContainerSizes[at] != null) {
         return;
       }
-      _measure(index, state.extendedImageInfo!);
-      galleryDownloadService.updateSafely(['${galleryDownloadService.downloadImageId}::${readPageState.readPageInfo.gid}::$index']);
+      _measure(at, state.extendedImageInfo!);
+      galleryDownloadService.updateSafely(['${galleryDownloadService.downloadImageId}::${readPageState.readPageInfo.gid}::$at']);
       // The halves of a split image are built around the page (buildPagePart).
-      logic.readPageLogic.updateSafely(['${readPageLogic.onlineImageId}::$index']);
+      logic.readPageLogic.updateSafely(['${readPageLogic.onlineImageId}::$at']);
     });
 
     return null;

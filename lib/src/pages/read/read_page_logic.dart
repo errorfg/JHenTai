@@ -338,10 +338,29 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   /// Whether no book follows the last one appended.
   bool _noNextSegment = false;
 
+  /// Whether no book precedes the first one.
+  bool _noPreviousSegment = false;
+
+  /// Whether the book before the first can not be put in this reader (a
+  /// downloaded volume before one read from the server), and is opened by
+  /// itself instead.
+  bool _previousOpensApart = false;
+
+  /// Whether the book before the first is being fetched.
+  bool _prepending = false;
+
+  /// Pages put before the first book so far: a page index taken before an
+  /// await is moved on by the pages put before it meanwhile.
+  int _pagesPrepended = 0;
+
+  /// The first image a scrolling layout showed when it last reported.
+  int? _firstVisible;
+
   /// Progress writes of each book, by its progress key.
   final Map<String, ReadProgressFlushCoordinator> _progressFlushCoordinators = {};
 
-  /// Pages left below the last visible one when the next book is fetched.
+  /// Pages left below the last visible one when the next book is fetched,
+  /// and above the first visible one when the previous book is.
   static const int _appendAhead = 3;
 
   /// Pages whose upscaled copy is being made, and pages left as they are
@@ -477,6 +496,9 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     }
 
     final int generation = _srGeneration;
+    final int prepended = _pagesPrepended;
+    // Where the page is by then: books put before it meanwhile moved it on.
+    int now() => index + _pagesPrepended - prepended;
     _srInFlight.add(index);
     unawaited(
       realtimeSrService.upscale(sourceKey: source.key, position: index, strips: source.strips, splitWide: splitWide, loadEncoded: source.load).then(
@@ -485,12 +507,12 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
           if (isClosed || generation != _srGeneration) {
             return;
           }
-          _srInFlight.remove(index);
+          _srInFlight.remove(now());
           if (bytes == null) {
-            _srSkipped[index] = splitWide;
+            _srSkipped[now()] = splitWide;
             // Wide pages were split or joined meanwhile: judged again.
             if (splitWide != splitsWidePages) {
-              requestRealtimeSr(index);
+              requestRealtimeSr(now());
             }
             return;
           }
@@ -501,14 +523,14 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
             await precacheImage(ExtendedMemoryImageProvider(bytes), context);
           }
           if (!isClosed && generation == _srGeneration) {
-            updateSafely(['$onlineImageId::$index']);
+            updateSafely(['$onlineImageId::${now()}']);
           }
         },
         onError: (Object e, StackTrace s) {
           if (generation == _srGeneration) {
-            _srInFlight.remove(index);
+            _srInFlight.remove(now());
           }
-          log.error('Upscale page $index failed', e, s);
+          log.error('Upscale page ${now()} failed', e, s);
         },
       ),
     );
@@ -861,7 +883,8 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     updateSafely(['$parseImageHrefsStateId::$index']);
 
     /// limit the rate of parsing to decrease the lagging of build
-    executor.scheduleTask(normalPriority, () => parseImageHref(index));
+    final int prepended = _pagesPrepended;
+    executor.scheduleTask(normalPriority, () => parseImageHref(index + _pagesPrepended - prepended));
   }
 
   Future<void> parseImageHref(int index) async {
@@ -869,7 +892,8 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       'Begin to load Thumbnail $index with page size: ${state.thumbnailsCountPerPage}',
     );
 
-    // Pages are numbered within their own book.
+    // Pages are numbered within their own book, which moves on with the
+    // books put before it.
     final ReadSegment segment = state.segmentAt(index);
     final int pageInBook = index - segment.start;
     int requestPageIndex = pageInBook ~/ state.thumbnailsCountPerPage;
@@ -888,17 +912,20 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
             log.error('Get thumbnails error!', (e as DioException).errorMsg),
       );
     } on DioException catch (_) {
+      index = segment.start + pageInBook;
       state.parseImageHrefErrorMsg = 'parsePageFailed'.tr;
       state.parseImageHrefsStates[index] = LoadingState.error;
       update(['$parseImageHrefsStateId::$index']);
       return;
     } on EHSiteException catch (e) {
+      index = segment.start + pageInBook;
       state.parseImageHrefErrorMsg = e.message;
       state.parseImageHrefsStates[index] = LoadingState.error;
       update(['$parseImageHrefsStateId::$index']);
       return;
     }
 
+    index = segment.start + pageInBook;
     state.parseImageHrefsStates[index] = LoadingState.idle;
 
     /// some gallery's [thumbnailsCountPerPage] is not equal to default setting, we need to compute and update it.
@@ -925,7 +952,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
         segment.info.galleryUrl!,
         requestPageIndex,
       );
-      return beginToParseImageHref(index);
+      return beginToParseImageHref(segment.start + pageInBook);
     }
 
     updateSafely(['$onlineImageId::$index']);
@@ -940,17 +967,20 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     state.parseImageUrlStates[index] = LoadingState.loading;
     updateSafely(['$parseImageUrlStateId::$index']);
 
+    final int prepended = _pagesPrepended;
     executor.scheduleTask(
       normalPriority,
-      () => parseImageUrl(index, reParse, reloadKey),
+      () => parseImageUrl(index + _pagesPrepended - prepended, reParse, reloadKey),
     );
   }
 
   Future<void> parseImageUrl(int index, bool reParse, String? reloadKey) async {
     GalleryImage image;
+    final int prepended = _pagesPrepended;
     try {
       image = await retry(
-        () => requestImage(index, reParse, reloadKey),
+        // Asked again where the page is now.
+        () => requestImage(index + _pagesPrepended - prepended, reParse, reloadKey),
         maxAttempts: 3,
         retryIf: (e) => e is DioException,
         onRetry: (e) => log.error(
@@ -959,22 +989,26 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
         ),
       );
     } on DioException catch (_) {
+      index += _pagesPrepended - prepended;
       state.parseImageUrlStates[index] = LoadingState.error;
       state.parseImageUrlErrorMsg[index] = 'parseURLFailed'.tr;
       updateSafely(['$parseImageUrlStateId::$index']);
       return;
     } on EHParseException catch (e) {
+      index += _pagesPrepended - prepended;
       state.parseImageUrlStates[index] = LoadingState.error;
       state.parseImageUrlErrorMsg[index] = e.message.tr;
       updateSafely(['$parseImageUrlStateId::$index']);
       return;
     } on EHSiteException catch (e) {
+      index += _pagesPrepended - prepended;
       state.parseImageUrlStates[index] = LoadingState.error;
       state.parseImageUrlErrorMsg[index] = e.message.tr;
       updateSafely(['$parseImageUrlStateId::$index']);
       return;
     }
 
+    index += _pagesPrepended - prepended;
     state.images[index] = image;
     state.parseImageUrlStates[index] = LoadingState.success;
     updateSafely(['$onlineImageId::$index']);
@@ -1215,7 +1249,8 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   int pageNumberOf(int index) => index - state.segmentAt(index).start + 1;
 
   /// Whether the next book is appended below the last as reading goes on,
-  /// instead of reopening the reader: in the scrolling layouts.
+  /// and the previous one put above the first, instead of reopening the
+  /// reader: in the scrolling layouts.
   bool get readsBooksInARow =>
       hasSiblingBooks &&
       (effectiveReadDirection == ReadDirection.top2bottomList ||
@@ -1267,14 +1302,17 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     }
   }
 
+  /// The layouts made so far: the one shown, and those shown before.
+  List<BaseLayoutLogic> get _layouts => <BaseLayoutLogic?>[
+    if (Get.isRegistered<VerticalListLayoutLogic>()) Get.find<VerticalListLayoutLogic>(),
+    if (Get.isRegistered<HorizontalListLayoutLogic>()) Get.find<HorizontalListLayoutLogic>(),
+    if (Get.isRegistered<HorizontalPageLayoutLogic>()) Get.find<HorizontalPageLayoutLogic>(),
+    if (Get.isRegistered<HorizontalDoubleColumnLayoutLogic>()) Get.find<HorizontalDoubleColumnLayoutLogic>(),
+  ].whereType<BaseLayoutLogic>().toList();
+
   void _onPagesAppended() {
     void notifyLayouts() {
-      for (final BaseLayoutLogic logic in <BaseLayoutLogic?>[
-        if (Get.isRegistered<VerticalListLayoutLogic>()) Get.find<VerticalListLayoutLogic>(),
-        if (Get.isRegistered<HorizontalListLayoutLogic>()) Get.find<HorizontalListLayoutLogic>(),
-        if (Get.isRegistered<HorizontalPageLayoutLogic>()) Get.find<HorizontalPageLayoutLogic>(),
-        if (Get.isRegistered<HorizontalDoubleColumnLayoutLogic>()) Get.find<HorizontalDoubleColumnLayoutLogic>(),
-      ].whereType<BaseLayoutLogic>()) {
+      for (final BaseLayoutLogic logic in _layouts) {
         logic.onPagesAppended();
       }
     }
@@ -1291,12 +1329,133 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     updateSafely([sliderId, pageNoId, thumbnailNoId, bottomMenuId]);
   }
 
+  String _noSiblingKey({required bool next}) => state.readPageInfo.siblingsAreChapters
+      ? (next ? 'noNextChapter' : 'noPreviousChapter')
+      : (next ? 'noNextBook' : 'noPreviousBook');
+
+  /// Whether the book before the first is being fetched.
+  bool get loadingPreviousBook => _prepending;
+
+  /// Pages put before the first book so far: what a page built before
+  /// another book was put in front of it finds out belongs that much
+  /// further on.
+  int get pagesPrepended => _pagesPrepended;
+
+  /// Puts the book before the first one above it, once. [asked]: the list
+  /// was pulled past its first page or turned back from it, and is told
+  /// when there is no such book. The pages go in once the list stands
+  /// still, as moving them stops a scroll; the page shown stays where it is
+  /// on screen.
+  Future<ReadSegment?> prependPreviousSegment({bool asked = false}) async {
+    if (_noPreviousSegment) {
+      if (asked) {
+        toast(_noSiblingKey(next: false).tr);
+      }
+      return null;
+    }
+    if (_prepending || _previousOpensApart || !readsBooksInARow) {
+      return null;
+    }
+    final Future<ReadPageInfo?> Function({required bool next})? load = state.segments.first.info.loadSiblingBook;
+    if (load == null) {
+      return null;
+    }
+    _prepending = true;
+    updateSafely([endOfBookId, topMenuId]);
+    try {
+      final ReadPageInfo? previous = await load(next: false);
+      if (isClosed) {
+        return null;
+      }
+      if (previous == null) {
+        _noPreviousSegment = true;
+        if (asked) {
+          toast(_noSiblingKey(next: false).tr);
+        }
+        return null;
+      }
+      if (!state.canAppend(previous)) {
+        // Read by itself instead, from the button to it.
+        _previousOpensApart = true;
+        log.warning('Book can not precede in this reader: ${previous.galleryTitle}');
+        return null;
+      }
+      // A scroll cut off without its end leaves the list marked scrolling:
+      // waited for ten seconds at most.
+      for (int waited = 0; state.isScrolling && !isClosed && waited < 100; waited++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      // Turned to a layout of pages meanwhile, which would show other pages.
+      if (isClosed || !readsBooksInARow) {
+        return null;
+      }
+      final ReadSegment segment = state.prependSegment(previous);
+      log.info('Put ${previous.galleryTitle} before: pages 0-${segment.end - 1}');
+      _onPagesPrepended(segment);
+      return segment;
+    } catch (e) {
+      log.error('Put previous book before failed', e);
+      return null;
+    } finally {
+      _prepending = false;
+      updateSafely([endOfBookId, topMenuId]);
+    }
+  }
+
+  void _onPagesPrepended(ReadSegment segment) {
+    final int count = segment.pageCount;
+    _pagesPrepended += count;
+    if (_firstVisible != null) {
+      _firstVisible = _firstVisible! + count;
+    }
+    // Pages being upscaled, and those left as they are, by their new place.
+    final List<int> inFlight = <int>[for (final int index in _srInFlight) index + count];
+    _srInFlight
+      ..clear()
+      ..addAll(inFlight);
+    final Map<int, bool> skipped = <int, bool>{for (final MapEntry<int, bool> e in _srSkipped.entries) e.key + count: e.value};
+    _srSkipped
+      ..clear()
+      ..addAll(skipped);
+    realtimeSrService.shiftPositions(count);
+
+    final ItemPosition? thumbnail = getCurrentVisibleThumbnails().firstOrNull;
+    // As after appending: the layouts look again once what earlier readings
+    // found about wide pages is read.
+    final Future<void> spreadsRead = state.spreadPages.onPagesPrepended(segment);
+    for (final BaseLayoutLogic logic in _layouts) {
+      logic.onPagesPrepended(count);
+    }
+    unawaited(spreadsRead.then((_) {
+      if (!isClosed) {
+        for (final BaseLayoutLogic logic in _layouts) {
+          logic.onPagesAppended();
+        }
+      }
+    }));
+    updateSafely([sliderId, pageNoId, thumbnailNoId, bottomMenuId]);
+    // The thumbnails show the pages they showed, once their list has all of
+    // them: it does not jump past the pages it had.
+    if (thumbnail != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!isClosed && state.thumbnailsScrollController.isAttached) {
+          state.thumbnailsScrollController.jumpTo(index: thumbnail.index + count, alignment: thumbnail.itemLeadingEdge);
+        }
+      });
+    }
+  }
+
+  /// The list was pulled past its first page, or turned back from it.
+  void onListStartReached() {
+    unawaited(prependPreviousSegment(asked: true));
+  }
+
   /// The previous or next book: within this reader when it is there or can
-  /// be appended, otherwise by closing this reader with the book as the
-  /// result; the page that opened the reader opens it once this reader is
-  /// disposed. Replacing the route in place would let the new page bind to
-  /// this reader's still-registered controllers, so the new book's page
-  /// events would be recorded as the old book's progress.
+  /// be appended or put before, otherwise by closing this reader with the
+  /// book as the result; the page that opened the reader opens it once this
+  /// reader is disposed. Replacing the route in place would let the new page
+  /// bind to this reader's still-registered controllers, so the new book's
+  /// page events would be recorded as the old book's progress.
   Future<void> openSiblingBook({required bool next}) async {
     final int position = state.segments.indexOf(_currentSegment);
     final int target = position + (next ? 1 : -1);
@@ -1309,9 +1468,22 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       if (appended != null) {
         jump2ImageIndex(appended.start);
       } else if (_noNextSegment) {
-        toast((state.readPageInfo.siblingsAreChapters ? 'noNextChapter' : 'noNextBook').tr);
+        toast(_noSiblingKey(next: true).tr);
       }
       return;
+    }
+    if (!next && readsBooksInARow && !_previousOpensApart) {
+      final ReadSegment? prepended = await prependPreviousSegment(asked: true);
+      if (prepended != null) {
+        // Once the list is built with the pages put before.
+        await WidgetsBinding.instance.endOfFrame;
+        if (!isClosed) {
+          jump2ImageIndex(prepended.start);
+        }
+      }
+      if (!_previousOpensApart) {
+        return;
+      }
     }
 
     final Future<ReadPageInfo?> Function({required bool next})? load =
@@ -1324,10 +1496,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     try {
       final ReadPageInfo? sibling = await load(next: next);
       if (sibling == null) {
-        final String key = state.readPageInfo.siblingsAreChapters
-            ? (next ? 'noNextChapter' : 'noPreviousChapter')
-            : (next ? 'noNextBook' : 'noPreviousBook');
-        toast(key.tr);
+        toast(_noSiblingKey(next: next).tr);
         return;
       }
       backRoute(currentRoute: Routes.read, result: sibling);
@@ -1607,17 +1776,24 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     requestRealtimeSrAhead();
   }
 
-  /// For the scrolling layouts: records [visible] (in index order) and
-  /// appends the next book as the end of the last one comes near.
+  /// For the scrolling layouts: records [visible] (in index order), appends
+  /// the next book as the end of the last one comes near, and fetches the
+  /// one before the first as its start comes near going back. Opening a
+  /// book at its start fetches nothing before it.
   void recordVisibleItems(List<ItemPosition> visible) {
     if (visible.isEmpty) {
       return;
     }
     final int first = visible.first.index;
+    final int? before = _firstVisible;
+    _firstVisible = first;
     final ReadSegment segment = state.segmentAt(first);
     recordReadProgress(first, reachedEnd: listShowsEnd(visible, segment.end));
     if (readsBooksInARow && visible.last.index >= state.readPageInfo.pageCount - _appendAhead) {
       unawaited(appendNextSegment());
+    }
+    if (readsBooksInARow && before != null && first < before && first < _appendAhead) {
+      unawaited(prependPreviousSegment());
     }
   }
 

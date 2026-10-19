@@ -62,9 +62,29 @@ class VerticalListLayoutLogic extends BaseLayoutLogic {
     toNext();
   }
 
+  /// The list is built anew with the image shown first at the place it was.
+  /// The first page of the reader is set off from the notch, which it no
+  /// longer is once pages come before it.
+  @override
+  void onPagesPrepended(int count) {
+    final ItemPosition? first = getCurrentVisibleItems().firstOrNull;
+    if (first != null && state.itemScrollController.isAttached) {
+      final double notch = first.index == 0 && GetPlatform.isMobile && readSetting.notchOptimization.isTrue ? Get.mediaQuery.padding.top : 0;
+      readPageState.readPageInfo.initialIndex = first.index + count;
+      state.initialAlignment = first.itemLeadingEdge + notch / readPageState.displayRegionSize.height;
+      state.listKey = UniqueKey();
+      // A list built later, after another layout, starts at its first image.
+      WidgetsBinding.instance.addPostFrameCallback((_) => state.initialAlignment = 0);
+    }
+    super.onPagesPrepended(count);
+  }
+
   /// to prev image or screen
   @override
   void toPrev() {
+    if (listAtStart(getCurrentVisibleItems())) {
+      readPageLogic.onListStartReached();
+    }
     switch (readSetting.turnPageMode.value) {
       case TurnPageMode.image:
         return _toPrevImage();
