@@ -13,6 +13,7 @@ import 'package:jhentai/src/service/jh_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/path_service.dart';
+import 'package:jhentai/src/service/tachi/tachi_source_setting_service.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
 import 'package:path/path.dart' as p;
 
@@ -47,7 +48,7 @@ class TachiInstalledOrigin {
 /// The repositories and the list of installed extensions (with the
 /// repository each came from) are a setting that cloud sync carries; a
 /// device that receives it installs what it lacks and removes what was
-/// removed elsewhere (see [applyInstalledList]). What the host has actually
+/// removed elsewhere (see [reconcileHost]). What the host has actually
 /// installed is [installed].
 class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBean {
   @override
@@ -86,12 +87,18 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
     if (recent != null) {
       recentSources.value = (jsonDecode(recent) as List).cast<String>();
     }
+    final String? removed = await localConfigService.read(configKey: ConfigEnum.tachiRemovedElsewhere);
+    if (removed != null) {
+      _removedElsewhere.addAll((jsonDecode(removed) as List).cast<String>());
+    }
+    tachiHost.addStartListener(() => unawaited(reconcileHost()));
   }
 
   @override
   void doAfterBeanReady() {}
 
-  /// Packages a received list no longer has: removed on another device.
+  /// Packages a received list no longer has: removed on another device, to
+  /// be removed from the host. Kept on the device until they are.
   final Set<String> _removedElsewhere = <String>{};
 
   @override
@@ -104,10 +111,17 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
         (e as Map<String, dynamic>)['pkg'] as String: TachiInstalledOrigin.fromJson(e),
     };
     updatedAt = json['updatedAt'] as String? ?? '';
-    _removedElsewhere
-      ..addAll(before.difference(origins.keys.toSet()))
-      ..removeAll(origins.keys);
+    final Set<String> removed = <String>{..._removedElsewhere, ...before.difference(origins.keys.toSet())}..removeAll(origins.keys);
+    if (!const SetEquality<String>().equals(removed, _removedElsewhere)) {
+      _removedElsewhere
+        ..clear()
+        ..addAll(removed);
+      unawaited(_saveRemovedElsewhere());
+    }
   }
+
+  Future<void> _saveRemovedElsewhere() =>
+      localConfigService.write(configKey: ConfigEnum.tachiRemovedElsewhere, value: jsonEncode(_removedElsewhere.toList()..sort()));
 
   @override
   String toConfigString() => jsonEncode(<String, dynamic>{
@@ -253,6 +267,8 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
       );
       await _saveChanged();
       await refreshInstalled();
+      // Settings of its sources that arrived from another device.
+      await tachiSourceSettingService.applyToHost();
     } finally {
       busy.remove(extension.pkg);
       if (apk.existsSync()) {
@@ -267,6 +283,7 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
     origins[extension.pkg] = TachiInstalledOrigin(pkg: extension.pkg, name: extension.name, repo: '', apk: '', versionCode: extension.versionCode);
     await _saveChanged();
     await refreshInstalled();
+    await tachiSourceSettingService.applyToHost();
     return extension;
   }
 
@@ -282,17 +299,43 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
     }
   }
 
+  Future<void>? _reconciling;
+  bool _reconcileAgain = false;
+
+  /// Brings the running host to what this device holds, after a sync and
+  /// once the host starts (it may have missed one): its extensions those of
+  /// [origins] (see [_applyInstalledList]), then the settings of their
+  /// sources (see [TachiSourceSettingService.applyToHost]). Nothing when
+  /// the host does not run: it is not started just for this on a phone.
+  /// One at a time; asked again meanwhile, it runs once more after.
+  Future<void> reconcileHost() {
+    if (_reconciling != null) {
+      _reconcileAgain = true;
+      return _reconciling!;
+    }
+    return _reconciling = () async {
+      do {
+        _reconcileAgain = false;
+        if (tachiHost.clientIfRunning == null) {
+          return;
+        }
+        try {
+          await _applyInstalledList();
+          await tachiSourceSettingService.applyToHost();
+        } catch (e) {
+          log.error('Bring the extension host up to date failed', e);
+        }
+      } while (_reconcileAgain);
+    }()
+        .whenComplete(() => _reconciling = null);
+  }
+
   /// Makes the host's extensions match [origins], after they arrived from
   /// another device: missing ones are installed from their repositories
   /// (whose newest version is taken), and ones removed there are
   /// uninstalled. An extension this device installed before it had a list
-  /// is kept. Only
-  /// when the host runs or [startHost] is set: the host is not started
-  /// just for this on a phone.
-  Future<void> applyInstalledList({bool startHost = false}) async {
-    if (tachiHost.clientIfRunning == null && !startHost) {
-      return;
-    }
+  /// is kept.
+  Future<void> _applyInstalledList() async {
     await refreshInstalled();
     final Set<String> have = installed.map((TachiExtension e) => e.pkg).toSet();
     final Iterable<TachiInstalledOrigin> missing = origins.values.where((TachiInstalledOrigin o) => !have.contains(o.pkg) && o.repo.isNotEmpty);
@@ -324,10 +367,14 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
           await tachiHost.run((TachiClient c) => c.uninstall(extension.pkg));
         } catch (e) {
           log.error('Remove extension ${extension.pkg} failed', e);
+          continue;
         }
       }
+      _removedElsewhere.remove(extension.pkg);
     }
-    _removedElsewhere.clear();
+    // Not installed here, or no longer.
+    _removedElsewhere.removeWhere((String pkg) => installed.every((TachiExtension e) => e.pkg != pkg));
+    await _saveRemovedElsewhere();
     await refreshInstalled();
   }
 }

@@ -156,24 +156,8 @@ List<RecordAdapter> defaultRecordAdapters() => [
         refresh: () => jmAccountSetting.refreshBean(),
       ),
       EhAccountRecords(),
-      SingleConfigRecords(
-        kind: 'tachiExtensionList',
-        type: CloudConfigTypeEnum.tachiExtensionList,
-        configKey: ConfigEnum.tachiExtensionSetting,
-        refresh: () async {
-          await tachiExtensionService.refreshBean();
-          unawaited(tachiExtensionService.applyInstalledList());
-        },
-      ),
-      SingleConfigRecords(
-        kind: 'tachiSourceSettings',
-        type: CloudConfigTypeEnum.tachiSourceSettings,
-        configKey: ConfigEnum.tachiSourceSetting,
-        refresh: () async {
-          await tachiSourceSettingService.refreshBean();
-          unawaited(tachiSourceSettingService.applyToHost());
-        },
-      ),
+      TachiExtensionRecords(),
+      TachiSourceRecords(),
     ];
 
 class HistoryRecords extends RowKindAdapter {
@@ -555,6 +539,126 @@ class SingleConfigRecords extends WholeKindAdapter {
       ),
     ]);
     await refresh();
+  }
+}
+
+/// Tachiyomi extension repositories and installed extensions (see
+/// [TachiExtensionService]), a record for each repository and each
+/// extension: extensions installed on two devices are both kept, and one
+/// removed on a device is removed on the others. Up to 8.1.1 the whole list
+/// was one record of kind `tachiExtensionList`; such records are left as
+/// they are.
+class TachiExtensionRecords extends WholeKindAdapter {
+  static const String _repo = 'repo:';
+  static const String _package = 'package:';
+
+  @override
+  String get kind => 'tachiExtension';
+
+  @override
+  CloudConfigTypeEnum get type => CloudConfigTypeEnum.tachiExtensionList;
+
+  Future<Map<String, dynamic>> _config() async {
+    String? raw = await localConfigService.read(configKey: ConfigEnum.tachiExtensionSetting);
+    return raw == null ? {} : Map<String, dynamic>.from(jsonDecode(raw) as Map);
+  }
+
+  @override
+  Future<List<MapEntry<String, LocalItem>>> export() async {
+    Map<String, dynamic> config = await _config();
+    return [
+      for (dynamic repo in (config['repos'] as List?) ?? []) MapEntry('$_repo$repo', LocalItem(jsonEncode(repo))),
+      for (dynamic extension in (config['extensions'] as List?) ?? [])
+        if (extension is Map && extension['pkg'] is String) MapEntry('$_package${extension['pkg']}', LocalItem(jsonEncode(extension))),
+    ];
+  }
+
+  @override
+  Future<String> changeTime() => _configTime(ConfigEnum.tachiExtensionSetting);
+
+  /// Repositories and extensions already here keep their order; new ones
+  /// follow.
+  @override
+  Future<void> replaceAll(List<SyncRecordData> records) async {
+    Map<String, dynamic> config = await _config();
+    List<String> repos = [
+      for (SyncRecordData r in records)
+        if (r.key.startsWith(_repo)) jsonDecode(r.value!) as String,
+    ];
+    Map<String, dynamic> extensions = {
+      for (SyncRecordData r in records)
+        if (r.key.startsWith(_package)) r.key.substring(_package.length): jsonDecode(r.value!),
+    };
+    List<String> oldRepos = ((config['repos'] as List?) ?? []).whereType<String>().toList();
+    List<String> oldPackages = [
+      for (dynamic e in (config['extensions'] as List?) ?? [])
+        if (e is Map && e['pkg'] is String) e['pkg'] as String,
+    ];
+    await localConfigService.write(
+      configKey: ConfigEnum.tachiExtensionSetting,
+      value: jsonEncode({
+        'repos': [
+          ...oldRepos.where(repos.contains),
+          ...repos.where((r) => !oldRepos.contains(r)),
+        ],
+        'extensions': [
+          for (String pkg in oldPackages)
+            if (extensions.containsKey(pkg)) extensions[pkg],
+          for (MapEntry<String, dynamic> e in extensions.entries)
+            if (!oldPackages.contains(e.key)) e.value,
+        ],
+        'updatedAt': SyncTimeUtil.nowIso(),
+      }),
+    );
+    await tachiExtensionService.refreshBean();
+    unawaited(tachiExtensionService.reconcileHost());
+  }
+}
+
+/// The settings of Tachiyomi sources (see [TachiSourceSettingService]), a
+/// record for each source: settings of a source changed on one device do
+/// not take back those of another source changed on another. Up to 8.1.1
+/// all were one record of kind `tachiSourceSettings`; such records are
+/// left as they are.
+class TachiSourceRecords extends WholeKindAdapter {
+  @override
+  String get kind => 'tachiSource';
+
+  @override
+  CloudConfigTypeEnum get type => CloudConfigTypeEnum.tachiSourceSettings;
+
+  @override
+  Future<List<MapEntry<String, LocalItem>>> export() async {
+    String? raw = await localConfigService.read(configKey: ConfigEnum.tachiSourceSetting);
+    Map sources = raw == null ? {} : (jsonDecode(raw) as Map)['sources'] as Map? ?? {};
+    List<MapEntry<String, LocalItem>> items = [];
+    for (MapEntry entry in sources.entries) {
+      if (entry.value is! Map) {
+        continue;
+      }
+      // When the source's settings were changed
+      DateTime? time = SyncTimeUtil.tryParse(entry.value['updatedAt']?.toString());
+      items.add(MapEntry(
+        '${entry.key}',
+        LocalItem(jsonEncode(entry.value), firstTime: time == null ? null : SyncTimeUtil.format(time)),
+      ));
+    }
+    return items;
+  }
+
+  @override
+  Future<String> changeTime() => _configTime(ConfigEnum.tachiSourceSetting);
+
+  @override
+  Future<void> replaceAll(List<SyncRecordData> records) async {
+    await localConfigService.write(
+      configKey: ConfigEnum.tachiSourceSetting,
+      value: jsonEncode({
+        'sources': {for (SyncRecordData r in records) r.key: jsonDecode(r.value!)},
+      }),
+    );
+    await tachiSourceSettingService.refreshBean();
+    unawaited(tachiExtensionService.reconcileHost());
   }
 }
 

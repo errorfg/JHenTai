@@ -250,8 +250,8 @@ class CloudConfigService
           ),
         ]);
         await tachiExtensionService.refreshBean();
-        // Installs what arrived, when the host runs already.
-        unawaited(tachiExtensionService.applyInstalledList());
+        // Installs what arrived, when the host runs already; otherwise once it starts.
+        unawaited(tachiExtensionService.reconcileHost());
         log.info('  ✅ Tachiyomi extensions imported');
         break;
       case CloudConfigTypeEnum.tachiSourceSettings:
@@ -264,7 +264,7 @@ class CloudConfigService
           ),
         ]);
         await tachiSourceSettingService.refreshBean();
-        unawaited(tachiSourceSettingService.applyToHost());
+        unawaited(tachiExtensionService.reconcileHost());
         log.info('  ✅ Tachiyomi source settings imported');
         break;
       case CloudConfigTypeEnum.tachiFavorite:
