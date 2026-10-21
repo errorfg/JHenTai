@@ -296,10 +296,10 @@ abstract class BaseLayout extends StatelessWidget {
       return null;
     }
 
-    final int prepended = readPageLogic.pagesPrepended;
+    final PageId page = readPageState.pageIdAt(index);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Where the page is by then: books put before it moved it on.
-      final int at = index + readPageLogic.pagesPrepended - prepended;
+      final int at = readPageState.indexOf(page);
       if (state.extendedImageInfo == null || logic.readPageState.imageContainerSizes[at] != null) {
         return;
       }
@@ -512,10 +512,10 @@ abstract class BaseLayout extends StatelessWidget {
       return null;
     }
 
-    final int prepended = readPageLogic.pagesPrepended;
+    final PageId page = readPageState.pageIdAt(index);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Where the page is by then: books put before it moved it on.
-      final int at = index + readPageLogic.pagesPrepended - prepended;
+      final int at = readPageState.indexOf(page);
       if (state.extendedImageInfo == null || logic.readPageState.imageContainerSizes[at] != null) {
         return;
       }

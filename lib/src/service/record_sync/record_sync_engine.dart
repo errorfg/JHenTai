@@ -16,6 +16,7 @@ import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
 
 import 'record_adapters.dart';
+import 'bucket_record_backend.dart';
 import 'record_backend.dart';
 
 RecordSyncEngine recordSyncEngine = RecordSyncEngine();
@@ -148,10 +149,15 @@ class RecordSyncEngine {
     await _writeState(state);
     onProgress?.call(0.75);
 
-    // 4. Local changes out
+    // 4. Local changes out: to a bucket in packs that are larger, each one
+    // object to write and to read
     int pushed = 0;
+    final bool bucket = backend is BucketRecordBackend;
     while (true) {
-      List<SyncRecordData> rows = _withinBytes(await SyncRecordDao.selectDirty(pushLimit));
+      List<SyncRecordData> rows = _withinBytes(
+        await SyncRecordDao.selectDirty(bucket ? BucketRecordBackend.packRecords : pushLimit),
+        bucket ? BucketRecordBackend.packBytes : pushBytes,
+      );
       if (rows.isEmpty) {
         break;
       }
@@ -429,7 +435,7 @@ class RecordSyncEngine {
     return pending;
   }
 
-  List<SyncRecordData> _withinBytes(List<SyncRecordData> rows) {
+  List<SyncRecordData> _withinBytes(List<SyncRecordData> rows, int pushBytes) {
     int bytes = 0;
     List<SyncRecordData> taken = [];
     for (SyncRecordData row in rows) {

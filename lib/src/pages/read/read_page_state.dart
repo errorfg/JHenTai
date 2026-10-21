@@ -61,6 +61,8 @@ class ReadPageState with ScrollStatusListerState {
   /// Which images are wider than tall, as found while reading.
   late final SpreadPages spreadPages = SpreadPages(this);
 
+  int _nextSegmentId = 1;
+
   ReadPageState() {
     segments = <ReadSegment>[ReadSegment(info: readPageInfo, start: 0, pageCount: readPageInfo.pageCount)];
     thumbnails = _pagesOf(readPageInfo.thumbnails, readPageInfo.pageCount);
@@ -99,6 +101,15 @@ class ReadPageState with ScrollStatusListerState {
     return segments.first;
   }
 
+  /// The page at [index], as it stays when books are put before it.
+  PageId pageIdAt(int index) {
+    final ReadSegment segment = segmentAt(index);
+    return (segment: segment.id, page: index - segment.start);
+  }
+
+  /// Where [page] is now among the pages of all the books.
+  int indexOf(PageId page) => segments.firstWhere((ReadSegment s) => s.id == page.segment).start + page.page;
+
   /// Whether [info] can follow or precede the books being read in this
   /// reader: same kind of source, its pages reachable by index.
   bool canAppend(ReadPageInfo info) {
@@ -116,7 +127,7 @@ class ReadPageState with ScrollStatusListerState {
   /// their index.
   ReadSegment appendSegment(ReadPageInfo info) {
     final int count = info.pageCount;
-    final ReadSegment segment = ReadSegment(info: info, start: pageCount, pageCount: count);
+    final ReadSegment segment = ReadSegment(info: info, start: pageCount, pageCount: count, id: _nextSegmentId++);
     segments.add(segment);
     thumbnails.addAll(_pagesOf(info.thumbnails, count));
     images.addAll(_pagesOf(info.images, count));
@@ -134,7 +145,7 @@ class ReadPageState with ScrollStatusListerState {
     for (final ReadSegment segment in segments) {
       segment.start += count;
     }
-    final ReadSegment segment = ReadSegment(info: info, start: 0, pageCount: count);
+    final ReadSegment segment = ReadSegment(info: info, start: 0, pageCount: count, id: _nextSegmentId++);
     segments.insert(0, segment);
     thumbnails.insertAll(0, _pagesOf(info.thumbnails, count));
     images.insertAll(0, _pagesOf(info.images, count));

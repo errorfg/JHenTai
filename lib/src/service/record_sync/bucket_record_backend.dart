@@ -134,6 +134,14 @@ class BucketRecordBackend implements RecordBackend {
 
   /// Packs there may be before they are compacted.
   final int compactAfter;
+
+  /// Records, and bytes of their values, a pack holds at most: a request
+  /// to a bucket takes much longer than one to a sync server.
+  static const int packRecords = 2000;
+  static const int packBytes = 4 * 1024 * 1024;
+
+  /// Packs downloaded ahead of the one taken.
+  static const int downloadAhead = 4;
   static const Duration packRetention = Duration(days: 7);
   static const int snapshotsToKeep = 2;
 
@@ -145,6 +153,7 @@ class BucketRecordBackend implements RecordBackend {
 
   BucketManifest? _manifest;
   List<_PackKey>? _packs;
+  final Map<String, Future<List<int>?>> _downloads = <String, Future<List<int>?>>{};
   final Map<String, _Snapshot> _snapshots = <String, _Snapshot>{};
 
   /// The manifest, made with a new layout when there is none. One that can
@@ -242,7 +251,11 @@ class BucketRecordBackend implements RecordBackend {
       if (records.isNotEmpty && records.length >= limit) {
         break;
       }
-      final List<int>? bytes = await _provider.getRawObject(pack.key);
+      for (final _PackKey next in pending.skip(taken).take(downloadAhead)) {
+        // A failure is met when the pack is taken.
+        _downloads.putIfAbsent(next.key, () => _provider.getRawObject(next.key)..ignore());
+      }
+      final List<int>? bytes = await _downloads.remove(pack.key);
       if (bytes == null) {
         // Removed by a compaction since the listing: its snapshot is taken next time.
         throw StateError('Pack ${pack.key} of the bucket records is gone');

@@ -68,8 +68,9 @@ class HotDataSyncEngine {
   /// Op packs applied, and their cursors stored, per round.
   static const int _applyChunk = 20;
 
-  /// Op packs downloaded at once.
-  static const int _downloadParallel = 4;
+  /// Op packs downloaded at once: only read now, once, when a later version
+  /// takes this layout over (see [sync]'s readOnly).
+  static const int _downloadParallel = 16;
 
   /// A download that failed is tried once more after this.
   static const Duration _retryDelay = Duration(seconds: 2);

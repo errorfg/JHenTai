@@ -102,9 +102,12 @@ class ReadPageInfo {
 /// book, whose pages are [start] to [start] + [pageCount] - 1 of the reader.
 /// [start] moves on when a book is put before the first.
 class ReadSegment {
-  ReadSegment({required this.info, required this.start, required this.pageCount});
+  ReadSegment({required this.info, required this.start, required this.pageCount, this.id = 0});
 
   final ReadPageInfo info;
+
+  /// Unique among the books of a reader (see PageId).
+  final int id;
   int start;
   final int pageCount;
 
@@ -112,6 +115,11 @@ class ReadSegment {
 
   bool contains(int index) => index >= start && index < end;
 }
+
+/// A page of a book in a reader, by the book and its number there: the same
+/// page when books are put before it, unlike its index among all pages
+/// (ReadPageState.pageIdAt, ReadPageState.indexOf).
+typedef PageId = ({int segment, int page});
 
 /// What looking for the book before or after those in a reader came to.
 sealed class SiblingOutcome {
