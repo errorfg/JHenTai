@@ -391,8 +391,8 @@ void main() {
 
     // The end of the list reached: the volume is found, and not looked for
     // again each time the end is reached.
-    expect(await tester.runAsync(() => reader.appendNextSegment()), isNull);
-    expect(await tester.runAsync(() => reader.appendNextSegment()), isNull);
+    expect(await tester.runAsync(reader.appendNextSegment), isNull);
+    expect(await tester.runAsync(reader.appendNextSegment), isNull);
     expect(loads, 1);
     expect(reader.state.segments, hasLength(1));
 
