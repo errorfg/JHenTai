@@ -105,7 +105,7 @@ class ScheduleService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBea
     while (page.isNotEmpty) {
       // The E-Hentai API answers galleries of other sources with an error
       // entry, which fails the whole batch.
-      List<GalleryDownloadedData> gallerys = page.where(_isEHGallery).toList();
+      List<GalleryDownloadedData> gallerys = page.where((g) => _isEHGallery(g.galleryUrl)).toList();
       if (gallerys.isEmpty) {
         pageNo++;
         page = await GalleryDao.selectGallerysForTagRefresh(pageNo, 25);
@@ -138,15 +138,22 @@ class ScheduleService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBea
     }
   }
 
-  bool _isEHGallery(GalleryDownloadedData gallery) {
-    GalleryUrl? url = GalleryUrl.tryParse(gallery.galleryUrl);
+  bool _isEHGallery(String galleryUrl) {
+    GalleryUrl? url = GalleryUrl.tryParse(galleryUrl);
     return url != null && url.isEHGallery;
   }
 
   Future<void> refreshArchiveTags() async {
     int pageNo = 1;
-    List<ArchiveDownloadedData> archives = await ArchiveDao.selectArchivesForTagRefresh(pageNo, 25);
-    while (archives.isNotEmpty) {
+    List<ArchiveDownloadedData> page = await ArchiveDao.selectArchivesForTagRefresh(pageNo, 25);
+    while (page.isNotEmpty) {
+      // Archives of nhentai too; the E-Hentai API fails a batch with one in it.
+      List<ArchiveDownloadedData> archives = page.where((a) => _isEHGallery(a.galleryUrl)).toList();
+      if (archives.isEmpty) {
+        pageNo++;
+        page = await ArchiveDao.selectArchivesForTagRefresh(pageNo, 25);
+        continue;
+      }
       try {
         List<GalleryMetadata> metadatas = await ehRequest.requestGalleryMetadatas<List<GalleryMetadata>>(
           list: archives.map((a) => (gid: a.gid, token: a.token)).toList(),
@@ -170,7 +177,7 @@ class ScheduleService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBea
       }
 
       pageNo++;
-      archives = await ArchiveDao.selectArchivesForTagRefresh(pageNo, 25);
+      page = await ArchiveDao.selectArchivesForTagRefresh(pageNo, 25);
     }
   }
 
