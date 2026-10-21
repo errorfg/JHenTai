@@ -8,6 +8,7 @@ import 'log.dart';
 import 'dart:convert';
 import 'package:collection/collection.dart';
 import 'package:jhentai/src/service/tachi/tachi_source_setting_service.dart';
+import 'package:jhentai/src/utils/sync_time_util.dart';
 
 SyncMerger syncMerger = SyncMerger();
 
@@ -262,13 +263,18 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     );
   }
 
-  /// Tachiyomi repositories: the later list. Which extensions are installed
-  /// is each device's own: the list of them the entry holds stays as the
-  /// remote has it, for devices of 8.1.1 and earlier, which install by it.
+  /// Tachiyomi repositories: the list changed later, by the time of the
+  /// repositories (an entry of 8.1.1 or earlier has only the entry's time;
+  /// installing an extension changes that too). Which extensions are
+  /// installed is each device's own: the list of them the entry holds stays
+  /// as the remote has it, for devices of 8.1.1 and earlier, which install
+  /// by it.
   MergeConfigResult _mergeTachiRepositories(CloudConfig local, CloudConfig remote) {
     Map<String, dynamic> mine = Map<String, dynamic>.from(jsonDecode(local.config) as Map);
     Map<String, dynamic> theirs = Map<String, dynamic>.from(jsonDecode(remote.config) as Map);
-    if (const ListEquality<dynamic>().equals(mine['repos'] as List?, theirs['repos'] as List?) || remote.ctime.isAfter(local.ctime)) {
+    DateTime reposTime(Map<String, dynamic> config, DateTime ctime) => SyncTimeUtil.tryParse(config['reposUpdatedAt'] as String?) ?? ctime;
+    if (const ListEquality<dynamic>().equals(mine['repos'] as List?, theirs['repos'] as List?) ||
+        reposTime(theirs, remote.ctime).isAfter(reposTime(mine, local.ctime))) {
       return MergeConfigResult(remote, MergeStatistics(1, 1, 1, 0, 0));
     }
     return MergeConfigResult(
@@ -278,8 +284,15 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         identificationCode: local.identificationCode,
         type: local.type,
         version: local.version,
-        config: jsonEncode({...theirs, 'repos': mine['repos'] ?? [], 'updatedAt': mine['updatedAt']}),
-        ctime: local.ctime,
+        config: jsonEncode({
+          ...theirs,
+          'repos': mine['repos'] ?? [],
+          'updatedAt': mine['updatedAt'],
+          'reposUpdatedAt': SyncTimeUtil.format(reposTime(mine, local.ctime)),
+        }),
+        // Not earlier than what devices of earlier versions have seen, so
+        // that they take the repositories.
+        ctime: remote.ctime.isAfter(local.ctime) ? remote.ctime : local.ctime,
       ),
       MergeStatistics(1, 1, 1, 0, 1),
     );

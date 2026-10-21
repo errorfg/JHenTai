@@ -265,7 +265,7 @@ class _Device {
     } else {
       extensions.repos.remove(repo);
     }
-    extensions.updatedAt = SyncTimeUtil.nowIso();
+    extensions.updatedAt = extensions.reposUpdatedAt = SyncTimeUtil.nowIso();
     await extensions.saveBeanConfig();
   }
 
@@ -506,10 +506,45 @@ void main() {
     expect(fakeHost.settings, hasLength(1));
   });
 
+  test('what the host had for a source, replaced on upgrade, is kept on the device and can be given back', () async {
+    final _FakeHost fakeHost = _FakeHost()..installed = true;
+    await fakeHost.start();
+    addTearDown(fakeHost.stop);
+    final TachiClient client = TachiClient(port: fakeHost.port, token: 'token');
+    addTearDown(client.close);
+    const String before = '2026-10-20T10:00:00.000000Z';
+
+    // The source renewed its token itself after its settings were taken.
+    fakeHost.values[_source] = <String, Object?>{'token': 'renewed by the source'};
+    final _Device device = _Device();
+    await device.storeAsBefore(<String, Object?>{
+      _source: <String, Object?>{'values': <String, Object?>{'token': 'taken before'}, 'updatedAt': before},
+    });
+    tachiHost = _LaunchHost(client);
+    await device.launch();
+    await tachiHost.client();
+    await fakeHost.quiet();
+    expect(fakeHost.values[_source], <String, Object?>{'token': 'taken before'});
+
+    // Still there after the app is opened again, and nothing given twice.
+    tachiHost = _LaunchHost(client);
+    await device.launch();
+    await tachiHost.client();
+    await fakeHost.quiet();
+    expect(fakeHost.settings, hasLength(1));
+    expect(device.sourceSettings.replacedAt(_source), isNotNull);
+
+    await device.sourceSettings.restoreReplaced(_source);
+    expect(fakeHost.values[_source], <String, Object?>{'token': 'renewed by the source'});
+    expect(device.sourceSettings.sources[_source]!['values'], <String, Object?>{'token': 'renewed by the source'});
+    expect((device.sourceSettings.sources[_source]!['updatedAt'] as String).compareTo(before), greaterThan(0), reason: 'synced as a change made now');
+    expect(device.sourceSettings.replacedAt(_source), isNull);
+  });
+
   test('through a bucket, the later repositories come in, and each device keeps the extensions it installed', () async {
     const String a = 'https://a.example/index.min.json', b = 'https://b.example/index.min.json', c = 'https://c.example/index.min.json';
     final DateTime t = DateTime.utc(2026, 10, 21, 8);
-    CloudConfig entry(List<String> repos, List<String> packages, DateTime ctime) => CloudConfig(
+    CloudConfig entry(List<String> repos, List<String> packages, DateTime ctime, {DateTime? reposAt}) => CloudConfig(
           id: CloudConfigService.localConfigId,
           shareCode: CloudConfigService.localConfigCode,
           identificationCode: CloudConfigService.localConfigCode,
@@ -519,6 +554,7 @@ void main() {
             'repos': repos,
             'extensions': <Object?>[for (final String pkg in packages) _origin(pkg).toJson()],
             'updatedAt': '',
+            if (reposAt != null) 'reposUpdatedAt': SyncTimeUtil.format(reposAt),
           }),
           ctime: ctime,
         );
@@ -548,5 +584,12 @@ void main() {
     // An extension installed here since changes nothing to send.
     final CloudConfig kept = await merge(entry(<String>[a, b], <String>['package.here', 'package.new'], t.add(const Duration(minutes: 3))), remote);
     expect((kept.config, kept.ctime), (remote.config, remote.ctime));
+
+    // A repository removed on another device stays removed, though an
+    // extension installed here later, on an older list, made this entry
+    // the later one.
+    final CloudConfig removedThere = entry(<String>[b], <String>['package.there'], t.add(const Duration(minutes: 5)), reposAt: t.add(const Duration(minutes: 5)));
+    final CloudConfig olderHere = entry(<String>[a, b], <String>['package.here'], t.add(const Duration(minutes: 6)), reposAt: t.add(const Duration(minutes: 1)));
+    expect((await merge(olderHere, removedThere)).config, removedThere.config);
   });
 }

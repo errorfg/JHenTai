@@ -581,8 +581,12 @@ class TachiRepositoryRecords extends WholeKindAdapter {
   @override
   List<MapEntry<String, LocalItem>> legacyItems(String value) => _items(jsonDecode(value) as Map);
 
+  /// When the repositories changed, not the extensions installed since.
   @override
-  Future<String> changeTime() => _configTime(ConfigEnum.tachiExtensionSetting);
+  Future<String> changeTime() async {
+    DateTime? time = SyncTimeUtil.tryParse((await _config())['reposUpdatedAt'] as String?);
+    return time == null ? _configTime(ConfigEnum.tachiExtensionSetting) : SyncTimeUtil.format(time);
+  }
 
   /// Repositories already here keep their order; new ones follow. The
   /// installed extensions stay as they are.
@@ -600,6 +604,7 @@ class TachiRepositoryRecords extends WholeKindAdapter {
           ...repos.where((r) => !oldRepos.contains(r)),
         ],
         'updatedAt': SyncTimeUtil.nowIso(),
+        'reposUpdatedAt': records.isEmpty ? SyncTimeUtil.nowIso() : records.map((r) => r.updatedAt).max,
       }),
     );
     await tachiExtensionService.refreshBean();

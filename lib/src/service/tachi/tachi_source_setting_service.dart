@@ -31,6 +31,13 @@ class TachiSourceSettingService with JHLifeCircleBeanWithConfigStorage implement
   /// in the host as stored (see [applyToHost]).
   Map<String, String> _inHost = <String, String>{};
 
+  /// What the host had for a source the first time this device gave it
+  /// settings from elsewhere, when that differed, by source id:
+  /// `{"values": {...}, "replacedAt": "..."}`. The host's could be the ones
+  /// wanted (a token the source renewed itself, say); kept on the device
+  /// until restored (see [restoreReplaced]) or dropped.
+  Map<String, Map<String, dynamic>> _replaced = <String, Map<String, dynamic>>{};
+
   /// Not kept by earlier versions, which left settings synced while the
   /// host did not run out of it: nothing stored then is taken as in the host.
   @override
@@ -38,6 +45,12 @@ class TachiSourceSettingService with JHLifeCircleBeanWithConfigStorage implement
     final String? inHost = await localConfigService.read(configKey: ConfigEnum.tachiSourceSettingInHost);
     if (inHost != null) {
       _inHost = (jsonDecode(inHost) as Map).cast<String, String>();
+    }
+    final String? replaced = await localConfigService.read(configKey: ConfigEnum.tachiSourceSettingReplaced);
+    if (replaced != null) {
+      _replaced = <String, Map<String, dynamic>>{
+        for (final MapEntry<String, dynamic> e in (jsonDecode(replaced) as Map<String, dynamic>).entries) e.key: Map<String, dynamic>.from(e.value as Map),
+      };
     }
     // The host may have missed settings while it did not run.
     tachiHost.addStartListener(() => unawaited(applyToHost()));
@@ -58,6 +71,31 @@ class TachiSourceSettingService with JHLifeCircleBeanWithConfigStorage implement
   Iterable<String> get _pending => sources.keys.where((String id) => sources[id]!['updatedAt'] != _inHost[id]);
 
   Future<void> _saveInHost() => localConfigService.write(configKey: ConfigEnum.tachiSourceSettingInHost, value: jsonEncode(_inHost));
+
+  Future<void> _saveReplaced() => localConfigService.write(configKey: ConfigEnum.tachiSourceSettingReplaced, value: jsonEncode(_replaced));
+
+  /// When the host's settings of [sourceId] were replaced by settings from
+  /// elsewhere, if they are kept.
+  DateTime? replacedAt(String sourceId) => SyncTimeUtil.tryParse(_replaced[sourceId]?['replacedAt'] as String?);
+
+  /// Gives the host back the settings of [sourceId] it had before they were
+  /// replaced, and takes them as the source's settings, which sync then
+  /// carries.
+  Future<void> restoreReplaced(String sourceId) async {
+    final Map<String, dynamic>? replaced = _replaced[sourceId];
+    if (replaced == null) {
+      return;
+    }
+    await tachiHost.run((TachiClient c) => c.setPreferenceStore(sourceId, Map<String, dynamic>.from(replaced['values'] as Map)));
+    await capture(sourceId);
+    await dropReplaced(sourceId);
+  }
+
+  Future<void> dropReplaced(String sourceId) async {
+    if (_replaced.remove(sourceId) != null) {
+      await _saveReplaced();
+    }
+  }
 
   @override
   String toConfigString() => jsonEncode(<String, dynamic>{'sources': sources});
@@ -122,8 +160,17 @@ class TachiSourceSettingService with JHLifeCircleBeanWithConfigStorage implement
       try {
         final String updatedAt = sources[id]!['updatedAt'] as String;
         final Map<String, dynamic> values = Map<String, dynamic>.from(sources[id]!['values'] as Map);
-        if (_inHost.containsKey(id) || !const DeepCollectionEquality().equals(await client.preferenceStore(id), values)) {
+        if (_inHost.containsKey(id)) {
           await client.setPreferenceStore(id, values);
+        } else {
+          final Map<String, dynamic> current = await client.preferenceStore(id);
+          if (!const DeepCollectionEquality().equals(current, values)) {
+            if (current.isNotEmpty) {
+              _replaced[id] = <String, dynamic>{'values': current, 'replacedAt': SyncTimeUtil.nowIso()};
+              await _saveReplaced();
+            }
+            await client.setPreferenceStore(id, values);
+          }
         }
         _inHost[id] = updatedAt;
         applied = true;

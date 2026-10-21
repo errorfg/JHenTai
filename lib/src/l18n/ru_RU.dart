@@ -1288,6 +1288,8 @@ class ru_RU {
       'tachiExtensionList': 'Репозитории расширений Tachiyomi',
       'tachiSourceSettings': 'Настройки источников Tachiyomi',
       'tachiOpenInWebView': 'Открыть в WebView',
+      'tachiRestoreReplaced': 'Вернуть прежние настройки этого устройства',
+      'tachiRestoreReplacedHint': '@time их заменили настройки, синхронизированные с другого устройства. После восстановления другие устройства получат их при следующей синхронизации.',
       'noTachiSources': 'Расширения не установлены',
       'tachiExtensionCount': 'Расширений: @count',
       'noChapters': 'Нет глав',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:jhentai/src/network/tachi/tachi_client.dart';
 import 'package:jhentai/src/network/tachi/tachi_host.dart';
 import 'package:jhentai/src/network/tachi/tachi_models.dart';
@@ -85,7 +86,37 @@ class _TachiSourceSettingsPageState extends State<TachiSourceSettingsPage> {
           ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
           : preferences == null
               ? const Center(child: CircularProgressIndicator())
-              : ListView(children: [for (final TachiPreference p in preferences.where((TachiPreference p) => p.visible)) _build(context, p)]),
+              : ListView(children: [
+                  if (tachiSourceSettingService.replacedAt(sourceId) != null) _restoreReplaced(),
+                  for (final TachiPreference p in preferences.where((TachiPreference p) => p.visible)) _build(context, p),
+                ]),
+    );
+  }
+
+  /// The host's own settings, replaced once by settings synced from
+  /// elsewhere (see [TachiSourceSettingService.restoreReplaced]).
+  Widget _restoreReplaced() {
+    final DateTime replacedAt = tachiSourceSettingService.replacedAt(sourceId)!;
+    return ListTile(
+      leading: const Icon(Icons.history),
+      title: Text('tachiRestoreReplaced'.tr),
+      subtitle: Text('tachiRestoreReplacedHint'.trParams(<String, String>{'time': DateFormat('yyyy-MM-dd HH:mm').format(replacedAt.toLocal())})),
+      trailing: IconButton(
+        icon: const Icon(Icons.close),
+        tooltip: 'dismiss'.tr,
+        onPressed: () async {
+          await tachiSourceSettingService.dropReplaced(sourceId);
+          setState(() {});
+        },
+      ),
+      onTap: () async {
+        try {
+          await tachiSourceSettingService.restoreReplaced(sourceId);
+          await _load();
+        } catch (e) {
+          snack('failed'.tr, e.toString(), isShort: true);
+        }
+      },
     );
   }
 

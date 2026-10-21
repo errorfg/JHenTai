@@ -1338,6 +1338,8 @@ favnote：匹配收藏备注
       'tachiExtensionList': 'Tachiyomi 插件仓库',
       'tachiSourceSettings': 'Tachiyomi 插件设置',
       'tachiOpenInWebView': '在网页中打开',
+      'tachiRestoreReplaced': '恢复本机原来的设置',
+      'tachiRestoreReplacedHint': '@time 被其他设备同步来的设置替换。恢复后，其他设备下次同步时也会改用这些设置。',
       'noTachiSources': '还没有安装插件',
       'tachiExtensionCount': '@count 个插件',
       'noChapters': '没有章节',

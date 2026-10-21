@@ -251,11 +251,12 @@ class CloudConfigService
           log.info('  ✅ Tachiyomi repositories unchanged');
           break;
         }
+        String reposTime = (jsonDecode(config.config) as Map)['reposUpdatedAt'] as String? ?? SyncTimeUtil.format(config.ctime);
         await localConfigService.batchWrite([
           LocalConfigCompanion(
             configKey: Value(ConfigEnum.tachiExtensionSetting.key),
             subConfigKey: const Value(LocalConfigService.defaultSubConfigKey),
-            value: Value(jsonEncode({...local, 'repos': repos, 'updatedAt': SyncTimeUtil.format(config.ctime)})),
+            value: Value(jsonEncode({...local, 'repos': repos, 'updatedAt': SyncTimeUtil.format(config.ctime), 'reposUpdatedAt': reposTime})),
             utime: Value(SyncTimeUtil.format(config.ctime)),
           ),
         ]);

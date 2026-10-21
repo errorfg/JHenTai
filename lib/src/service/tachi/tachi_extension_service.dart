@@ -59,6 +59,12 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
   /// another device, as stored (fixed-width UTC ISO 8601).
   String updatedAt = '';
 
+  /// When [repos] last changed here, or the list of another device that
+  /// changed later was taken: what syncs compare, as installing an
+  /// extension changes [updatedAt] too. Configs of 8.1.1 and earlier have
+  /// only [updatedAt].
+  String reposUpdatedAt = '';
+
   /// What the host has installed, once asked.
   final RxList<TachiExtension> installed = <TachiExtension>[].obs;
   final RxBool loadingInstalled = false.obs;
@@ -97,6 +103,7 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
         (e as Map<String, dynamic>)['pkg'] as String: TachiInstalledOrigin.fromJson(e),
     };
     updatedAt = json['updatedAt'] as String? ?? '';
+    reposUpdatedAt = json['reposUpdatedAt'] as String? ?? updatedAt;
   }
 
   @override
@@ -104,10 +111,14 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
         'repos': repos,
         'extensions': origins.values.map((TachiInstalledOrigin o) => o.toJson()).toList(),
         'updatedAt': updatedAt,
+        'reposUpdatedAt': reposUpdatedAt,
       });
 
-  Future<void> _saveChanged() async {
+  Future<void> _saveChanged({bool repos = false}) async {
     updatedAt = SyncTimeUtil.nowIso();
+    if (repos) {
+      reposUpdatedAt = updatedAt;
+    }
     await saveBeanConfig();
   }
 
@@ -192,7 +203,7 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
     }
     if (!repos.contains(repo)) {
       repos.add(repo);
-      await _saveChanged();
+      await _saveChanged(repos: true);
     }
     await _fetchRepo(repo);
     return repoErrors[repo];
@@ -202,7 +213,7 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
     repos.remove(repo);
     available.remove(repo);
     repoErrors.remove(repo);
-    await _saveChanged();
+    await _saveChanged(repos: true);
   }
 
   /// Every extension the repositories offer, the newest version of each package.

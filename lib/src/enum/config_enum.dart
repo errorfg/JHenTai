@@ -82,8 +82,10 @@ enum ConfigEnum {
   tachiRecentSources('tachiRecentSources'),
 
   /// Tachiyomi, kept on the device only: the settings of each source the
-  /// host has (their updatedAt).
+  /// host has (their updatedAt), and those of the host that settings from
+  /// elsewhere replaced the first time.
   tachiSourceSettingInHost('tachiSourceSettingInHost'),
+  tachiSourceSettingReplaced('tachiSourceSettingReplaced'),
   myTagsSetting('MyTagsSetting'),
   builtInBlockedUser('builtInBlockedUser'),
 

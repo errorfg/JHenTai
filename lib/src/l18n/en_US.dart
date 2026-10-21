@@ -1404,6 +1404,8 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'tachiExtensionList': 'Tachiyomi extension repositories',
       'tachiSourceSettings': 'Tachiyomi source settings',
       'tachiOpenInWebView': 'Open in WebView',
+      'tachiRestoreReplaced': 'Restore the settings this device had',
+      'tachiRestoreReplacedHint': 'Replaced on @time by settings synced from another device. Once restored, other devices take them with their next sync.',
       'noTachiSources': 'No extensions installed',
       'tachiExtensionCount': '@count extensions',
       'noChapters': 'No chapters',
