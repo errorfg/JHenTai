@@ -208,6 +208,9 @@ class RecordSyncEngine {
       if (whole != firstTime) {
         continue;
       }
+      if (whole) {
+        await _takeLegacy(adapter);
+      }
       List<RowItem> items = await adapter.read(whole ? null : adapter.pendingKeys(token));
       if (whole) {
         log.info('🗄 Record sync: taking all ${items.length} ${adapter.kind} rows');
@@ -333,7 +336,7 @@ class RecordSyncEngine {
   /// again, say) gets what devices of earlier versions synced. Each keeps
   /// the device of the record it came from, so devices doing this make the
   /// same records; they are not pushed. The old records stay as they are.
-  Future<void> _takeLegacy(WholeKindAdapter adapter) async {
+  Future<void> _takeLegacy(RecordAdapter adapter) async {
     String? legacyKind = adapter.legacyKind;
     if (legacyKind == null) {
       return;

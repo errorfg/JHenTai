@@ -6,6 +6,7 @@ import 'package:jhentai/src/database/dao/gallery_history_dao.dart';
 import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/enum/config_type_enum.dart';
+import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/service/cloud/pending_sync_tracker.dart';
 import 'package:jhentai/src/service/eh_account_sync.dart';
 import 'package:jhentai/src/service/history_service.dart';
@@ -35,6 +36,14 @@ abstract class RecordAdapter {
 
   /// The cloud config type the kind belongs to, for syncs of chosen types.
   CloudConfigTypeEnum get type;
+
+  /// The kind this one took the place of, if any: a device new to this
+  /// kind takes over what that kind's records hold, each item timed at its
+  /// own time if it has one, else at the record's (see RecordSyncEngine).
+  String? get legacyKind => null;
+
+  /// The items a record of [legacyKind] with [value] holds.
+  List<MapEntry<String, LocalItem>> legacyItems(String value) => const [];
 }
 
 /// A row of a kind the app keeps row by row, each row with its own time.
@@ -98,18 +107,10 @@ abstract class WholeKindAdapter extends RecordAdapter {
   /// kind was last written, which an import or a sync of earlier versions
   /// also does.
   bool get itemTimesAreOwn => false;
-
-  /// The kind this one took the place of, if any: a device new to this
-  /// kind takes over what that kind's records hold, each item timed at its
-  /// own time if it has one, else at the record's (see RecordSyncEngine).
-  String? get legacyKind => null;
-
-  /// The items a record of [legacyKind] with [value] holds.
-  List<MapEntry<String, LocalItem>> legacyItems(String value) => const [];
 }
 
 List<RecordAdapter> defaultRecordAdapters() => [
-      HistoryRecords(),
+      GalleryHistoryRecords(),
       ReadProgressRecords(),
       ConfigListRecords(
         kind: 'nhentaiFavorite',
@@ -174,13 +175,41 @@ List<RecordAdapter> defaultRecordAdapters() => [
       TachiSourceRecords(),
     ];
 
-class HistoryRecords extends RowKindAdapter {
+/// Gallery history, a record for each gallery by its key (GalleryUrl.contentKey):
+/// the same number of two sites is two records. Up to 8.1.1 the records
+/// were of kind `history`, by the bare number; a device new to this kind
+/// takes those over once, by the gallery each holds (a deletion holds
+/// none, and is not taken).
+class GalleryHistoryRecords extends RowKindAdapter {
+  static const String historyKind = 'galleryHistory';
+
   @override
-  String get kind => 'history';
+  String get kind => historyKind;
 
   @override
   CloudConfigTypeEnum get type => CloudConfigTypeEnum.history;
 
+  @override
+  String get legacyKind => 'history';
+
+  /// The key of the gallery a history row with [jsonBody] is of; null when
+  /// it can not be read.
+  static String? keyOf(String jsonBody) {
+    try {
+      final dynamic url = (jsonDecode(jsonBody) as Map)['galleryUrl'];
+      return url is String ? GalleryUrl.tryParseStored(url)?.contentKey : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  List<MapEntry<String, LocalItem>> legacyItems(String value) {
+    final String? key = keyOf(value);
+    return key == null ? const [] : [MapEntry(key, LocalItem(value))];
+  }
+
+  /// [keys]: of the pending set, row numbers.
   @override
   Future<List<RowItem>> read(Set<String>? keys) async {
     List<GalleryHistoryV2Data> rows;
@@ -190,7 +219,10 @@ class HistoryRecords extends RowKindAdapter {
       Set<int> gids = keys.map(int.tryParse).whereType<int>().toSet();
       rows = gids.isEmpty ? [] : await historyService.getRawHistoryByGids(gids);
     }
-    return rows.map((h) => RowItem('${h.gid}', h.jsonBody, SyncTimeUtil.canonicalize(h.lastReadTime))).toList();
+    return [
+      for (GalleryHistoryV2Data h in rows)
+        if (keyOf(h.jsonBody) case final String key) RowItem(key, h.jsonBody, SyncTimeUtil.canonicalize(h.lastReadTime)),
+    ];
   }
 
   @override
@@ -200,7 +232,7 @@ class HistoryRecords extends RowKindAdapter {
   Future<void> apply(List<SyncRecordData> records) async {
     List<GalleryHistoryV2Data> upserts = [];
     for (SyncRecordData record in records) {
-      int? gid = int.tryParse(record.key);
+      int? gid = GalleryUrl.storageGidOfKey(record.key);
       if (gid == null) {
         continue;
       }

@@ -330,7 +330,7 @@ class EHGalleryListCard extends StatelessWidget {
     final readIndex = await readProgressService.getReadProgressOf(gallery.galleryUrl);
     int? pageCount = gallery.pageCount;
     if (pageCount == null && readIndex > 0) {
-      final history = await GalleryHistoryDao.selectByGid(gallery.gid);
+      final history = await GalleryHistoryDao.selectByGid(gallery.galleryUrl.storageGid);
       if (history != null) {
         pageCount = GalleryHistoryModel.fromJson(jsonDecode(history.jsonBody)).pageCount;
       }

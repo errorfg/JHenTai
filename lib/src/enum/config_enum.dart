@@ -6,6 +6,7 @@ enum ConfigEnum {
   migrateStorageConfig('migrateStorageConfig'),
   migrateLocalConfigUtimeToUtc('migrateLocalConfigUtimeToUtc'),
   migrateHistoryTimeToUtc('migrateHistoryTimeToUtc'),
+  migrateHistoryKeys('migrateHistoryKeys'),
 
   /// oplog-based cloud sync (format v2) state
   syncDeviceId('syncDeviceId'),

@@ -206,7 +206,7 @@ void main() {
     await jmFavoriteService.addFavorite(_jmGallery(102), favoriteCategoryIndex: 1);
     await jmFavoriteService.removeFavorite(_jmGallery(101).gid);
     await mac.sync(bucket, server);
-    expect(server.record('history', '2'), isNotNull);
+    expect(server.record('galleryHistory', 'eh:2'), isNotNull);
     expect(server.record('jmFavorite', '${_jmGallery(101).gid}')!.deleted, isTrue);
 
     // Meanwhile the phone, still on the bucket, reads too.
@@ -240,7 +240,7 @@ void main() {
     mac.provider = 'server';
     await mac.sync(bucket, server);
     for (String gid in ['3', '4', '5']) {
-      expect(server.record('history', gid), isNotNull, reason: 'history $gid');
+      expect(server.record('galleryHistory', 'eh:$gid'), isNotNull, reason: 'history $gid');
     }
     expect(server.record('jmFavorite', '${_jmGallery(104).gid}'), isNotNull);
     expect(server.record('jmFavorite', '${_jmGallery(103).gid}'), isNotNull);

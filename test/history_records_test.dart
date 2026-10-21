@@ -113,6 +113,24 @@ void main() {
     expect(WebDavProvider(serverUrl: 'https://dav.example.com/', username: 'u', password: 'p', remotePath: '/JHenTaiConfig/').remotePath, '/JHenTaiConfig');
   });
 
+  test('galleries of one number on two sites are two entries; an nhentai entry of 8.1.1 moves to its own number, its time kept', () async {
+    // As 8.1.1 kept it: nhentai 123 under the bare number.
+    await _store(123, _row('https://nhentai.net/g/123/', 'nhentai 123'), '2026-10-18T10:00:00.000000Z');
+    await historyService.ensureMigrated();
+    expect((await GalleryHistoryDao.selectByGid(GalleryUrl.nhStorageOffset + 123))?.lastReadTime, '2026-10-18T10:00:00.000000Z');
+    expect(await GalleryHistoryDao.selectByGid(123), isNull);
+
+    GalleryHistoryModel model(String url, String title) => GalleryHistoryModel.fromJson(_row(url, title));
+    await historyService.record(model('https://e-hentai.org/g/123/abcdef1234/', 'E-Hentai 123'));
+    await historyService.record(model('https://www.wnacg.com/photos-index-aid-123.html', 'wnacg 123'));
+    final List<GalleryHistoryModel> shown = await historyService.getByPageIndex(0);
+    expect(shown.map((GalleryHistoryModel h) => h.title).toSet(), <String>{'E-Hentai 123', 'wnacg 123', 'nhentai 123'});
+
+    // Deleting one leaves the others.
+    await historyService.delete(GalleryUrl.parse('https://www.wnacg.com/photos-index-aid-123.html').storageGid);
+    expect((await historyService.getByPageIndex(0)).map((GalleryHistoryModel h) => h.title).toSet(), <String>{'E-Hentai 123', 'nhentai 123'});
+  });
+
   group('a new version of an E-Hentai gallery', () {
     GalleryUrl eh(int gid) => GalleryUrl(isEH: true, gid: gid, token: 'abcdef1234');
 

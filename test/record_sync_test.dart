@@ -391,7 +391,38 @@ void main() {
     final _MemoryServer second = _MemoryServer('db-2');
     await phone.sync(second);
     expect(second.record('laterKind', 'k')!.device, 'other');
-    expect(second.record('history', '1'), isNotNull);
+    expect(second.record('galleryHistory', 'eh:1'), isNotNull);
+  });
+
+  test('history synced by 8.1.1, by the bare number, is taken over once by the gallery it holds; its deletions are not', () async {
+    final _MemoryServer server = _MemoryServer('db-1');
+    final String time = SyncTimeUtil.nowIso();
+    final GalleryHistoryModel nh = GalleryHistoryModel(
+      galleryUrl: GalleryUrl(isEH: true, isNH: true, gid: 5, token: 'nhentai', sourceHost: 'nhentai.net'),
+      title: 'nhentai 5',
+      category: 'Manga',
+      coverUrl: 'https://cdn.example.test/5.jpg',
+      pageCount: 20,
+      rating: 0,
+      language: '',
+      uploader: '',
+      publishTime: '',
+      isExpunged: false,
+      tags: const <String>[],
+    );
+    await server.push([
+      RemoteRecord(kind: 'history', key: '5', value: jsonEncode(nh), updatedAt: time, device: 'old', deleted: false),
+      RemoteRecord(kind: 'history', key: '6', value: jsonEncode(_entry(6)), updatedAt: time, device: 'old', deleted: false),
+      RemoteRecord(kind: 'history', key: '8', value: null, updatedAt: time, device: 'old', deleted: true),
+    ]);
+
+    final _Device desktop = _Device();
+    await desktop.activate();
+    await historyService.record(_entry(8));
+    await desktop.sync(server);
+    expect(await desktop.historyGids(), {GalleryUrl.nhStorageOffset + 5, 6, 8}, reason: 'which gallery 8 the deletion was of is not known');
+    expect(server.record('galleryHistory', 'nh:5'), isNull, reason: 'taken over the same way on each device, not pushed');
+    expect(server.record('galleryHistory', 'eh:8'), isNotNull);
   });
 
   test('a pull cut short goes on from where it stopped', () async {
@@ -400,8 +431,8 @@ void main() {
     await server.push([
       for (int gid = 1; gid <= 450; gid++)
         RemoteRecord(
-          kind: 'history',
-          key: '$gid',
+          kind: 'galleryHistory',
+          key: 'eh:$gid',
           value: jsonEncode(_entry(gid)),
           updatedAt: time,
           device: 'other',
@@ -413,7 +444,7 @@ void main() {
     server.pullsBeforeFailure = 2;
     await expectLater(desktop.sync(server), throwsA(isA<RecordServerException>()));
     await desktop.activate();
-    expect((await SyncRecordDao.selectByKind('history')).length, 2 * RecordSyncEngine.pullLimit);
+    expect((await SyncRecordDao.selectByKind('galleryHistory')).length, 2 * RecordSyncEngine.pullLimit);
 
     server.pullsBeforeFailure = null;
     server.pulls = 0;
@@ -433,7 +464,7 @@ void main() {
     final SyncService service = SyncService(recordBackendFactory: () => server);
     SyncResult result = await service.sync(types: const [CloudConfigTypeEnum.history]);
     expect(result.success, isTrue, reason: result.message);
-    expect(server.record('history', '7'), isNotNull);
+    expect(server.record('galleryHistory', 'eh:7'), isNotNull);
   });
 
   test('a sync given up stops before it writes, and the next sync waits for it', () async {
@@ -457,11 +488,11 @@ void main() {
     held.release.complete();
     await Future<void>.delayed(const Duration(milliseconds: 20));
     expect(server.pushedRecords, 0);
-    expect(await SyncRecordDao.selectByKind('history'), isEmpty);
+    expect(await SyncRecordDao.selectByKind('galleryHistory'), isEmpty);
 
     result = await service.sync(types: const [CloudConfigTypeEnum.history]);
     expect(result.success, isTrue, reason: result.message);
-    expect(server.record('history', '7'), isNotNull);
+    expect(server.record('galleryHistory', 'eh:7'), isNotNull);
   });
 }
 

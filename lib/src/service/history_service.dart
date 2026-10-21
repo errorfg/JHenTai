@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:jhentai/src/database/dao/gallery_history_dao.dart';
 import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
+import 'package:jhentai/src/service/record_sync/record_adapters.dart';
+import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/extension/list_extension.dart';
 import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
@@ -42,7 +44,55 @@ class HistoryService
   /// Awaitable and memoized: the sync service calls this before its first
   /// sync because bean ready hooks are fired without being awaited.
   Future<void> ensureMigrated() {
-    return _migrationFuture ??= _migrateLastReadTimeToUtc();
+    return _migrationFuture ??= () async {
+      await _migrateLastReadTimeToUtc();
+      await _migrateKeys();
+    }();
+  }
+
+  /// The number of the row of the gallery [jsonBody] is of (see
+  /// GalleryUrl.storageGid); null when it can not be read.
+  static int? storageGidOf(String jsonBody) {
+    try {
+      final dynamic url = (jsonDecode(jsonBody) as Map)['galleryUrl'];
+      return url is String ? GalleryUrl.tryParseStored(url)?.storageGid : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// [row] under the number of the gallery it is of: rows of versions up to
+  /// 8.1.1, from their sync too, have nhentai and wnacg galleries under the
+  /// bare number.
+  static GalleryHistoryV2Data _keyed(GalleryHistoryV2Data row) {
+    final int? gid = storageGidOf(row.jsonBody);
+    return gid == null || gid == row.gid ? row : row.copyWith(gid: gid);
+  }
+
+  /// One-time migration: nhentai and wnacg rows of versions up to 8.1.1 move
+  /// from the bare number to their own (see [_keyed]), by what each row
+  /// says it is; times stay as they are. A row that can not be read stays.
+  Future<void> _migrateKeys() async {
+    if (await localConfigService.read(configKey: ConfigEnum.migrateHistoryKeys) == '1') {
+      return;
+    }
+    try {
+      List<GalleryHistoryV2Data> rows = await getAllRawHistory();
+      List<GalleryHistoryV2Data> moved = [for (GalleryHistoryV2Data row in rows) if (_keyed(row).gid != row.gid) _keyed(row)];
+      if (moved.isNotEmpty) {
+        Set<int> movedFrom = {for (GalleryHistoryV2Data row in rows) if (_keyed(row).gid != row.gid) row.gid};
+        await appDb.transaction(() async {
+          for (int gid in movedFrom) {
+            await GalleryHistoryDao.deleteHistory(gid);
+          }
+          await GalleryHistoryDao.batchUpsertIfNewer(moved);
+        });
+        log.info('Moved ${moved.length} nhentai and wnacg history rows to their own numbers');
+      }
+      await localConfigService.write(configKey: ConfigEnum.migrateHistoryKeys, value: '1');
+    } catch (e) {
+      log.error('Move nhentai and wnacg history rows failed', e);
+    }
   }
 
   /// One-time migration: lastReadTime used to be a local-time string; convert
@@ -147,20 +197,20 @@ class HistoryService
   }
 
   Future<void> record(GalleryHistoryModel gallery) async {
-    log.trace('Record history: ${gallery.galleryUrl.gid}');
+    log.trace('Record history: ${gallery.galleryUrl.contentKey}');
 
     try {
-      bool isNewHistory =
-          !await GalleryHistoryDao.existsHistory(gallery.galleryUrl.gid);
+      int gid = gallery.galleryUrl.storageGid;
+      bool isNewHistory = !await GalleryHistoryDao.existsHistory(gid);
 
       await GalleryHistoryDao.replaceHistory(
         GalleryHistoryV2Data(
-          gid: gallery.galleryUrl.gid,
+          gid: gid,
           jsonBody: jsonEncode(gallery),
           lastReadTime: SyncTimeUtil.nowIso(),
         ),
       );
-      await pendingSyncTracker.markHistoryPending(gallery.galleryUrl.gid);
+      await pendingSyncTracker.markHistoryPending(gid);
 
       if (isNewHistory) {
         int totalCount = await GalleryHistoryDao.selectTotalCount();
@@ -176,19 +226,19 @@ class HistoryService
   Future<void> recordAt(GalleryHistoryModel gallery, String lastReadTime) async {
     await GalleryHistoryDao.replaceHistory(
       GalleryHistoryV2Data(
-        gid: gallery.galleryUrl.gid,
+        gid: gallery.galleryUrl.storageGid,
         jsonBody: jsonEncode(gallery),
         lastReadTime: lastReadTime,
       ),
     );
-    await pendingSyncTracker.markHistoryPending(gallery.galleryUrl.gid);
+    await pendingSyncTracker.markHistoryPending(gallery.galleryUrl.storageGid);
   }
 
   Future<void> batchRecord(List<GalleryHistoryV2Data> gallerys) async {
     log.trace('Batch record history, size: ${gallerys.length}');
 
     try {
-      for (List<GalleryHistoryV2Data> partition in gallerys.partition(2000)) {
+      for (List<GalleryHistoryV2Data> partition in gallerys.map(_keyed).toList().partition(2000)) {
         await GalleryHistoryDao.batchReplaceHistory(partition);
         await Future.delayed(const Duration(milliseconds: 200));
       }
@@ -213,7 +263,7 @@ class HistoryService
           await GalleryHistoryDao.selectGidToLastReadTime();
 
       List<GalleryHistoryV2Data> newer = [];
-      for (GalleryHistoryV2Data incoming in gallerys) {
+      for (GalleryHistoryV2Data incoming in gallerys.map(_keyed)) {
         DateTime? incomingTime = SyncTimeUtil.tryParse(incoming.lastReadTime);
         if (incomingTime == null) {
           continue;
@@ -248,29 +298,33 @@ class HistoryService
 
   Future<bool> delete(int gid) => deleteGids([gid]);
 
+  /// [gids]: numbers of rows (GalleryUrl.storageGid).
   Future<bool> deleteGids(Iterable<int> gids) async {
     log.info('Delete history: $gids');
 
+    List<GalleryHistoryV2Data> rows = await getRawHistoryByGids(gids.toSet());
     bool deleted = false;
     for (int gid in gids) {
       deleted = await GalleryHistoryDao.deleteHistory(gid) > 0 || deleted;
     }
-    await _recordDeletions(gids.map((gid) => '$gid'));
+    await _recordDeletions(rows);
     return deleted;
   }
 
   Future<bool> deleteAll() async {
     log.info('Delete all historys');
-    Iterable<int> gids = (await GalleryHistoryDao.selectGidToLastReadTime()).keys;
+    List<GalleryHistoryV2Data> rows = await getAllRawHistory();
     bool deleted = await GalleryHistoryDao.deleteAllHistory() > 0;
-    await _recordDeletions(gids.map((gid) => '$gid'));
+    await _recordDeletions(rows);
     return deleted;
   }
 
-  /// Sync passes deletions to the other devices.
-  Future<void> _recordDeletions(Iterable<String> gids) async {
+  /// Sync passes deletions to the other devices, by the key of each
+  /// gallery; a row that can not be read has none and is not passed on.
+  Future<void> _recordDeletions(List<GalleryHistoryV2Data> rows) async {
+    Iterable<String> keys = rows.map((row) => GalleryHistoryRecords.keyOf(row.jsonBody)).whereType<String>();
     try {
-      await recordSyncEngine.recordDeletions('history', gids, syncOn: syncSetting.enableSync.value);
+      await recordSyncEngine.recordDeletions(GalleryHistoryRecords.historyKind, keys, syncOn: syncSetting.enableSync.value);
     } on Exception catch (e) {
       log.error('Record history deletions for sync failed', e);
     }

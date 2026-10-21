@@ -110,6 +110,36 @@ class GalleryUrl {
   /// [contentKey].
   String? get legacyKey => contentKey == '$gid' ? null : '$gid';
 
+  /// nhentai and wnacg galleries in tables keyed by number: in ranges of
+  /// their own, above E-Hentai's gids and below JM's.
+  static const int nhStorageOffset = 7000000000;
+  static const int wnStorageOffset = 8000000000;
+
+  /// The gallery's number in tables keyed by number (history): its gid,
+  /// but for nhentai and wnacg galleries, in the ranges above, so that a
+  /// number of two sites is two rows. Up to 8.1.1 their rows had the bare
+  /// number.
+  int get storageGid => switch (source.kind) {
+        SourceKind.nhentai => nhStorageOffset + gid,
+        SourceKind.wnacg => wnStorageOffset + gid,
+        SourceKind.ehentai || SourceKind.jm || SourceKind.tachiyomi => gid,
+      };
+
+  /// [storageGid] of the gallery of [contentKey]; null for a key of no
+  /// gallery.
+  static int? storageGidOfKey(String contentKey) {
+    final Match? match = RegExp(r'^(?:(eh|nh|wn):)?(\d+)$').firstMatch(contentKey);
+    if (match == null) {
+      return null;
+    }
+    final int number = int.parse(match.group(2)!);
+    return switch (match.group(1)) {
+      'nh' => nhStorageOffset + number,
+      'wn' => wnStorageOffset + number,
+      _ => number,
+    };
+  }
+
   /// [contentKey] and [legacyKey] of the gallery stored with the address
   /// [url] and the number [gid]; the number alone when the address can not
   /// be read.

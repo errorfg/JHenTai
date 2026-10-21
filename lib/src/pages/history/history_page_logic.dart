@@ -123,12 +123,12 @@ class HistoryPageLogic extends OldBasePageLogic {
   /// alone.
   static Future<List<int>> entriesShownAs(GalleryUrl url) async {
     if (!url.isJM) {
-      return <int>[url.gid];
+      return <int>[url.storageGid];
     }
     final Map<int, int> albumOf = (await jmReadingService.knownAlbums()).albumOf;
     final int? album = albumOf[url.jmChapterId];
     if (album == null) {
-      return <int>[url.gid];
+      return <int>[url.storageGid];
     }
     return <int>[
       for (final MapEntry<int, int> entry in albumOf.entries)
