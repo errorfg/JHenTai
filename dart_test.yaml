@@ -1,0 +1,5 @@
+tags:
+  # Needs what a developer sets up on a machine: real accounts and sites
+  # (test/e2e/*.json) or the upscaler tools. CI leaves these out, and every
+  # other test must run there, none skipped.
+  external:

@@ -1,5 +1,6 @@
 // Live requests to a third-party server whose response times vary widely.
 @Timeout(Duration(minutes: 4))
+@Tags(<String>['external'])
 library;
 
 import 'dart:convert';

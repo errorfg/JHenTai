@@ -22,6 +22,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  Test:
+    uses: ./.github/workflows/tests.yml
+
   BuildAllTargets:
     if: ${{ (github.event_name != 'push' || !contains(join(github.event.commits.*.message, ' '), '[skip-build]')) && (github.event_name != 'pull_request' || (!contains(github.event.pull_request.title, '[skip-build]') && !contains(github.event.pull_request.body || '', '[skip-build]'))) }}
     name: Build ${{ matrix.target }}

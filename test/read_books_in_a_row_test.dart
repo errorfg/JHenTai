@@ -582,7 +582,7 @@ void main() {
       Get.reset();
       await appDb.close();
     });
-  }, skip: _srToolsRoot() == null);
+  }, skip: _srToolsRoot() == null, tags: 'external');
 
   /// Reads [info] with upscaling on until the pages [upscaled] have their
   /// upscaled copy, and checks that the first page shows as it: the reader's
@@ -720,7 +720,7 @@ void main() {
 
     expect(refused, 0);
     expect(served.keys.toSet(), <String>{for (int i = 1; i <= _pages; i++) '/api/v1/books/book-1/pages/$i'});
-  }, skip: _srToolsRoot() == null);
+  }, skip: _srToolsRoot() == null, tags: 'external');
 
   testWidgets('a downloaded Komga book is upscaled as it is read', (WidgetTester tester) async {
     await readUpscaled(
@@ -738,7 +738,7 @@ void main() {
         useSuperResolution: false,
       ),
     );
-  }, skip: _srToolsRoot() == null);
+  }, skip: _srToolsRoot() == null, tags: 'external');
 
   testWidgets('a downloaded gallery is upscaled as it is read, but for a page still downloading', (WidgetTester tester) async {
     const int gid = 4242;
@@ -786,5 +786,5 @@ void main() {
       upscaled: const <int>[0, 1, 2, 4],
       left: const <int>[3],
     );
-  }, skip: _srToolsRoot() == null);
+  }, skip: _srToolsRoot() == null, tags: 'external');
 }

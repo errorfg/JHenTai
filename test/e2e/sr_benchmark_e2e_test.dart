@@ -1,5 +1,6 @@
 // Live requests to JM and real runs of the upscaler programs.
 @Timeout(Duration(minutes: 20))
+@Tags(<String>['external'])
 library;
 
 import 'dart:convert';
