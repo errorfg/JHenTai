@@ -337,6 +337,10 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
   /// is kept.
   Future<void> _applyInstalledList() async {
     await refreshInstalled();
+    if (hostError.value != null) {
+      // What the host has is not known: left for the next time.
+      return;
+    }
     final Set<String> have = installed.map((TachiExtension e) => e.pkg).toSet();
     final Iterable<TachiInstalledOrigin> missing = origins.values.where((TachiInstalledOrigin o) => !have.contains(o.pkg) && o.repo.isNotEmpty);
     if (missing.isNotEmpty) {
