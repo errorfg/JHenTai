@@ -1206,7 +1206,7 @@ favnote：配對收藏備註
       'tachiUpdates': '更新',
       'tachiExtensions': '插件',
       'tachiFavorite': 'Tachiyomi 收藏',
-      'tachiExtensionList': 'Tachiyomi 插件與倉庫',
+      'tachiExtensionList': 'Tachiyomi 插件倉庫',
       'tachiSourceSettings': 'Tachiyomi 插件設定',
       'tachiOpenInWebView': '在網頁中開啟',
       'noTachiSources': '還沒有安裝插件',

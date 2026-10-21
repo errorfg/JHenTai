@@ -1283,7 +1283,7 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'tachiUpdates': 'Atualizações',
       'tachiExtensions': 'Extensões',
       'tachiFavorite': 'Favoritos Tachiyomi',
-      'tachiExtensionList': 'Extensões e repositórios Tachiyomi',
+      'tachiExtensionList': 'Repositórios de extensões Tachiyomi',
       'tachiSourceSettings': 'Configurações das fontes Tachiyomi',
       'tachiOpenInWebView': 'Abrir no WebView',
       'noTachiSources': 'Nenhuma extensão instalada',

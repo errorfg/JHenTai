@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:collection/collection.dart';
 import 'package:drift/drift.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
@@ -241,18 +243,24 @@ class CloudConfigService
         log.info('  ✅ E-Hentai account imported');
         break;
       case CloudConfigTypeEnum.tachiExtensionList:
+        // The repositories; which extensions are installed is each device's own.
+        List<String> repos = (((jsonDecode(config.config) as Map)['repos'] as List?) ?? []).whereType<String>().toList();
+        String? stored = await localConfigService.read(configKey: ConfigEnum.tachiExtensionSetting);
+        Map<String, dynamic> local = stored == null ? {} : Map<String, dynamic>.from(jsonDecode(stored) as Map);
+        if (const ListEquality<dynamic>().equals(local['repos'] as List?, repos)) {
+          log.info('  ✅ Tachiyomi repositories unchanged');
+          break;
+        }
         await localConfigService.batchWrite([
           LocalConfigCompanion(
             configKey: Value(ConfigEnum.tachiExtensionSetting.key),
             subConfigKey: const Value(LocalConfigService.defaultSubConfigKey),
-            value: Value(config.config),
+            value: Value(jsonEncode({...local, 'repos': repos, 'updatedAt': SyncTimeUtil.format(config.ctime)})),
             utime: Value(SyncTimeUtil.format(config.ctime)),
           ),
         ]);
         await tachiExtensionService.refreshBean();
-        // Installs what arrived, when the host runs already; otherwise once it starts.
-        unawaited(tachiExtensionService.reconcileHost());
-        log.info('  ✅ Tachiyomi extensions imported');
+        log.info('  ✅ Tachiyomi repositories imported');
         break;
       case CloudConfigTypeEnum.tachiSourceSettings:
         await localConfigService.batchWrite([
@@ -264,7 +272,7 @@ class CloudConfigService
           ),
         ]);
         await tachiSourceSettingService.refreshBean();
-        unawaited(tachiExtensionService.reconcileHost());
+        unawaited(tachiSourceSettingService.applyToHost());
         log.info('  ✅ Tachiyomi source settings imported');
         break;
       case CloudConfigTypeEnum.tachiFavorite:

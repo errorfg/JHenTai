@@ -208,7 +208,7 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       case CloudConfigTypeEnum.tachiFavorite:
         return await _mergeLocalSourceFavorite(type, local, remote);
       case CloudConfigTypeEnum.tachiExtensionList:
-        return _mergeLatestConfig(local, remote);
+        return _mergeTachiRepositories(local, remote);
       case CloudConfigTypeEnum.tachiSourceSettings:
         return _mergeTachiSourceSettings(local, remote);
       case CloudConfigTypeEnum.komgaSetting:
@@ -259,6 +259,29 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     return MergeConfigResult(
       useRemote ? remote : local,
       MergeStatistics(1, 1, 1, useRemote ? 1 : 0, 1),
+    );
+  }
+
+  /// Tachiyomi repositories: the later list. Which extensions are installed
+  /// is each device's own: the list of them the entry holds stays as the
+  /// remote has it, for devices of 8.1.1 and earlier, which install by it.
+  MergeConfigResult _mergeTachiRepositories(CloudConfig local, CloudConfig remote) {
+    Map<String, dynamic> mine = Map<String, dynamic>.from(jsonDecode(local.config) as Map);
+    Map<String, dynamic> theirs = Map<String, dynamic>.from(jsonDecode(remote.config) as Map);
+    if (const ListEquality<dynamic>().equals(mine['repos'] as List?, theirs['repos'] as List?) || remote.ctime.isAfter(local.ctime)) {
+      return MergeConfigResult(remote, MergeStatistics(1, 1, 1, 0, 0));
+    }
+    return MergeConfigResult(
+      CloudConfig(
+        id: local.id,
+        shareCode: local.shareCode,
+        identificationCode: local.identificationCode,
+        type: local.type,
+        version: local.version,
+        config: jsonEncode({...theirs, 'repos': mine['repos'] ?? [], 'updatedAt': mine['updatedAt']}),
+        ctime: local.ctime,
+      ),
+      MergeStatistics(1, 1, 1, 0, 1),
     );
   }
 

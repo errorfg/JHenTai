@@ -106,6 +106,7 @@ class RecordSyncEngine {
     await _takeRowChanges(device, state, token, firstTime: true);
     for (WholeKindAdapter adapter in _wholeAdapters) {
       if (!state.kinds.contains(adapter.kind) && wanted(adapter)) {
+        await _takeLegacy(adapter);
         await _takeWholeChanges(adapter, device, state);
       }
     }
@@ -309,6 +310,43 @@ class RecordSyncEngine {
       await SyncRecordDao.write(writes);
     });
     state.kinds.add(adapter.kind);
+  }
+
+  /// What the records of the kind [adapter]'s took the place of hold, as
+  /// records of its kind, taken like records pulled: once, before the kind
+  /// is first taken in here, so that a device new to the kind (installed
+  /// again, say) gets what devices of earlier versions synced. Each keeps
+  /// the device of the record it came from, so devices doing this make the
+  /// same records; they are not pushed. The old records stay as they are.
+  Future<void> _takeLegacy(WholeKindAdapter adapter) async {
+    String? legacyKind = adapter.legacyKind;
+    if (legacyKind == null) {
+      return;
+    }
+    List<RemoteRecord> records = [];
+    for (SyncRecordData row in await SyncRecordDao.selectByKind(legacyKind)) {
+      if (row.deleted || row.value == null) {
+        continue;
+      }
+      try {
+        for (MapEntry<String, LocalItem> item in adapter.legacyItems(row.value!)) {
+          records.add(RemoteRecord(
+            kind: adapter.kind,
+            key: item.key,
+            value: item.value.value,
+            updatedAt: item.value.firstTime ?? row.updatedAt,
+            device: row.device,
+            deleted: false,
+          ));
+        }
+      } catch (e) {
+        log.warning('Record sync: $legacyKind record of ${row.device} unreadable', e);
+      }
+    }
+    if (records.isNotEmpty) {
+      int taken = await _takeRemote(records);
+      log.info('🗄 Record sync: took $taken of ${records.length} ${adapter.kind} records from $legacyKind');
+    }
   }
 
   /// Stores the records that win over this device's versions, each to be

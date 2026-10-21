@@ -5,9 +5,13 @@ import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jhentai/src/database/database.dart';
+import 'package:jhentai/src/enum/config_enum.dart';
+import 'package:jhentai/src/enum/config_type_enum.dart';
+import 'package:jhentai/src/model/config.dart';
 import 'package:jhentai/src/network/tachi/tachi_client.dart';
 import 'package:jhentai/src/network/tachi/tachi_host.dart';
 import 'package:jhentai/src/service/cloud/pending_sync_tracker.dart';
+import 'package:jhentai/src/service/cloud_service.dart';
 import 'package:jhentai/src/service/history_service.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
@@ -16,6 +20,7 @@ import 'package:jhentai/src/service/path_service.dart';
 import 'package:jhentai/src/service/record_sync/record_adapters.dart';
 import 'package:jhentai/src/service/record_sync/record_backend.dart';
 import 'package:jhentai/src/service/record_sync/record_sync_engine.dart';
+import 'package:jhentai/src/service/sync_merger.dart';
 import 'package:jhentai/src/service/tachi/tachi_extension_service.dart';
 import 'package:jhentai/src/service/tachi/tachi_source_setting_service.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
@@ -85,6 +90,9 @@ class _FakeHost {
   /// Settings given to the host: source id and values, as JSON.
   final List<String> settings = <String>[];
 
+  /// The settings each source has in the host.
+  final Map<String, Object?> values = <String, Object?>{};
+
   int get port => _server.port;
 
   String get repo => 'http://127.0.0.1:$port/repo/index.min.json';
@@ -133,9 +141,13 @@ class _FakeHost {
           final Map<String, dynamic> json = jsonDecode(await utf8.decodeStream(request)) as Map<String, dynamic>;
           installed = false;
           uninstalls.add(json['pkg'] as String);
+        case '/source/preference-store':
+          final Map<String, dynamic> json = jsonDecode(await utf8.decodeStream(request)) as Map<String, dynamic>;
+          body = <String, Object?>{'values': values[json['source']] ?? <String, Object?>{}};
         case '/source/preference-store/set':
           final Map<String, dynamic> json = jsonDecode(await utf8.decodeStream(request)) as Map<String, dynamic>;
           settings.add('${json['source']} ${jsonEncode(json['values'])}');
+          values[json['source'] as String] = json['values'];
         default:
           request.response.statusCode = HttpStatus.notFound;
           body = <String, Object?>{'error': 'not here'};
@@ -207,7 +219,7 @@ class _Device {
 
   Future<void> sync(_MemoryServer server) async {
     activate();
-    await RecordSyncEngine(adapters: <RecordAdapter>[TachiExtensionRecords(), TachiSourceRecords()]).sync(server);
+    await RecordSyncEngine(adapters: <RecordAdapter>[TachiRepositoryRecords(), TachiSourceRecords()]).sync(server);
   }
 
   /// The settings of [source] changed here, as the settings page takes them
@@ -243,6 +255,31 @@ class _Device {
     activate();
     await extensions.refreshBean();
     return extensions.origins.keys.toSet();
+  }
+
+  /// [repo] added (or removed) here, as the repositories page does.
+  Future<void> setRepo(String repo, {bool add = true}) async {
+    activate();
+    if (add) {
+      extensions.repos.add(repo);
+    } else {
+      extensions.repos.remove(repo);
+    }
+    extensions.updatedAt = SyncTimeUtil.nowIso();
+    await extensions.saveBeanConfig();
+  }
+
+  Future<List<String>> repos() async {
+    activate();
+    await extensions.refreshBean();
+    return extensions.repos.toList();
+  }
+
+  /// The settings of earlier versions: stored, and no record of which the
+  /// host has.
+  Future<void> storeAsBefore(Map<String, Object?> sources) async {
+    activate();
+    await localConfigService.write(configKey: ConfigEnum.tachiSourceSetting, value: jsonEncode(<String, Object?>{'sources': sources}));
   }
 }
 
@@ -291,33 +328,40 @@ void main() {
     }
   });
 
-  test('extensions installed on each of two devices are both kept; one removed on a device goes from the other', () async {
+  test('repositories added on each of two devices are both kept, one removed on a device goes from the other; extensions are not carried', () async {
     final _MemoryServer server = _MemoryServer();
     final _Device phone = _Device(), desktop = _Device();
     await phone.launch();
     await desktop.launch();
-    await phone.setExtension('package.shared', _origin('package.shared'));
+    await phone.setRepo('https://shared.example/index.min.json');
+    await phone.setExtension('package.phone', _origin('package.phone'));
     await phone.sync(server);
     await desktop.sync(server);
 
-    await phone.setExtension('package.phone', _origin('package.phone'));
+    await phone.setRepo('https://phone.example/index.min.json');
     await Future<void>.delayed(const Duration(milliseconds: 2));
-    await desktop.setExtension('package.desktop', _origin('package.desktop'));
+    await desktop.setRepo('https://desktop.example/index.min.json');
     await phone.sync(server);
     await desktop.sync(server);
     await phone.sync(server);
     for (final _Device device in <_Device>[phone, desktop]) {
-      expect(await device.packages(), <String>{'package.shared', 'package.phone', 'package.desktop'});
+      expect((await device.repos()).toSet(), <String>{
+        'https://shared.example/index.min.json',
+        'https://phone.example/index.min.json',
+        'https://desktop.example/index.min.json',
+      });
     }
+    expect(await desktop.packages(), isEmpty);
+    expect(await phone.packages(), <String>{'package.phone'});
 
-    await desktop.setExtension('package.shared', null);
+    await desktop.setRepo('https://shared.example/index.min.json', add: false);
     await desktop.sync(server);
     await phone.sync(server);
-    expect(await phone.packages(), <String>{'package.phone', 'package.desktop'});
+    expect((await phone.repos()).toSet(), <String>{'https://phone.example/index.min.json', 'https://desktop.example/index.min.json'});
   });
 
-  test('settings and extensions synced while the host does not run reach it when it starts, after the app was closed too', () async {
-    final _FakeHost fakeHost = _FakeHost();
+  test('settings synced while the host does not run reach it when it starts, after the app was closed too; extensions are left to each device', () async {
+    final _FakeHost fakeHost = _FakeHost()..installed = true;
     await fakeHost.start();
     addTearDown(fakeHost.stop);
     final TachiClient client = TachiClient(port: fakeHost.port, token: 'token');
@@ -335,7 +379,6 @@ void main() {
     await phone.launch();
     await phone.sync(server);
     await fakeHost.quiet();
-    expect(fakeHost.installs, isEmpty);
     expect(fakeHost.settings, isEmpty);
 
     // Opened again later; a Tachiyomi page starts the host.
@@ -343,7 +386,6 @@ void main() {
     await phone.launch();
     await tachiHost.client();
     await fakeHost.quiet();
-    expect(fakeHost.installs, <String>[_pkg]);
     expect(fakeHost.settings, <String>['$_source {"choice":"from the desktop"}']);
 
     // The next launch has nothing to give the host.
@@ -351,22 +393,160 @@ void main() {
     await phone.launch();
     await tachiHost.client();
     await fakeHost.quiet();
-    expect(fakeHost.installs, hasLength(1));
     expect(fakeHost.settings, hasLength(1));
 
-    // Removed on the desktop while the phone's host is not running, then
-    // the phone is closed: the extension goes once the host starts again.
+    // Removed on the desktop: the phone keeps its own.
     await desktop.setExtension(_pkg, null);
     await desktop.sync(server);
     tachiHost = _LaunchHost(client);
     await phone.launch();
     await phone.sync(server);
-    await fakeHost.quiet();
-    expect(fakeHost.uninstalls, isEmpty);
-    tachiHost = _LaunchHost(client);
-    await phone.launch();
     await tachiHost.client();
     await fakeHost.quiet();
-    expect(fakeHost.uninstalls, <String>[_pkg]);
+    expect(fakeHost.installs, isEmpty);
+    expect(fakeHost.uninstalls, isEmpty);
+  });
+
+  test('a device new to the records of this version takes over those of earlier versions, once, behind newer ones', () async {
+    const String before = '2026-10-20T10:00:00.000000Z';
+    final _MemoryServer server = _MemoryServer();
+    await server.push(<RemoteRecord>[
+      RemoteRecord(
+        kind: 'tachiSourceSettings',
+        key: 'default',
+        value: jsonEncode(<String, Object?>{
+          'sources': <String, Object?>{
+            '101': <String, Object?>{'values': <String, Object?>{'choice': 'old version'}, 'updatedAt': before},
+            '102': <String, Object?>{'values': <String, Object?>{'choice': 'old version'}, 'updatedAt': before},
+          },
+        }),
+        updatedAt: before,
+        device: 'old-device',
+        deleted: false,
+      ),
+      RemoteRecord(
+        kind: 'tachiExtensionList',
+        key: 'default',
+        value: jsonEncode(<String, Object?>{
+          'repos': <String>['https://old.example/index.min.json'],
+          'extensions': <Object?>[_origin(_pkg).toJson()],
+          'updatedAt': before,
+        }),
+        updatedAt: before,
+        device: 'old-device',
+        deleted: false,
+      ),
+    ]);
+
+    // An upgraded device changed one source since.
+    final _Device upgraded = _Device();
+    await upgraded.launch();
+    await upgraded.sync(server);
+    await upgraded.changeSource('102', 'new version');
+    await upgraded.sync(server);
+
+    final _Device fresh = _Device();
+    await fresh.launch();
+    await fresh.sync(server);
+    expect(await fresh.choiceOf('101'), 'old version');
+    expect(await fresh.choiceOf('102'), 'new version');
+    expect(await fresh.repos(), <String>['https://old.example/index.min.json']);
+    expect(await fresh.packages(), isEmpty, reason: 'which extensions are installed is not synced');
+
+    // Later records of earlier versions are not taken over again.
+    await server.push(<RemoteRecord>[
+      RemoteRecord(
+        kind: 'tachiSourceSettings',
+        key: 'default',
+        value: jsonEncode(<String, Object?>{
+          'sources': <String, Object?>{
+            '101': <String, Object?>{'values': <String, Object?>{'choice': 'old version, later'}, 'updatedAt': SyncTimeUtil.nowIso()},
+          },
+        }),
+        updatedAt: SyncTimeUtil.nowIso(),
+        device: 'old-device',
+        deleted: false,
+      ),
+    ]);
+    await fresh.sync(server);
+    expect(await fresh.choiceOf('101'), 'old version');
+  });
+
+  test('settings an earlier version kept are given to the host on upgrade, unless the host has them already', () async {
+    final _FakeHost fakeHost = _FakeHost()..installed = true;
+    await fakeHost.start();
+    addTearDown(fakeHost.stop);
+    final TachiClient client = TachiClient(port: fakeHost.port, token: 'token');
+    addTearDown(client.close);
+    const String before = '2026-10-20T10:00:00.000000Z';
+
+    // Synced while the host did not run: the host never got them.
+    final _Device device = _Device();
+    await device.storeAsBefore(<String, Object?>{
+      _source: <String, Object?>{'values': <String, Object?>{'choice': 'never given'}, 'updatedAt': before},
+    });
+    tachiHost = _LaunchHost(client);
+    await device.launch();
+    await tachiHost.client();
+    await fakeHost.quiet();
+    expect(fakeHost.settings, <String>['$_source {"choice":"never given"}']);
+
+    // Taken from the host: it has them, and is not written to.
+    final _Device other = _Device();
+    fakeHost.values[_source] = <String, Object?>{'choice': 'in the host'};
+    await other.storeAsBefore(<String, Object?>{
+      _source: <String, Object?>{'values': <String, Object?>{'choice': 'in the host'}, 'updatedAt': before},
+    });
+    for (int launch = 0; launch < 2; launch++) {
+      tachiHost = _LaunchHost(client);
+      await other.launch();
+      await tachiHost.client();
+      await fakeHost.quiet();
+    }
+    expect(fakeHost.settings, hasLength(1));
+  });
+
+  test('through a bucket, the later repositories come in, and each device keeps the extensions it installed', () async {
+    const String a = 'https://a.example/index.min.json', b = 'https://b.example/index.min.json', c = 'https://c.example/index.min.json';
+    final DateTime t = DateTime.utc(2026, 10, 21, 8);
+    CloudConfig entry(List<String> repos, List<String> packages, DateTime ctime) => CloudConfig(
+          id: CloudConfigService.localConfigId,
+          shareCode: CloudConfigService.localConfigCode,
+          identificationCode: CloudConfigService.localConfigCode,
+          type: CloudConfigTypeEnum.tachiExtensionList,
+          version: '1.0.0',
+          config: jsonEncode(<String, Object?>{
+            'repos': repos,
+            'extensions': <Object?>[for (final String pkg in packages) _origin(pkg).toJson()],
+            'updatedAt': '',
+          }),
+          ctime: ctime,
+        );
+    Future<CloudConfig> merge(CloudConfig local, CloudConfig remote) async =>
+        (await syncMerger.mergeConfigType(CloudConfigTypeEnum.tachiExtensionList, local, remote, remote.ctime, null)).config;
+    List<Object?> held(CloudConfig config, String field) => (jsonDecode(config.config) as Map)[field] as List;
+
+    final _Device device = _Device();
+    await device.launch();
+    await device.setRepo(a);
+    await device.setExtension('package.here', _origin('package.here'));
+
+    // The other device's list is later: its repositories come in.
+    final CloudConfig remote = entry(<String>[a, b], <String>['package.there'], t.add(const Duration(minutes: 1)));
+    final CloudConfig taken = await merge(entry(<String>[a], <String>['package.here'], t), remote);
+    await cloudConfigService.importConfig(taken);
+    expect(await device.repos(), <String>[a, b]);
+    expect(await device.packages(), <String>{'package.here'});
+
+    // Repositories changed here later go up; the extensions the entry
+    // lists stay as they were, for devices of earlier versions.
+    final CloudConfig sent = await merge(entry(<String>[a, c], <String>['package.here'], t.add(const Duration(minutes: 2))), remote);
+    expect(held(sent, 'repos'), <String>[a, c]);
+    expect(held(sent, 'extensions').map((Object? e) => (e as Map)['pkg']), <String>['package.there']);
+    expect(sent.ctime, t.add(const Duration(minutes: 2)));
+
+    // An extension installed here since changes nothing to send.
+    final CloudConfig kept = await merge(entry(<String>[a, b], <String>['package.here', 'package.new'], t.add(const Duration(minutes: 3))), remote);
+    expect((kept.config, kept.ctime), (remote.config, remote.ctime));
   });
 }

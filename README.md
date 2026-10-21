@@ -35,7 +35,7 @@ Across sources:
 - an `EH` button on nhentai, wnacg and JM details searches the same title on E-Hentai;
 - one login page with a site picker (E-Hentai, nhentai, JM);
 - favorites of all sources can be shown mixed with E-Hentai favorites or separately;
-- cloud sync (WebDAV, S3-compatible, or a self-hosted sync server) of settings, local favorites, history, reading progress, logins, and Tachiyomi extensions with their settings;
+- cloud sync (WebDAV, S3-compatible, or a self-hosted sync server) of settings, local favorites, history, reading progress, logins, and Tachiyomi extension repositories and extension settings (each device installs its own extensions);
 - a "Send to Telegraph bot" button for a self-hosted eh2telegraph service.
 
 ## Changes Compared With Upstream
@@ -63,7 +63,7 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - a host (`ext_host/`) runs Tachiyomi/Mihon extensions inside the app: on Android the system loads the extension APKs; on iOS an embedded OpenJDK (Zero interpreter) runs them after dex2jar conversion, with a compatibility layer for the Android classes they use and native networking; desktop builds bundle a Java runtime.
   - Tachiyomi is a site beside E-Hentai, nhentai, wnacg and JM, with sources, search across all sources, updates (manual refresh) and an extensions page; manga and chapters reuse the details page, reader, favorites, history, progress and downloads, as JM's chapters do, and pages can be upscaled while reading.
   - extensions that need a web page (for logging in) get one from the app's WKWebView on iOS and macOS and the system WebView on Android, with cookies shared both ways; "Open in web view" lets you complete such steps yourself.
-  - Tachiyomi/Mihon backups (`.tachibk`) can be imported; extensions and repositories, extension settings and Tachiyomi favorites are included in cloud sync (all syncing devices need 8.0.28 or later).
+  - Tachiyomi/Mihon backups (`.tachibk`) can be imported; extension repositories, extension settings and Tachiyomi favorites are included in cloud sync (all syncing devices need 8.0.28 or later); which extensions are installed is each device's own.
 - Gallery and search UX:
   - multi-tag selection in detail page, searching or copying the selected tags.
   - client-side filters for Popular and Ranklist pages.

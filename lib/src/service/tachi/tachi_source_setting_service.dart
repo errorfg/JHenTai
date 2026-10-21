@@ -1,12 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:collection/collection.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/network/tachi/tachi_client.dart';
 import 'package:jhentai/src/network/tachi/tachi_host.dart';
+import 'package:jhentai/src/network/tachi/tachi_models.dart';
 import 'package:jhentai/src/service/jh_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/log.dart';
-import 'package:jhentai/src/service/tachi/tachi_extension_service.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
 
 TachiSourceSettingService tachiSourceSettingService = TachiSourceSettingService();
@@ -25,26 +27,20 @@ class TachiSourceSettingService with JHLifeCircleBeanWithConfigStorage implement
   /// The `updatedAt` of the settings the host has, by source id: taken
   /// from it, or given to it. Kept on the device, so that settings that
   /// arrived while the host did not run reach it once it does, after the
-  /// app was closed meanwhile too.
+  /// app was closed meanwhile too. A source missing here may or may not be
+  /// in the host as stored (see [applyToHost]).
   Map<String, String> _inHost = <String, String>{};
 
+  /// Not kept by earlier versions, which left settings synced while the
+  /// host did not run out of it: nothing stored then is taken as in the host.
   @override
   Future<void> doInitBean() async {
     final String? inHost = await localConfigService.read(configKey: ConfigEnum.tachiSourceSettingInHost);
     if (inHost != null) {
       _inHost = (jsonDecode(inHost) as Map).cast<String, String>();
-      return;
     }
-    // Kept from this version on: what was stored before, the host had.
-    final String? stored = await localConfigService.read(configKey: configEnum);
-    if (stored != null) {
-      applyBeanConfig(stored);
-      _inHost = <String, String>{
-        for (final MapEntry<String, Map<String, dynamic>> e in sources.entries)
-          if (e.value['updatedAt'] is String) e.key: e.value['updatedAt'] as String,
-      };
-    }
-    await _saveInHost();
+    // The host may have missed settings while it did not run.
+    tachiHost.addStartListener(() => unawaited(applyToHost()));
   }
 
   @override
@@ -80,16 +76,44 @@ class TachiSourceSettingService with JHLifeCircleBeanWithConfigStorage implement
     }
   }
 
+  Future<void>? _applying;
+  bool _applyAgain = false;
+
   /// Gives the host the settings that arrived from other devices, for
-  /// installed sources; nothing when the host is not running. Settings it
-  /// could not take stay to be given at the next call (see
-  /// [TachiExtensionService.reconcileHost]).
-  Future<void> applyToHost() async {
+  /// installed sources: after a sync, an install, and once the host starts.
+  /// Nothing when the host is not running: it is not started just for this
+  /// on a phone. Settings it could not take stay to be given at the next
+  /// call. One at a time; asked again meanwhile, it runs once more after.
+  ///
+  /// A source never given or taken on this device is compared with the
+  /// host first: writing replaces all the source keeps, values it wrote
+  /// itself since its settings were taken included.
+  Future<void> applyToHost() {
+    if (_applying != null) {
+      _applyAgain = true;
+      return _applying!;
+    }
+    return _applying = () async {
+      do {
+        _applyAgain = false;
+        await _applyToHost();
+      } while (_applyAgain);
+    }()
+        .whenComplete(() => _applying = null);
+  }
+
+  Future<void> _applyToHost() async {
     final TachiClient? client = tachiHost.clientIfRunning;
-    if (client == null) {
+    if (client == null || _pending.isEmpty) {
       return;
     }
-    final Set<String> installed = tachiExtensionService.installed.expand((e) => e.sources).map((s) => s.id).toSet();
+    final Set<String> installed;
+    try {
+      installed = (await client.extensions()).expand((TachiExtension e) => e.sources).map((TachiSourceInfo s) => s.id).toSet();
+    } catch (e) {
+      log.error('List the extensions of the Tachiyomi host failed', e);
+      return;
+    }
     bool applied = false;
     for (final String id in _pending.toList()) {
       if (!installed.contains(id)) {
@@ -97,7 +121,10 @@ class TachiSourceSettingService with JHLifeCircleBeanWithConfigStorage implement
       }
       try {
         final String updatedAt = sources[id]!['updatedAt'] as String;
-        await client.setPreferenceStore(id, Map<String, dynamic>.from(sources[id]!['values'] as Map));
+        final Map<String, dynamic> values = Map<String, dynamic>.from(sources[id]!['values'] as Map);
+        if (_inHost.containsKey(id) || !const DeepCollectionEquality().equals(await client.preferenceStore(id), values)) {
+          await client.setPreferenceStore(id, values);
+        }
         _inHost[id] = updatedAt;
         applied = true;
       } catch (e) {

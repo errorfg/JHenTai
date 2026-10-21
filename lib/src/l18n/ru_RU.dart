@@ -1285,7 +1285,7 @@ class ru_RU {
       'tachiUpdates': 'Обновления',
       'tachiExtensions': 'Расширения',
       'tachiFavorite': 'Избранное Tachiyomi',
-      'tachiExtensionList': 'Расширения и репозитории Tachiyomi',
+      'tachiExtensionList': 'Репозитории расширений Tachiyomi',
       'tachiSourceSettings': 'Настройки источников Tachiyomi',
       'tachiOpenInWebView': 'Открыть в WebView',
       'noTachiSources': 'Расширения не установлены',

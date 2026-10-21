@@ -82,10 +82,8 @@ enum ConfigEnum {
   tachiRecentSources('tachiRecentSources'),
 
   /// Tachiyomi, kept on the device only: the settings of each source the
-  /// host has (their updatedAt), and extensions removed on another device
-  /// that the host still has.
+  /// host has (their updatedAt).
   tachiSourceSettingInHost('tachiSourceSettingInHost'),
-  tachiRemovedElsewhere('tachiRemovedElsewhere'),
   myTagsSetting('MyTagsSetting'),
   builtInBlockedUser('builtInBlockedUser'),
 
