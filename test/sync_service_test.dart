@@ -359,4 +359,39 @@ void main() {
       expect((await first).success, isTrue);
     },
   );
+
+  test(
+    'a sync given up answers its caller, and keeps later ones out until it has stopped',
+    () async {
+      final List<Completer<SyncResult>> runs = [];
+      final SyncService service = SyncService(
+        executeSync: ({required types, providerName, onProgress}) {
+          final Completer<SyncResult> run = Completer<SyncResult>();
+          runs.add(run);
+          return run.future;
+        },
+        syncTimeout: const Duration(milliseconds: 20),
+      );
+
+      final SyncResult givenUp = await service.sync(
+        types: const [CloudConfigTypeEnum.history],
+      );
+      expect(givenUp.success, isFalse);
+      expect(givenUp.message, startsWith('Sync timed out'));
+
+      final SyncResult meanwhile = await service.sync(
+        types: const [CloudConfigTypeEnum.history],
+      );
+      expect(meanwhile.message, 'Sync already in progress');
+      expect(runs, hasLength(1));
+
+      // A read-progress sync asked for meanwhile runs once it has stopped.
+      final Future<SyncResult?> queued = service.syncReadProgress(force: true);
+      runs.single.complete(_result(success: false));
+      await Future<void>.delayed(Duration.zero);
+      expect(runs, hasLength(2));
+      runs.last.complete(_result());
+      expect((await queued)?.success, isTrue);
+    },
+  );
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 
@@ -433,4 +434,52 @@ void main() {
     expect(result.success, isTrue, reason: result.message);
     expect(server.record('history', '7'), isNotNull);
   });
+
+  test('a sync given up stops before it writes, and the next sync waits for it', () async {
+    final _MemoryServer server = _MemoryServer('db-1');
+    final _HeldServer held = _HeldServer(server);
+    final _Device phone = _Device();
+    await phone.activate();
+    syncSetting.currentProvider.value = SyncService.serverProvider;
+    await historyService.record(_entry(7));
+
+    final SyncService service = SyncService(
+      recordBackendFactory: () => held,
+      syncTimeout: const Duration(milliseconds: 50),
+    );
+    SyncResult result = await service.sync(types: const [CloudConfigTypeEnum.history]);
+    expect(result.message, startsWith('Sync timed out'));
+    result = await service.sync(types: const [CloudConfigTypeEnum.history]);
+    expect(result.message, 'Sync already in progress');
+
+    // The pull answers after the sync was given up: nothing more is written.
+    held.release.complete();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(server.pushedRecords, 0);
+    expect(await SyncRecordDao.selectByKind('history'), isEmpty);
+
+    result = await service.sync(types: const [CloudConfigTypeEnum.history]);
+    expect(result.success, isTrue, reason: result.message);
+    expect(server.record('history', '7'), isNotNull);
+  });
+}
+
+/// [server] with its first pull held until [release] completes.
+class _HeldServer implements RecordBackend {
+  _HeldServer(this.server);
+
+  final _MemoryServer server;
+  final Completer<void> release = Completer<void>();
+
+  @override
+  Future<RecordServerInfo> info() => server.info();
+
+  @override
+  Future<RecordPage> pull({required int since, required String device, required int limit}) async {
+    await release.future;
+    return server.pull(since: since, device: device, limit: limit);
+  }
+
+  @override
+  Future<void> push(List<RemoteRecord> records) => server.push(records);
 }

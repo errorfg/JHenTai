@@ -42,12 +42,17 @@ class WebDavProvider implements CloudProvider {
       throw Exception('WebDAV server URL and username are required');
     }
 
+    // Without time limits a stalled request would keep its sync running,
+    // and every later sync waiting for it.
     return webdav.newClient(
       serverUrl,
       user: username,
       password: password,
       debug: false,
-    );
+    )
+      ..setConnectTimeout(20 * 1000)
+      ..setSendTimeout(60 * 1000)
+      ..setReceiveTimeout(90 * 1000);
   }
 
   /// Ensure remote directory exists

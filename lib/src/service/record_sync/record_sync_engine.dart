@@ -8,6 +8,7 @@ import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/service/cloud/pending_sync_tracker.dart';
+import 'package:jhentai/src/service/cloud/sync_cancel_token.dart';
 import 'package:jhentai/src/service/cloud/sync_device_id.dart';
 import 'package:jhentai/src/service/history_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
@@ -49,10 +50,12 @@ class RecordSyncEngine {
 
   RecordAdapter? _adapterOf(String kind) => _adapters.firstWhereOrNull((a) => a.kind == kind);
 
+  /// [cancel]: looked at before each step that writes.
   Future<RecordSyncResult> sync(
     RecordBackend backend, {
     Set<CloudConfigTypeEnum>? types,
     void Function(double progress)? onProgress,
+    SyncCancelToken? cancel,
   }) async {
     /// Timestamp format migrations must complete before any timestamp
     /// comparison below: bean ready hooks are fired without being awaited
@@ -61,6 +64,7 @@ class RecordSyncEngine {
     String device = await ensureSyncDeviceId();
 
     RecordServerInfo info = await backend.info();
+    cancel?.throwIfCancelled();
     _State state = await _readState();
     if (state.database != info.database) {
       int marked = await SyncRecordDao.markAllDirty();
@@ -88,6 +92,7 @@ class RecordSyncEngine {
     int pulled = 0;
     while (true) {
       RecordPage page = await backend.pull(since: state.cursor, device: device, limit: pullLimit);
+      cancel?.throwIfCancelled();
       pulled += await _takeRemote(page.records);
       state.cursor = page.next;
       await _writeState(state);
@@ -97,6 +102,7 @@ class RecordSyncEngine {
     }
 
     // Kinds taken in for the first time, against what the server holds
+    cancel?.throwIfCancelled();
     await _takeRowChanges(device, state, token, firstTime: true);
     for (WholeKindAdapter adapter in _wholeAdapters) {
       if (!state.kinds.contains(adapter.kind) && wanted(adapter)) {
@@ -117,6 +123,7 @@ class RecordSyncEngine {
     // know stay in the table until a version that knows them
     int applied = 0;
     for (String kind in await SyncRecordDao.selectApplyPendingKinds()) {
+      cancel?.throwIfCancelled();
       RecordAdapter? adapter = _adapterOf(kind);
       if (adapter is RowKindAdapter) {
         applied += await _applyRows(adapter);
@@ -134,6 +141,7 @@ class RecordSyncEngine {
       if (rows.isEmpty) {
         break;
       }
+      cancel?.throwIfCancelled();
       await backend.push(rows.map(RemoteRecord.fromRow).toList());
       await SyncRecordDao.clearDirty(rows);
       pushed += rows.length;

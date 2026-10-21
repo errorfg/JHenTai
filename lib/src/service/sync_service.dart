@@ -6,6 +6,7 @@ import 'package:jhentai/src/model/config.dart';
 import 'package:jhentai/src/service/cloud/cloud_provider.dart';
 import 'package:jhentai/src/service/cloud/hot_data_sync_engine.dart';
 import 'package:jhentai/src/service/cloud/s3_provider.dart';
+import 'package:jhentai/src/service/cloud/sync_cancel_token.dart';
 import 'package:jhentai/src/service/cloud/webdav_provider.dart';
 import 'package:jhentai/src/service/history_service.dart';
 import 'package:jhentai/src/service/record_sync/record_backend.dart';
@@ -57,11 +58,13 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     RecordBackendFactory? recordBackendFactory,
     DateTime Function()? now,
     Duration progressCooldown = const Duration(seconds: 5),
+    Duration syncTimeout = const Duration(minutes: 15),
   }) : _syncRunner = executeSync,
        _providerFactory = providerFactory,
        _recordBackendFactory = recordBackendFactory,
        _now = now ?? DateTime.now,
-       _readProgressSyncCooldown = progressCooldown;
+       _readProgressSyncCooldown = progressCooldown,
+       _syncTimeout = syncTimeout;
 
   /// Provider name of a sync server (record by record), as opposed to the
   /// buckets 's3' and 'webdav'.
@@ -83,9 +86,11 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   bool _historyAutoSyncInProgress = false;
   static const _minSyncInterval = Duration(seconds: 30);
 
-  /// A sync that has not ended by then is given up, so that one stuck request
-  /// cannot keep every later sync "already in progress".
-  static const Duration _syncTimeout = Duration(minutes: 15);
+  /// A sync that has not ended by then is given up: its caller is answered,
+  /// and the sync stops before its next write (see [SyncCancelToken]).
+  /// Later syncs wait until it has stopped, so that two never write at once;
+  /// every request of a provider has a time limit, so it does stop.
+  final Duration _syncTimeout;
   static const int _historyAutoSyncStep = 5;
 
   @override
@@ -285,21 +290,25 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     }
     final Completer<void> done = Completer<void>();
     _inFlightSync = done.future;
+    final SyncCancelToken cancel = SyncCancelToken();
+    final Future<SyncResult> run =
+        _syncRunner?.call(
+          types: types,
+          providerName: providerName,
+          onProgress: onProgress,
+        ) ??
+        _doSync(
+          types: types,
+          providerName: providerName,
+          onProgress: onProgress,
+          cancel: cancel,
+        );
     try {
-      final SyncResult result =
-          await (_syncRunner?.call(
-                types: types,
-                providerName: providerName,
-                onProgress: onProgress,
-              ) ??
-              _doSync(
-                types: types,
-                providerName: providerName,
-                onProgress: onProgress,
-              )).timeout(
+      final SyncResult result = await run.timeout(
         _syncTimeout,
         onTimeout: () {
-          log.error('Sync gave up after $_syncTimeout');
+          log.error('Sync gave up after $_syncTimeout, it stops before its next write');
+          cancel.cancel();
           return SyncResult(
             success: false,
             message: 'Sync timed out after ${_syncTimeout.inMinutes} minutes',
@@ -318,9 +327,17 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       }
       return result;
     } finally {
-      _inFlightSync = null;
-      done.complete();
-      _drainQueuedReadProgressSync();
+      void release() {
+        _inFlightSync = null;
+        done.complete();
+        _drainQueuedReadProgressSync();
+      }
+
+      if (cancel.isCancelled) {
+        unawaited(run.then<void>((_) {}, onError: (Object _) {}).whenComplete(release));
+      } else {
+        release();
+      }
     }
   }
 
@@ -417,6 +434,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     required List<CloudConfigTypeEnum> types,
     String? providerName,
     void Function(double progress)? onProgress,
+    required SyncCancelToken cancel,
   }) async {
     void reportProgress(double progress) {
       onProgress?.call(progress.clamp(0, 1).toDouble());
@@ -427,7 +445,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
 
       String provider = providerName ?? syncSetting.currentProvider.value;
       if (provider == serverProvider) {
-        return await _doRecordSync(types: types, onProgress: reportProgress);
+        return await _doRecordSync(types: types, onProgress: reportProgress, cancel: cancel);
       }
       CloudProvider? cloudProvider = _createProvider(provider);
       if (cloudProvider == null) {
@@ -495,9 +513,13 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
           hotResult = await _hotEngine.sync(
             cloudProvider,
             legacyRemoteConfigJson: remoteData,
+            cancel: cancel,
           );
           effectiveTypes = types.where((t) => !hotTypes.contains(t)).toList();
         } catch (e, stack) {
+          if (e is SyncCancelledException) {
+            rethrow;
+          }
           log.error(
             'Hot data sync failed, falling back to legacy full-file sync',
             e,
@@ -539,6 +561,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       // The "latest local activity" heuristic used by whole-file LWW types is
       // computed from the hot tables directly since they no longer travel here.
       DateTime? latestLocalTime = await _computeLatestLocalActivityTime();
+      cancel.throwIfCancelled();
       var mergeResult = await syncMerger.merge(
         localConfigs,
         remoteConfigFile.configs,
@@ -567,6 +590,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         log.info(
           'Uploading ${uploadEntries.length} configs to remote (${encodedData.length} bytes)',
         );
+        cancel.throwIfCancelled();
         await cloudProvider.upload(encodedData, saveHistory: saveHistory);
         log.info('Upload complete');
         reportProgress(0.92);
@@ -599,6 +623,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   Future<SyncResult> _doRecordSync({
     required List<CloudConfigTypeEnum> types,
     required void Function(double progress) onProgress,
+    required SyncCancelToken cancel,
   }) async {
     try {
       RecordBackend? backend = _recordBackendFactory != null ? _recordBackendFactory() : _createRecordBackend();
@@ -606,7 +631,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         return SyncResult(success: false, message: 'The sync server address is not set', statistics: {});
       }
       log.info('🔄 Starting sync with the sync server');
-      await recordSyncEngine.sync(backend, types: types.toSet(), onProgress: onProgress);
+      await recordSyncEngine.sync(backend, types: types.toSet(), onProgress: onProgress, cancel: cancel);
       log.info('Sync completed successfully');
       return SyncResult(success: true, message: 'Sync completed successfully', statistics: {});
     } catch (e, stack) {
