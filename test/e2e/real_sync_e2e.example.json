@@ -1,0 +1,13 @@
+{
+  "s3": {
+    "endpoint": "account-id.r2.cloudflarestorage.com",
+    "accessKey": "access key",
+    "secretKey": "secret key",
+    "bucket": "jhentai-sync-dev",
+    "region": "auto"
+  },
+  "server": {
+    "url": "https://gallery-sync-dev.example.workers.dev",
+    "token": "token of the test sync server"
+  }
+}

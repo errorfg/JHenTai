@@ -58,6 +58,8 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - JM local favorites included in config sync.
   - config sync keeps remote entries it does not understand (written by newer versions) and the types it is not syncing, and aborts instead of uploading when the remote file cannot be read.
   - sync server provider (a Cloudflare Worker with a D1 database in `sync_server/`, deployed by yourself): item-by-item sync where deletions reach other devices too; see the [wiki](https://github.com/errorfg/JHenTai/wiki/Sync-Service).
+  - WebDAV and S3-compatible buckets sync item by item as the sync server does, deletions included, in a `records/v1/` folder: the first device of a later version takes over once what 8.1.1 and earlier synced in the bucket; those versions keep syncing among themselves in their own files, which later versions no longer read or write, so every device syncing a bucket needs the same later version.
+  - galleries of the same number on two sites (E-Hentai, `nhentai`, wnacg) keep their own history, downloads, read progress and double pages; data of 8.1.1 and earlier is moved by the address it holds, and progress kept under the bare number stays a fallback for each of them.
   - E-Hentai login included in sync (each device fetches its own `igneous`); the sync provider and switches stay each device's own choice.
 - Tachiyomi extensions:
   - a host (`ext_host/`) runs Tachiyomi/Mihon extensions inside the app: on Android the system loads the extension APKs; on iOS an embedded OpenJDK (Zero interpreter) runs them after dex2jar conversion, with a compatibility layer for the Android classes they use and native networking; desktop builds bundle a Java runtime.
