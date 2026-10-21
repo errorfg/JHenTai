@@ -569,6 +569,7 @@ class en_US {
       'cloudProviderS3': 'S3-Compatible Storage',
       'cloudProviderWebDAV': 'WebDAV',
       'cloudProviderServer': 'Sync server (database)',
+      'testBuildSyncTarget': 'This test build syncs only with @target',
       's3Sync': 'S3 Sync (R2/S3/MinIO)',
       's3Config': 'S3 Configuration',
       'enableS3': 'Enable S3 Sync',

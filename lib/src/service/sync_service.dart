@@ -23,6 +23,7 @@ import 'package:jhentai/src/service/cloud_service.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/sync_merger.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
+import 'package:jhentai/src/setting/test_build.dart';
 import 'package:jhentai/src/widget/app_manager.dart';
 
 import 'jh_service.dart';
@@ -450,6 +451,9 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       reportProgress(0.03);
 
       String provider = providerName ?? syncSetting.currentProvider.value;
+      if (!_testBuildAllows(provider)) {
+        return SyncResult(success: false, message: _testBuildRefusal, statistics: {});
+      }
       if (provider == serverProvider) {
         return await _doRecordSync(types: types, onProgress: reportProgress, cancel: cancel);
       }
@@ -750,6 +754,10 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   Future<bool> testConnection(String providerName) async {
     try {
       log.info('Testing connection for provider: $providerName');
+      if (!_testBuildAllows(providerName)) {
+        log.warning(_testBuildRefusal);
+        return false;
+      }
 
       if (providerName == serverProvider) {
         RecordBackend? backend = _recordBackendFactory != null ? _recordBackendFactory() : _createRecordBackend();
@@ -814,6 +822,12 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       return false;
     }
   }
+
+  static const String _testBuildRefusal = 'A test build syncs only with a test bucket or a test sync server';
+
+  /// A test build syncs only with the test ones (see TestBuild).
+  bool _testBuildAllows(String provider) =>
+      !TestBuild.on || TestBuild.allows(provider: provider, bucket: syncSetting.s3BucketName.value, serverUrl: syncSetting.syncServerUrl.value);
 
   /// Create a provider from the latest settings; null for unknown names.
   CloudProvider? _createProvider(String provider) {

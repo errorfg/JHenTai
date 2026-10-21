@@ -22,6 +22,19 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
+// A test build (lib/src/setting/test_build.dart, built with
+// --dart-define-from-file): an app of its own beside the release one.
+def dartDefines = [:]
+if (project.hasProperty('dart-defines')) {
+    project.property('dart-defines').split(',').each { entry ->
+        def pair = new String(entry.decodeBase64(), 'UTF-8').split('=', 2)
+        if (pair.length == 2) {
+            dartDefines[pair[0]] = pair[1]
+        }
+    }
+}
+def testBuild = dartDefines['JH_TEST_BUILD'] == 'true'
+
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {
@@ -46,7 +59,11 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.gallery.reader"
+        applicationId testBuild ? "com.gallery.reader.dev" : "com.gallery.reader"
+        manifestPlaceholders += [
+                appLabel: testBuild ? "Gallery Reader Dev" : "Gallery Reader",
+                fileProviderAuthority: testBuild ? "com.gallery.reader.dev.provider" : "top.jtmonster.jhentai.provider",
+        ]
         minSdkVersion flutter.minSdkVersion
         targetSdkVersion 35
         versionCode flutterVersionCode.toInteger()
@@ -65,7 +82,8 @@ android {
     /// If you want to use debug signing config, use default [signingConfigs.debug]
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            // A test build is an app of its own: signed with this machine's debug key
+            signingConfig testBuild ? signingConfigs.debug : signingConfigs.release
         }
     }
 }

@@ -533,6 +533,7 @@ class zh_CN {
       'cloudProviderS3': 'S3 兼容存储',
       'cloudProviderWebDAV': 'WebDAV',
       'cloudProviderServer': '同步服务（数据库）',
+      'testBuildSyncTarget': '测试版只同步测试资源：@target',
       's3Sync': 'S3 同步 (R2/S3/MinIO)',
       's3Config': 'S3 配置',
       'enableS3': '启用 S3 同步',

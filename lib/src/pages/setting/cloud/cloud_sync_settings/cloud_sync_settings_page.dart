@@ -11,6 +11,7 @@ import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/sync_service.dart';
 import 'package:jhentai/src/service/sync_merger.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
+import 'package:jhentai/src/setting/test_build.dart';
 import 'package:jhentai/src/utils/route_util.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
 import 'package:jhentai/src/widget/eh_config_type_select_dialog.dart';
@@ -122,11 +123,15 @@ class _CloudSyncSettingsPageState extends State<CloudSyncSettingsPage> {
               _buildProviderSelector(context),
               _buildAutoSyncSwitch(context),
               const Divider(height: 32),
-              if (syncSetting.currentProvider.value == 's3') ..._buildS3Settings(context),
-              if (syncSetting.currentProvider.value == 'webdav') ..._buildWebDavSettings(context),
-              if (syncSetting.currentProvider.value == SyncService.serverProvider) ..._buildSyncServerSettings(context),
+              if (TestBuild.on)
+                _buildTestBuildTarget(context)
+              else ...[
+                if (syncSetting.currentProvider.value == 's3') ..._buildS3Settings(context),
+                if (syncSetting.currentProvider.value == 'webdav') ..._buildWebDavSettings(context),
+                if (syncSetting.currentProvider.value == SyncService.serverProvider) ..._buildSyncServerSettings(context),
+              ],
               const Divider(height: 32),
-              // Version history is kept by the buckets' latest.json only
+              // Version history is kept by buckets only
               if (syncSetting.currentProvider.value != SyncService.serverProvider) ...[
                 ..._buildHistorySettings(context),
                 const Divider(height: 32),
@@ -170,10 +175,21 @@ class _CloudSyncSettingsPageState extends State<CloudSyncSettingsPage> {
         },
         items: [
           DropdownMenuItem(value: 's3', child: Text('cloudProviderS3'.tr)),
-          DropdownMenuItem(value: 'webdav', child: Text('cloudProviderWebDAV'.tr)),
+          if (!TestBuild.on) DropdownMenuItem(value: 'webdav', child: Text('cloudProviderWebDAV'.tr)),
           DropdownMenuItem(value: SyncService.serverProvider, child: Text('cloudProviderServer'.tr)),
         ],
       ),
+    );
+  }
+
+  /// What a test build syncs with, fixed when it was built (see TestBuild).
+  Widget _buildTestBuildTarget(BuildContext context) {
+    final String target = syncSetting.currentProvider.value == SyncService.serverProvider
+        ? (Uri.tryParse(syncSetting.syncServerUrl.value)?.host ?? syncSetting.syncServerUrl.value)
+        : syncSetting.s3BucketName.value;
+    return ListTile(
+      leading: const Icon(Icons.science_outlined),
+      title: Text('testBuildSyncTarget'.trParams({'target': target})),
     );
   }
 
@@ -455,8 +471,10 @@ class _CloudSyncSettingsPageState extends State<CloudSyncSettingsPage> {
     setState(() => _testConnectionState = LoadingState.loading);
 
     try {
-      // Save all current values from controllers before testing
-      if (syncSetting.currentProvider.value == 's3') {
+      // Save all current values from controllers before testing; a test
+      // build has its own
+      if (TestBuild.on) {
+      } else if (syncSetting.currentProvider.value == 's3') {
         await syncSetting.saveS3Endpoint(_s3EndpointController.text);
         await syncSetting.saveS3AccessKey(_s3AccessKeyController.text);
         await syncSetting.saveS3SecretKey(_s3SecretKeyController.text);

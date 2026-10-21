@@ -5,11 +5,16 @@ import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/service/log.dart';
 
 import '../service/jh_service.dart';
+import 'test_build.dart';
 
 SyncSetting syncSetting = SyncSetting();
 
 /// 统一同步设置（整合 WebDAV + S3 + 历史版本配置）
 class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBean {
+  SyncSetting() {
+    _keepToTestBuild();
+  }
+
   // ==================== 通用设置 ====================
 
   /// 当前使用的同步提供商 ('s3'、'webdav' 或 'server')
@@ -128,6 +133,28 @@ class SyncSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCircle
     enableHistory.value = map['enableHistory'] ?? enableHistory.value;
     maxHistoryVersions.value = map['maxHistoryVersions'] ?? maxHistoryVersions.value;
     autoCleanHistory.value = map['autoCleanHistory'] ?? autoCleanHistory.value;
+
+    _keepToTestBuild();
+  }
+
+  /// A test build syncs only with the test bucket and test sync server it
+  /// was built with (see TestBuild), whatever was stored, imported or synced.
+  void _keepToTestBuild() {
+    if (!TestBuild.on) {
+      return;
+    }
+    s3Endpoint.value = TestBuild.s3Endpoint;
+    s3AccessKey.value = TestBuild.s3AccessKey;
+    s3SecretKey.value = TestBuild.s3SecretKey;
+    s3BucketName.value = TestBuild.s3Bucket;
+    s3Region.value = 'auto';
+    s3BaseKey.value = '';
+    s3UseSSL.value = true;
+    syncServerUrl.value = TestBuild.serverUrl;
+    syncServerToken.value = TestBuild.serverToken;
+    if (currentProvider.value != 's3' && currentProvider.value != 'server') {
+      currentProvider.value = 's3';
+    }
   }
 
   @override

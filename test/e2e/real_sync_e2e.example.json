@@ -9,5 +9,8 @@
   "server": {
     "url": "https://gallery-sync-dev.example.workers.dev",
     "token": "token of the test sync server"
+  },
+  "upgrade": {
+    "database": "/path/to/a/copy/of/db.sqlite of 8.1.1 (only read: a copy of it is opened)"
   }
 }
