@@ -35,7 +35,7 @@ Across sources:
 - an `EH` button on nhentai, wnacg and JM details searches the same title on E-Hentai;
 - one login page with a site picker (E-Hentai, nhentai, JM);
 - favorites of all sources can be shown mixed with E-Hentai favorites or separately;
-- cloud sync (WebDAV, S3-compatible, or a self-hosted sync server) of settings, local favorites, history, reading progress, logins, and Tachiyomi extension repositories and extension settings (each device installs its own extensions);
+- cloud sync (WebDAV, S3-compatible, or a self-hosted sync server) of settings, local favorites, history, reading progress, logins, and Tachiyomi extension repositories and extension settings, which can include a source's login (each device installs its own extensions);
 - a "Send to Telegraph bot" button for a self-hosted eh2telegraph service.
 
 ## Changes Compared With Upstream

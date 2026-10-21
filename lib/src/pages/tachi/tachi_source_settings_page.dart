@@ -64,7 +64,7 @@ class _TachiSourceSettingsPageState extends State<TachiSourceSettingsPage> {
     final List<TachiPreference>? preferences = _preferences;
     return Scaffold(
       appBar: AppBar(
-        title: Text(tachiExtensionService.source(sourceId)?.name ?? 'tachiSourceSettings'.tr),
+        title: Text(tachiExtensionService.source(sourceId)?.name ?? 'setting'.tr),
         centerTitle: true,
         actions: [
           // A login made on the site shows in settings that report it.

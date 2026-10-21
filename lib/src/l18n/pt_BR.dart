@@ -1284,7 +1284,7 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'tachiExtensions': 'Extensões',
       'tachiFavorite': 'Favoritos Tachiyomi',
       'tachiExtensionList': 'Repositórios de extensões Tachiyomi',
-      'tachiSourceSettings': 'Configurações das fontes Tachiyomi',
+      'tachiSourceSettings': 'Configurações das fontes Tachiyomi (podem incluir logins)',
       'tachiOpenInWebView': 'Abrir no WebView',
       'tachiRestoreReplaced': 'Restaurar as configurações que este aparelho tinha',
       'tachiRestoreReplacedHint': 'Substituídas em @time por configurações sincronizadas de outro aparelho. Depois de restauradas, os outros aparelhos passam a usá-las na próxima sincronização.',

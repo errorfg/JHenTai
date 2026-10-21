@@ -1286,7 +1286,7 @@ class ru_RU {
       'tachiExtensions': 'Расширения',
       'tachiFavorite': 'Избранное Tachiyomi',
       'tachiExtensionList': 'Репозитории расширений Tachiyomi',
-      'tachiSourceSettings': 'Настройки источников Tachiyomi',
+      'tachiSourceSettings': 'Настройки источников Tachiyomi (могут содержать данные входа)',
       'tachiOpenInWebView': 'Открыть в WebView',
       'tachiRestoreReplaced': 'Вернуть прежние настройки этого устройства',
       'tachiRestoreReplacedHint': '@time их заменили настройки, синхронизированные с другого устройства. После восстановления другие устройства получат их при следующей синхронизации.',

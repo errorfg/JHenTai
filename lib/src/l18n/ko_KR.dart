@@ -1235,7 +1235,7 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'tachiExtensions': '확장',
       'tachiFavorite': 'Tachiyomi 즐겨찾기',
       'tachiExtensionList': 'Tachiyomi 확장 저장소',
-      'tachiSourceSettings': 'Tachiyomi 소스 설정',
+      'tachiSourceSettings': 'Tachiyomi 소스 설정 (로그인 정보 포함 가능)',
       'tachiOpenInWebView': '웹뷰에서 열기',
       'tachiRestoreReplaced': '이 기기의 원래 설정 복원',
       'tachiRestoreReplacedHint': '@time에 다른 기기에서 동기화된 설정으로 바뀌었습니다. 복원하면 다른 기기도 다음 동기화 때 이 설정을 사용합니다.',

@@ -1336,7 +1336,7 @@ favnote：匹配收藏备注
       'tachiExtensions': '插件',
       'tachiFavorite': 'Tachiyomi 收藏',
       'tachiExtensionList': 'Tachiyomi 插件仓库',
-      'tachiSourceSettings': 'Tachiyomi 插件设置',
+      'tachiSourceSettings': 'Tachiyomi 插件设置（可能含登录信息）',
       'tachiOpenInWebView': '在网页中打开',
       'tachiRestoreReplaced': '恢复本机原来的设置',
       'tachiRestoreReplacedHint': '@time 被其他设备同步来的设置替换。恢复后，其他设备下次同步时也会改用这些设置。',

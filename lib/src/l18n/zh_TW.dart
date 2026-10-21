@@ -1207,7 +1207,7 @@ favnote：配對收藏備註
       'tachiExtensions': '插件',
       'tachiFavorite': 'Tachiyomi 收藏',
       'tachiExtensionList': 'Tachiyomi 插件倉庫',
-      'tachiSourceSettings': 'Tachiyomi 插件設定',
+      'tachiSourceSettings': 'Tachiyomi 插件設定（可能含登入資訊）',
       'tachiOpenInWebView': '在網頁中開啟',
       'tachiRestoreReplaced': '恢復本機原來的設定',
       'tachiRestoreReplacedHint': '@time 被其他裝置同步來的設定取代。恢復後，其他裝置下次同步時也會改用這些設定。',
