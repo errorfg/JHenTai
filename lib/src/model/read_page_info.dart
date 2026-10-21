@@ -109,3 +109,41 @@ class ReadSegment {
 
   bool contains(int index) => index >= start && index < end;
 }
+
+/// What looking for the book before or after those in a reader came to.
+sealed class SiblingOutcome {
+  const SiblingOutcome();
+}
+
+/// Put in the reader.
+final class SiblingJoined extends SiblingOutcome {
+  const SiblingJoined(this.segment);
+
+  final ReadSegment segment;
+}
+
+/// It can not be shown with the books in the reader (a downloaded volume
+/// after one read from the server, say): read by itself, as loaded.
+final class SiblingApart extends SiblingOutcome {
+  const SiblingApart(this.book);
+
+  final ReadPageInfo book;
+}
+
+/// There is none.
+final class SiblingNone extends SiblingOutcome {
+  const SiblingNone();
+}
+
+/// It could not be loaded; asked for again, it is looked for again.
+final class SiblingFailed extends SiblingOutcome {
+  const SiblingFailed(this.error);
+
+  final Object error;
+}
+
+/// Not looked for: it is being looked for already, or the reader closed or
+/// left the layout it was looked for in meanwhile.
+final class SiblingNotNow extends SiblingOutcome {
+  const SiblingNotNow();
+}

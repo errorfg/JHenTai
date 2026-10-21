@@ -434,19 +434,49 @@ void main() {
 
     // The end of the list reached: the volume is found, and not looked for
     // again each time the end is reached.
-    expect(await tester.runAsync(reader.appendNextSegment), isNull);
-    expect(await tester.runAsync(reader.appendNextSegment), isNull);
+    expect(await tester.runAsync(reader.appendNextSegment), isA<SiblingApart>());
+    expect(await tester.runAsync(reader.appendNextSegment), isA<SiblingApart>());
     expect(loads, 1);
     expect(reader.state.segments, hasLength(1));
 
     // Its button closes the reader with it, for the page that opened the
-    // reader to open it.
+    // reader to open it: the volume found, not loaded again.
     await tester.runAsync(() => reader.openSiblingBook(next: true));
     await settle(tester);
+    expect(loads, 1);
     final dynamic result = await tester.runAsync<dynamic>(() => readerResult!);
     expect(result is ReadPageInfo ? result.galleryTitle : result, 'Volume 2');
     expect(Get.currentRoute, isNot('/read'));
 
+    await tester.runAsync(() async {
+      Get.reset();
+      await appDb.close();
+    });
+  });
+
+  testWidgets('a chapter that could not be loaded is looked for again, and then follows', (WidgetTester tester) async {
+    final List<String> shown = <String>[];
+    int loads = 0;
+    final ReadPageLogic reader = await openReader(
+      tester,
+      _chapter(1, shown: shown, next: ({required bool next}) async {
+        loads++;
+        if (loads == 1) {
+          throw StateError('connection reset');
+        }
+        return next ? _chapter(2, shown: shown) : null;
+      }),
+    );
+    expect(await tester.runAsync(reader.appendNextSegment), isA<SiblingFailed>());
+    expect(await tester.runAsync(reader.appendNextSegment), isA<SiblingJoined>());
+    expect(reader.state.segments.map((ReadSegment s) => s.info.galleryTitle), <String>['Chapter 1', 'Chapter 2']);
+    expect(loads, 2);
+
+    await tester.runAsync(() async {
+      Get.back();
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    await settle(tester);
     await tester.runAsync(() async {
       Get.reset();
       await appDb.close();

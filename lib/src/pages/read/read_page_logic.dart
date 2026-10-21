@@ -335,21 +335,11 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   /// The book being read, of [ReadPageState.segments].
   late ReadSegment _currentSegment = state.segments.first;
 
-  /// Whether no book follows the last one appended.
-  bool _noNextSegment = false;
-
-  /// Whether the book after the last can not follow in this reader (a
-  /// downloaded volume after one read from the server, or two downloaded
-  /// volumes), and is opened by itself instead.
-  bool _nextOpensApart = false;
-
-  /// Whether no book precedes the first one.
-  bool _noPreviousSegment = false;
-
-  /// Whether the book before the first can not be put in this reader (a
-  /// downloaded volume before one read from the server), and is opened by
-  /// itself instead.
-  bool _previousOpensApart = false;
+  /// What was found after the last book and before the first, once it is
+  /// known for good: none, or a book read by itself ([SiblingApart]).
+  /// Cleared when a book is put there, which has siblings of its own.
+  SiblingOutcome? _after;
+  SiblingOutcome? _before;
 
   /// Whether the book before the first is being fetched.
   bool _prepending = false;
@@ -1267,42 +1257,44 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       hasSiblingBooks &&
       _reachedEnd &&
       identical(_currentSegment, state.segments.last) &&
-      !(readsBooksInARow && _noNextSegment);
+      !(readsBooksInARow && _after is SiblingNone);
 
-  /// Appends the book after the last one, once.
-  Future<ReadSegment?> appendNextSegment() async {
-    if (_openingSibling || _noNextSegment || _nextOpensApart) {
-      return null;
+  /// Appends the book after the last one. What is known for good is not
+  /// looked for again.
+  Future<SiblingOutcome> appendNextSegment() async {
+    final SiblingOutcome? known = _after;
+    if (known != null) {
+      return known;
+    }
+    if (_openingSibling) {
+      return const SiblingNotNow();
     }
     final Future<ReadPageInfo?> Function({required bool next})? load =
         state.segments.last.info.loadSiblingBook;
     if (load == null) {
-      return null;
+      return _after = const SiblingNone();
     }
     _openingSibling = true;
     update([endOfBookId, topMenuId]);
     try {
       final ReadPageInfo? next = await load(next: true);
       if (isClosed) {
-        return null;
+        return const SiblingNotNow();
       }
       if (next == null) {
-        _noNextSegment = true;
-        return null;
+        return _after = const SiblingNone();
       }
       if (!state.canAppend(next)) {
-        // Read by itself instead, from the button to it.
-        _nextOpensApart = true;
         log.warning('Book can not follow in this reader: ${next.galleryTitle}');
-        return null;
+        return _after = SiblingApart(next);
       }
       final ReadSegment segment = state.appendSegment(next);
       log.info('Appended ${next.galleryTitle}: pages ${segment.start}-${segment.end - 1}');
       _onPagesAppended();
-      return segment;
+      return SiblingJoined(segment);
     } catch (e) {
       log.error('Append next book failed', e);
-      return null;
+      return SiblingFailed(e);
     } finally {
       _openingSibling = false;
       updateSafely([endOfBookId, topMenuId]);
@@ -1348,44 +1340,43 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   /// further on.
   int get pagesPrepended => _pagesPrepended;
 
-  /// Puts the book before the first one above it, once. [asked]: the list
-  /// was pulled past its first page or turned back from it, and is told
-  /// when there is no such book. The pages go in once the list stands
-  /// still, as moving them stops a scroll; the page shown stays where it is
-  /// on screen.
-  Future<ReadSegment?> prependPreviousSegment({bool asked = false}) async {
-    if (_noPreviousSegment) {
-      if (asked) {
-        toast(_noSiblingKey(next: false).tr);
-      }
-      return null;
+  /// Puts the book before the first one above it. [asked]: the list was
+  /// pulled past its first page or turned back from it, and is told when
+  /// there is no such book. The pages go in once the list stands still, as
+  /// moving them stops a scroll; the page shown stays where it is on screen.
+  Future<SiblingOutcome> prependPreviousSegment({bool asked = false}) async {
+    final SiblingOutcome outcome = await _prependPreviousSegment();
+    if (asked && outcome is SiblingNone) {
+      toast(_noSiblingKey(next: false).tr);
     }
-    if (_prepending || _previousOpensApart || !readsBooksInARow) {
-      return null;
+    return outcome;
+  }
+
+  Future<SiblingOutcome> _prependPreviousSegment() async {
+    final SiblingOutcome? known = _before;
+    if (known != null) {
+      return known;
+    }
+    if (_prepending || !readsBooksInARow) {
+      return const SiblingNotNow();
     }
     final Future<ReadPageInfo?> Function({required bool next})? load = state.segments.first.info.loadSiblingBook;
     if (load == null) {
-      return null;
+      return _before = const SiblingNone();
     }
     _prepending = true;
     updateSafely([endOfBookId, topMenuId]);
     try {
       final ReadPageInfo? previous = await load(next: false);
       if (isClosed) {
-        return null;
+        return const SiblingNotNow();
       }
       if (previous == null) {
-        _noPreviousSegment = true;
-        if (asked) {
-          toast(_noSiblingKey(next: false).tr);
-        }
-        return null;
+        return _before = const SiblingNone();
       }
       if (!state.canAppend(previous)) {
-        // Read by itself instead, from the button to it.
-        _previousOpensApart = true;
         log.warning('Book can not precede in this reader: ${previous.galleryTitle}');
-        return null;
+        return _before = SiblingApart(previous);
       }
       // A scroll cut off without its end leaves the list marked scrolling:
       // waited for ten seconds at most.
@@ -1394,15 +1385,15 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       }
       // Turned to a layout of pages meanwhile, which would show other pages.
       if (isClosed || !readsBooksInARow) {
-        return null;
+        return const SiblingNotNow();
       }
       final ReadSegment segment = state.prependSegment(previous);
       log.info('Put ${previous.galleryTitle} before: pages 0-${segment.end - 1}');
       _onPagesPrepended(segment);
-      return segment;
+      return SiblingJoined(segment);
     } catch (e) {
       log.error('Put previous book before failed', e);
-      return null;
+      return SiblingFailed(e);
     } finally {
       _prepending = false;
       updateSafely([endOfBookId, topMenuId]);
@@ -1470,51 +1461,53 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       jump2ImageIndex(state.segments[target].start);
       return;
     }
-    if (next && readsBooksInARow && !_nextOpensApart) {
-      final ReadSegment? appended = await appendNextSegment();
-      if (appended != null) {
-        jump2ImageIndex(appended.start);
-      } else if (_noNextSegment) {
-        toast(_noSiblingKey(next: true).tr);
-      }
-      if (!_nextOpensApart) {
-        return;
-      }
-    }
-    if (!next && readsBooksInARow && !_previousOpensApart) {
-      final ReadSegment? prepended = await prependPreviousSegment(asked: true);
-      if (prepended != null) {
-        // Once the list is built with the pages put before.
-        await WidgetsBinding.instance.endOfFrame;
-        if (!isClosed) {
-          jump2ImageIndex(prepended.start);
+    final SiblingOutcome outcome = readsBooksInARow
+        ? await (next ? appendNextSegment() : _prependPreviousSegment())
+        : await _loadSiblingApart(next: next);
+    switch (outcome) {
+      case SiblingJoined(:final ReadSegment segment):
+        if (!next) {
+          // Once the list is built with the pages put before.
+          await WidgetsBinding.instance.endOfFrame;
         }
-      }
-      if (!_previousOpensApart) {
-        return;
-      }
+        if (!isClosed) {
+          jump2ImageIndex(segment.start);
+        }
+      case SiblingApart(:final ReadPageInfo book):
+        backRoute(currentRoute: Routes.read, result: book);
+      case SiblingNone():
+        toast(_noSiblingKey(next: next).tr);
+      case SiblingFailed(:final Object error):
+        toast(error.toString(), isShort: false);
+      case SiblingNotNow():
+        break;
     }
+  }
 
-    final Future<ReadPageInfo?> Function({required bool next})? load =
-        _currentSegment.info.loadSiblingBook;
-    if (load == null || _openingSibling) {
-      return;
+  /// The book before or after the one read, in a layout of pages: read by
+  /// itself.
+  Future<SiblingOutcome> _loadSiblingApart({required bool next}) async {
+    final Future<ReadPageInfo?> Function({required bool next})? load = _currentSegment.info.loadSiblingBook;
+    if (load == null) {
+      return const SiblingNone();
+    }
+    if (_openingSibling) {
+      return const SiblingNotNow();
     }
     _openingSibling = true;
     update([endOfBookId, topMenuId]);
     try {
       final ReadPageInfo? sibling = await load(next: next);
-      if (sibling == null) {
-        toast(_noSiblingKey(next: next).tr);
-        return;
+      if (isClosed) {
+        return const SiblingNotNow();
       }
-      backRoute(currentRoute: Routes.read, result: sibling);
+      return sibling == null ? const SiblingNone() : SiblingApart(sibling);
     } catch (e) {
       log.error('Open sibling book failed', e);
-      toast(e.toString(), isShort: false);
+      return SiblingFailed(e);
     } finally {
       _openingSibling = false;
-      update([endOfBookId, topMenuId]);
+      updateSafely([endOfBookId, topMenuId]);
     }
   }
 
