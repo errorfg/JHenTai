@@ -365,14 +365,14 @@ class DetailsPageLogic extends GetxController
     );
     SchedulerBinding.instance.scheduleTask(
       () => GalleryDao.updateGalleryTags(
-        state.galleryDetails!.galleryUrl.gid,
+        state.galleryDetails!.galleryUrl.storageGid,
         tagMap2TagString(state.galleryDetails!.tags),
       ),
       Priority.animation,
     );
     SchedulerBinding.instance.scheduleTask(
       () => ArchiveDao.updateArchiveTags(
-        state.galleryDetails!.galleryUrl.gid,
+        state.galleryDetails!.galleryUrl.storageGid,
         tagMap2TagString(state.galleryDetails!.tags),
       ),
       Priority.animation,
@@ -485,9 +485,9 @@ class DetailsPageLogic extends GetxController
   Future<void> handleTapDownload() async {
     GalleryDownloadedData? galleryDownloadedData = galleryDownloadService
         .gallerys
-        .singleWhereOrNull((g) => g.gid == state.galleryUrl.gid);
+        .singleWhereOrNull((g) => g.gid == state.galleryUrl.storageGid);
     GalleryDownloadProgress? downloadProgress = galleryDownloadService
-        .galleryDownloadInfos[state.galleryUrl.gid]
+        .galleryDownloadInfos[state.galleryUrl.storageGid]
         ?.downloadProgress;
 
     /// new download
@@ -515,8 +515,8 @@ class DetailsPageLogic extends GetxController
 
       GalleryDownloadedData galleryDownloadedData = GalleryDownloadedData(
         gid:
-            state.galleryDetails?.galleryUrl.gid ??
-            state.gallery!.galleryUrl.gid,
+            state.galleryDetails?.galleryUrl.storageGid ??
+            state.gallery!.galleryUrl.storageGid,
         token:
             state.galleryDetails?.galleryUrl.token ??
             state.gallery!.galleryUrl.token,
@@ -1228,7 +1228,7 @@ class DetailsPageLogic extends GetxController
     }
 
     ArchiveStatus? archiveStatus = archiveDownloadService
-        .archiveDownloadInfos[state.galleryUrl.gid]
+        .archiveDownloadInfos[state.galleryUrl.storageGid]
         ?.archiveStatus;
 
     /// new download
@@ -1254,7 +1254,7 @@ class DetailsPageLogic extends GetxController
         }
 
         ArchiveDownloadedData archive = ArchiveDownloadedData(
-          gid: state.galleryDetails!.galleryUrl.gid,
+          gid: state.galleryDetails!.galleryUrl.storageGid,
           token: state.galleryDetails!.galleryUrl.token,
           title: mainTitleText,
           category: state.galleryDetails!.category,
@@ -1307,7 +1307,7 @@ class DetailsPageLogic extends GetxController
       }
 
       ArchiveDownloadedData archive = ArchiveDownloadedData(
-        gid: state.galleryDetails!.galleryUrl.gid,
+        gid: state.galleryDetails!.galleryUrl.storageGid,
         token: state.galleryDetails!.galleryUrl.token,
         title: mainTitleText,
         category: state.galleryDetails!.category,
@@ -1344,7 +1344,7 @@ class DetailsPageLogic extends GetxController
     }
 
     ArchiveDownloadedData archive = archiveDownloadService.archives.firstWhere(
-      (a) => a.gid == state.galleryUrl.gid,
+      (a) => a.gid == state.galleryUrl.storageGid,
     );
 
     if (archiveStatus == ArchiveStatus.needReUnlock) {
@@ -1960,7 +1960,7 @@ class DetailsPageLogic extends GetxController
 
     /// online
     if (galleryDownloadService
-            .galleryDownloadInfos[state.galleryUrl.gid]
+            .galleryDownloadInfos[state.galleryUrl.storageGid]
             ?.downloadProgress ==
         null) {
       unawaited(
@@ -1985,7 +1985,7 @@ class DetailsPageLogic extends GetxController
 
     /// use GalleryDownloadedData's title
     GalleryDownloadedData gallery = galleryDownloadService.gallerys.firstWhere(
-      (g) => g.gid == state.galleryUrl.gid,
+      (g) => g.gid == state.galleryUrl.storageGid,
     );
 
     if (readSetting.useThirdPartyViewer.isTrue &&
@@ -2008,7 +2008,7 @@ class DetailsPageLogic extends GetxController
           readProgressRecordStorageKey: state.galleryUrl.contentKey,
           legacyProgressKey: state.galleryUrl.legacyKey,
           pageCount: gallery.pageCount,
-          useSuperResolution: superResolutionService.get(state.galleryUrl.gid, SuperResolutionType.gallery) != null,
+          useSuperResolution: superResolutionService.get(state.galleryUrl.storageGid, SuperResolutionType.gallery) != null,
           readDirection: webtoonReadDirection,
         ),
       ),

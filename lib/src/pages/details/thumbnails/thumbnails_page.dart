@@ -96,7 +96,7 @@ class ThumbnailsPage extends StatelessWidget with Scroll2TopPageMixin {
                 }
 
                 GalleryImage? downloadedImage = galleryDownloadService
-                    .galleryDownloadInfos[logic.detailsPageState.galleryDetails!.galleryUrl.gid]?.images[state.absoluteIndexOfThumbnails[index]];
+                    .galleryDownloadInfos[logic.detailsPageState.galleryDetails!.galleryUrl.storageGid]?.images[state.absoluteIndexOfThumbnails[index]];
 
                 return Column(
                   children: [

@@ -112,15 +112,15 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
         }
 
         return GetBuilder<ArchiveDownloadService>(
-          id: '${ArchiveDownloadService.archiveStatusId}::${state.galleryUrl.gid}',
+          id: '${ArchiveDownloadService.archiveStatusId}::${state.galleryUrl.storageGid}',
           builder: (_) => GetBuilder<GalleryDownloadService>(
-            id: '${galleryDownloadService.galleryDownloadProgressId}::${state.galleryUrl.gid}',
+            id: '${galleryDownloadService.galleryDownloadProgressId}::${state.galleryUrl.storageGid}',
             builder: (_) {
               bool containGallery = galleryDownloadService.containGallery(
-                state.galleryUrl.gid,
+                state.galleryUrl.storageGid,
               );
               bool containArchive = archiveDownloadService.containArchive(
-                state.galleryUrl.gid,
+                state.galleryUrl.storageGid,
               );
 
               return PopupMenuButton(
@@ -222,7 +222,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                   if (value == 3) {
                     logic.handleTapDeleteDownload(
                       context,
-                      state.galleryUrl.gid,
+                      state.galleryUrl.storageGid,
                       containGallery
                           ? DownloadPageGalleryType.download
                           : DownloadPageGalleryType.archive,
@@ -1372,10 +1372,10 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
             state.gallery?.pageCount == null;
 
         return GetBuilder<GalleryDownloadService>(
-          id: '${galleryDownloadService.galleryDownloadProgressId}::${state.galleryUrl.gid}',
+          id: '${galleryDownloadService.galleryDownloadProgressId}::${state.galleryUrl.storageGid}',
           builder: (_) {
             GalleryDownloadProgress? downloadProgress = galleryDownloadService
-                .galleryDownloadInfos[state.galleryUrl.gid]
+                .galleryDownloadInfos[state.galleryUrl.storageGid]
                 ?.downloadProgress;
 
             String text = downloadProgress == null
@@ -1546,10 +1546,10 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
         bool disabled = state.galleryDetails == null;
 
         return GetBuilder<ArchiveDownloadService>(
-          id: '${ArchiveDownloadService.archiveStatusId}::${state.galleryUrl.gid}',
+          id: '${ArchiveDownloadService.archiveStatusId}::${state.galleryUrl.storageGid}',
           builder: (_) {
             ArchiveStatus? archiveStatus = archiveDownloadService
-                .archiveDownloadInfos[state.galleryUrl.gid]
+                .archiveDownloadInfos[state.galleryUrl.storageGid]
                 ?.archiveStatus;
 
             String text = archiveStatus == null
@@ -2111,7 +2111,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                     }
 
                     GalleryImage? downloadedImage = galleryDownloadService
-                        .galleryDownloadInfos[state.galleryUrl.gid]
+                        .galleryDownloadInfos[state.galleryUrl.storageGid]
                         ?.images[index];
 
                     return Column(

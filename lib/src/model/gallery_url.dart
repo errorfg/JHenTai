@@ -125,6 +125,18 @@ class GalleryUrl {
         SourceKind.ehentai || SourceKind.jm || SourceKind.tachiyomi => gid,
       };
 
+  /// The site's own number of the gallery kept under [storageGid]: what
+  /// folders of downloads are named by, as up to 8.1.1.
+  static int siteNumberOf(int storageGid) => storageGid >= nhStorageOffset && storageGid < wnStorageOffset
+      ? storageGid - nhStorageOffset
+      : storageGid >= wnStorageOffset && storageGid < jmGidOffset
+          ? storageGid - wnStorageOffset
+          : storageGid;
+
+  /// [storageGid] of the gallery stored with the address [url]; [gid] when
+  /// it can not be read.
+  static int storageGidOfStored(String url, int gid) => tryParseStored(url)?.storageGid ?? gid;
+
   /// [storageGid] of the gallery of [contentKey]; null for a key of no
   /// gallery.
   static int? storageGidOfKey(String contentKey) {
