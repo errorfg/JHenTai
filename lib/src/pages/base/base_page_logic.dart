@@ -442,9 +442,11 @@ abstract class BasePageLogic extends GetxController with Scroll2TopLogicMixin {
     return filteredGallerys;
   }
 
-  /// deal with the first and last page
+  /// deal with the first and last page. Each page has GalleryUrls of its
+  /// own, so they are compared by the address they stand for.
   void _cleanDuplicateGallery(List<Gallery> newGallerys) {
-    newGallerys.removeWhere((newGallery) => state.gallerys.firstWhereOrNull((e) => e.galleryUrl == newGallery.galleryUrl) != null);
+    Set<String> shown = state.gallerys.map((e) => e.galleryUrl.url).toSet();
+    newGallerys.removeWhere((newGallery) => shown.contains(newGallery.galleryUrl.url));
   }
 
   Future<List<Gallery>> _filterByBlockingRules(List<Gallery> newGallerys) async {

@@ -28,6 +28,11 @@ class _SilentLogService extends LogService {
 
 /// A JM list whose requests answer when the test says.
 class _ListLogic extends JmQueryPageLogic {
+  _ListLogic({this.dropsDuplicates = false});
+
+  /// Pages go through the list's own handling of repeated galleries only.
+  final bool dropsDuplicates;
+
   @override
   final JmListPageState state = JmListPageState('test')..query = const JmFilterQuery(order: 'mr');
 
@@ -45,7 +50,8 @@ class _ListLogic extends JmQueryPageLogic {
   }
 
   @override
-  Future<List<Gallery>> postHandleNewGallerys(List<Gallery> gallerys, {bool cleanDuplicate = true}) async => gallerys;
+  Future<List<Gallery>> postHandleNewGallerys(List<Gallery> gallerys, {bool cleanDuplicate = true}) async =>
+      dropsDuplicates ? super.postHandleNewGallerys(gallerys, cleanDuplicate: cleanDuplicate) : gallerys;
 }
 
 Gallery _album(int id) => Gallery(
@@ -102,5 +108,16 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(logic.state.gallerys.map((Gallery g) => g.title), <String>['Album 2']);
     expect(logic.state.loadingState, LoadingState.noMore);
+  });
+
+  test('a gallery the next page repeats, moved there by new uploads, is shown once', () async {
+    final _ListLogic logic = _ListLogic(dropsDuplicates: true);
+    final Future<void> first = logic.loadMore();
+    logic.requests.last.answer.complete(GalleryPageInfo(gallerys: <Gallery>[_album(1), _album(2)], nextGid: 'mr-2'));
+    await first;
+    final Future<void> second = logic.loadMore();
+    logic.requests.last.answer.complete(GalleryPageInfo(gallerys: <Gallery>[_album(2), _album(3)], nextGid: 'mr-3'));
+    await second;
+    expect(logic.state.gallerys.map((Gallery g) => g.title), <String>['Album 1', 'Album 2', 'Album 3']);
   });
 }
