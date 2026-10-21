@@ -291,19 +291,20 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     final Completer<void> done = Completer<void>();
     _inFlightSync = done.future;
     final SyncCancelToken cancel = SyncCancelToken();
-    final Future<SyncResult> run =
-        _syncRunner?.call(
-          types: types,
-          providerName: providerName,
-          onProgress: onProgress,
-        ) ??
-        _doSync(
-          types: types,
-          providerName: providerName,
-          onProgress: onProgress,
-          cancel: cancel,
-        );
+    Future<SyncResult>? run;
     try {
+      run =
+          _syncRunner?.call(
+            types: types,
+            providerName: providerName,
+            onProgress: onProgress,
+          ) ??
+          _doSync(
+            types: types,
+            providerName: providerName,
+            onProgress: onProgress,
+            cancel: cancel,
+          );
       final SyncResult result = await run.timeout(
         _syncTimeout,
         onTimeout: () {
@@ -333,7 +334,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         _drainQueuedReadProgressSync();
       }
 
-      if (cancel.isCancelled) {
+      if (cancel.isCancelled && run != null) {
         unawaited(run.then<void>((_) {}, onError: (Object _) {}).whenComplete(release));
       } else {
         release();
