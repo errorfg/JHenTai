@@ -267,6 +267,35 @@ void main() {
     await device.db.close();
   });
 
+  test('deleting an album listed once deletes the entries of its chapters, and only those', () async {
+    final _Device device = _Device()..activate();
+    Future<List<String>> shown() async => (await HistoryPageLogic.visibleHistory(0, await historyService.getPageCount()))
+        .rows
+        .map((GalleryHistoryModel row) => row.title)
+        .toList();
+    await jmReadingService.remember(albumId: 100, chapterIds: _chapters);
+    await historyService.recordAt(_history(GalleryUrl.jm(101), 'Album - Chapter 2'), '2026-10-01T00:00:00.000000Z');
+    await historyService.recordAt(_history(GalleryUrl.jm(103), 'Album - Chapter 4'), '2026-10-02T00:00:00.000000Z');
+    await historyService.recordAt(_history(GalleryUrl.jm(100), 'Album'), '2026-10-03T00:00:00.000000Z');
+    await historyService.recordAt(_history(GalleryUrl.jm(300), 'Another album'), '2026-10-04T00:00:00.000000Z');
+    await historyService.recordAt(_history(GalleryUrl.tryParse('https://e-hentai.org/g/123456/abcdef0123/')!, 'Other'), '2026-10-05T00:00:00.000000Z');
+    expect(await shown(), <String>['Other', 'Another album', 'Album']);
+
+    final HistoryPageLogic logic = HistoryPageLogic();
+    await logic.delete(GalleryUrl.jm(100));
+    expect(await shown(), <String>['Other', 'Another album'], reason: 'an older chapter must not stand for the album now');
+
+    // A chapter shown for its album, the album having no entry of its own.
+    await historyService.recordAt(_history(GalleryUrl.jm(102), 'Album - Chapter 3'), '2026-10-06T00:00:00.000000Z');
+    await historyService.recordAt(_history(GalleryUrl.jm(101), 'Album - Chapter 2'), '2026-10-01T00:00:00.000000Z');
+    expect(await shown(), <String>['Album - Chapter 3', 'Other', 'Another album']);
+    await logic.delete(GalleryUrl.jm(102));
+    expect(await shown(), <String>['Other', 'Another album']);
+    expect(await GalleryHistoryDao.selectTotalCount(), 2);
+
+    await device.db.close();
+  });
+
   test('entries made per chapter find their album by themselves, once', () async {
     final _Device device = _Device()..activate();
     JmAlbum album(int id, List<int> chapterIds) => JmAlbum(

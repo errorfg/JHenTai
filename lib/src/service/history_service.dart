@@ -254,6 +254,18 @@ class HistoryService
     return deleted;
   }
 
+  /// Deletes the entries of [gids], as [delete] does each.
+  Future<bool> deleteGids(Iterable<int> gids) async {
+    log.info('Delete history: $gids');
+
+    bool deleted = false;
+    for (int gid in gids) {
+      deleted = await GalleryHistoryDao.deleteHistory(gid) > 0 || deleted;
+    }
+    await _recordDeletions(gids.map((gid) => '$gid'));
+    return deleted;
+  }
+
   Future<bool> deleteAll() async {
     log.info('Delete all historys');
     Iterable<int> gids = (await GalleryHistoryDao.selectGidToLastReadTime()).keys;

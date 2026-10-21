@@ -118,6 +118,24 @@ class HistoryPageLogic extends OldBasePageLogic {
     return entries.first.gid;
   }
 
+  /// The gids of the history entries the entry of [url] stands for: those
+  /// of a multi-chapter JM album's chapters and of the album, or [url]'s
+  /// alone.
+  static Future<List<int>> entriesShownAs(GalleryUrl url) async {
+    if (!url.isJM) {
+      return <int>[url.gid];
+    }
+    final Map<int, int> albumOf = (await jmReadingService.knownAlbums()).albumOf;
+    final int? album = albumOf[url.jmChapterId];
+    if (album == null) {
+      return <int>[url.gid];
+    }
+    return <int>[
+      for (final MapEntry<int, int> entry in albumOf.entries)
+        if (entry.value == album) GalleryUrl.jm(entry.key).gid,
+    ];
+  }
+
   static Future<GalleryHistoryModel?> _albumEntry(int albumId) async {
     final GalleryHistoryV2Data? stored = await GalleryHistoryDao.selectByGid(GalleryUrl.jm(albumId).gid);
     return stored == null ? null : GalleryHistoryModel.fromJson(jsonDecode(stored.jsonBody));
@@ -141,7 +159,7 @@ class HistoryPageLogic extends OldBasePageLogic {
         EHContextMenuAction(
           text: 'delete'.tr,
           color: UIConfig.alertColor(context),
-          onTap: () => delete(gallery.gid),
+          onTap: () => delete(gallery.galleryUrl),
         ),
       ],
     );
@@ -152,9 +170,12 @@ class HistoryPageLogic extends OldBasePageLogic {
     handleLongPressCard(context, gallery, position: position);
   }
 
-  Future<void> delete(int gid) async {
-    await historyService.delete(gid);
-    state.gallerys.removeWhere((g) => g.gid == gid);
+  /// Deletes what the entry of [url] stands for: a JM album shown as one
+  /// entry goes with all its chapters' entries, which would show again
+  /// otherwise.
+  Future<void> delete(GalleryUrl url) async {
+    await historyService.deleteGids(await entriesShownAs(url));
+    state.gallerys.removeWhere((g) => g.gid == url.gid);
     updateSafely([bodyId]);
   }
 }
