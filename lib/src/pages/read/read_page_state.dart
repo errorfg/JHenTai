@@ -14,8 +14,19 @@ import '../../widget/loading_state_indicator.dart';
 import 'spread_pages.dart';
 
 class ReadPageState with ScrollStatusListerState {
-  /// gallery info
+  /// The book the reader was opened with. It stays as it is when books are
+  /// put before or after it (see [segments]); what is of the reading as a
+  /// whole is here: [pageCount], [currentImageIndex], [initialIndex].
   final ReadPageInfo readPageInfo = Get.arguments;
+
+  /// Pages of all the books in the reader.
+  int get pageCount => segments.last.end;
+
+  /// The page shown, among the pages of all the books.
+  late int currentImageIndex = readPageInfo.initialIndex;
+
+  /// The page a layout opens on, among the pages of all the books.
+  late int initialIndex = readPageInfo.initialIndex;
 
   /// property used for parsing and loading
   int thumbnailsCountPerPage = SiteSetting.thumbnailsCountPerPage.value;
@@ -105,7 +116,7 @@ class ReadPageState with ScrollStatusListerState {
   /// their index.
   ReadSegment appendSegment(ReadPageInfo info) {
     final int count = info.pageCount;
-    final ReadSegment segment = ReadSegment(info: info, start: readPageInfo.pageCount, pageCount: count);
+    final ReadSegment segment = ReadSegment(info: info, start: pageCount, pageCount: count);
     segments.add(segment);
     thumbnails.addAll(_pagesOf(info.thumbnails, count));
     images.addAll(_pagesOf(info.images, count));
@@ -113,7 +124,6 @@ class ReadPageState with ScrollStatusListerState {
     parseImageUrlStates.addAll(List.generate(count, (_) => LoadingState.idle));
     imageContainerSizes.addAll(List.generate(count, (_) => null));
     parseImageUrlErrorMsg.addAll(List.generate(count, (_) => null));
-    readPageInfo.pageCount += count;
     return segment;
   }
 
@@ -132,9 +142,8 @@ class ReadPageState with ScrollStatusListerState {
     parseImageUrlStates.insertAll(0, List.generate(count, (_) => LoadingState.idle));
     imageContainerSizes.insertAll(0, List.generate(count, (_) => null));
     parseImageUrlErrorMsg.insertAll(0, List.generate(count, (_) => null));
-    readPageInfo.pageCount += count;
-    readPageInfo.initialIndex += count;
-    readPageInfo.currentImageIndex += count;
+    initialIndex += count;
+    currentImageIndex += count;
     return segment;
   }
 }

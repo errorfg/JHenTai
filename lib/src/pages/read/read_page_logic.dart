@@ -538,8 +538,8 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   int get _srAheadEnd {
     final int batch = realtimeSrService.batchSize;
     final int ahead = max(readSetting.preloadPageCount.value, batch);
-    final int end = ((state.readPageInfo.currentImageIndex + 1 + ahead) / batch).ceil() * batch;
-    return min(end, state.readPageInfo.pageCount);
+    final int end = ((state.currentImageIndex + 1 + ahead) / batch).ceil() * batch;
+    return min(end, state.pageCount);
   }
 
   /// Fetches and upscales the pages up to [_srAheadEnd] that are not there
@@ -548,7 +548,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     if (!realtimeSrOn) {
       return;
     }
-    for (int index = state.readPageInfo.currentImageIndex; index < _srAheadEnd; index++) {
+    for (int index = state.currentImageIndex; index < _srAheadEnd; index++) {
       _ensureRealtimeSr(index);
     }
   }
@@ -557,7 +557,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   /// first when it is not known (the lookups call back here), then its
   /// upscaled copy asked for.
   void _ensureRealtimeSr(int index) {
-    if (!realtimeSrOn || index < state.readPageInfo.currentImageIndex || index >= _srAheadEnd) {
+    if (!realtimeSrOn || index < state.currentImageIndex || index >= _srAheadEnd) {
       return;
     }
     if (state.images[index] != null) {
@@ -784,7 +784,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
     unawaited(_notifyShown(state.segments.first));
 
-    realtimeSrService.focus = () => state.readPageInfo.currentImageIndex;
+    realtimeSrService.focus = () => state.currentImageIndex;
     requestRealtimeSrAhead();
 
     inited = true;
@@ -1192,7 +1192,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
   void onEffectiveSettingChanged() {
     clearImageContainerSized();
-    state.readPageInfo.initialIndex = state.readPageInfo.currentImageIndex;
+    state.initialIndex = state.currentImageIndex;
     _syncDisplayFirstPageAloneToState();
     updateSafely([layoutId]);
     // Wide pages split or joined: the pages ahead left as they are are
@@ -1659,7 +1659,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
   /// [pageNo] counts within the book being read.
   void handleSlide(double pageNo) {
-    state.readPageInfo.currentImageIndex = _currentSegment.start + (pageNo - 1).toInt();
+    state.currentImageIndex = _currentSegment.start + (pageNo - 1).toInt();
     update([sliderId, pageNoId]);
   }
 
@@ -1680,7 +1680,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     }
 
     /// No more thumbnails, do not scroll more
-    if (lastThumbnailIndex == state.readPageInfo.pageCount - 1 &&
+    if (lastThumbnailIndex == state.pageCount - 1 &&
         targetImageIndex > firstThumbnailIndex) {
       return;
     }
@@ -1759,7 +1759,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     final ReadSegment left = _currentSegment;
     final int leftProgress = _progressIndex;
 
-    state.readPageInfo.currentImageIndex = index;
+    state.currentImageIndex = index;
     final ReadSegment segment = state.segmentAt(index);
     final bool atEnd = reachedEnd || (segment.pageCount > 0 && index >= segment.end - 1);
 
@@ -1791,7 +1791,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     _firstVisible = first;
     final ReadSegment segment = state.segmentAt(first);
     recordReadProgress(first, reachedEnd: listShowsEnd(visible, segment.end));
-    if (readsBooksInARow && visible.last.index >= state.readPageInfo.pageCount - _appendAhead) {
+    if (readsBooksInARow && visible.last.index >= state.pageCount - _appendAhead) {
       unawaited(appendNextSegment());
     }
     if (readsBooksInARow && before != null && first < before && first < _appendAhead) {
@@ -1807,7 +1807,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
     pageCount: segment.pageCount,
   );
 
-  int get _progressIndex => _progressIndexIn(_currentSegment, _reachedEnd, state.readPageInfo.currentImageIndex);
+  int get _progressIndex => _progressIndexIn(_currentSegment, _reachedEnd, state.currentImageIndex);
 
   Future<void> _notifyShown(ReadSegment segment) async {
     try {
@@ -1836,7 +1836,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
   void clearImageContainerSized() {
     state.imageContainerSizes = List.generate(
-      state.readPageInfo.pageCount,
+      state.pageCount,
       (_) => null,
     );
   }

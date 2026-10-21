@@ -30,13 +30,11 @@ class ReadPageInfo {
 
   String? galleryUrl;
 
-  int initialIndex;
+  /// The page of the book to open it on.
+  final int initialIndex;
 
-  int currentImageIndex;
-
-  /// Pages of the whole reader: grows as later books are appended to a
-  /// running reader, or earlier ones put before it (see [ReadSegment]).
-  int pageCount;
+  /// Pages of the book; those of all the books in a reader are its state's.
+  final int pageCount;
 
   /// used for archive
   bool isOriginal;
@@ -97,7 +95,7 @@ class ReadPageInfo {
     this.loadSiblingBook,
     this.siblingsAreChapters = false,
     this.readDirection,
-  }) : currentImageIndex = initialIndex;
+  });
 }
 
 /// One book of a reader that reads several in a row: [info] describes the

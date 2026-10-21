@@ -348,7 +348,7 @@ void main() {
     final HorizontalPageLayoutLogic layout = Get.find<HorizontalPageLayoutLogic>();
     layout.toNext();
     await settle(tester);
-    expect(reader.state.readPageInfo.currentImageIndex, 1);
+    expect(reader.state.currentImageIndex, 1);
     final Iterable<ui.Image?> shown = find.byType(ExtendedRawImage).evaluate().map((Element e) => (e.widget as ExtendedRawImage).image);
     expect(shown.any((ui.Image? image) => image != null && image.width == 1200 && image.height == 800), isTrue);
 

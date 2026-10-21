@@ -163,14 +163,14 @@ void main() {
     await settle();
     final ReadPageLogic reader = Get.find<ReadPageLogic>();
     expect(shown, <String>['Chapter 1']);
-    expect(reader.state.readPageInfo.pageCount, _pages);
+    expect(reader.state.pageCount, _pages);
 
     // Down to the last page of chapter 1: chapter 2 is appended below it.
     Get.find<VerticalListLayoutLogic>().state.itemScrollController.jumpTo(index: _pages - 1);
     await settle();
     expect(loads, 1);
     expect(reader.state.segments, hasLength(2));
-    expect(reader.state.readPageInfo.pageCount, 2 * _pages);
+    expect(reader.state.pageCount, 2 * _pages);
     expect(reader.currentSegment.info.galleryTitle, 'Chapter 1');
     expect(reader.reachedEnd, isTrue);
     // The next chapter is already there: no button to it.
@@ -180,7 +180,7 @@ void main() {
     Get.find<VerticalListLayoutLogic>().state.itemScrollController.jumpTo(index: _pages + 1);
     await settle();
     expect(reader.currentSegment.info.galleryTitle, 'Chapter 2');
-    expect(reader.pageNumberOf(reader.state.readPageInfo.currentImageIndex), 2);
+    expect(reader.pageNumberOf(reader.state.currentImageIndex), 2);
     expect(shown, <String>['Chapter 1', 'Chapter 2']);
     expect(find.text('Chapter 2'), findsWidgets);
 
@@ -301,13 +301,13 @@ void main() {
 
     expect(opened.asked, <bool>[false]);
     expect(reader.state.segments.map((ReadSegment s) => s.info.galleryTitle), <String>['Chapter 1', 'Chapter 2']);
-    expect(reader.state.readPageInfo.pageCount, 2 * _pages);
+    expect(reader.state.pageCount, 2 * _pages);
     expect(reader.state.segments.last.start, _pages);
     // Still on the first page of chapter 2, at the same place on screen, the
     // image decoded before (not loaded again).
-    expect(reader.state.readPageInfo.currentImageIndex, _pages);
+    expect(reader.state.currentImageIndex, _pages);
     expect(reader.currentSegment.info.galleryTitle, 'Chapter 2');
-    expect(reader.pageNumberOf(reader.state.readPageInfo.currentImageIndex), 1);
+    expect(reader.pageNumberOf(reader.state.currentImageIndex), 1);
     final ({ui.Image image, Rect rect}) after = topPage(tester);
     expect(after.rect.top, moreOrLessEquals(before.rect.top, epsilon: 0.5));
     expect(after.image.isCloneOf(before.image), isTrue);
@@ -317,7 +317,7 @@ void main() {
     Get.find<VerticalListLayoutLogic>().state.itemScrollController.jumpTo(index: _pages - 1);
     await settle(tester);
     expect(reader.currentSegment.info.galleryTitle, 'Chapter 1');
-    expect(reader.pageNumberOf(reader.state.readPageInfo.currentImageIndex), _pages);
+    expect(reader.pageNumberOf(reader.state.currentImageIndex), _pages);
     expect(opened.shown, <String>['Chapter 2', 'Chapter 1']);
 
     // Going back to the top of chapter 1 looks for the chapter before it,
@@ -393,7 +393,7 @@ void main() {
     await settle(tester);
     expect(reader.state.segments.map((ReadSegment s) => s.info.galleryTitle), <String>['Chapter 1', 'Chapter 2']);
     expect(reader.currentSegment.info.galleryTitle, 'Chapter 1');
-    expect(reader.state.readPageInfo.currentImageIndex, 0);
+    expect(reader.state.currentImageIndex, 0);
     // The reader stays open: the chapter is read in it.
     expect(Get.isRegistered<ReadPageLogic>(), isTrue);
 
@@ -497,14 +497,14 @@ void main() {
     expect(reader.state.segments, hasLength(2));
     Get.find<VerticalListLayoutLogic>().state.itemScrollController.jumpTo(index: 2);
     await settle(tester);
-    expect(reader.state.readPageInfo.currentImageIndex, 2);
+    expect(reader.state.currentImageIndex, 2);
 
     // Both layouts were made when chapter 2 alone was read, at its first
     // page.
     readSetting.readDirection.value = ReadDirection.left2rightSinglePage;
     await settle(tester);
     expect(Get.find<HorizontalPageLayoutLogic>().pageController.page, 2);
-    expect(reader.state.readPageInfo.currentImageIndex, 2);
+    expect(reader.state.currentImageIndex, 2);
     expect(reader.currentSegment.info.galleryTitle, 'Chapter 1');
 
     readSetting.readDirection.value = ReadDirection.left2rightDoubleColumn;

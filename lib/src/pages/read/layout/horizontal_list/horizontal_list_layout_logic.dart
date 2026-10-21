@@ -45,7 +45,7 @@ class HorizontalListLayoutLogic extends BaseLayoutLogic {
   void onPagesPrepended(int count) {
     final ItemPosition? first = getCurrentVisibleItems().firstOrNull;
     if (first != null && state.itemScrollController.isAttached) {
-      readPageState.readPageInfo.initialIndex = first.index + count;
+      readPageState.initialIndex = first.index + count;
       state.initialAlignment = first.itemLeadingEdge;
       state.listKey = UniqueKey();
       // A list built later, after another layout, starts at its first image.
@@ -128,7 +128,7 @@ class HorizontalListLayoutLogic extends BaseLayoutLogic {
       return;
     }
 
-    toImageIndex(min(firstPosition.index + 1, readPageState.readPageInfo.pageCount - 1));
+    toImageIndex(min(firstPosition.index + 1, readPageState.pageCount - 1));
   }
 
   void _toPrevScreen() {
@@ -169,7 +169,7 @@ class HorizontalListLayoutLogic extends BaseLayoutLogic {
   }
 
   void _enterAutoModeByScroll() {
-    int restPageCount = readPageState.readPageInfo.pageCount - readPageState.readPageInfo.currentImageIndex - 1;
+    int restPageCount = readPageState.pageCount - readPageState.currentImageIndex - 1;
     double totalTime = restPageCount * readSetting.autoModeInterval.value;
 
     readPageLogic.toggleMenu();
@@ -208,7 +208,7 @@ class HorizontalListLayoutLogic extends BaseLayoutLogic {
         }
 
         /// sometimes itemTrailingEdge is not equal to 1.0
-        if (lastPosition.index == readPageState.readPageInfo.pageCount - 1 && lastPosition.itemTrailingEdge <= 1.2) {
+        if (lastPosition.index == readPageState.pageCount - 1 && lastPosition.itemTrailingEdge <= 1.2) {
           Get.engine.addPostFrameCallback((_) {
             readPageLogic.closeAutoMode();
           });

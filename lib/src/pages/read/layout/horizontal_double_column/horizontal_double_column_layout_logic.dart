@@ -24,7 +24,7 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
 
     state.pageCount = computePageCount();
 
-    state.pageController = PageController(initialPage: computePageIndexOfImage(readPageState.readPageInfo.initialIndex));
+    state.pageController = PageController(initialPage: computePageIndexOfImage(readPageState.initialIndex));
 
     /// record reading progress and sync thumbnails list index
     state.pageController.addListener(_readProgressListener);
@@ -47,7 +47,7 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
     if (!initCompleter.isCompleted || state.pageController.hasClients) {
       return;
     }
-    final int target = computePageIndexOfImage(readPageState.readPageInfo.currentImageIndex);
+    final int target = computePageIndexOfImage(readPageState.currentImageIndex);
     if (state.pageController.initialPage == target) {
       return;
     }
@@ -203,12 +203,12 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
 
     updateSafely([BaseLayoutLogic.pageId]);
     if (computePageIndexOfImage(imageIndex) <= state.pageController.page!.toInt()) {
-      jump2ImageIndex(readPageState.readPageInfo.currentImageIndex);
+      jump2ImageIndex(readPageState.currentImageIndex);
     }
   }
 
   int computePageCount() {
-    return computePageIndexOfImage(readPageState.readPageInfo.pageCount - 1) + 1;
+    return computePageIndexOfImage(readPageState.pageCount - 1) + 1;
   }
 
   /// provide a page index, compute which images we should display in this page
@@ -267,7 +267,7 @@ class HorizontalDoubleColumnLayoutLogic extends BaseLayoutLogic {
       return [currentImageIndex];
     }
 
-    if (currentImageIndex == readPageState.readPageInfo.pageCount - 1) {
+    if (currentImageIndex == readPageState.pageCount - 1) {
       return [currentImageIndex];
     }
 

@@ -232,7 +232,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
   Widget _buildPageNoInfo() {
     return GetBuilder<ReadPageLogic>(
       id: logic.pageNoId,
-      builder: (_) => Text('${logic.pageNumberOf(state.readPageInfo.currentImageIndex)}/${logic.currentSegment.pageCount}'),
+      builder: (_) => Text('${logic.pageNumberOf(state.currentImageIndex)}/${logic.currentSegment.pageCount}'),
     );
   }
 
@@ -478,8 +478,8 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
             reverse: logic.isInRight2LeftDirection,
             physics: const ClampingScrollPhysics(),
             minCacheExtent: 1 * fullScreenWidth,
-            initialScrollIndex: state.readPageInfo.initialIndex,
-            itemCount: state.readPageInfo.pageCount,
+            initialScrollIndex: state.initialIndex,
+            itemCount: state.pageCount,
             itemScrollController: state.thumbnailsScrollController,
             itemPositionsListener: state.thumbnailPositionsListener,
             scrollOffsetController: state.thumbnailsScrollOffsetController,
@@ -505,7 +505,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                       child: Container(
                         width: 24,
                         decoration: BoxDecoration(
-                          color: state.readPageInfo.currentImageIndex == index
+                          color: state.currentImageIndex == index
                               ? UIConfig.readPageBottomCurrentImageHighlightBackgroundColor(context)
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(4),
@@ -515,7 +515,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                           logic.pageNumberOf(index).toString(),
                           style: TextStyle(
                             fontSize: 9,
-                            color: state.readPageInfo.currentImageIndex == index ? UIConfig.readPageBottomCurrentImageHighlightForegroundColor(context) : null,
+                            color: state.currentImageIndex == index ? UIConfig.readPageBottomCurrentImageHighlightForegroundColor(context) : null,
                           ),
                         ),
                       ),
@@ -641,7 +641,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(logic.isInRight2LeftDirection ? logic.currentSegment.pageCount.toString() : logic.pageNumberOf(state.readPageInfo.currentImageIndex).toString())
+            Text(logic.isInRight2LeftDirection ? logic.currentSegment.pageCount.toString() : logic.pageNumberOf(state.currentImageIndex).toString())
                 .marginOnly(left: 36, right: 4),
             Expanded(
               child: Column(
@@ -655,7 +655,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                         child: Slider(
                           min: 1,
                           max: logic.currentSegment.pageCount.toDouble(),
-                          value: logic.pageNumberOf(state.readPageInfo.currentImageIndex).toDouble(),
+                          value: logic.pageNumberOf(state.currentImageIndex).toDouble(),
                           thumbColor: UIConfig.readPageForeGroundColor,
                           onChanged: logic.handleSlide,
                           onChangeEnd: logic.handleSlideEnd,
@@ -666,7 +666,7 @@ class _ReadPageState extends State<ReadPage> with ScrollStatusListener, WindowLi
                 ],
               ),
             ),
-            Text(logic.isInRight2LeftDirection ? logic.pageNumberOf(state.readPageInfo.currentImageIndex).toString() : logic.currentSegment.pageCount.toString())
+            Text(logic.isInRight2LeftDirection ? logic.pageNumberOf(state.currentImageIndex).toString() : logic.currentSegment.pageCount.toString())
                 .marginOnly(right: 36, left: 4),
           ],
         ),
