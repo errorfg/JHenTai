@@ -439,8 +439,8 @@ class FavoritePageLogic extends BasePageLogic {
       ),
     );
 
-    // Remove any previously merged local favorites (identified by NH/WN/JM URL)
-    state.gallerys.removeWhere((g) => g.galleryUrl.isNH || g.galleryUrl.isWN || g.galleryUrl.isJM);
+    // Favorites merged before: what the E-Hentai pages did not list
+    state.gallerys.removeWhere((g) => !g.galleryUrl.isEHGallery);
 
     // Combine and sort descending by the time matching current sort order
     bool sortByPublishTime =

@@ -140,7 +140,7 @@ class ScheduleService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBea
 
   bool _isEHGallery(GalleryDownloadedData gallery) {
     GalleryUrl? url = GalleryUrl.tryParse(gallery.galleryUrl);
-    return url != null && !url.isNH && !url.isWN && !url.isJM;
+    return url != null && url.isEHGallery;
   }
 
   Future<void> refreshArchiveTags() async {

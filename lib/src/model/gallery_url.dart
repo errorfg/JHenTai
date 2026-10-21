@@ -80,6 +80,10 @@ class GalleryUrl {
 
   bool get isTachiChapter => isTachi && tachiChapterPath != null;
 
+  /// A gallery of E-Hentai or ExHentai: of none of the other sites, some of
+  /// which set [isEH] as well.
+  bool get isEHGallery => !isNH && !isWN && !isJM && !isTachi;
+
   /// The manga of a Tachiyomi chapter (or the manga itself).
   GalleryUrl get tachiMangaUrl => GalleryUrl.tachiManga(tachiSource!, tachiMangaPath!);
 
