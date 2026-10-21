@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:jhentai/src/exception/internal_exception.dart';
+import 'package:jhentai/src/model/content_source.dart';
 import 'package:jhentai/src/setting/eh_setting.dart';
 
 class GalleryUrl {
@@ -80,9 +81,20 @@ class GalleryUrl {
 
   bool get isTachiChapter => isTachi && tachiChapterPath != null;
 
-  /// A gallery of E-Hentai or ExHentai: of none of the other sites, some of
-  /// which set [isEH] as well.
-  bool get isEHGallery => !isNH && !isWN && !isJM && !isTachi;
+  /// The site the gallery is from. [isEH] tells E-Hentai from ExHentai for
+  /// an E-Hentai gallery only; galleries of the other sites set it as well.
+  ContentSource get source => isTachi
+      ? ContentSource(SourceKind.tachiyomi, tachiSource)
+      : isJM
+          ? ContentSource.jm
+          : isWN
+              ? ContentSource.wnacg
+              : isNH
+                  ? ContentSource.nhentai
+                  : ContentSource.ehentai;
+
+  /// A gallery of E-Hentai or ExHentai.
+  bool get isEHGallery => source.kind == SourceKind.ehentai;
 
   /// The manga of a Tachiyomi chapter (or the manga itself).
   GalleryUrl get tachiMangaUrl => GalleryUrl.tachiManga(tachiSource!, tachiMangaPath!);

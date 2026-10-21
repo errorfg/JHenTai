@@ -14,6 +14,7 @@ import 'package:jhentai/src/enum/eh_namespace.dart';
 import 'package:jhentai/src/extension/string_extension.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/mixin/scroll_to_top_page_mixin.dart';
+import 'package:jhentai/src/model/content_source.dart';
 import 'package:jhentai/src/model/gallery_image.dart';
 import 'package:jhentai/src/model/gallery_tag.dart';
 import 'package:jhentai/src/model/search_config.dart';
@@ -140,11 +141,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                         children: [Text('share'.tr), const Icon(Icons.share)],
                       ),
                     ),
-                    if (state.galleryDetails != null &&
-                        !state.galleryUrl.isNH &&
-                        !state.galleryUrl.isWN &&
-                        !state.galleryUrl.isJM &&
-                        !state.galleryUrl.isTachi)
+                    if (state.galleryDetails != null && logic.features.tagVotes)
                       PopupMenuItem(
                         value: 2,
                         child: Row(
@@ -1172,40 +1169,17 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
               _buildFavoriteButton(context),
             ];
 
-            if (state.galleryUrl.isNH ||
-                state.galleryUrl.isWN ||
-                state.galleryUrl.isJM ||
-                state.galleryUrl.isTachi) {
-              actions.add(_buildSearchInEHButton(context));
-            }
-
-            if (!state.galleryUrl.isNH &&
-                !state.galleryUrl.isWN &&
-                !state.galleryUrl.isJM &&
-                !state.galleryUrl.isTachi) {
-              actions.addAll([
-                _buildRatingButton(context),
-                _buildArchiveButton(context),
-                _buildShowInWatchedButton(context),
-                _buildTorrentButton(context),
-                // _buildStatisticButton(context),
-              ]);
-            } else if (state.galleryUrl.isNH && logic.hasNhentaiOfficialApi) {
-              actions.addAll([
-                _buildArchiveButton(context),
-                _buildTorrentButton(context),
-              ]);
-            }
-
-            actions.add(_buildTelegraphButton(context));
-
-            // Last: the least used.
-            if (!state.galleryUrl.isNH &&
-                !state.galleryUrl.isWN &&
-                !state.galleryUrl.isJM &&
-                !state.galleryUrl.isTachi) {
-              actions.add(_buildHHButton(context));
-            }
+            final SourceFeatures features = logic.features;
+            actions.addAll([
+              if (features.searchOnEHentai) _buildSearchInEHButton(context),
+              if (features.rating) _buildRatingButton(context),
+              if (features.archives) _buildArchiveButton(context),
+              if (features.watched) _buildShowInWatchedButton(context),
+              if (features.torrents) _buildTorrentButton(context),
+              _buildTelegraphButton(context),
+              // Last: the least used.
+              if (features.hathDownload) _buildHHButton(context),
+            ]);
 
             return ListView(
               scrollDirection: Axis.horizontal,
@@ -1969,6 +1943,13 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
   }
 
   List<Widget> _buildSubTags(List<GalleryTag> tags) {
+    final SourceFeatures features = logic.features;
+    // Voted on at E-Hentai; put on the account's blacklist at nhentai.
+    final void Function(GalleryTag)? tagAction = features.tagBlacklist
+        ? logic.toggleNhentaiBlacklistTag
+        : features.tagVotes
+            ? logic.showTagDialog
+            : null;
     return tags.map((tag) {
       bool isSelected =
           state.isTagSelectionMode &&
@@ -1984,30 +1965,13 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
             ? (tag) => logic.toggleTagSelection(tag)
             : (tag) => newSearch(
                 // A Tachiyomi source takes plain text: the genre or author itself.
-                rewriteSearchConfig: state.galleryUrl.isTachi
-                    ? SearchConfig(keyword: tag.tagData.key, tachiSource: state.galleryUrl.tachiSource)
-                    : SearchConfig(
-                        keyword: '${tag.tagData.namespace}:"${tag.tagData.key}\$"',
-                        isNhSearch: state.galleryUrl.isNH,
-                        isWnacgSearch: state.galleryUrl.isWN,
-                        isJmSearch: state.galleryUrl.isJM,
-                      ),
+                rewriteSearchConfig: SearchConfig(
+                  keyword: state.galleryUrl.isTachi ? tag.tagData.key : '${tag.tagData.namespace}:"${tag.tagData.key}\$"',
+                )..searchOn(state.galleryUrl.source),
                 forceNewRoute: true,
               ),
-        onSecondaryTap: state.galleryUrl.isNH
-            ? (logic.hasNhentaiOfficialApi
-                  ? logic.toggleNhentaiBlacklistTag
-                  : null)
-            : state.galleryUrl.isWN || state.galleryUrl.isJM || state.galleryUrl.isTachi
-            ? null
-            : logic.showTagDialog,
-        onLongPress: state.galleryUrl.isNH
-            ? (logic.hasNhentaiOfficialApi
-                  ? logic.toggleNhentaiBlacklistTag
-                  : null)
-            : state.galleryUrl.isWN || state.galleryUrl.isJM || state.galleryUrl.isTachi
-            ? null
-            : logic.showTagDialog,
+        onSecondaryTap: tagAction,
+        onLongPress: tagAction,
         showTagStatus: preferenceSetting.showGalleryTagVoteStatus.isTrue,
       );
 
@@ -2055,16 +2019,13 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
         global: false,
         init: logic,
         builder: (_) {
-          if (state.galleryDetails == null ||
-              state.galleryUrl.isWN ||
-              (state.galleryUrl.isNH && !logic.hasNhentaiOfficialApi)) {
+          final SourceFeatures features = logic.features;
+          if (state.galleryDetails == null || !features.comments) {
             return const SizedBox();
           }
 
           bool disableButtons =
-              state.galleryUrl.isNH ||
-              state.galleryUrl.isJM ||
-              state.galleryUrl.isTachi ||
+              !features.commentActions ||
               state.galleryDetails!.comments.any((comment) => comment.fromMe);
 
           return Column(
@@ -2078,7 +2039,7 @@ class DetailsPage extends StatelessWidget with Scroll2TopPageMixin {
                     child: Text(
                       state.galleryDetails!.comments.isEmpty
                           ? 'noComments'.tr
-                          : state.galleryUrl.isNH || state.galleryUrl.isJM
+                          : features.commentCount
                           ? '${'allComments'.tr} (${state.galleryDetails!.commentCount})'
                           : 'allComments'.tr,
                     ),
