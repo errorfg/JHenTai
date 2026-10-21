@@ -338,6 +338,11 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
   /// Whether no book follows the last one appended.
   bool _noNextSegment = false;
 
+  /// Whether the book after the last can not follow in this reader (a
+  /// downloaded volume after one read from the server, or two downloaded
+  /// volumes), and is opened by itself instead.
+  bool _nextOpensApart = false;
+
   /// Whether no book precedes the first one.
   bool _noPreviousSegment = false;
 
@@ -1266,7 +1271,7 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
 
   /// Appends the book after the last one, once.
   Future<ReadSegment?> appendNextSegment() async {
-    if (_openingSibling || _noNextSegment) {
+    if (_openingSibling || _noNextSegment || _nextOpensApart) {
       return null;
     }
     final Future<ReadPageInfo?> Function({required bool next})? load =
@@ -1286,6 +1291,8 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
         return null;
       }
       if (!state.canAppend(next)) {
+        // Read by itself instead, from the button to it.
+        _nextOpensApart = true;
         log.warning('Book can not follow in this reader: ${next.galleryTitle}');
         return null;
       }
@@ -1463,14 +1470,16 @@ class ReadPageLogic extends GetxController with WidgetsBindingObserver {
       jump2ImageIndex(state.segments[target].start);
       return;
     }
-    if (next && readsBooksInARow) {
+    if (next && readsBooksInARow && !_nextOpensApart) {
       final ReadSegment? appended = await appendNextSegment();
       if (appended != null) {
         jump2ImageIndex(appended.start);
       } else if (_noNextSegment) {
         toast(_noSiblingKey(next: true).tr);
       }
-      return;
+      if (!_nextOpensApart) {
+        return;
+      }
     }
     if (!next && readsBooksInARow && !_previousOpensApart) {
       final ReadSegment? prepended = await prependPreviousSegment(asked: true);

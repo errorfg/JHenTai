@@ -199,6 +199,9 @@ void main() {
     }
   }
 
+  /// What the reader opened last closes with.
+  Future<dynamic>? readerResult;
+
   /// Opens the reader on [info], in [direction].
   Future<ReadPageLogic> openReader(WidgetTester tester, ReadPageInfo info, {ReadDirection direction = ReadDirection.top2bottomList}) async {
     appDb = (await tester.runAsync(() async => AppDb.forTesting(NativeDatabase.memory())))!;
@@ -227,7 +230,7 @@ void main() {
           getPages: [GetPage(name: '/read', page: () => const ReadPage())],
         ),
       );
-      Get.toNamed('/read', arguments: info);
+      readerResult = Get.toNamed('/read', arguments: info);
       await Future<void>.delayed(const Duration(milliseconds: 300));
     });
     await settle(tester);
@@ -356,6 +359,51 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 500));
     });
     await settle(tester);
+    await tester.runAsync(() async {
+      Get.reset();
+      await appDb.close();
+    });
+  });
+
+  testWidgets('a downloaded volume after the last, which can not follow in the reader, is opened by itself', (WidgetTester tester) async {
+    ReadPageInfo volume(int number, {Future<ReadPageInfo?> Function({required bool next})? siblings}) => ReadPageInfo(
+          mode: ReadMode.local,
+          galleryTitle: 'Volume $number',
+          initialIndex: 0,
+          pageCount: _pages,
+          readProgressRecordStorageKey: 'komga:test:book-$number',
+          images: <GalleryImage?>[
+            for (int i = 0; i < _pages; i++)
+              GalleryImage(url: '', path: '${files.path}/c$number-$i.png', downloadStatus: DownloadStatus.downloaded),
+          ],
+          useSuperResolution: false,
+          loadSiblingBook: siblings,
+        );
+    int loads = 0;
+    final ReadPageLogic reader = await openReader(
+      tester,
+      volume(1, siblings: ({required bool next}) async {
+        loads++;
+        return next ? volume(2) : null;
+      }),
+    );
+    expect(reader.readsBooksInARow, isTrue);
+
+    // The end of the list reached: the volume is found, and not looked for
+    // again each time the end is reached.
+    expect(await tester.runAsync(() => reader.appendNextSegment()), isNull);
+    expect(await tester.runAsync(() => reader.appendNextSegment()), isNull);
+    expect(loads, 1);
+    expect(reader.state.segments, hasLength(1));
+
+    // Its button closes the reader with it, for the page that opened the
+    // reader to open it.
+    await tester.runAsync(() => reader.openSiblingBook(next: true));
+    await settle(tester);
+    final dynamic result = await tester.runAsync<dynamic>(() => readerResult!);
+    expect(result is ReadPageInfo ? result.galleryTitle : result, 'Volume 2');
+    expect(Get.currentRoute, isNot('/read'));
+
     await tester.runAsync(() async {
       Get.reset();
       await appDb.close();
