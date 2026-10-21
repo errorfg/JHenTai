@@ -67,11 +67,12 @@ class _MemoryServer implements RecordBackend {
   }
 
   @override
-  Future<RecordPage> pull({required int since, required String device, required int limit}) async {
+  Future<RecordPage> pull({required String since, required String device, required int limit}) async {
+    final int after = int.tryParse(since) ?? 0;
     final List<({RemoteRecord record, int seq})> page =
-        (stored.values.where((s) => s.seq > since && s.record.device != device).toList()..sort((a, b) => a.seq.compareTo(b.seq))).take(limit).toList();
+        (stored.values.where((s) => s.seq > after && s.record.device != device).toList()..sort((a, b) => a.seq.compareTo(b.seq))).take(limit).toList();
     final bool more = page.length == limit;
-    return RecordPage(records: page.map((s) => s.record).toList(), next: more ? page.last.seq : (seq > since ? seq : since), more: more);
+    return RecordPage(records: page.map((s) => s.record).toList(), next: '${more ? page.last.seq : (seq > after ? seq : after)}', more: more);
   }
 }
 

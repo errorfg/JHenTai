@@ -74,21 +74,23 @@ class RecordServerInfo {
 class RecordPage {
   final List<RemoteRecord> records;
 
-  /// Cursor for the next pull.
-  final int next;
+  /// Cursor for the next pull: opaque, the backend's own.
+  final String next;
   final bool more;
 
   const RecordPage({required this.records, required this.next, required this.more});
 }
 
-/// A sync server speaking protocol 1 (see sync_server/ in the repository).
+/// Where records are kept: a sync server speaking protocol 1 (see
+/// sync_server/ in the repository), or a bucket (BucketRecordBackend).
 abstract class RecordBackend {
   Future<RecordServerInfo> info();
 
   Future<void> push(List<RemoteRecord> records);
 
-  /// Records written by other devices after [since].
-  Future<RecordPage> pull({required int since, required String device, required int limit});
+  /// Records written by other devices after [since], a cursor this backend
+  /// gave ([RecordPage.next]); empty for all.
+  Future<RecordPage> pull({required String since, required String device, required int limit});
 }
 
 class RecordServerException implements Exception {
@@ -152,14 +154,14 @@ class HttpRecordBackend implements RecordBackend {
   }
 
   @override
-  Future<RecordPage> pull({required int since, required String device, required int limit}) async {
+  Future<RecordPage> pull({required String since, required String device, required int limit}) async {
     Map<String, dynamic> json = await _send(() => _dio.get<String>(
           '/v1/pull',
-          queryParameters: {'since': since, 'device': device, 'limit': limit},
+          queryParameters: {'since': int.tryParse(since) ?? 0, 'device': device, 'limit': limit},
         ));
     return RecordPage(
       records: (json['records'] as List).map((e) => RemoteRecord.fromJson(Map<String, dynamic>.from(e))).toList(),
-      next: json['next'] as int,
+      next: '${json['next']}',
       more: json['more'] as bool,
     );
   }

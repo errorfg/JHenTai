@@ -90,7 +90,8 @@ class _MemoryServer implements RecordBackend {
   }
 
   @override
-  Future<RecordPage> pull({required int since, required String device, required int limit}) async {
+  Future<RecordPage> pull({required String since, required String device, required int limit}) async {
+    final int after = int.tryParse(since) ?? 0;
     if (pullsBeforeFailure != null) {
       if (pullsBeforeFailure == 0) {
         throw RecordServerException(null, 'connection reset');
@@ -98,14 +99,14 @@ class _MemoryServer implements RecordBackend {
       pullsBeforeFailure = pullsBeforeFailure! - 1;
     }
     pulls++;
-    List<_Stored> page = (stored.values.where((s) => s.seq > since && s.record.device != device).toList()
+    List<_Stored> page = (stored.values.where((s) => s.seq > after && s.record.device != device).toList()
           ..sort((a, b) => a.seq.compareTo(b.seq)))
         .take(limit)
         .toList();
     bool more = page.length == limit;
     return RecordPage(
       records: page.map((s) => s.record).toList(),
-      next: more ? page.last.seq : (seq > since ? seq : since),
+      next: '${more ? page.last.seq : (seq > after ? seq : after)}',
       more: more,
     );
   }
@@ -475,7 +476,7 @@ class _HeldServer implements RecordBackend {
   Future<RecordServerInfo> info() => server.info();
 
   @override
-  Future<RecordPage> pull({required int since, required String device, required int limit}) async {
+  Future<RecordPage> pull({required String since, required String device, required int limit}) async {
     await release.future;
     return server.pull(since: since, device: device, limit: limit);
   }

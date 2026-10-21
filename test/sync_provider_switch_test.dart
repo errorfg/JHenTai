@@ -11,7 +11,6 @@ import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'package:jhentai/src/model/gallery_image.dart';
 import 'package:jhentai/src/model/gallery_tag.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
-import 'package:jhentai/src/service/cloud/cloud_provider.dart';
 import 'package:jhentai/src/service/cloud/pending_sync_tracker.dart';
 import 'package:jhentai/src/service/history_service.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
@@ -22,6 +21,8 @@ import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/service/record_sync/record_backend.dart';
 import 'package:jhentai/src/service/sync_service.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
+
+import 'memory_bucket.dart';
 
 /// A device that leaves the bucket for the sync server and comes back must
 /// still sync with the devices that never left: what it changed meanwhile
@@ -49,47 +50,6 @@ class _InlineIsolateService extends IsolateService {
 }
 
 /// A bucket in memory: latest.json plus the op packs, snapshots and manifest.
-class _MemoryBucket implements CloudProvider {
-  String? latest;
-  DateTime? latestTime;
-  final Map<String, List<int>> objects = {};
-
-  @override
-  String get name => 'memory';
-
-  @override
-  Future<String?> download() async => latest;
-
-  @override
-  Future<CloudFile> upload(String data, {bool saveHistory = false}) async {
-    latest = data;
-    latestTime = DateTime.now().toUtc();
-    return CloudFile(version: 'latest', modifiedTime: latestTime!, size: data.length);
-  }
-
-  @override
-  Future<CloudFile?> getFileMetadata() async =>
-      latest == null ? null : CloudFile(version: 'latest', modifiedTime: latestTime!, size: latest!.length);
-
-  @override
-  Future<void> putRawObject(String key, List<int> bytes) async => objects[key] = bytes;
-
-  @override
-  Future<List<int>?> getRawObject(String key) async => objects[key];
-
-  @override
-  Future<List<RemoteObjectInfo>> listRawObjects(String prefix) async => [
-        for (MapEntry<String, List<int>> e in objects.entries)
-          if (e.key.startsWith(prefix)) RemoteObjectInfo(key: e.key, size: e.value.length),
-      ];
-
-  @override
-  Future<void> deleteRawObject(String key) async => objects.remove(key);
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError('${invocation.memberName}');
-}
-
 class _Stored {
   final RemoteRecord record;
   final int seq;
@@ -118,15 +78,16 @@ class _MemoryServer implements RecordBackend {
   }
 
   @override
-  Future<RecordPage> pull({required int since, required String device, required int limit}) async {
-    List<_Stored> page = (stored.values.where((s) => s.seq > since && s.record.device != device).toList()
+  Future<RecordPage> pull({required String since, required String device, required int limit}) async {
+    final int after = int.tryParse(since) ?? 0;
+    List<_Stored> page = (stored.values.where((s) => s.seq > after && s.record.device != device).toList()
           ..sort((a, b) => a.seq.compareTo(b.seq)))
         .take(limit)
         .toList();
     bool more = page.length == limit;
     return RecordPage(
       records: page.map((s) => s.record).toList(),
-      next: more ? page.last.seq : (seq > since ? seq : since),
+      next: '${more ? page.last.seq : (seq > after ? seq : after)}',
       more: more,
     );
   }
@@ -162,7 +123,7 @@ class _Device {
     settings.currentProvider.value = provider;
   }
 
-  Future<void> sync(_MemoryBucket bucket, _MemoryServer server) async {
+  Future<void> sync(MemoryBucket bucket, _MemoryServer server) async {
     activate();
     SyncResult result = await SyncService(providerFactory: (_) => bucket, recordBackendFactory: () => server)
         .sync(types: CloudConfigTypeEnum.values);
@@ -222,7 +183,7 @@ void main() {
   });
 
   test('a device back from the sync server syncs with the bucket both ways, and back on the server again', () async {
-    final _MemoryBucket bucket = _MemoryBucket();
+    final MemoryBucket bucket = MemoryBucket();
     final _MemoryServer server = _MemoryServer();
     final _Device phone = _Device('s3');
     final _Device mac = _Device('s3');
@@ -261,11 +222,10 @@ void main() {
     await phone.sync(bucket, server);
     expect(await phone.historyGids(), {1, 2, 3});
     expect(await phone.readProgress('2'), 7);
-    // A bucket keeps the union of favorites: the deletion made on the server
-    // does not travel through it, and 101 is back on the Mac, as before.
-    expect(phone.favoriteIds(), {101, 102, 103});
+    // Records in the bucket too: the deletion made on the server travels.
+    expect(phone.favoriteIds(), {102, 103});
     expect(await mac.historyGids(), {1, 2, 3});
-    expect(mac.favoriteIds(), {101, 102, 103});
+    expect(mac.favoriteIds(), {102, 103});
 
     // Changes made on the bucket reach the server once the Mac is back there.
     phone.activate();
@@ -285,8 +245,6 @@ void main() {
     expect(server.record('jmFavorite', '${_jmGallery(104).gid}'), isNotNull);
     expect(server.record('jmFavorite', '${_jmGallery(103).gid}'), isNotNull);
 
-    // The favorite the bucket brought back predates its deletion on the
-    // server: the deletion stands, there and on the Mac.
     expect(server.record('jmFavorite', '${_jmGallery(101).gid}')!.deleted, isTrue);
     expect(mac.favoriteIds(), {102, 103, 104});
   });

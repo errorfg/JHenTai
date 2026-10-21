@@ -51,11 +51,20 @@ class RecordSyncEngine {
   RecordAdapter? _adapterOf(String kind) => _adapters.firstWhereOrNull((a) => a.kind == kind);
 
   /// [cancel]: looked at before each step that writes.
+  ///
+  /// [joining]: the records hold what devices of earlier versions synced,
+  /// taken over by another device (see BucketRecordBackend). Data of a kind
+  /// taken in here for the first time then only adds items the records do
+  /// not have, unless its items carry their own times
+  /// ([WholeKindAdapter.itemTimesAreOwn]): the time of the rest is when
+  /// this device last wrote the data, by a sync of an earlier version too,
+  /// which says nothing of whether it is newer than the records.
   Future<RecordSyncResult> sync(
     RecordBackend backend, {
     Set<CloudConfigTypeEnum>? types,
     void Function(double progress)? onProgress,
     SyncCancelToken? cancel,
+    bool joining = false,
   }) async {
     /// Timestamp format migrations must complete before any timestamp
     /// comparison below: bean ready hooks are fired without being awaited
@@ -71,7 +80,7 @@ class RecordSyncEngine {
       log.info('🗄 Record sync: server database ${info.database} is new to this device, pushing all $marked records');
       state
         ..database = info.database
-        ..cursor = 0;
+        ..cursor = '';
       await _writeState(state);
     }
     onProgress?.call(0.1);
@@ -104,10 +113,14 @@ class RecordSyncEngine {
     // Kinds taken in for the first time, against what the server holds
     cancel?.throwIfCancelled();
     await _takeRowChanges(device, state, token, firstTime: true);
+    final Set<String> joined = {};
     for (WholeKindAdapter adapter in _wholeAdapters) {
       if (!state.kinds.contains(adapter.kind) && wanted(adapter)) {
         await _takeLegacy(adapter);
-        await _takeWholeChanges(adapter, device, state);
+        await _takeWholeChanges(adapter, device, state, joining: joining);
+        if (joining) {
+          joined.add(adapter.kind);
+        }
       }
     }
     await pendingSyncTracker.removePushedSnapshot(token);
@@ -129,7 +142,7 @@ class RecordSyncEngine {
       if (adapter is RowKindAdapter) {
         applied += await _applyRows(adapter);
       } else if (adapter is WholeKindAdapter) {
-        applied += await _applyWhole(adapter, device, state);
+        applied += await _applyWhole(adapter, device, state, joining: joined.contains(adapter.kind));
       }
     }
     await _writeState(state);
@@ -165,9 +178,9 @@ class RecordSyncEngine {
   }
 
   /// [keys] of [kind] were deleted on this device. Kept only once the device
-  /// syncs that kind through a server, or is set to.
-  Future<void> recordDeletions(String kind, Iterable<String> keys, {required bool serverChosen}) async {
-    if (keys.isEmpty || (!serverChosen && !await SyncRecordDao.existsKind(kind))) {
+  /// has synced that kind, or [syncOn].
+  Future<void> recordDeletions(String kind, Iterable<String> keys, {required bool syncOn}) async {
+    if (keys.isEmpty || (!syncOn && !await SyncRecordDao.existsKind(kind))) {
       return;
     }
     String device = await ensureSyncDeviceId();
@@ -236,7 +249,8 @@ class RecordSyncEngine {
   /// - Without such a match (the kind's first time, an item new to the
   ///   table, a record not yet written into the app), the item and the
   ///   record are compared by time, and nothing counts as deleted.
-  Future<void> _takeWholeChanges(WholeKindAdapter adapter, String device, _State state) async {
+  /// [joining]: see [sync]; until the records are written into the app.
+  Future<void> _takeWholeChanges(WholeKindAdapter adapter, String device, _State state, {bool joining = false}) async {
     List<MapEntry<String, LocalItem>> items = await adapter.export();
     String changeTime = await adapter.changeTime();
     bool first = !state.kinds.contains(adapter.kind);
@@ -281,7 +295,8 @@ class RecordSyncEngine {
 
         if (first || row == null || row.localHash == null || row.applyPending) {
           String time = item.firstTime ?? changeTime;
-          if (row == null || compareVersions(time, device, row.updatedAt, row.device) > 0) {
+          bool mayWin = !(joining && !adapter.itemTimesAreOwn);
+          if (row == null || (mayWin && compareVersions(time, device, row.updatedAt, row.device) > 0)) {
             writes.add(version(time));
           } else if (!row.applyPending) {
             writes.add(row.copyWith(applyPending: true));
@@ -392,8 +407,8 @@ class RecordSyncEngine {
 
   /// Rebuilds the app's data of the kind from its records, after taking in
   /// what changed here since step 1, and records what each item now hashes to.
-  Future<int> _applyWhole(WholeKindAdapter adapter, String device, _State state) async {
-    await _takeWholeChanges(adapter, device, state);
+  Future<int> _applyWhole(WholeKindAdapter adapter, String device, _State state, {bool joining = false}) async {
+    await _takeWholeChanges(adapter, device, state, joining: joining);
     List<SyncRecordData> rows = await SyncRecordDao.selectByKind(adapter.kind);
     int pending = rows.where((r) => r.applyPending).length;
     if (pending == 0) {
@@ -454,7 +469,8 @@ class RecordSyncEngine {
       Map<String, dynamic> json = jsonDecode(raw);
       return _State(
         database: json['database'] as String?,
-        cursor: json['cursor'] as int? ?? 0,
+        // An int up to 8.1.1, of the sync server.
+        cursor: '${json['cursor'] ?? ''}',
         kinds: (json['kinds'] as List? ?? []).cast<String>().toSet(),
       );
     } catch (e) {
@@ -473,12 +489,14 @@ class RecordSyncEngine {
 
 class _State {
   String? database;
-  int cursor;
+
+  /// Where the next pull starts, as the backend gave it; empty for the start.
+  String cursor;
 
   /// Kinds taken into the table at least once.
   final Set<String> kinds;
 
-  _State({this.database, this.cursor = 0, Set<String>? kinds}) : kinds = kinds ?? {};
+  _State({this.database, this.cursor = '', Set<String>? kinds}) : kinds = kinds ?? {};
 }
 
 class RecordSyncResult {

@@ -9,7 +9,6 @@ import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/network/eh_cookie_manager.dart';
 import 'package:jhentai/src/network/eh_igneous.dart';
-import 'package:jhentai/src/service/cloud/cloud_provider.dart';
 import 'package:jhentai/src/service/eh_account_sync.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
@@ -20,6 +19,8 @@ import 'package:jhentai/src/service/record_sync/record_sync_engine.dart';
 import 'package:jhentai/src/service/sync_service.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
 import 'package:jhentai/src/setting/user_setting.dart';
+
+import 'memory_bucket.dart';
 
 /// The E-Hentai login travels between devices, through the sync server and
 /// through a bucket; igneous does not: each device gets its own.
@@ -95,46 +96,22 @@ class _MemoryServer implements RecordBackend {
   }
 
   @override
-  Future<RecordPage> pull({required int since, required String device, required int limit}) async {
-    List<_Stored> page = (stored.values.where((s) => s.seq > since && s.record.device != device).toList()
+  Future<RecordPage> pull({required String since, required String device, required int limit}) async {
+    final int after = int.tryParse(since) ?? 0;
+    List<_Stored> page = (stored.values.where((s) => s.seq > after && s.record.device != device).toList()
           ..sort((a, b) => a.seq.compareTo(b.seq)))
         .take(limit)
         .toList();
     bool more = page.length == limit;
     return RecordPage(
       records: page.map((s) => s.record).toList(),
-      next: more ? page.last.seq : (seq > since ? seq : since),
+      next: '${more ? page.last.seq : (seq > after ? seq : after)}',
       more: more,
     );
   }
 }
 
 /// latest.json in memory.
-class _MemoryBucket implements CloudProvider {
-  String? latest;
-  DateTime? latestTime;
-
-  @override
-  String get name => 'memory';
-
-  @override
-  Future<String?> download() async => latest;
-
-  @override
-  Future<CloudFile> upload(String data, {bool saveHistory = false}) async {
-    latest = data;
-    latestTime = DateTime.now().toUtc();
-    return CloudFile(version: 'latest', modifiedTime: latestTime!, size: data.length);
-  }
-
-  @override
-  Future<CloudFile?> getFileMetadata() async =>
-      latest == null ? null : CloudFile(version: 'latest', modifiedTime: latestTime!, size: latest!.length);
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError('${invocation.memberName}');
-}
-
 class _Device {
   _Device(this.name) {
     jar = _ManagerJar(EHCookieManager(config), user);
@@ -196,7 +173,7 @@ class _Device {
     await accountSync.igneousFetch;
   }
 
-  Future<void> syncThroughBucket(_MemoryBucket bucket) async {
+  Future<void> syncThroughBucket(MemoryBucket bucket) async {
     activate();
     settings.currentProvider.value = 's3';
     SyncResult result = await SyncService(providerFactory: (_) => bucket).sync(types: const [CloudConfigTypeEnum.ehAccount]);
@@ -273,7 +250,7 @@ void main() {
   });
 
   test('a login reaches the other device through a bucket, with an igneous of its own, and so does a logout', () async {
-    final _MemoryBucket bucket = _MemoryBucket();
+    final MemoryBucket bucket = MemoryBucket();
     final _Device phone = _Device('phone');
     final _Device desktop = _Device('desktop');
 

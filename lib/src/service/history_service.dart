@@ -267,14 +267,10 @@ class HistoryService
     return deleted;
   }
 
-  /// A sync server passes deletions to the other devices.
+  /// Sync passes deletions to the other devices.
   Future<void> _recordDeletions(Iterable<String> gids) async {
     try {
-      await recordSyncEngine.recordDeletions(
-        'history',
-        gids,
-        serverChosen: syncSetting.currentProvider.value == SyncService.serverProvider,
-      );
+      await recordSyncEngine.recordDeletions('history', gids, syncOn: syncSetting.enableSync.value);
     } on Exception catch (e) {
       log.error('Record history deletions for sync failed', e);
     }

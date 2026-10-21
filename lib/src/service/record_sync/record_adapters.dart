@@ -93,6 +93,12 @@ abstract class WholeKindAdapter extends RecordAdapter {
   /// Makes the app's data of this kind exactly [records] (none deleted).
   Future<void> replaceAll(List<SyncRecordData> records);
 
+  /// Whether an item's [LocalItem.firstTime] is when the item itself was
+  /// made or changed (a favorite's time), not when the app's data of the
+  /// kind was last written, which an import or a sync of earlier versions
+  /// also does.
+  bool get itemTimesAreOwn => false;
+
   /// The kind this one took the place of, if any: a device new to this
   /// kind takes over what that kind's records hold, each item timed at its
   /// own time if it has one, else at the record's (see RecordSyncEngine).
@@ -267,6 +273,10 @@ Future<String> _configTime(ConfigEnum configKey) async {
 /// A JSON list kept in one config row, one record per item: the favorites
 /// of the sources whose favorites live on the device.
 class ConfigListRecords extends WholeKindAdapter {
+  /// A favorite's time.
+  @override
+  bool get itemTimesAreOwn => true;
+
   @override
   final String kind;
 
@@ -616,6 +626,10 @@ class TachiRepositoryRecords extends WholeKindAdapter {
 /// not take back those of another source changed on another. Up to 8.1.1
 /// all were one record of kind `tachiSourceSettings`.
 class TachiSourceRecords extends WholeKindAdapter {
+  /// When the source's settings were changed.
+  @override
+  bool get itemTimesAreOwn => true;
+
   @override
   String get kind => 'tachiSource';
 

@@ -2,12 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:http/testing.dart';
+import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/service/cloud/s3_provider.dart';
+import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/sync_service.dart';
 
@@ -97,7 +100,13 @@ class _StalledServer {
 }
 
 void main() {
-  setUp(() => log = _SilentLogService());
+  setUp(() {
+    log = _SilentLogService();
+    appDb = AppDb.forTesting(NativeDatabase.memory());
+    localConfigService = LocalConfigService();
+  });
+
+  tearDown(() => appDb.close());
 
   test('a request the service never answers ends the sync, which lets the next one in', () async {
     final List<String> requests = <String>[];
@@ -117,7 +126,8 @@ void main() {
 
     final SyncResult second = await sync().timeout(const Duration(seconds: 5));
     expect(second.message, isNot('Sync already in progress'));
-    expect(requests, <String>['HEAD', 'HEAD']);
+    // The manifest of the records, asked for by each sync.
+    expect(requests, <String>['GET', 'GET']);
   });
 
   test('a sync given up keeps the next one out until its request is ended, then lets it in', () async {

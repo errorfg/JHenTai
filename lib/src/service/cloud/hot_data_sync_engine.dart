@@ -82,10 +82,15 @@ class HotDataSyncEngine {
   /// hot data into latest.json - to keep absorbing their changes.
   ///
   /// [cancel]: looked at before each step that writes.
+  ///
+  /// [readOnly]: what other devices wrote is applied here, and nothing is
+  /// written to the remote (no bootstrap, push or compaction): how a device
+  /// takes over this layout once into the records of a newer one.
   Future<HotSyncResult> sync(
     CloudProvider provider, {
     String? legacyRemoteConfigJson,
     SyncCancelToken? cancel,
+    bool readOnly = false,
   }) async {
     /// Timestamp format migrations must complete before any timestamp
     /// comparison below: bean ready hooks are fired without being awaited
@@ -98,7 +103,12 @@ class HotDataSyncEngine {
     bool bootstrapped = false;
     int applied = 0;
 
-    if (manifest == null) {
+    if (manifest == null && readOnly) {
+      if (legacyRemoteConfigJson != null) {
+        cancel?.throwIfCancelled();
+        applied += await _applyLegacyConfig(legacyRemoteConfigJson);
+      }
+    } else if (manifest == null) {
       log.info('🔁 Hot sync: no manifest found, bootstrapping format v2');
       cancel?.throwIfCancelled();
       applied += await _bootstrap(provider, legacyRemoteConfigJson);
@@ -190,6 +200,10 @@ class HotDataSyncEngine {
       log.info(
         '🔁 Hot sync: applied ${start + chunk.length}/${pending.length} op packs ($applied rows total)',
       );
+    }
+
+    if (readOnly) {
+      return HotSyncResult(success: true, appliedRows: applied, pushedRows: 0, appliedPacks: pending.length, bootstrapped: false);
     }
 
     // 3. Push local changes as a new op pack

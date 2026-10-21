@@ -18,6 +18,11 @@ enum ConfigEnum {
   /// sync server state: its database, the pull cursor, the kinds taken in
   recordSyncState('recordSyncState'),
 
+  /// records kept in a bucket: the key of this device's last pack, and what
+  /// the last history version of the settings held
+  recordPackLastKey('recordPackLastKey'),
+  recordBackupHash('recordBackupHash'),
+
   /// a login received through sync still has no igneous of this device's own
   ehIgneousPending('ehIgneousPending'),
 
