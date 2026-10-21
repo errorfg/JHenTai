@@ -193,7 +193,7 @@ abstract class BaseLayout extends StatelessWidget {
               Text(
                 readPageState.parseImageHrefsStates[index] == LoadingState.error ? readPageState.parseImageHrefErrorMsg! : 'parsingPage'.tr,
               ).marginOnly(top: 8),
-              Text((index + 1).toString()).marginOnly(top: 4),
+              Text(readPageLogic.pageNumberOf(index).toString()).marginOnly(top: 4),
             ],
           ),
         ),
@@ -223,7 +223,7 @@ abstract class BaseLayout extends StatelessWidget {
               Text(
                 readPageState.parseImageUrlStates[index] == LoadingState.error ? readPageState.parseImageUrlErrorMsg[index]! : 'parsingURL'.tr,
               ).marginOnly(top: 8),
-              Text((index + 1).toString()).marginOnly(top: 4),
+              Text(readPageLogic.pageNumberOf(index).toString()).marginOnly(top: 4),
             ],
           ),
         ),
@@ -262,7 +262,7 @@ abstract class BaseLayout extends StatelessWidget {
       children: [
         CircularProgressIndicator(value: progress),
         Text('loading'.tr).marginOnly(top: 8),
-        Text((index + 1).toString()).marginOnly(top: 4),
+        Text(readPageLogic.pageNumberOf(index).toString()).marginOnly(top: 4),
       ],
     );
   }
@@ -279,7 +279,7 @@ abstract class BaseLayout extends StatelessWidget {
           text: Text('networkError'.tr, style: const TextStyle(color: UIConfig.readPageButtonColor)),
           onPressed: () => logic.readPageLogic.reloadImage(index),
         ),
-        Text((index + 1).toString()),
+        Text(readPageLogic.pageNumberOf(index).toString()),
       ],
     );
   }
@@ -382,7 +382,7 @@ abstract class BaseLayout extends StatelessWidget {
           if (downloadStatus == DownloadStatus.downloading) const CircularProgressIndicator(),
           if (downloadStatus == DownloadStatus.paused) const Icon(Icons.pause_circle_outline, color: UIConfig.readPageButtonColor),
           Text(downloadStatus == DownloadStatus.downloading ? 'parsingPage'.tr : 'paused'.tr).marginOnly(top: 8),
-          Text((index + 1).toString()).marginOnly(top: 4),
+          Text(readPageLogic.pageNumberOf(index).toString()).marginOnly(top: 4),
         ],
       ),
     );
@@ -401,7 +401,7 @@ abstract class BaseLayout extends StatelessWidget {
           if (downloadStatus == DownloadStatus.downloading) const CircularProgressIndicator(),
           if (downloadStatus == DownloadStatus.paused) const Icon(Icons.pause_circle_outline, color: UIConfig.readPageButtonColor),
           Text(downloadStatus == DownloadStatus.downloading ? 'parsingURL'.tr : 'paused'.tr).marginOnly(top: 8),
-          Text((index + 1).toString()).marginOnly(top: 4),
+          Text(readPageLogic.pageNumberOf(index).toString()).marginOnly(top: 4),
         ],
       ),
     );
@@ -453,7 +453,7 @@ abstract class BaseLayout extends StatelessWidget {
           children: [
             CircularProgressIndicator(value: max(downloadedBytes / totalBytes, 0.01)),
             Text('downloading'.tr).marginOnly(top: 8),
-            Text((index + 1).toString()),
+            Text(readPageLogic.pageNumberOf(index).toString()),
           ],
         );
       },
@@ -467,7 +467,7 @@ abstract class BaseLayout extends StatelessWidget {
       children: [
         const Icon(Icons.pause_circle_outline, color: UIConfig.readPageButtonColor),
         Text('paused'.tr).marginOnly(top: 8),
-        Text((index + 1).toString()),
+        Text(readPageLogic.pageNumberOf(index).toString()),
       ],
     );
   }
@@ -478,7 +478,7 @@ abstract class BaseLayout extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         UIConfig.loadingAnimation(context),
-        Text((index + 1).toString()),
+        Text(readPageLogic.pageNumberOf(index).toString()),
       ],
     );
   }
@@ -495,7 +495,7 @@ abstract class BaseLayout extends StatelessWidget {
           text: Text('error'.tr, style: const TextStyle(color: UIConfig.readPageButtonColor)),
           onPressed: state.reLoadImage,
         ),
-        Text((index + 1).toString()),
+        Text(readPageLogic.pageNumberOf(index).toString()),
       ],
     );
   }

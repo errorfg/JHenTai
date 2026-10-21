@@ -16,6 +16,7 @@ import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/model/gallery_image.dart';
 import 'package:jhentai/src/model/gallery_thumbnail.dart';
 import 'package:jhentai/src/model/read_page_info.dart';
+import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/pages/read/layout/horizontal_double_column/horizontal_double_column_layout_logic.dart';
 import 'package:jhentai/src/pages/read/layout/horizontal_page/horizontal_page_layout_logic.dart';
 import 'package:jhentai/src/pages/read/layout/vertical_list/vertical_list_layout_logic.dart';
@@ -30,6 +31,7 @@ import 'package:jhentai/src/service/sr/realtime_sr_service.dart';
 import 'package:jhentai/src/service/sr/sr_tools.dart';
 import 'package:jhentai/src/setting/read_setting.dart';
 import 'package:jhentai/src/setting/super_resolution_setting.dart';
+import 'package:jhentai/src/utils/eh_spider_parser.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 class _SilentLogService extends LogService {
@@ -52,6 +54,7 @@ ReadPageInfo _chapter(
   int chapter, {
   required List<String> shown,
   Future<ReadPageInfo?> Function({required bool next})? next,
+  Set<int> missing = const <int>{},
 }) {
   return ReadPageInfo(
     mode: ReadMode.online,
@@ -65,15 +68,23 @@ ReadPageInfo _chapter(
     thumbnails: <GalleryThumbnail?>[
       for (int i = 0; i < _pages; i++) GalleryThumbnail(href: 'test://$chapter/$i', isLarge: true, thumbUrl: ''),
     ],
+    // Pages [missing] are still to be found, as online pages are.
     images: <GalleryImage?>[
       for (int i = 0; i < _pages; i++)
-        GalleryImage(url: 'test://$chapter/$i', path: 'c$chapter-$i.png', downloadStatus: DownloadStatus.downloaded),
+        missing.contains(i) ? null : GalleryImage(url: 'test://$chapter/$i', path: 'c$chapter-$i.png', downloadStatus: DownloadStatus.downloaded),
     ],
     onShown: () => shown.add('Chapter $chapter'),
     useSuperResolution: false,
     loadSiblingBook: next,
     siblingsAreChapters: true,
   );
+}
+
+/// Image pages that are still being looked for.
+class _UnansweredImagePages extends EHRequest {
+  @override
+  Future<T> requestImagePage<T>(String href, {String? reloadKey, CancelToken? cancelToken, bool useCacheIfAvailable = true, required HtmlParser<T> parser}) =>
+      Completer<T>().future;
 }
 
 /// Where the upscaler programs are, from test/e2e/sr_e2e.json; null to skip
@@ -335,6 +346,38 @@ void main() {
     expect(progress['chapter-1']?.value, '${_pages - 1}');
     expect(progress['chapter-2']?.value, '0');
 
+    await tester.runAsync(() async {
+      Get.reset();
+      await appDb.close();
+    });
+  });
+
+  testWidgets('a page of the chapter that follows, still being found, shows its number in that chapter', (WidgetTester tester) async {
+    final List<String> shown = <String>[];
+    final ReadPageInfo first = _chapter(
+      1,
+      shown: shown,
+      next: ({required bool next}) async => next ? _chapter(2, shown: shown, missing: <int>{2}) : null,
+    );
+    final EHRequest appRequests = ehRequest;
+    ehRequest = _UnansweredImagePages();
+    addTearDown(() => ehRequest = appRequests);
+    final ReadPageLogic reader = await openReader(tester, first);
+    Get.find<VerticalListLayoutLogic>().state.itemScrollController.jumpTo(index: _pages - 1);
+    await settle(tester);
+    expect(reader.state.segments, hasLength(2));
+
+    Get.find<VerticalListLayoutLogic>().state.itemScrollController.jumpTo(index: _pages + 2);
+    await settle(tester);
+    expect(find.text('parsingURL'.tr), findsWidgets);
+    expect(find.text('3'), findsWidgets);
+    expect(find.text('${_pages + 3}'), findsNothing);
+
+    await tester.runAsync(() async {
+      Get.back();
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    await settle(tester);
     await tester.runAsync(() async {
       Get.reset();
       await appDb.close();
