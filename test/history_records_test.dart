@@ -142,5 +142,14 @@ void main() {
       expect(await readProgressService.takeOverFromOlderVersion(gid: 3500003, olderGid: 3400003, pageCount: 25), isFalse);
       expect(await readProgressService.getReadProgressEntryByKey('3500003'), isNull);
     });
+
+    test('progress cleared on it stays cleared when its page is opened again', () async {
+      await readProgressService.updateReadProgress('3400000', 14);
+      expect(await readProgressService.takeOverFromOlderVersion(gid: 3500000, olderGid: 3400000, pageCount: 25), isTrue);
+
+      await readProgressService.deleteReadProgress('3500000');
+      expect(await readProgressService.takeOverFromOlderVersion(gid: 3500000, olderGid: 3400000, pageCount: 25), isFalse);
+      expect(await readProgressService.getReadProgressEntryByKey('3500000'), isNull);
+    });
   });
 }

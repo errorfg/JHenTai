@@ -68,9 +68,10 @@ class ReadProgressService extends GetxController
   /// E-Hentai update gets another gid) and has no progress of its own
   /// starts where the older one was read, within its [pageCount]: 15 of 20
   /// read, the new version with 25 pages starts at 15. Completes with
-  /// whether it took over.
+  /// whether it took over. Progress cleared on the new version (the unread
+  /// marker) is a record of its own: the older version's is not taken again.
   Future<bool> takeOverFromOlderVersion({required int gid, required int olderGid, required int pageCount}) async {
-    if (gid == olderGid || await getReadProgressEntryByKey('$gid') != null) {
+    if (gid == olderGid || (await getProgressRecords({'$gid'})).isNotEmpty) {
       return false;
     }
     final ReadProgressEntry? older = await getReadProgressEntryByKey('$olderGid');
