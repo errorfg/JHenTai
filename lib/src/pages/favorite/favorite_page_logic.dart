@@ -198,6 +198,7 @@ class FavoritePageLogic extends BasePageLogic {
       return;
     }
 
+    dropPendingPages();
     state.loadingState = LoadingState.loading;
 
     state.gallerys.clear();
@@ -259,6 +260,7 @@ class FavoritePageLogic extends BasePageLogic {
       _loadLocalSourceFavorites();
     } else if (!userSetting.hasLoggedIn()) {
       // E-Hentai favorites need an account; nothing to request.
+      dropPendingPages();
       state.gallerys = [];
       state.prevGid = null;
       state.nextGid = null;
@@ -293,6 +295,8 @@ class FavoritePageLogic extends BasePageLogic {
       return handleClearAndRefresh();
     }
 
+    // The favorites of this device replace what was asked of a site.
+    dropPendingPages();
     List<Gallery> nhFavorites = nhentaiFavoriteService.getDisplayFavorites(
       sortOrder: state.favoriteSortOrder,
       searchConfig: state.searchConfig,
@@ -372,6 +376,8 @@ class FavoritePageLogic extends BasePageLogic {
           : null;
 
   Future<void> _loadLocalSourceFavorites() async {
+    // The favorites of this device replace what was asked of a site.
+    dropPendingPages();
     List<Gallery> favorites = _shownLocalSourceService!.getDisplayFavorites(
       sortOrder: state.favoriteSortOrder,
       searchConfig: state.searchConfig,

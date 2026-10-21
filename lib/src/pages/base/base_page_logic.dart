@@ -91,6 +91,41 @@ abstract class BasePageLogic extends GetxController with Scroll2TopLogicMixin {
     return loadBefore();
   }
 
+  /// Bumped when another list is asked for (another query, a list made on
+  /// the device): pages still on their way for the list before are dropped
+  /// when they come, and so are their failures.
+  int _listGeneration = 0;
+
+  /// Pages asked for so far are of a list no longer wanted.
+  @protected
+  void dropPendingPages() {
+    _listGeneration++;
+    // A pull-down refresh dropped so ends here.
+    if (state.refreshState == LoadingState.loading) {
+      state.refreshState = LoadingState.idle;
+      updateSafely([refreshStateId]);
+    }
+  }
+
+  /// Logs and shows that a request of the list failed.
+  void _reportFailure(String title, Object e) {
+    if (e is DioException) {
+      log.error(title, e.errorMsg);
+      snack(title, e.errorMsg ?? '', isShort: true);
+    } else if (e is EHSiteException) {
+      log.error(title, e.message);
+      snack(
+        title,
+        e.message,
+        isShort: true,
+        onPressed: e.referLink == null ? null : () => launchUrlString(e.referLink!, mode: LaunchMode.externalApplication),
+      );
+    } else {
+      log.error(title, e.toString());
+      snack(title, e.toString(), isShort: true);
+    }
+  }
+
   /// not clear current data before refresh
   /// [updateId] is for subclass to override
   Future<void> handleRefresh({String? updateId}) async {
@@ -101,35 +136,24 @@ abstract class BasePageLogic extends GetxController with Scroll2TopLogicMixin {
     state.refreshState = LoadingState.loading;
     updateSafely([refreshStateId]);
 
+    final int generation = _listGeneration;
     GalleryPageInfo galleryPage;
+    List<Gallery> gallerys;
     try {
       galleryPage = await getGalleryPage();
-    } on DioException catch (e) {
-      log.error('refreshGalleryFailed'.tr, e.errorMsg);
-      snack('refreshGalleryFailed'.tr, e.errorMsg ?? '', isShort: true);
-      state.refreshState = LoadingState.error;
-      updateSafely([refreshStateId]);
-      return;
-    } on EHSiteException catch (e) {
-      log.error('refreshGalleryFailed'.tr, e.message);
-      snack(
-        'refreshGalleryFailed'.tr,
-        e.message,
-        isShort: true,
-        onPressed: e.referLink == null ? null : () => launchUrlString(e.referLink!, mode: LaunchMode.externalApplication),
-      );
-      state.refreshState = LoadingState.error;
-      updateSafely([refreshStateId]);
-      return;
+      gallerys = await postHandleNewGallerys(galleryPage.gallerys, cleanDuplicate: false);
     } catch (e) {
-      log.error('refreshGalleryFailed'.tr, e.toString());
-      snack('refreshGalleryFailed'.tr, e.toString(), isShort: true);
+      if (generation != _listGeneration) {
+        return;
+      }
+      _reportFailure('refreshGalleryFailed'.tr, e);
       state.refreshState = LoadingState.error;
       updateSafely([refreshStateId]);
       return;
     }
-
-    List<Gallery> gallerys = await postHandleNewGallerys(galleryPage.gallerys, cleanDuplicate: false);
+    if (generation != _listGeneration) {
+      return;
+    }
 
     state.gallerys = gallerys;
     state.totalCount = galleryPage.totalCount;
@@ -155,11 +179,10 @@ abstract class BasePageLogic extends GetxController with Scroll2TopLogicMixin {
     }
   }
 
-  /// clear current data first, then refresh
+  /// clear current data first, then refresh; what is still on its way for
+  /// the list shown before (another query) is dropped
   Future<void> handleClearAndRefresh() async {
-    if (state.loadingState == LoadingState.loading) {
-      return;
-    }
+    dropPendingPages();
 
     state.loadingState = LoadingState.loading;
 
@@ -187,35 +210,24 @@ abstract class BasePageLogic extends GetxController with Scroll2TopLogicMixin {
     LoadingState prevState = state.loadingState;
     state.loadingState = LoadingState.loading;
 
+    final int generation = _listGeneration;
     GalleryPageInfo galleryPage;
+    List<Gallery> gallerys;
     try {
       galleryPage = await getGalleryPage(prevGid: state.prevGid);
-    } on DioException catch (e) {
-      log.error('getGallerysFailed'.tr, e.errorMsg);
-      snack('getGallerysFailed'.tr, e.errorMsg ?? '', isShort: true);
-      state.loadingState = prevState;
-      updateSafely([loadingStateId]);
-      return;
-    } on EHSiteException catch (e) {
-      log.error('getGallerysFailed'.tr, e.message);
-      snack(
-        'getGallerysFailed'.tr,
-        e.message,
-        isShort: true,
-        onPressed: e.referLink == null ? null : () => launchUrlString(e.referLink!, mode: LaunchMode.externalApplication),
-      );
-      state.loadingState = prevState;
-      updateSafely([loadingStateId]);
-      return;
+      gallerys = await postHandleNewGallerys(galleryPage.gallerys);
     } catch (e) {
-      log.error('getGallerysFailed'.tr, e.toString());
-      snack('getGallerysFailed'.tr, e.toString(), isShort: true);
+      if (generation != _listGeneration) {
+        return;
+      }
+      _reportFailure('getGallerysFailed'.tr, e);
       state.loadingState = prevState;
       updateSafely([loadingStateId]);
       return;
     }
-
-    List<Gallery> gallerys = await postHandleNewGallerys(galleryPage.gallerys);
+    if (generation != _listGeneration) {
+      return;
+    }
 
     state.gallerys.insertAll(0, gallerys);
     state.totalCount = galleryPage.totalCount;
@@ -236,35 +248,24 @@ abstract class BasePageLogic extends GetxController with Scroll2TopLogicMixin {
     state.loadingState = LoadingState.loading;
     updateSafely([loadingStateId]);
 
+    final int generation = _listGeneration;
     GalleryPageInfo galleryPage;
+    List<Gallery> gallerys;
     try {
       galleryPage = await getGalleryPage(nextGid: state.nextGid);
-    } on DioException catch (e) {
-      log.error('getGallerysFailed'.tr, e.errorMsg);
-      snack('getGallerysFailed'.tr, e.errorMsg ?? '', isShort: true);
-      state.loadingState = LoadingState.error;
-      updateSafely([loadingStateId]);
-      return;
-    } on EHSiteException catch (e) {
-      log.error('getGallerysFailed'.tr, e.message);
-      snack(
-        'getGallerysFailed'.tr,
-        e.message,
-        isShort: true,
-        onPressed: e.referLink == null ? null : () => launchUrlString(e.referLink!, mode: LaunchMode.externalApplication),
-      );
-      state.loadingState = LoadingState.error;
-      updateSafely([loadingStateId]);
-      return;
+      gallerys = await postHandleNewGallerys(galleryPage.gallerys);
     } catch (e) {
-      log.error('getGallerysFailed'.tr, e.toString());
-      snack('getGallerysFailed'.tr, e.toString(), isShort: true);
+      if (generation != _listGeneration) {
+        return;
+      }
+      _reportFailure('getGallerysFailed'.tr, e);
       state.loadingState = LoadingState.error;
       updateSafely([loadingStateId]);
       return;
     }
-
-    List<Gallery> gallerys = await postHandleNewGallerys(galleryPage.gallerys);
+    if (generation != _listGeneration) {
+      return;
+    }
 
     state.gallerys.addAll(gallerys);
     state.totalCount = galleryPage.totalCount;
@@ -295,10 +296,11 @@ abstract class BasePageLogic extends GetxController with Scroll2TopLogicMixin {
     await _jump(nextGid: '${gid + 1}');
   }
 
+  /// Lists from elsewhere; what is still on its way for the list shown
+  /// before is dropped.
   Future<void> _jump({String? nextGid, String? prevGid, DateTime? seek}) async {
-    if (state.loadingState == LoadingState.loading) {
-      return;
-    }
+    dropPendingPages();
+    final int generation = _listGeneration;
 
     state.gallerys.clear();
     state.loadingState = LoadingState.loading;
@@ -310,33 +312,22 @@ abstract class BasePageLogic extends GetxController with Scroll2TopLogicMixin {
     }
 
     GalleryPageInfo galleryPage;
+    List<Gallery> gallerys;
     try {
       galleryPage = await getGalleryPage(nextGid: nextGid, prevGid: prevGid, seek: seek);
-    } on DioException catch (e) {
-      log.error('getGallerysFailed'.tr, e.errorMsg);
-      snack('getGallerysFailed'.tr, e.errorMsg ?? '', isShort: true);
-      state.loadingState = LoadingState.error;
-      updateSafely([loadingStateId]);
-      return;
-    } on EHSiteException catch (e) {
-      log.error('getGallerysFailed'.tr, e.message);
-      snack(
-        'getGallerysFailed'.tr,
-        e.message,
-        isShort: true,
-        onPressed: e.referLink == null ? null : () => launchUrlString(e.referLink!, mode: LaunchMode.externalApplication),
-      );
-      state.loadingState = LoadingState.error;
-      updateSafely([loadingStateId]);
-      return;
+      gallerys = await postHandleNewGallerys(galleryPage.gallerys);
     } catch (e) {
-      log.error('getGallerysFailed'.tr, e.toString());
-      snack('getGallerysFailed'.tr, e.toString(), isShort: true);
+      if (generation != _listGeneration) {
+        return;
+      }
+      _reportFailure('getGallerysFailed'.tr, e);
+      state.loadingState = LoadingState.error;
       updateSafely([loadingStateId]);
       return;
     }
-
-    List<Gallery> gallerys = await postHandleNewGallerys(galleryPage.gallerys);
+    if (generation != _listGeneration) {
+      return;
+    }
 
     state.gallerys = gallerys;
     state.totalCount = galleryPage.totalCount;
