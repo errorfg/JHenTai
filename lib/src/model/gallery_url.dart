@@ -96,6 +96,28 @@ class GalleryUrl {
   /// A gallery of E-Hentai or ExHentai.
   bool get isEHGallery => source.kind == SourceKind.ehentai;
 
+  /// The gallery's key in data kept by key (read progress, double pages,
+  /// block rules, synced history): the site's key and number for E-Hentai,
+  /// nhentai and wnacg, whose numbers overlap ('nh:123'); the gid of a JM
+  /// or Tachiyomi gallery, which is unique already.
+  String get contentKey => switch (source.kind) {
+        SourceKind.ehentai || SourceKind.nhentai || SourceKind.wnacg => '${source.kind.key}:$gid',
+        SourceKind.jm || SourceKind.tachiyomi => '$gid',
+      };
+
+  /// What versions up to 8.1.1 kept such data under: the bare number, which
+  /// any of E-Hentai, nhentai and wnacg may have had; null where that is
+  /// [contentKey].
+  String? get legacyKey => contentKey == '$gid' ? null : '$gid';
+
+  /// [contentKey] and [legacyKey] of the gallery stored with the address
+  /// [url] and the number [gid]; the number alone when the address can not
+  /// be read.
+  static ({String key, String? legacy}) keysOf(String url, int gid) {
+    final GalleryUrl? parsed = tryParseStored(url);
+    return parsed == null ? (key: '$gid', legacy: null) : (key: parsed.contentKey, legacy: parsed.legacyKey);
+  }
+
   /// The manga of a Tachiyomi chapter (or the manga itself).
   GalleryUrl get tachiMangaUrl => GalleryUrl.tachiManga(tachiSource!, tachiMangaPath!);
 

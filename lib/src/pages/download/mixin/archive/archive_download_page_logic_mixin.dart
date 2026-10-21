@@ -1,3 +1,4 @@
+import 'package:jhentai/src/model/gallery_url.dart';
 import 'dart:io';
 
 import 'package:clipboard/clipboard.dart';
@@ -395,8 +396,8 @@ mixin ArchiveDownloadPageLogicMixin on GetxController
         readSetting.thirdPartyViewerPath.value != null) {
       openThirdPartyViewer(archiveDownloadService.computeArchiveUnpackingPath(archive));
     } else {
-      int readIndexRecord =
-          await readProgressService.getReadProgress(archive.gid);
+      final ({String key, String? legacy}) progress = GalleryUrl.keysOf(archive.galleryUrl, archive.gid);
+      int readIndexRecord = await readProgressService.getReadProgressOfKeys(progress.key, progress.legacy);
 
       List<GalleryImage> images =
           await archiveDownloadService.getUnpackedImages(archive.gid);
@@ -413,7 +414,8 @@ mixin ArchiveDownloadPageLogicMixin on GetxController
           initialIndex: readIndexRecord,
           pageCount: images.length,
           isOriginal: archive.isOriginal,
-          readProgressRecordStorageKey: archive.gid.toString(),
+          readProgressRecordStorageKey: progress.key,
+          legacyProgressKey: progress.legacy,
           images: images,
           useSuperResolution: superResolutionService.get(archive.gid, SuperResolutionType.archive) != null,
           readDirection: readDirection,

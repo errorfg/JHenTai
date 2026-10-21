@@ -114,42 +114,45 @@ void main() {
   });
 
   group('a new version of an E-Hentai gallery', () {
+    GalleryUrl eh(int gid) => GalleryUrl(isEH: true, gid: gid, token: 'abcdef1234');
+
     test('takes over the progress of the version it replaces, within its own pages', () async {
-      // Page 15 of the old version (index 14).
+      // Page 15 of the old version (index 14), as 8.1.1 kept it: under the bare number.
       await readProgressService.updateReadProgress('3400000', 14);
 
-      expect(await readProgressService.takeOverFromOlderVersion(gid: 3500000, olderGid: 3400000, pageCount: 25), isTrue);
-      expect(await readProgressService.getReadProgress(3500000), 14);
+      expect(await readProgressService.takeOverFromOlderVersion(url: eh(3500000), older: eh(3400000), pageCount: 25), isTrue);
+      expect(await readProgressService.getReadProgressOf(eh(3500000)), 14);
+      expect((await readProgressService.getProgressRecords({'eh:3500000'}))['eh:3500000']?.value, '14');
       // The old version keeps its own.
-      expect(await readProgressService.getReadProgress(3400000), 14);
+      expect(await readProgressService.getReadProgressOf(eh(3400000)), 14);
 
       // Fewer pages than were read: the last one.
-      await readProgressService.updateReadProgress('3400001', 30);
-      await readProgressService.takeOverFromOlderVersion(gid: 3500001, olderGid: 3400001, pageCount: 25);
-      expect(await readProgressService.getReadProgress(3500001), 24);
+      await readProgressService.updateReadProgress('eh:3400001', 30);
+      await readProgressService.takeOverFromOlderVersion(url: eh(3500001), older: eh(3400001), pageCount: 25);
+      expect(await readProgressService.getReadProgressOf(eh(3500001)), 24);
     });
 
     test('keeps its own progress, and takes nothing from an older version never read', () async {
-      await readProgressService.updateReadProgress('3400000', 14);
-      await readProgressService.updateReadProgress('3500000', 3);
-      expect(await readProgressService.takeOverFromOlderVersion(gid: 3500000, olderGid: 3400000, pageCount: 25), isFalse);
-      expect(await readProgressService.getReadProgress(3500000), 3);
+      await readProgressService.updateReadProgress('eh:3400000', 14);
+      await readProgressService.updateReadProgress('eh:3500000', 3);
+      expect(await readProgressService.takeOverFromOlderVersion(url: eh(3500000), older: eh(3400000), pageCount: 25), isFalse);
+      expect(await readProgressService.getReadProgressOf(eh(3500000)), 3);
 
       // Opened at its first page: that is progress of its own too.
-      await readProgressService.updateReadProgress('3500002', 0);
-      expect(await readProgressService.takeOverFromOlderVersion(gid: 3500002, olderGid: 3400000, pageCount: 25), isFalse);
+      await readProgressService.updateReadProgress('eh:3500002', 0);
+      expect(await readProgressService.takeOverFromOlderVersion(url: eh(3500002), older: eh(3400000), pageCount: 25), isFalse);
 
-      expect(await readProgressService.takeOverFromOlderVersion(gid: 3500003, olderGid: 3400003, pageCount: 25), isFalse);
-      expect(await readProgressService.getReadProgressEntryByKey('3500003'), isNull);
+      expect(await readProgressService.takeOverFromOlderVersion(url: eh(3500003), older: eh(3400003), pageCount: 25), isFalse);
+      expect(await readProgressService.getReadProgressEntryOf(eh(3500003)), isNull);
     });
 
     test('progress cleared on it stays cleared when its page is opened again', () async {
-      await readProgressService.updateReadProgress('3400000', 14);
-      expect(await readProgressService.takeOverFromOlderVersion(gid: 3500000, olderGid: 3400000, pageCount: 25), isTrue);
+      await readProgressService.updateReadProgress('eh:3400000', 14);
+      expect(await readProgressService.takeOverFromOlderVersion(url: eh(3500000), older: eh(3400000), pageCount: 25), isTrue);
 
-      await readProgressService.deleteReadProgress('3500000');
-      expect(await readProgressService.takeOverFromOlderVersion(gid: 3500000, olderGid: 3400000, pageCount: 25), isFalse);
-      expect(await readProgressService.getReadProgressEntryByKey('3500000'), isNull);
+      await readProgressService.deleteReadProgress('eh:3500000');
+      expect(await readProgressService.takeOverFromOlderVersion(url: eh(3500000), older: eh(3400000), pageCount: 25), isFalse);
+      expect(await readProgressService.getReadProgressEntryOf(eh(3500000)), isNull);
     });
   });
 }

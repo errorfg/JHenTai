@@ -43,6 +43,10 @@ class ReadPageInfo {
 
   String readProgressRecordStorageKey;
 
+  /// Where versions up to 8.1.1 kept the progress and double pages of the
+  /// book (see GalleryUrl.legacyKey), read while it has none of its own.
+  final String? legacyProgressKey;
+
   /// used for archive, local and remote; in online mode, pages already
   /// downloaded, the others null
   List<GalleryImage?>? images;
@@ -84,6 +88,7 @@ class ReadPageInfo {
     required this.pageCount,
     this.isOriginal = false,
     required this.readProgressRecordStorageKey,
+    this.legacyProgressKey,
     this.images,
     this.thumbnails,
     this.onShown,

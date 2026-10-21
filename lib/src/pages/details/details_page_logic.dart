@@ -1389,7 +1389,9 @@ class DetailsPageLogic extends GetxController
           initialIndex: await getReadIndexRecord(),
           pageCount: images.length,
           isOriginal: archive.isOriginal,
-          readProgressRecordStorageKey: archive.gid.toString(),
+          // An archive of the gallery: the gallery's progress.
+          readProgressRecordStorageKey: state.galleryUrl.contentKey,
+          legacyProgressKey: state.galleryUrl.legacyKey,
           images: images,
           useSuperResolution: superResolutionService.get(archive.gid, SuperResolutionType.archive) != null,
           readDirection: readDirection,
@@ -1922,9 +1924,7 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleResetReadProgress() async {
-    await readProgressService.deleteReadProgress(
-      state.galleryUrl.gid.toString(),
-    );
+    await readProgressService.deleteReadProgress(state.galleryUrl.contentKey);
     updateSafely([readButtonId]);
     toast('success'.tr);
   }
@@ -1936,7 +1936,8 @@ class DetailsPageLogic extends GetxController
         target: LocalBlockTargetEnum.gallery,
         attribute: LocalBlockAttributeEnum.gid,
         pattern: LocalBlockPatternEnum.equal,
-        expression: state.galleryUrl.gid.toString(),
+        // This site's gallery only, not another site's of the same number.
+        expression: state.galleryUrl.contentKey,
       ),
     );
     toast('blockGallerySuccess'.tr);
@@ -1971,7 +1972,8 @@ class DetailsPageLogic extends GetxController
             galleryTitle: mainTitleText,
             galleryUrl: state.galleryUrl.url,
             initialIndex: forceIndex ?? await getReadIndexRecord(),
-            readProgressRecordStorageKey: state.galleryUrl.gid.toString(),
+            readProgressRecordStorageKey: state.galleryUrl.contentKey,
+            legacyProgressKey: state.galleryUrl.legacyKey,
             pageCount: state.galleryDetails?.pageCount ?? state.gallery?.pageCount ?? state.galleryMetadata!.pageCount,
             useSuperResolution: false,
             readDirection: webtoonReadDirection,
@@ -2003,7 +2005,8 @@ class DetailsPageLogic extends GetxController
           galleryTitle: gallery.title,
           galleryUrl: gallery.galleryUrl,
           initialIndex: forceIndex ?? await getReadIndexRecord(),
-          readProgressRecordStorageKey: state.galleryUrl.gid.toString(),
+          readProgressRecordStorageKey: state.galleryUrl.contentKey,
+          legacyProgressKey: state.galleryUrl.legacyKey,
           pageCount: gallery.pageCount,
           useSuperResolution: superResolutionService.get(state.galleryUrl.gid, SuperResolutionType.gallery) != null,
           readDirection: webtoonReadDirection,
@@ -2095,9 +2098,8 @@ class DetailsPageLogic extends GetxController
       token: url.token,
       galleryTitle: chapter.title,
       galleryUrl: url.url,
-      initialIndex:
-          initialIndex ?? await readProgressService.getReadProgress(url.gid),
-      readProgressRecordStorageKey: url.gid.toString(),
+      initialIndex: initialIndex ?? await readProgressService.getReadProgressOf(url),
+      readProgressRecordStorageKey: url.contentKey,
       pageCount: chapter.pageCount,
       images: downloaded,
       thumbnails: chapter.pageThumbnails(),
@@ -2257,8 +2259,8 @@ class DetailsPageLogic extends GetxController
     }
     try {
       await readProgressService.takeOverFromOlderVersion(
-        gid: url.gid,
-        olderGid: parent.gid,
+        url: url,
+        older: parent,
         pageCount: state.galleryDetails!.pageCount,
       );
     } catch (e) {
@@ -2267,7 +2269,7 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<int> getReadIndexRecord() async {
-    return readProgressService.getReadProgress(state.galleryUrl.gid);
+    return readProgressService.getReadProgressOf(state.galleryUrl);
   }
 
   /// The history entry of this page. A multi-chapter series is one entry,

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:jhentai/src/database/database.dart' show LocalConfigCompanion;
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
+import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/service/jh_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
@@ -59,27 +60,42 @@ class ReadProgressService extends GetxController
   @override
   Future<void> doAfterBeanReady() async {}
 
-  /// Get read progress for a gallery with cache
-  Future<int> getReadProgress(int gid) async {
-    return getReadProgressByKey(gid.toString());
+  /// The progress of the gallery at [url]: under its own key, else, as
+  /// long as it has no record there (the unread marker is one), what
+  /// versions up to 8.1.1 kept under its bare number, which may be another
+  /// site's gallery of that number. That is not moved: it stays for each
+  /// gallery it may be, until each has its own.
+  Future<ReadProgressEntry?> getReadProgressEntryOf(GalleryUrl url) => getReadProgressEntryOfKeys(url.contentKey, url.legacyKey);
+
+  Future<int> getReadProgressOf(GalleryUrl url) async => (await getReadProgressEntryOf(url))?.pageIndex ?? 0;
+
+  /// [getReadProgressEntryOf] by [key] and [legacy] (GalleryUrl.keysOf).
+  Future<ReadProgressEntry?> getReadProgressEntryOfKeys(String key, String? legacy) async {
+    final ReadProgressEntry? own = await getReadProgressEntryByKey(key);
+    if (own != null || legacy == null || (await getProgressRecords({key})).isNotEmpty) {
+      return own;
+    }
+    return getReadProgressEntryByKey(legacy);
   }
 
-  /// A gallery that replaces an older version of itself ([olderGid]; an
+  Future<int> getReadProgressOfKeys(String key, String? legacy) async => (await getReadProgressEntryOfKeys(key, legacy))?.pageIndex ?? 0;
+
+  /// A gallery that replaces an older version of itself ([older]; an
   /// E-Hentai update gets another gid) and has no progress of its own
   /// starts where the older one was read, within its [pageCount]: 15 of 20
   /// read, the new version with 25 pages starts at 15. Completes with
   /// whether it took over. Progress cleared on the new version (the unread
   /// marker) is a record of its own: the older version's is not taken again.
-  Future<bool> takeOverFromOlderVersion({required int gid, required int olderGid, required int pageCount}) async {
-    if (gid == olderGid || (await getProgressRecords({'$gid'})).isNotEmpty) {
+  Future<bool> takeOverFromOlderVersion({required GalleryUrl url, required GalleryUrl older, required int pageCount}) async {
+    if (url.gid == older.gid || (await getReadProgressEntryOf(url)) != null || (await getProgressRecords({url.contentKey})).isNotEmpty) {
       return false;
     }
-    final ReadProgressEntry? older = await getReadProgressEntryByKey('$olderGid');
-    if (older == null) {
+    final ReadProgressEntry? olderEntry = await getReadProgressEntryOf(older);
+    if (olderEntry == null) {
       return false;
     }
-    final int index = pageCount > 0 ? older.pageIndex.clamp(0, pageCount - 1) : older.pageIndex;
-    await updateReadProgress('$gid', index);
+    final int index = pageCount > 0 ? olderEntry.pageIndex.clamp(0, pageCount - 1) : olderEntry.pageIndex;
+    await updateReadProgress(url.contentKey, index);
     return true;
   }
 

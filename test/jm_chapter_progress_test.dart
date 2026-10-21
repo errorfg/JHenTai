@@ -201,7 +201,7 @@ void main() {
     expect((await jmReadingService.albumProgress(100))!.fraction, closeTo(4 / 6, 1e-9));
     expect(await jmReadingService.lastOpenedChapter(100), 102);
     // A marked chapter re-read from the reader starts at its first page.
-    expect(await readProgressService.getReadProgress(100 + 9000000000), 0);
+    expect(await readProgressService.getReadProgressOf(GalleryUrl.jm(100)), 0);
 
     // Reading chapter 104 there shows up on the phone.
     await _read(104, page: 5, pageCount: 25);

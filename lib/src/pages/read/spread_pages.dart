@@ -84,7 +84,9 @@ class SpreadPages {
   }
 
   Future<void> _read(ReadSegment segment) async {
-    final String? text = await localConfigService.read(configKey: ConfigEnum.isSpreadPage, subConfigKey: segment.info.readProgressRecordStorageKey);
+    final String? legacy = segment.info.legacyProgressKey;
+    final String? text = await localConfigService.read(configKey: ConfigEnum.isSpreadPage, subConfigKey: segment.info.readProgressRecordStorageKey) ??
+        (legacy == null ? null : await localConfigService.read(configKey: ConfigEnum.isSpreadPage, subConfigKey: legacy));
     if (text == null) {
       return;
     }
