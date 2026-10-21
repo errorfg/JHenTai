@@ -196,45 +196,18 @@ jobs:
           cd ..
           sh dmg.sh
 
+      # The same scripts as Build & Release, which also check that the
+      # extension host is in the package.
       - name: Build Windows
         if: matrix.target == 'Windows'
-        run: |
-          flutter build windows -t lib/src/main.dart --release
-          $DestDir = "build\windows\JHenTai_${{ steps.get_version.outputs.version }}"
-          $SrcDir = "build\windows\x64\runner\Release"
-          New-Item -Path $DestDir -ItemType Directory
-          Copy-Item $SrcDir\* -Recurse $DestDir
-          Copy-Item -Filter *.dll -Path windows\* -Destination $DestDir -Force
-          Compress-Archive $DestDir build\windows\JHenTai_${{ steps.get_version.outputs.version }}_Windows.zip
+        run: ./.github/scripts/package_windows.ps1 -Version '${{ steps.get_version.outputs.version }}'
 
       - name: Build Linux Deb
         if: matrix.target == 'Linux-x64-deb' || matrix.target == 'Linux-arm64-deb'
         run: |
           sudo apt-get update -y
           sudo apt-get install -y ninja-build libfuse2 webkit2gtk-4.1
-
-          flutter build linux --release -t lib/src/main.dart
-
-          mkdir -p build/linux/JHenTai-${{ steps.get_version.outputs.version }}-Linux-${{ steps.get_version.outputs.arch }}
-          cd build/linux/JHenTai-${{ steps.get_version.outputs.version }}-Linux-${{ steps.get_version.outputs.arch }}
-          mkdir -p opt/jhentai
-          mkdir -p usr/share/applications
-          mkdir -p usr/share/icons/hicolor/512x512/apps
-          cp -r ../${{ steps.get_version.outputs.arch }}/release/bundle/* opt/jhentai
-          cp -r ../../../linux/assets/DEBIAN .
-          chmod 0755 DEBIAN/postinst
-          chmod 0755 DEBIAN/postrm
-
-          cp ../../../linux/assets/top.jtmonster.jhentai.desktop usr/share/applications
-          cp ../../../assets/icon/JHenTai_512.png usr/share/icons/hicolor/512x512/apps/top.jtmonster.jhentai.png
-
-          sed -i "/^Version: /s/Version: .*/Version: ${{ steps.get_version.outputs.version }}/" DEBIAN/control
-          if [ "${{ steps.get_version.outputs.arch }}" = "arm64" ]; then
-              sed -i "/^Architecture: /s/Architecture: .*/Architecture: arm64/" DEBIAN/control
-          fi
-
-          cd ..
-          dpkg-deb --build --root-owner-group JHenTai-${{ steps.get_version.outputs.version }}-Linux-${{ steps.get_version.outputs.arch }}
+          bash .github/scripts/package_linux_deb.sh '${{ steps.get_version.outputs.version }}' '${{ steps.get_version.outputs.arch }}'
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
