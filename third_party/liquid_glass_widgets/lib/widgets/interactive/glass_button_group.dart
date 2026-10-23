@@ -346,8 +346,12 @@ class GlassButtonGroup extends StatelessWidget {
           // on a wide pill. This matches iOS 26 toolbar feel.
           stretch: 0.15,
           // The lens over the pressed item shows the touch; a glow under the
-          // finger would wash the pill white.
+          // finger or the pressed button's white lift would wash the pill
+          // white. Nor does the whole pill grow: while it is scaled its
+          // premium refraction freezes into an opaque frosted face.
           glowColor: const Color(0x00000000),
+          ambientBaseLight: 0,
+          interactionScale: 1.0,
           child: _GlassGroupItemsRow(
             items: items!,
             direction: direction,

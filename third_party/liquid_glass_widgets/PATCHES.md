@@ -22,6 +22,8 @@ configured away, so:
   item, and the icon under it grows by `selectionMagnification` (1.15).
   Lifting the finger after a slide activates the item it is on; a press
   without a slide is still the item's own tap. The pill no longer glows under
-  the finger.
+  the finger, no longer turns white while pressed (`ambientBaseLight`), and
+  no longer grows as a whole (`interactionScale`): while scaled, its premium
+  refraction froze into an opaque frosted face.
 - `analysis_options.yaml` (new): the package is analyzed without the app's
   lints.
