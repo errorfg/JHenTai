@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
@@ -140,11 +141,10 @@ class _KomgaPageState extends State<KomgaPage> {
         }
         return false;
       },
+      // Scaffold for the drawer only: GlassScaffold has none.
       child: Scaffold(
         key: _scaffoldKey,
         backgroundColor: UIConfig.backGroundColor(context),
-        // The content scrolls under the glass buttons of the bar.
-        extendBodyBehindAppBar: true,
         drawer: MobileLeftDrawer(
           state: _drawerState,
           currentScheme: ContentScheme.komga,
@@ -152,97 +152,99 @@ class _KomgaPageState extends State<KomgaPage> {
           onDestinationSelected: _openJhentaiDestination,
           showSelectedDestination: false,
         ),
-        // Glass only on the controls above the content, icons of one group
-        // sharing one piece of glass (Apple's Human Interface Guidelines).
-        appBar: GlassAppBar(
-          // The buttons keep the theme's glass; the menus they open take the
-          // thicker glass around them (_menuGlass).
-          buttonSettings:
-              GlassThemeData.of(
-                context,
-              ).settingsFor(context)?.applyTo(const LiquidGlassSettings()) ??
-              const LiquidGlassSettings(),
-          leading: GlassButtonGroup.icons(
-            items: <GlassButtonGroupItem>[
-              GlassButtonGroupItem(
-                icon: const Icon(CupertinoIcons.sidebar_left),
-                label: MaterialLocalizations.of(context).openAppDrawerTooltip,
-                onTap: () => _scaffoldKey.currentState?.openDrawer(),
-              ),
-              if (canGoBack)
+        // The bars float over the content, which scrolls under them and fades
+        // at their edges; GlassScaffold renders their glass at premium.
+        // Glass only on these controls, the icons of one group sharing one
+        // piece (Apple's Human Interface Guidelines).
+        body: GlassScaffold(
+          backgroundColor: UIConfig.backGroundColor(context),
+          contentAwareBrightness: true,
+          appBar: GlassAppBar(
+            leading: GlassButtonGroup.icons(
+              items: <GlassButtonGroupItem>[
                 GlassButtonGroupItem(
-                  icon: const Icon(CupertinoIcons.back),
-                  label: MaterialLocalizations.of(context).backButtonTooltip,
-                  onTap: controller!.goBack,
+                  icon: const Icon(CupertinoIcons.sidebar_left),
+                  label: MaterialLocalizations.of(context).openAppDrawerTooltip,
+                  onTap: () => _scaffoldKey.currentState?.openDrawer(),
                 ),
-            ],
-          ),
-          title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis),
-          // A group holds one menu at most, so More is a group of its own.
-          actions: <Widget>[
-            InheritedLiquidGlass(
-              settings: _menuGlass(context),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  if (controller != null)
-                    GlassButtonGroup.icons(
-                      items: <GlassButtonGroupItem>[
-                        GlassButtonGroupItem(
-                          icon: const Icon(CupertinoIcons.search),
-                          label: 'komgaSearch'.tr,
-                          onTap: _openSearch,
-                        ),
-                        if (level != null && query != null)
-                          GlassButtonGroupItem.menu(
-                            // Filled while anything is filtered out, as in Photos.
-                            icon: Icon(
-                              filtered
-                                  ? CupertinoIcons
-                                        .line_horizontal_3_decrease_circle_fill
-                                  : CupertinoIcons
-                                        .line_horizontal_3_decrease_circle,
-                            ),
-                            label: 'komgaSortAndFilter'.tr,
-                            menuWidth: 260,
-                            menuItems: _sortAndFilterItems(
-                              controller,
-                              level,
-                              query,
-                            ),
-                          ),
-                      ],
+                if (canGoBack)
+                  GlassButtonGroupItem(
+                    icon: const Icon(CupertinoIcons.back),
+                    label: MaterialLocalizations.of(context).backButtonTooltip,
+                    onTap: controller!.goBack,
+                  ),
+              ],
+            ),
+            title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            // A group holds one menu at most, so More is a group of its own.
+            actions: <Widget>[
+              if (controller != null)
+                GlassButtonGroup.icons(
+                  items: <GlassButtonGroupItem>[
+                    GlassButtonGroupItem(
+                      icon: const Icon(CupertinoIcons.search),
+                      label: 'komgaSearch'.tr,
+                      onTap: _openSearch,
                     ),
-                  const SizedBox(width: 8),
-                  GlassButtonGroup.icons(
-                    items: <GlassButtonGroupItem>[
+                    if (level != null && query != null)
                       GlassButtonGroupItem.menu(
-                        icon: _syncingAll
-                            ? const SizedBox.square(
-                                dimension: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(CupertinoIcons.ellipsis),
-                        label: 'komgaMore'.tr,
+                        // Filled while anything is filtered out, as in Photos.
+                        icon: Icon(
+                          filtered
+                              ? CupertinoIcons
+                                    .line_horizontal_3_decrease_circle_fill
+                              : CupertinoIcons
+                                    .line_horizontal_3_decrease_circle,
+                        ),
+                        label: 'komgaSortAndFilter'.tr,
                         menuWidth: 260,
-                        menuItems: _moreItems(controller),
+                        menuItems: _sortAndFilterItems(
+                          controller,
+                          level,
+                          query,
+                        ),
                       ),
-                    ],
+                  ],
+                ),
+              const SizedBox(width: 8),
+              GlassButtonGroup.icons(
+                items: <GlassButtonGroupItem>[
+                  GlassButtonGroupItem.menu(
+                    icon: _syncingAll
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(CupertinoIcons.ellipsis),
+                    label: 'komgaMore'.tr,
+                    menuWidth: 260,
+                    menuItems: _moreItems(controller),
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
-        body: GlassScrollEdgeEffect(
-          topFadeHeight: MediaQuery.paddingOf(context).top + 64,
-          // Only a library or search has a switch floating at the bottom.
-          fadeBottom: level is KomgaListLevel,
-          bottomFadeHeight: MediaQuery.paddingOf(context).bottom + 72,
-          fadeColor: UIConfig.backGroundColor(context),
-          child: _buildBody(context),
+            ],
+          ),
+          bottomBar: level is KomgaListLevel
+              ? _targetBar(controller!, level)
+              : null,
+          bottomBarHeight: _targetBarHeight,
+          body: Builder(
+            // Clear of the bars: lists pad themselves by this.
+            builder: (BuildContext context) {
+              final MediaQueryData media = MediaQuery.of(context);
+              return MediaQuery(
+                data: media.copyWith(
+                  padding: media.padding.copyWith(
+                    top: media.padding.top + 44,
+                    bottom:
+                        media.padding.bottom +
+                        (level is KomgaListLevel ? _targetBarHeight : 0),
+                  ),
+                ),
+                child: _buildBody(context),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -396,21 +398,37 @@ class _KomgaPageState extends State<KomgaPage> {
     ),
   ];
 
-  /// Menus are larger and more opaque than the buttons that open them
-  /// (Apple's Human Interface Guidelines); the package's default menu glass
-  /// is a white of 12%.
-  static LiquidGlassSettings _menuGlass(BuildContext context) =>
-      LiquidGlassSettings(
-        blur: 16,
-        thickness: 10,
-        glassColor: Theme.of(context).brightness == Brightness.dark
-            ? const Color.fromRGBO(44, 44, 46, 0.6)
-            : const Color.fromRGBO(255, 255, 255, 0.6),
-        lightIntensity: 0.7,
-        ambientStrength: 0.4,
-        saturation: 1.2,
-        refractiveIndex: 0.7,
-      );
+  static const double _targetBarHeight = 60;
+
+  /// Series or all books of a library or search, floating at the bottom like
+  /// the Years/Months/All switch of Photos: a glass tab bar whose indicator
+  /// follows a drag.
+  Widget _targetBar(KomgaBrowseController controller, KomgaListLevel level) {
+    // GlassScaffold lifts the bar above Android's navigation bar only.
+    final double safeBottom = defaultTargetPlatform == TargetPlatform.android
+        ? 0
+        : MediaQuery.paddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.only(top: 8, bottom: 12 + safeBottom),
+      child: Center(
+        child: SizedBox(
+          width: 280,
+          child: GlassTabBar.inline(
+            key: const ValueKey<String>('komgaTargetToggle'),
+            tabs: <GlassTab>[
+              GlassTab(label: 'komgaSeriesView'.tr),
+              GlassTab(label: 'komgaAllBooksView'.tr),
+            ],
+            selectedIndex: level.query.target == KomgaTarget.series ? 0 : 1,
+            onTabSelected: (int index) => controller.setTarget(
+              level,
+              index == 0 ? KomgaTarget.series : KomgaTarget.books,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   static Widget _checkMark(bool checked) => SizedBox.square(
     dimension: 20,

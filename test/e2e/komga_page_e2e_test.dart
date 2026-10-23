@@ -118,7 +118,8 @@ void main() {
     await _waitFor(tester, find.text(TestLibrary.alpha));
     expect(find.byIcon(CupertinoIcons.line_horizontal_3_decrease_circle), findsOneWidget);
 
-    await tester.tap(find.text('全部书籍'));
+    // The glass tab bar draws its labels twice: under and in the indicator.
+    await tester.tap(find.text('全部书籍').first);
     await _waitFor(tester, find.textContaining(' vol '));
 
     // Back goes up inside Komga, then stays: Komga is not on top of a site.
