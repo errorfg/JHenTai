@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/l18n/locale_text.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/network/jh_request.dart';
 import 'package:jhentai/src/routes/getx_router_observer.dart';
@@ -162,12 +165,16 @@ void main(List<String> args) async {
     ),
   );
 
+  // Loads the glass shaders of the Komga page while the app starts.
+  unawaited(LiquidGlassWidgets.initialize());
+
   lifeCircleBeans = topologicalSort(lifeCircleBeans);
   for (JHLifeCircleBean bean in lifeCircleBeans) {
     await bean.initBean();
   }
 
-  runApp(const MyApp());
+  // Glass follows the app's light or dark theme, not only the system's.
+  runApp(LiquidGlassWidgets.wrap(child: const MyApp(), brightnessResolver: Theme.maybeBrightnessOf));
 }
 
 class MyApp extends StatelessWidget {

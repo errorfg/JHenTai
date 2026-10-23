@@ -1,14 +1,18 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
+import 'package:jhentai/src/model/komga/komga_browse_models.dart';
 import 'package:jhentai/src/model/komga/komga_models.dart';
+import 'package:jhentai/src/model/komga/komga_query.dart';
 import 'package:jhentai/src/model/read_page_info.dart';
 import 'package:jhentai/src/model/content_scheme.dart';
 import 'package:jhentai/src/model/tab_bar_icon.dart';
 import 'package:jhentai/src/network/komga_client.dart';
 import 'package:jhentai/src/pages/komga/komga_browse_controller.dart';
+import 'package:jhentai/src/pages/komga/komga_filter_sheet.dart';
 import 'package:jhentai/src/pages/komga/komga_home_view.dart';
 import 'package:jhentai/src/pages/komga/komga_item_widgets.dart';
 import 'package:jhentai/src/pages/komga/komga_list_view.dart';
@@ -26,10 +30,13 @@ import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/service/sync_service.dart';
 import 'package:jhentai/src/setting/komga_setting.dart';
+import 'package:jhentai/src/setting/scheme_setting.dart';
 import 'package:jhentai/src/setting/style_setting.dart';
 import 'package:jhentai/src/utils/route_util.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
 import 'package:jhentai/src/widget/eh_context_menu.dart';
+import 'package:jhentai/src/widget/will_pop_interceptor.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 class KomgaPage extends StatefulWidget {
   const KomgaPage({super.key, this.clientFactory = KomgaClient.fromSetting});
@@ -56,6 +63,7 @@ class _KomgaPageState extends State<KomgaPage> {
   @override
   void initState() {
     super.initState();
+    unawaited(schemeSetting.openOwnPage(ContentScheme.komga));
     _settingWorker = ever<int>(
       komgaSetting.revision,
       (_) => _reloadForSettingChange(),
@@ -68,6 +76,7 @@ class _KomgaPageState extends State<KomgaPage> {
 
   @override
   void dispose() {
+    unawaited(schemeSetting.closeOwnPage(ContentScheme.komga));
     _progressReloadTimer?.cancel();
     _progressListenerDisposer();
     _settingWorker.dispose();
@@ -110,21 +119,32 @@ class _KomgaPageState extends State<KomgaPage> {
   Widget build(BuildContext context) {
     final KomgaBrowseController? controller = _controller;
     final bool canGoBack = controller?.canGoBack ?? false;
-    return PopScope(
-      canPop: !canGoBack,
-      onPopInvokedWithResult: (bool didPop, dynamic _) {
-        if (didPop) {
-          return;
-        }
+    final KomgaLevel? level = controller?.current;
+    final KomgaQuery? query = switch (level) {
+      final KomgaListLevel level => level.query,
+      final KomgaSeriesLevel level => level.query,
+      _ => null,
+    };
+    final bool filtered =
+        query != null &&
+        (query.progress != KomgaProgressFilter.all || !query.filters.isEmpty);
+    return SchemePagePopScope(
+      onBack: () {
         if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
           _scaffoldKey.currentState?.closeDrawer();
-        } else {
-          controller?.goBack();
+          return true;
         }
+        if (controller?.canGoBack ?? false) {
+          controller!.goBack();
+          return true;
+        }
+        return false;
       },
       child: Scaffold(
         key: _scaffoldKey,
         backgroundColor: UIConfig.backGroundColor(context),
+        // The content scrolls under the glass buttons of the bar.
+        extendBodyBehindAppBar: true,
         drawer: MobileLeftDrawer(
           state: _drawerState,
           currentScheme: ContentScheme.komga,
@@ -132,66 +152,305 @@ class _KomgaPageState extends State<KomgaPage> {
           onDestinationSelected: _openJhentaiDestination,
           showSelectedDestination: false,
         ),
-        appBar: AppBar(
-          leadingWidth: canGoBack ? 96 : null,
-          leading: canGoBack
-              ? Row(
-                  children: <Widget>[
-                    IconButton(
-                      tooltip: MaterialLocalizations.of(
-                        context,
-                      ).openAppDrawerTooltip,
-                      onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                      icon: const Icon(Icons.menu),
-                    ),
-                    IconButton(
-                      tooltip: MaterialLocalizations.of(
-                        context,
-                      ).backButtonTooltip,
-                      onPressed: controller!.goBack,
-                      icon: const Icon(Icons.arrow_back),
-                    ),
-                  ],
-                )
-              : null,
-          title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis),
-          actions: <Widget>[
-            if (controller != null)
-              IconButton(
-                key: const ValueKey<String>('komgaSearchButton'),
-                tooltip: 'komgaSearch'.tr,
-                onPressed: _openSearch,
-                icon: const Icon(Icons.search),
+        // Glass only on the controls above the content, icons of one group
+        // sharing one piece of glass (Apple's Human Interface Guidelines).
+        appBar: GlassAppBar(
+          // The buttons keep the theme's glass; the menus they open take the
+          // thicker glass around them (_menuGlass).
+          buttonSettings:
+              GlassThemeData.of(
+                context,
+              ).settingsFor(context)?.applyTo(const LiquidGlassSettings()) ??
+              const LiquidGlassSettings(),
+          leading: GlassButtonGroup.icons(
+            items: <GlassButtonGroupItem>[
+              GlassButtonGroupItem(
+                icon: const Icon(CupertinoIcons.sidebar_left),
+                label: MaterialLocalizations.of(context).openAppDrawerTooltip,
+                onTap: () => _scaffoldKey.currentState?.openDrawer(),
               ),
-            IconButton(
-              key: const ValueKey<String>('komgaImportProgressButton'),
-              tooltip: 'komgaImportProgress'.tr,
-              onPressed: controller == null || _syncingAll
-                  ? null
-                  : _syncAllProgress,
-              icon: _syncingAll
-                  ? const SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.cloud_sync_outlined),
-            ),
-            IconButton(
-              tooltip: 'refresh'.tr,
-              onPressed: controller == null ? null : _syncProgressAndRefresh,
-              icon: const Icon(Icons.refresh),
-            ),
-            IconButton(
-              key: const ValueKey<String>('komgaSettingsButton'),
-              tooltip: 'komgaSettings'.tr,
-              onPressed: _openSettings,
-              icon: const Icon(Icons.settings_outlined),
+              if (canGoBack)
+                GlassButtonGroupItem(
+                  icon: const Icon(CupertinoIcons.back),
+                  label: MaterialLocalizations.of(context).backButtonTooltip,
+                  onTap: controller!.goBack,
+                ),
+            ],
+          ),
+          title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis),
+          // A group holds one menu at most, so More is a group of its own.
+          actions: <Widget>[
+            InheritedLiquidGlass(
+              settings: _menuGlass(context),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  if (controller != null)
+                    GlassButtonGroup.icons(
+                      items: <GlassButtonGroupItem>[
+                        GlassButtonGroupItem(
+                          icon: const Icon(CupertinoIcons.search),
+                          label: 'komgaSearch'.tr,
+                          onTap: _openSearch,
+                        ),
+                        if (level != null && query != null)
+                          GlassButtonGroupItem.menu(
+                            // Filled while anything is filtered out, as in Photos.
+                            icon: Icon(
+                              filtered
+                                  ? CupertinoIcons
+                                        .line_horizontal_3_decrease_circle_fill
+                                  : CupertinoIcons
+                                        .line_horizontal_3_decrease_circle,
+                            ),
+                            label: 'komgaSortAndFilter'.tr,
+                            menuWidth: 260,
+                            menuItems: _sortAndFilterItems(
+                              controller,
+                              level,
+                              query,
+                            ),
+                          ),
+                      ],
+                    ),
+                  const SizedBox(width: 8),
+                  GlassButtonGroup.icons(
+                    items: <GlassButtonGroupItem>[
+                      GlassButtonGroupItem.menu(
+                        icon: _syncingAll
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(CupertinoIcons.ellipsis),
+                        label: 'komgaMore'.tr,
+                        menuWidth: 260,
+                        menuItems: _moreItems(controller),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),
-        body: _buildBody(context),
+        body: GlassScrollEdgeEffect(
+          topFadeHeight: MediaQuery.paddingOf(context).top + 64,
+          // Only a library or search has a switch floating at the bottom.
+          fadeBottom: level is KomgaListLevel,
+          bottomFadeHeight: MediaQuery.paddingOf(context).bottom + 72,
+          fadeColor: UIConfig.backGroundColor(context),
+          child: _buildBody(context),
+        ),
       ),
     );
+  }
+
+  /// Sort orders first, then reading status and display as submenus and the
+  /// metadata filters, as in the sort and filter menu of Photos. Picking the
+  /// current order again reverses it, as in Files.
+  List<Widget> _sortAndFilterItems(
+    KomgaBrowseController controller,
+    KomgaLevel level,
+    KomgaQuery query,
+  ) {
+    final List<KomgaSortMode> sortModes = <KomgaSortMode>[
+      if (query.hasSearch) KomgaSortMode.relevance,
+      if (query.target != KomgaTarget.series) KomgaSortMode.number,
+      KomgaSortMode.addedAt,
+      KomgaSortMode.lastReadAt,
+      KomgaSortMode.title,
+    ];
+    final List<KomgaProgressFilter> progressFilters = <KomgaProgressFilter>[
+      KomgaProgressFilter.all,
+      KomgaProgressFilter.unread,
+      KomgaProgressFilter.inProgress,
+      KomgaProgressFilter.read,
+      if (level is KomgaListLevel && level.library != null)
+        KomgaProgressFilter.newlyAdded,
+    ];
+    final KomgaDisplayMode display = controller.preferences.displayMode;
+    return <Widget>[
+      GlassMenuLabel(title: 'komgaSortBy'.tr),
+      for (final KomgaSortMode mode in sortModes)
+        GlassMenuItem(
+          title: sortModeLabel(mode),
+          icon: _checkMark(mode == query.sortMode),
+          trailing: mode == query.sortMode && mode != KomgaSortMode.relevance
+              ? Icon(
+                  query.descending
+                      ? CupertinoIcons.arrow_down
+                      : CupertinoIcons.arrow_up,
+                  size: 16,
+                )
+              : null,
+          onTap: () {
+            if (mode != query.sortMode) {
+              controller.setSort(
+                level,
+                mode,
+                mode != KomgaSortMode.title && mode != KomgaSortMode.number,
+              );
+            } else if (mode != KomgaSortMode.relevance) {
+              controller.setSort(level, mode, !query.descending);
+            }
+          },
+        ),
+      const GlassMenuDivider(),
+      GlassMenuItem(
+        title: 'komgaReadingStatus'.tr,
+        subtitle: progressFilterLabel(query.progress),
+        icon: const Icon(CupertinoIcons.book),
+        onTap: () {},
+        submenu: <Widget>[
+          for (final KomgaProgressFilter progress in progressFilters)
+            GlassMenuItem(
+              title: progressFilterLabel(progress),
+              icon: _checkMark(progress == query.progress),
+              onTap: () => controller.setProgressFilter(level, progress),
+            ),
+        ],
+      ),
+      GlassMenuItem(
+        title: 'komgaDisplayMode'.tr,
+        subtitle: _displayModeLabel(display),
+        icon: Icon(_displayModeIcon(display)),
+        onTap: () {},
+        submenu: <Widget>[
+          for (final KomgaDisplayMode mode in KomgaDisplayMode.values)
+            GlassMenuItem(
+              title: _displayModeLabel(mode),
+              icon: _checkMark(mode == display),
+              trailing: Icon(_displayModeIcon(mode), size: 18),
+              onTap: () => controller.setDisplayMode(mode),
+            ),
+        ],
+      ),
+      if (level is KomgaListLevel)
+        GlassMenuItem(
+          key: const ValueKey<String>('komgaFilterButton'),
+          title: 'komgaFilters'.tr,
+          icon: const Icon(CupertinoIcons.slider_horizontal_3),
+          trailing: query.filters.isEmpty
+              ? null
+              : Text(query.filters.count.toString()),
+          onTap: () => _openFilterSheet(level),
+        ),
+      if (query.progress != KomgaProgressFilter.all ||
+          !query.filters.isEmpty) ...<Widget>[
+        const GlassMenuDivider(),
+        GlassMenuItem(
+          title: 'komgaClearAllFilters'.tr,
+          icon: const Icon(CupertinoIcons.xmark_circle),
+          isDestructive: true,
+          onTap: () => _clearFilters(controller, level),
+        ),
+      ],
+    ];
+  }
+
+  /// Series actions on a series, then the page's own.
+  List<Widget> _moreItems(KomgaBrowseController? controller) => <Widget>[
+    if (controller?.current case final KomgaSeriesLevel level) ...<Widget>[
+      GlassMenuItem(
+        title: 'komgaMarkSeriesRead'.tr,
+        icon: const Icon(CupertinoIcons.checkmark_circle),
+        onTap: () =>
+            _runSeriesAction(level.series, KomgaSeriesAction.markRead),
+      ),
+      GlassMenuItem(
+        title: 'komgaMarkSeriesUnread'.tr,
+        icon: const Icon(CupertinoIcons.circle),
+        onTap: () =>
+            _runSeriesAction(level.series, KomgaSeriesAction.markUnread),
+      ),
+      GlassMenuItem(
+        title: 'komgaDownloadSeries'.tr,
+        icon: const Icon(CupertinoIcons.arrow_down_circle),
+        onTap: () =>
+            _runSeriesAction(level.series, KomgaSeriesAction.download),
+      ),
+      const GlassMenuDivider(),
+    ],
+    GlassMenuItem(
+      key: const ValueKey<String>('komgaImportProgressButton'),
+      title: 'komgaImportProgress'.tr,
+      maxLines: 2,
+      icon: const Icon(CupertinoIcons.arrow_2_circlepath),
+      enabled: controller != null && !_syncingAll,
+      onTap: _syncAllProgress,
+    ),
+    GlassMenuItem(
+      title: 'refresh'.tr,
+      icon: const Icon(CupertinoIcons.refresh),
+      enabled: controller != null,
+      onTap: _syncProgressAndRefresh,
+    ),
+    GlassMenuItem(
+      key: const ValueKey<String>('komgaSettingsButton'),
+      title: 'komgaSettings'.tr,
+      icon: const Icon(CupertinoIcons.gear),
+      onTap: _openSettings,
+    ),
+  ];
+
+  /// Menus are larger and more opaque than the buttons that open them
+  /// (Apple's Human Interface Guidelines); the package's default menu glass
+  /// is a white of 12%.
+  static LiquidGlassSettings _menuGlass(BuildContext context) =>
+      LiquidGlassSettings(
+        blur: 16,
+        thickness: 10,
+        glassColor: Theme.of(context).brightness == Brightness.dark
+            ? const Color.fromRGBO(44, 44, 46, 0.6)
+            : const Color.fromRGBO(255, 255, 255, 0.6),
+        lightIntensity: 0.7,
+        ambientStrength: 0.4,
+        saturation: 1.2,
+        refractiveIndex: 0.7,
+      );
+
+  static Widget _checkMark(bool checked) => SizedBox.square(
+    dimension: 20,
+    child: checked ? const Icon(CupertinoIcons.checkmark, size: 18) : null,
+  );
+
+  static String _displayModeLabel(KomgaDisplayMode mode) => switch (mode) {
+    KomgaDisplayMode.grid => 'komgaCardView'.tr,
+    KomgaDisplayMode.list => 'komgaListView'.tr,
+    KomgaDisplayMode.detail => 'komgaDetailView'.tr,
+  };
+
+  static IconData _displayModeIcon(KomgaDisplayMode mode) => switch (mode) {
+    KomgaDisplayMode.grid => CupertinoIcons.square_grid_2x2,
+    KomgaDisplayMode.list => CupertinoIcons.list_bullet,
+    KomgaDisplayMode.detail => CupertinoIcons.rectangle_grid_1x2,
+  };
+
+  Future<void> _openFilterSheet(KomgaListLevel level) async {
+    final KomgaBrowseController controller = _controller!;
+    final KomgaFilters? result = await showKomgaFilterSheet(
+      context,
+      controller: controller,
+      libraryId: level.query.libraryId,
+      target: level.query.target,
+      initial: level.query.filters,
+    );
+    if (result != null && identical(controller, _controller)) {
+      await controller.setFilters(level, result);
+    }
+  }
+
+  Future<void> _clearFilters(
+    KomgaBrowseController controller,
+    KomgaLevel level,
+  ) async {
+    await controller.setProgressFilter(level, KomgaProgressFilter.all);
+    if (level is KomgaListLevel) {
+      await controller.setFilters(level, const KomgaFilters());
+    }
   }
 
   String get _title {
@@ -245,8 +504,6 @@ class _KomgaPageState extends State<KomgaPage> {
           views: KomgaItemViews(context, controller.client, actions),
           onContinue: _openBook,
           onFilter: controller.openFilter,
-          onSeriesAction: (KomgaSeriesAction action) =>
-              _runSeriesAction(level.series, action),
         ),
       ),
       KomgaDownloadsLevel() => KomgaDownloadsView(

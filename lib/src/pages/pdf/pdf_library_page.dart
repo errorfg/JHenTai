@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -7,11 +8,13 @@ import 'package:jhentai/src/model/content_scheme.dart';
 import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/service/pdf_service.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
+import 'package:jhentai/src/setting/scheme_setting.dart';
 import 'package:jhentai/src/utils/route_util.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
 import 'package:jhentai/src/widget/eh_image.dart';
 import 'package:jhentai/src/widget/loading_state_indicator.dart';
 import 'package:jhentai/src/widget/scheme_header.dart';
+import 'package:jhentai/src/widget/will_pop_interceptor.dart';
 
 class PdfLibraryPage extends StatefulWidget {
   const PdfLibraryPage({super.key});
@@ -21,11 +24,13 @@ class PdfLibraryPage extends StatefulWidget {
 }
 
 class _PdfLibraryPageState extends State<PdfLibraryPage> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String? _openingPath;
 
   @override
   void initState() {
     super.initState();
+    unawaited(schemeSetting.openOwnPage(ContentScheme.pdf));
     if (!Get.isRegistered<PdfService>()) {
       Get.put<PdfService>(pdfService, permanent: true);
     }
@@ -33,24 +38,40 @@ class _PdfLibraryPageState extends State<PdfLibraryPage> {
   }
 
   @override
+  void dispose() {
+    unawaited(schemeSetting.closeOwnPage(ContentScheme.pdf));
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: const SchemeDrawer(current: ContentScheme.pdf),
-      appBar: AppBar(
-        title: Text('pdfLibrary'.tr),
-        actions: [
-          IconButton(
-            tooltip: 'refresh'.tr,
-            onPressed: pdfService.loadingState == LoadingState.loading
-                ? null
-                : pdfService.refresh,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
-      body: GetBuilder<PdfService>(
-        init: pdfService,
-        builder: (_) => _buildBody(context),
+    return SchemePagePopScope(
+      onBack: () {
+        if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
+          _scaffoldKey.currentState?.closeDrawer();
+          return true;
+        }
+        return false;
+      },
+      child: Scaffold(
+        key: _scaffoldKey,
+        drawer: const SchemeDrawer(current: ContentScheme.pdf),
+        appBar: AppBar(
+          title: Text('pdfLibrary'.tr),
+          actions: [
+            IconButton(
+              tooltip: 'refresh'.tr,
+              onPressed: pdfService.loadingState == LoadingState.loading
+                  ? null
+                  : pdfService.refresh,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+        body: GetBuilder<PdfService>(
+          init: pdfService,
+          builder: (_) => _buildBody(context),
+        ),
       ),
     );
   }
