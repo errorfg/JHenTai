@@ -7,10 +7,8 @@ import 'package:jhentai/src/network/komga_client.dart';
 import 'package:jhentai/src/pages/komga/komga_browse_controller.dart';
 import 'package:jhentai/src/pages/komga/komga_item_widgets.dart';
 import 'package:jhentai/src/pages/komga/komga_paged_loader.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
-/// A paged series or book list; on a library or search, with the series/books
-/// switch floating at its bottom. [header] is shown above the items (the
+/// A paged series or book list. [header] is shown above the items (the
 /// series header on a series level).
 class KomgaListView extends StatefulWidget {
   const KomgaListView({
@@ -115,11 +113,10 @@ class _KomgaListViewState extends State<KomgaListView> {
             ),
           );
 
-    // The page's bar floats over the top of the list, the series/books
-    // switch over its bottom.
+    // The page's bars float over the top and bottom of the list; the
+    // padding clears them.
     final EdgeInsets inset = MediaQuery.paddingOf(context);
-    final KomgaLevel level = widget.level;
-    final Widget list = RefreshIndicator(
+    return RefreshIndicator(
       onRefresh: widget.onRefresh,
       edgeOffset: inset.top,
       child: CustomScrollView(
@@ -135,43 +132,9 @@ class _KomgaListViewState extends State<KomgaListView> {
             SliverToBoxAdapter(child: _activeFilters()),
           body,
           SliverToBoxAdapter(child: _footer(context)),
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: inset.bottom + (level is KomgaListLevel ? 72 : 0),
-            ),
-          ),
+          SliverToBoxAdapter(child: SizedBox(height: inset.bottom)),
         ],
       ),
-    );
-    if (level is! KomgaListLevel) {
-      return list;
-    }
-    return Stack(
-      children: <Widget>[
-        list,
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: inset.bottom + 12,
-          child: Center(
-            child: SizedBox(
-              width: 280,
-              child: GlassSegmentedControl(
-                key: const ValueKey<String>('komgaTargetToggle'),
-                segments: <GlassSegment>[
-                  GlassSegment(label: 'komgaSeriesView'.tr),
-                  GlassSegment(label: 'komgaAllBooksView'.tr),
-                ],
-                selectedIndex: _query.target == KomgaTarget.series ? 0 : 1,
-                onSegmentSelected: (int index) => _controller.setTarget(
-                  level,
-                  index == 0 ? KomgaTarget.series : KomgaTarget.books,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 
