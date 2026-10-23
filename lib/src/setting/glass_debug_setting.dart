@@ -138,6 +138,13 @@ class GlassDebugSetting with JHLifeCircleBeanWithConfigStorage implements JHLife
   final Rx<GlassScrollEdgeStyle> edgeStyle = GlassScrollEdgeStyle.soft.obs;
   final RxBool performanceOverlay = false.obs;
 
+  /// Growth of what lies under the selection lens: group icons and the
+  /// switch's labels.
+  final RxDouble lensMagnification = 1.15.obs;
+
+  /// Opacity of the switch's selected pill at rest; the package uses 0.1.
+  final RxDouble restingPill = 0.1.obs;
+
   @override
   ConfigEnum get configEnum => ConfigEnum.glassDebugSetting;
 
@@ -153,6 +160,8 @@ class GlassDebugSetting with JHLifeCircleBeanWithConfigStorage implements JHLife
     contentAwareBrightness.value = map['contentAwareBrightness'] != false;
     edgeStyle.value = GlassScrollEdgeStyle.values.firstWhereOrNull((GlassScrollEdgeStyle s) => s.name == map['edgeStyle']) ?? GlassScrollEdgeStyle.soft;
     performanceOverlay.value = map['performanceOverlay'] == true;
+    lensMagnification.value = (map['lensMagnification'] as num?)?.toDouble() ?? 1.15;
+    restingPill.value = (map['restingPill'] as num?)?.toDouble() ?? 0.1;
   }
 
   @override
@@ -165,6 +174,8 @@ class GlassDebugSetting with JHLifeCircleBeanWithConfigStorage implements JHLife
     'contentAwareBrightness': contentAwareBrightness.value,
     'edgeStyle': edgeStyle.value.name,
     'performanceOverlay': performanceOverlay.value,
+    'lensMagnification': lensMagnification.value,
+    'restingPill': restingPill.value,
   });
 
   @override
@@ -184,6 +195,8 @@ class GlassDebugSetting with JHLifeCircleBeanWithConfigStorage implements JHLife
     contentAwareBrightness.value = true;
     edgeStyle.value = GlassScrollEdgeStyle.soft;
     performanceOverlay.value = false;
+    lensMagnification.value = 1.15;
+    restingPill.value = 0.1;
     return saveBeanConfig();
   }
 }

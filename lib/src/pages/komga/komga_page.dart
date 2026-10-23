@@ -170,6 +170,7 @@ class _KomgaPageState extends State<KomgaPage> {
             edgeStyle: glassDebugSetting.edgeStyle.value,
             appBar: GlassAppBar(
               leading: GlassButtonGroup.icons(
+                selectionMagnification: glassDebugSetting.lensMagnification.value,
                 quality: barQuality,
                 settings: barGlass,
                 items: <GlassButtonGroupItem>[
@@ -199,6 +200,7 @@ class _KomgaPageState extends State<KomgaPage> {
                     children: <Widget>[
                       if (controller != null)
                         GlassButtonGroup.icons(
+                          selectionMagnification: glassDebugSetting.lensMagnification.value,
                           quality: barQuality,
                           settings: barGlass,
                           items: <GlassButtonGroupItem>[
@@ -229,6 +231,7 @@ class _KomgaPageState extends State<KomgaPage> {
                         ),
                       const SizedBox(width: 8),
                       GlassButtonGroup.icons(
+                        selectionMagnification: glassDebugSetting.lensMagnification.value,
                         quality: barQuality,
                         settings: barGlass,
                         items: <GlassButtonGroupItem>[
@@ -448,10 +451,6 @@ class _KomgaPageState extends State<KomgaPage> {
               level,
               index == 0 ? KomgaTarget.series : KomgaTarget.books,
             ),
-            // The lens shows the touch: the label under it grows, and no glow
-            // under the finger washes the track white.
-            magnification: 1.15,
-            interactionGlowColor: const Color(0x00000000),
           ),
         ),
       ),

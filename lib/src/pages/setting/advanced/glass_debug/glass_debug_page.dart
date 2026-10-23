@@ -32,6 +32,23 @@ class GlassDebugPage extends StatelessWidget {
                   const _Header('顶栏按钮与底部切换栏'),
                   _quality(glassDebugSetting.barQuality),
                   ..._params(glassDebugSetting.bar, GlassParams.barDefaults),
+                  const _Header('按下时的透镜'),
+                  _ParamSlider(
+                    label: '透镜下放大',
+                    min: 1,
+                    max: 1.4,
+                    value: glassDebugSetting.lensMagnification.value,
+                    onChanged: (double v) => glassDebugSetting.lensMagnification.value = v,
+                    onChangeEnd: (_) => glassDebugSetting.save(),
+                  ),
+                  _ParamSlider(
+                    label: '切换栏选中底色',
+                    min: 0,
+                    max: 0.4,
+                    value: glassDebugSetting.restingPill.value,
+                    onChanged: (double v) => glassDebugSetting.restingPill.value = v,
+                    onChangeEnd: (_) => glassDebugSetting.save(),
+                  ),
                   const _Header('菜单'),
                   _quality(glassDebugSetting.menuQuality),
                   ..._params(glassDebugSetting.menu, GlassParams.menuDefaults),
@@ -200,6 +217,9 @@ class _PreviewState extends State<_Preview> {
             right: 12,
             child: komgaMenuGlass(
               GlassButtonGroup.icons(
+                selectionMagnification: glassDebugSetting.lensMagnification.value,
+                // Outside GlassScaffold, premium glass needs a layer of its own.
+                useOwnLayer: true,
                 quality: barQuality,
                 settings: barGlass,
                 items: [
@@ -223,6 +243,9 @@ class _PreviewState extends State<_Preview> {
             top: 12,
             left: 12,
             child: GlassButtonGroup.icons(
+              selectionMagnification: glassDebugSetting.lensMagnification.value,
+              // Outside GlassScaffold, premium glass needs a layer of its own.
+              useOwnLayer: true,
               quality: barQuality,
               settings: barGlass,
               items: [
@@ -281,6 +304,9 @@ Widget komgaTargetSwitch({Key? key, required int selectedIndex, required List<St
     key: key,
     quality: quality,
     settings: glass,
+    magnification: glassDebugSetting.lensMagnification.value,
+    interactionGlowColor: const Color(0x00000000),
+    indicatorColor: (Get.isDarkMode ? Colors.white : Colors.black).withValues(alpha: glassDebugSetting.restingPill.value),
     tabs: [for (final String label in labels) GlassTab(label: label)],
     selectedIndex: selectedIndex,
     onTabSelected: onSelected,
