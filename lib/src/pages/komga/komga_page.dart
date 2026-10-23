@@ -448,6 +448,10 @@ class _KomgaPageState extends State<KomgaPage> {
               level,
               index == 0 ? KomgaTarget.series : KomgaTarget.books,
             ),
+            // The lens shows the touch: the label under it grows, and no glow
+            // under the finger washes the track white.
+            magnification: 1.15,
+            interactionGlowColor: const Color(0x00000000),
           ),
         ),
       ),
