@@ -24,12 +24,14 @@ import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2_logic.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2_state.dart';
 import 'package:jhentai/src/pages/read/read_page_logic.dart';
+import 'package:jhentai/src/pages/setting/advanced/glass_debug/glass_debug_page.dart';
 import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/service/komga_download_service.dart';
 import 'package:jhentai/src/service/komga_progress_sync_service.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/service/sync_service.dart';
+import 'package:jhentai/src/setting/glass_debug_setting.dart';
 import 'package:jhentai/src/setting/komga_setting.dart';
 import 'package:jhentai/src/setting/scheme_setting.dart';
 import 'package:jhentai/src/setting/style_setting.dart';
@@ -156,96 +158,123 @@ class _KomgaPageState extends State<KomgaPage> {
         // at their edges; GlassScaffold renders their glass at premium.
         // Glass only on these controls, the icons of one group sharing one
         // piece (Apple's Human Interface Guidelines).
-        body: GlassScaffold(
-          backgroundColor: UIConfig.backGroundColor(context),
-          contentAwareBrightness: true,
-          appBar: GlassAppBar(
-            leading: GlassButtonGroup.icons(
-              items: <GlassButtonGroupItem>[
-                GlassButtonGroupItem(
-                  icon: const Icon(CupertinoIcons.sidebar_left),
-                  label: MaterialLocalizations.of(context).openAppDrawerTooltip,
-                  onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                ),
-                if (canGoBack)
-                  GlassButtonGroupItem(
-                    icon: const Icon(CupertinoIcons.back),
-                    label: MaterialLocalizations.of(context).backButtonTooltip,
-                    onTap: controller!.goBack,
-                  ),
-              ],
-            ),
-            title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis),
-            // A group holds one menu at most, so More is a group of its own.
-            actions: <Widget>[
-              if (controller != null)
-                GlassButtonGroup.icons(
-                  items: <GlassButtonGroupItem>[
-                    GlassButtonGroupItem(
-                      icon: const Icon(CupertinoIcons.search),
-                      label: 'komgaSearch'.tr,
-                      onTap: _openSearch,
-                    ),
-                    if (level != null && query != null)
-                      GlassButtonGroupItem.menu(
-                        // Filled while anything is filtered out, as in Photos.
-                        icon: Icon(
-                          filtered
-                              ? CupertinoIcons
-                                    .line_horizontal_3_decrease_circle_fill
-                              : CupertinoIcons
-                                    .line_horizontal_3_decrease_circle,
-                        ),
-                        label: 'komgaSortAndFilter'.tr,
-                        menuWidth: 260,
-                        menuItems: _sortAndFilterItems(
-                          controller,
-                          level,
-                          query,
-                        ),
-                      ),
-                  ],
-                ),
-              const SizedBox(width: 8),
-              GlassButtonGroup.icons(
+        // Test builds: glass as the debug page sets it.
+        body: Obx(() {
+          final GlassQuality barQuality = glassDebugSetting.barQuality.value;
+          final LiquidGlassSettings? barGlass =
+              glassDebugSetting.bar.value?.settings;
+          return GlassScaffold(
+            backgroundColor: UIConfig.backGroundColor(context),
+            contentAwareBrightness:
+                glassDebugSetting.contentAwareBrightness.value,
+            edgeStyle: glassDebugSetting.edgeStyle.value,
+            appBar: GlassAppBar(
+              leading: GlassButtonGroup.icons(
+                quality: barQuality,
+                settings: barGlass,
                 items: <GlassButtonGroupItem>[
-                  GlassButtonGroupItem.menu(
-                    icon: _syncingAll
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(CupertinoIcons.ellipsis),
-                    label: 'komgaMore'.tr,
-                    menuWidth: 260,
-                    menuItems: _moreItems(controller),
+                  GlassButtonGroupItem(
+                    icon: const Icon(CupertinoIcons.sidebar_left),
+                    label: MaterialLocalizations.of(
+                      context,
+                    ).openAppDrawerTooltip,
+                    onTap: () => _scaffoldKey.currentState?.openDrawer(),
                   ),
+                  if (canGoBack)
+                    GlassButtonGroupItem(
+                      icon: const Icon(CupertinoIcons.back),
+                      label: MaterialLocalizations.of(
+                        context,
+                      ).backButtonTooltip,
+                      onTap: controller!.goBack,
+                    ),
                 ],
               ),
-            ],
-          ),
-          bottomBar: level is KomgaListLevel
-              ? _targetBar(controller!, level)
-              : null,
-          bottomBarHeight: _targetBarHeight,
-          body: Builder(
-            // Clear of the bars: lists pad themselves by this.
-            builder: (BuildContext context) {
-              final MediaQueryData media = MediaQuery.of(context);
-              return MediaQuery(
-                data: media.copyWith(
-                  padding: media.padding.copyWith(
-                    top: media.padding.top + 44,
-                    bottom:
-                        media.padding.bottom +
-                        (level is KomgaListLevel ? _targetBarHeight : 0),
+              title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis),
+              // A group holds one menu at most, so More is a group of its own.
+              actions: <Widget>[
+                komgaMenuGlass(
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      if (controller != null)
+                        GlassButtonGroup.icons(
+                          quality: barQuality,
+                          settings: barGlass,
+                          items: <GlassButtonGroupItem>[
+                            GlassButtonGroupItem(
+                              icon: const Icon(CupertinoIcons.search),
+                              label: 'komgaSearch'.tr,
+                              onTap: _openSearch,
+                            ),
+                            if (level != null && query != null)
+                              GlassButtonGroupItem.menu(
+                                // Filled while anything is filtered out, as in Photos.
+                                icon: Icon(
+                                  filtered
+                                      ? CupertinoIcons
+                                            .line_horizontal_3_decrease_circle_fill
+                                      : CupertinoIcons
+                                            .line_horizontal_3_decrease_circle,
+                                ),
+                                label: 'komgaSortAndFilter'.tr,
+                                menuWidth: 260,
+                                menuItems: _sortAndFilterItems(
+                                  controller,
+                                  level,
+                                  query,
+                                ),
+                              ),
+                          ],
+                        ),
+                      const SizedBox(width: 8),
+                      GlassButtonGroup.icons(
+                        quality: barQuality,
+                        settings: barGlass,
+                        items: <GlassButtonGroupItem>[
+                          GlassButtonGroupItem.menu(
+                            icon: _syncingAll
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(CupertinoIcons.ellipsis),
+                            label: 'komgaMore'.tr,
+                            menuWidth: 260,
+                            menuItems: _moreItems(controller),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                child: _buildBody(context),
-              );
-            },
-          ),
-        ),
+              ],
+            ),
+            bottomBar: level is KomgaListLevel
+                ? _targetBar(controller!, level)
+                : null,
+            bottomBarHeight: _targetBarHeight,
+            body: Builder(
+              // Clear of the bars: lists pad themselves by this.
+              builder: (BuildContext context) {
+                final MediaQueryData media = MediaQuery.of(context);
+                return MediaQuery(
+                  data: media.copyWith(
+                    padding: media.padding.copyWith(
+                      top: media.padding.top + 44,
+                      bottom:
+                          media.padding.bottom +
+                          (level is KomgaListLevel ? _targetBarHeight : 0),
+                    ),
+                  ),
+                  child: _buildBody(context),
+                );
+              },
+            ),
+          );
+        }),
       ),
     );
   }
@@ -359,8 +388,7 @@ class _KomgaPageState extends State<KomgaPage> {
       GlassMenuItem(
         title: 'komgaMarkSeriesRead'.tr,
         icon: const Icon(CupertinoIcons.checkmark_circle),
-        onTap: () =>
-            _runSeriesAction(level.series, KomgaSeriesAction.markRead),
+        onTap: () => _runSeriesAction(level.series, KomgaSeriesAction.markRead),
       ),
       GlassMenuItem(
         title: 'komgaMarkSeriesUnread'.tr,
@@ -371,8 +399,7 @@ class _KomgaPageState extends State<KomgaPage> {
       GlassMenuItem(
         title: 'komgaDownloadSeries'.tr,
         icon: const Icon(CupertinoIcons.arrow_down_circle),
-        onTap: () =>
-            _runSeriesAction(level.series, KomgaSeriesAction.download),
+        onTap: () => _runSeriesAction(level.series, KomgaSeriesAction.download),
       ),
       const GlassMenuDivider(),
     ],
@@ -413,14 +440,11 @@ class _KomgaPageState extends State<KomgaPage> {
       child: Center(
         child: SizedBox(
           width: 280,
-          child: GlassTabBar.inline(
+          child: komgaTargetSwitch(
             key: const ValueKey<String>('komgaTargetToggle'),
-            tabs: <GlassTab>[
-              GlassTab(label: 'komgaSeriesView'.tr),
-              GlassTab(label: 'komgaAllBooksView'.tr),
-            ],
+            labels: <String>['komgaSeriesView'.tr, 'komgaAllBooksView'.tr],
             selectedIndex: level.query.target == KomgaTarget.series ? 0 : 1,
-            onTabSelected: (int index) => controller.setTarget(
+            onSelected: (int index) => controller.setTarget(
               level,
               index == 0 ? KomgaTarget.series : KomgaTarget.books,
             ),
@@ -615,7 +639,11 @@ class _KomgaPageState extends State<KomgaPage> {
       position: position,
       entries: <_MenuEntry<String>>[
         _MenuEntry('read', Icons.check_circle_outline, 'komgaMarkRead'.tr),
-        _MenuEntry('unread', Icons.radio_button_unchecked, 'komgaMarkUnread'.tr),
+        _MenuEntry(
+          'unread',
+          Icons.radio_button_unchecked,
+          'komgaMarkUnread'.tr,
+        ),
         if (downloaded)
           _MenuEntry('delete', Icons.delete_outline, 'komgaDeleteDownload'.tr)
         else if (book.isReadable &&

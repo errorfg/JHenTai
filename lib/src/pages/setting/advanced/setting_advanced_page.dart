@@ -91,6 +91,13 @@ class _SettingAdvancedPageState extends State<SettingAdvancedPage> {
             _buildExportData(context),
             const Divider(),
             _buildCloudSyncSettings(),
+            // Test builds only.
+            ListTile(
+              leading: const Icon(Icons.tune),
+              title: const Text('液态玻璃调试'),
+              trailing: const Icon(Icons.keyboard_arrow_right),
+              onTap: () => toRoute(Routes.glassDebug),
+            ),
           ],
         ).withListTileTheme(context),
       ),

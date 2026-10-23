@@ -103,6 +103,7 @@ enum ConfigEnum {
 
   /// cache
   isSpreadPage('isSpreadPage'),
+  glassDebugSetting('glassDebugSetting'),
   galleryImageHash('galleryImageHash');
 
   final String key;

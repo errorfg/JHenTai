@@ -18,6 +18,7 @@ import 'package:jhentai/src/pages/tachi/tachi_source_page.dart';
 import 'package:jhentai/src/pages/tachi/tachi_source_settings_page.dart';
 import 'package:jhentai/src/pages/tachi/tachi_webview_page.dart';
 import 'package:jhentai/src/pages/komga/komga_settings_page.dart';
+import 'package:jhentai/src/pages/setting/advanced/glass_debug/glass_debug_page.dart';
 import 'package:jhentai/src/pages/pdf/pdf_library_page.dart';
 import 'package:jhentai/src/pages/popular/popular_page.dart';
 import 'package:jhentai/src/pages/ranklist/ranklist_page.dart';
@@ -84,6 +85,7 @@ class Routes {
   static const String komga = "/komga";
   static const String komgaSettings = "/komga/settings";
   static const String pdfLibrary = "/pdf_library";
+  static const String glassDebug = "/glass_debug";
 
   /// left
   static const String desktopHome = "/desktop_home";
@@ -210,6 +212,12 @@ class Routes {
     EHPage(
       name: pdfLibrary,
       page: () => const PdfLibraryPage(),
+      transition: defaultTransition,
+      side: Side.fullScreen,
+    ),
+    EHPage(
+      name: glassDebug,
+      page: () => const GlassDebugPage(),
       transition: defaultTransition,
       side: Side.fullScreen,
     ),

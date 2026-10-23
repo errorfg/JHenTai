@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:jhentai/src/utils/route_util.dart';
+import 'package:jhentai/src/routes/routes.dart';
 import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/network/komga_client.dart';
 import 'package:jhentai/src/service/sync_service.dart';
@@ -119,6 +121,15 @@ class _KomgaSettingsPageState extends State<KomgaSettingsPage> {
             _buildHint(Icons.cloud_sync_outlined, 'komgaConfigSyncHint'.tr),
             const SizedBox(height: 10),
             _buildHint(Icons.sync_alt_outlined, 'komgaProgressSyncHint'.tr),
+            // Test builds: back from it returns here, then to Komga.
+            const SizedBox(height: 18),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.tune),
+              title: const Text('液态玻璃调试'),
+              trailing: const Icon(Icons.keyboard_arrow_right),
+              onTap: () => toRoute(Routes.glassDebug),
+            ),
           ],
         ),
       ),

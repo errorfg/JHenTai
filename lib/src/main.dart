@@ -53,6 +53,7 @@ import 'package:jhentai/src/setting/archive_bot_setting.dart';
 import 'package:jhentai/src/setting/download_setting.dart';
 import 'package:jhentai/src/setting/eh_setting.dart';
 import 'package:jhentai/src/setting/favorite_setting.dart';
+import 'package:jhentai/src/setting/glass_debug_setting.dart';
 import 'package:jhentai/src/setting/keyboard_shortcut_setting.dart';
 import 'package:jhentai/src/setting/komga_setting.dart';
 import 'package:jhentai/src/setting/mouse_setting.dart';
@@ -132,6 +133,7 @@ List<JHLifeCircleBean> lifeCircleBeans = [
   nhentaiApiSetting,
   jmSetting,
   schemeSetting,
+  glassDebugSetting,
   jmAccountSetting,
   eh2telegraphSetting,
   performanceSetting,
@@ -217,7 +219,14 @@ class MyApp extends StatelessWidget {
           ? Routes.lock
           : Routes.home,
       navigatorObservers: [GetXRouterObserver()],
-      builder: (context, child) => AppManager(child: child!),
+      // Test builds: the GPU cost of the glass, from its debug page.
+      builder: (context, child) => AppManager(
+        child: Obx(
+          () => glassDebugSetting.performanceOverlay.isTrue
+              ? Stack(children: [child!, PerformanceOverlay.allEnabled()])
+              : child!,
+        ),
+      ),
 
       /// enable swipe back feature
       popGesture: preferenceSetting.enableSwipeBackGesture.isTrue,
