@@ -179,7 +179,7 @@ class DownloadSearchPage extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: () => toRoute(
         Routes.details,
-        arguments: DetailsPageArgument(galleryUrl: GalleryUrl.parse(gallery.galleryUrl)),
+        arguments: DetailsPageArgument(galleryUrl: GalleryUrl.parseStored(gallery.galleryUrl)),
       ),
       child: GetBuilder<GalleryDownloadService>(
         id: '${galleryDownloadService.downloadImageUrlId}::${gallery.gid}::0',
@@ -409,7 +409,7 @@ class DownloadSearchPage extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: () => toRoute(
         Routes.details,
-        arguments: DetailsPageArgument(galleryUrl: GalleryUrl.parse(archive.galleryUrl)),
+        arguments: DetailsPageArgument(galleryUrl: GalleryUrl.parseStored(archive.galleryUrl)),
       ),
       child: EHImage(
         galleryImage: GalleryImage(url: archive.coverUrl),

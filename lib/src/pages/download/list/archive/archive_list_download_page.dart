@@ -316,7 +316,7 @@ class ArchiveListDownloadPage extends StatelessWidget
           : toRoute(
               Routes.details,
               arguments: DetailsPageArgument(
-                  galleryUrl: GalleryUrl.parse(archive.galleryUrl)),
+                  galleryUrl: GalleryUrl.parseStored(archive.galleryUrl)),
             ),
       child: EHImage(
         galleryImage: archiveDownloadService.buildArchiveCoverImage(archive),
