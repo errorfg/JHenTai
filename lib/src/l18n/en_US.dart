@@ -1434,8 +1434,8 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'tachiClearCookies': 'Clear extension cookies',
       'tachiUpdatesFailed': '@count manga could not be checked',
       'checkNewChaptersFailed': 'Checking new chapters failed',
-      'noNewChapters': 'No new chapters',
-      'newChaptersFound': '@count with new chapters',
+      'allCaughtUp': 'Every one read up to its newest chapter',
+      'notCaughtUpCount': '@count not read up to the newest chapter',
       'newChaptersCheckFailed': '@count could not be checked',
       'tachiUpdatesHint': 'Pull to refresh to check the manga in your Tachiyomi favorites for new chapters. Each manga asks its site for its chapter list once.',
     };

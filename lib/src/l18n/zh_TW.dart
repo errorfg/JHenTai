@@ -1239,8 +1239,8 @@ favnote：配對收藏備註
       'tachiClearCookies': '清除插件的 Cookie',
       'tachiUpdatesFailed': '@count 部漫畫檢查失敗',
       'checkNewChaptersFailed': '檢查新章節失敗',
-      'noNewChapters': '沒有新章節',
-      'newChaptersFound': '@count 部有新章節',
+      'allCaughtUp': '都已讀到最新一章',
+      'notCaughtUpCount': '@count 部還沒讀到最新一章',
       'newChaptersCheckFailed': '@count 部檢查失敗',
       'tachiUpdatesHint': '下拉重新整理，檢查 Tachiyomi 收藏中各部漫畫的新章節。每部漫畫向它的站點請求一次章節列表。',
     };

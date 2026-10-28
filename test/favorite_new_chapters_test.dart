@@ -78,19 +78,15 @@ JmSearchResult _page(List<(int, DateTime)> albums) => JmSearchResult(total: 1000
         JmAlbumSummary(id: id, name: 'Album $id', author: '', categoryTitle: '', subCategoryTitle: '', addDate: '', updateAt: at),
     ]);
 
+Set<int> _fadedOf(FavoritePageLogic logic) => <int>{
+      for (final Gallery g in logic.state.gallerys)
+        if (logic.cardWrapper?.call(g, const SizedBox()) case Opacity(opacity: final double o) when o == WatchedCard.readOpacity) g.gid,
+    };
+
 /// The favorites are shown in [order], and those of [faded] show faded.
 void _expectShown(FavoritePageLogic logic, List<int> order, Set<int> faded, {String? reason}) {
-  final List<Gallery> gallerys = logic.state.gallerys;
-  final Widget Function(Gallery, Widget)? wrap = logic.cardWrapper;
-  expect(gallerys.map((Gallery g) => g.gid).toList(), order, reason: reason);
-  expect(
-    <int>{
-      for (final Gallery g in gallerys)
-        if (wrap?.call(g, const SizedBox()) case Opacity(opacity: final double o) when o == WatchedCard.readOpacity) g.gid,
-    },
-    faded,
-    reason: reason,
-  );
+  expect(logic.state.gallerys.map((Gallery g) => g.gid).toList(), order, reason: reason);
+  expect(_fadedOf(logic), faded, reason: reason);
 }
 
 /// The extension host, as far as manga and their chapters go; chapters
@@ -157,7 +153,7 @@ void main() {
     await appDb.close();
   });
 
-  testWidgets('JM favorites: a pull-down finds new chapters, puts them first and fades the rest; reading the newest chapter fades it too', (WidgetTester tester) async {
+  testWidgets('JM favorites: a pull-down checks them; those whose newest chapter is not opened come first, the rest fade', (WidgetTester tester) async {
     await tester.runAsync(() async {
       schemeSetting.site.value = ContentScheme.jm;
       jmFavoriteService = JmFavoriteService();
@@ -165,7 +161,6 @@ void main() {
       final List<int> pagesAsked = <int>[];
       final List<int> albumsAsked = <int>[];
       Map<int, JmAlbum> albums = <int, JmAlbum>{
-        // A chapter out after it was favorited.
         100: _album(100, <int>[100, 101, 102], now.subtract(const Duration(days: 2))),
         200: _album(200, <int>[200, 201], now.subtract(const Duration(days: 40))),
         300: _album(300, <int>[300], now.subtract(const Duration(days: 50))),
@@ -184,13 +179,14 @@ void main() {
           }
           return albums[id]!;
         };
-      for (final (int id, int favoritedDaysAgo, int publishedDaysAgo) in <(int, int, int)>[(100, 20, 30), (200, 10, 40), (300, 5, 50)]) {
-        await jmFavoriteService.addFavorite(
-          _favorite(GalleryUrl.jm(id), 'Album $id', now.subtract(Duration(days: publishedDaysAgo))),
-          favoriteCategoryIndex: 0,
-          favoritedTime: now.subtract(Duration(days: favoritedDaysAgo)),
-        );
-      }
+      Future<void> favorite(int id, {required int favoritedDaysAgo, required int publishedDaysAgo}) => jmFavoriteService.addFavorite(
+            _favorite(GalleryUrl.jm(id), 'Album $id', now.subtract(Duration(days: publishedDaysAgo))),
+            favoriteCategoryIndex: 0,
+            favoritedTime: now.subtract(Duration(days: favoritedDaysAgo)),
+          );
+      await favorite(100, favoritedDaysAgo: 20, publishedDaysAgo: 30);
+      await favorite(200, favoritedDaysAgo: 10, publishedDaysAgo: 40);
+      await favorite(300, favoritedDaysAgo: 5, publishedDaysAgo: 50);
       int gid(int albumId) => GalleryUrl.jm(albumId).gid;
 
       final FavoritePageLogic logic = Get.put(FavoritePageLogic(), permanent: true);
@@ -198,6 +194,8 @@ void main() {
       expect(logic.state.showJmFavorites, isTrue);
       _expectShown(logic, <int>[gid(300), gid(200), gid(100)], <int>{}, reason: 'nothing checked yet: as favorited, none faded');
 
+      // Read up to the newest chapter of 200, and the one chapter of 300.
+      await jmReadingService.markRead(<int>[201, 300]);
       // The first check asks for every album.
       await logic.handlePullDown();
       expect(pagesAsked, isEmpty);
@@ -208,6 +206,11 @@ void main() {
       await jmReadingService.markRead(<int>[102]);
       await logic.handleRefresh();
       _expectShown(logic, <int>[gid(300), gid(200), gid(100)], <int>{gid(300), gid(200), gid(100)});
+
+      // Favorited since, not read: shown, without asking for it.
+      await favorite(400, favoritedDaysAgo: 0, publishedDaysAgo: 1);
+      await logic.handleRefresh();
+      _expectShown(logic, <int>[gid(400), gid(300), gid(200), gid(100)], <int>{gid(300), gid(200), gid(100)});
 
       // Album 200 gets a chapter: back on top of the newest list. The list
       // is read down to a day before the last check, and only 200 is asked,
@@ -223,7 +226,7 @@ void main() {
       await logic.handlePullDown();
       expect(pagesAsked, <int>[1, 2]);
       expect(albumsAsked, <int>[200]);
-      expect(logic.cardWrapper!(logic.state.gallerys.firstWhere((Gallery g) => g.gid == gid(200)), const SizedBox()), isA<Opacity>(), reason: 'not known yet');
+      expect(_fadedOf(logic), contains(gid(200)), reason: 'its new chapter not known yet');
 
       // Not in the list any more, but asked again as it failed.
       newest = <JmSearchResult>[_page(<(int, DateTime)>[(997, now.subtract(const Duration(days: 3)))])];
@@ -232,11 +235,17 @@ void main() {
       await logic.handlePullDown();
       expect(pagesAsked, <int>[1]);
       expect(albumsAsked, <int>[200]);
-      _expectShown(logic, <int>[gid(200), gid(300), gid(100)], <int>{gid(300), gid(100)});
+      _expectShown(logic, <int>[gid(400), gid(200), gid(300), gid(100)], <int>{gid(300), gid(100)});
+
+      // 400 opened (its chapters kept) and read to its newest.
+      await jmReadingService.remember(albumId: 400, chapterIds: <int>[400, 401]);
+      await jmReadingService.markRead(<int>[401]);
+      await logic.handleRefresh();
+      _expectShown(logic, <int>[gid(200), gid(400), gid(300), gid(100)], <int>{gid(400), gid(300), gid(100)});
     });
   });
 
-  testWidgets('Tachiyomi favorites: a pull-down asks each manga for its chapters; one with a chapter found new comes first', (WidgetTester tester) async {
+  testWidgets('Tachiyomi favorites: a pull-down asks each manga for its chapters; those whose newest chapter is not opened come first', (WidgetTester tester) async {
     final _Host host = _Host();
     await tester.runAsync(() async {
       await host.start();
@@ -261,19 +270,21 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 300));
       expect(logic.state.showTachiFavorites, isTrue);
 
-      // The first check only learns the chapters.
+      // Read up to the newest chapter of /b; /a not at all.
+      await tachiReadingService.markRead(<int>[TachiSource.idOf(GalleryUrl.tachiChapter(source, '/b', '/b/1'))]);
       await logic.handlePullDown();
       expect(host.asked..sort(), <String>['/a', '/b']);
-      _expectShown(logic, <int>[gid('/b'), gid('/a')], <int>{gid('/b'), gid('/a')});
-
-      host.chapters['/a'] = <Map<String, Object?>>[chapter('/a/3'), ...host.chapters['/a']!];
-      await logic.handlePullDown();
       _expectShown(logic, <int>[gid('/a'), gid('/b')], <int>{gid('/b')});
-      final List<int> order = await tachiReadingService.chaptersOf(TachiSource.idOf(GalleryUrl.tachiManga(source, '/a')));
-      expect(order, hasLength(3));
 
-      // Read: faded, back in its place.
-      await tachiReadingService.markRead(<int>[order.last]);
+      // A chapter of /b found new: its newest not opened any more.
+      host.chapters['/b'] = <Map<String, Object?>>[chapter('/b/2'), ...host.chapters['/b']!];
+      await logic.handlePullDown();
+      _expectShown(logic, <int>[gid('/b'), gid('/a')], <int>{});
+      final List<int> order = await tachiReadingService.chaptersOf(TachiSource.idOf(GalleryUrl.tachiManga(source, '/b')));
+      expect(order, hasLength(2), reason: 'the chapters kept for the cards');
+
+      // Both read to their newest: faded, as favorited.
+      await tachiReadingService.markRead(<int>[order.last, TachiSource.idOf(GalleryUrl.tachiChapter(source, '/a', '/a/2'))]);
       await logic.handleRefresh();
       _expectShown(logic, <int>[gid('/b'), gid('/a')], <int>{gid('/b'), gid('/a')});
       await host.stop();

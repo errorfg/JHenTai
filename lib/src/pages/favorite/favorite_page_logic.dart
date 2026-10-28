@@ -55,9 +55,9 @@ class FavoritePageLogic extends BasePageLogic {
   /// The account's nhentai favorites listed since its first page loaded.
   final Set<int> _listedNhAccountGids = <int>{};
 
-  /// Favorites of JM or Tachiyomi with new chapters, by gid, each with the
-  /// time of its newest (see [favoritesWithNewChapters]).
-  Map<int, DateTime> _newChapters = <int, DateTime>{};
+  /// Favorites of JM or Tachiyomi whose newest chapter has not been opened,
+  /// by gid, each with the time of that chapter (see [favoritesNotCaughtUp]).
+  Map<int, DateTime> _notCaughtUp = <int, DateTime>{};
 
   /// Opens on the favorites of the current scheme's site and follows
   /// scheme switches.
@@ -145,24 +145,44 @@ class FavoritePageLogic extends BasePageLogic {
     await super.handlePullDown();
     if (failed != null) {
       toast(<String>[
-        _newChapters.isEmpty ? 'noNewChapters'.tr : 'newChaptersFound'.trParams(<String, String>{'count': '${_newChapters.length}'}),
+        _notCaughtUp.isEmpty ? 'allCaughtUp'.tr : 'notCaughtUpCount'.trParams(<String, String>{'count': '${_notCaughtUp.length}'}),
         if (failed > 0) 'newChaptersCheckFailed'.trParams(<String, String>{'count': '$failed'}),
       ].join('\n'));
     }
   }
 
-  /// What the favorites of JM and Tachiyomi know of their new chapters.
-  ({SeriesLatest? Function(Gallery gallery) latestOf, SeriesReadingService reading, bool checked})? get _shownUpdates => state.showJmFavorites
-      ? (latestOf: jmUpdateService.latestOf, reading: jmReadingService, checked: jmUpdateService.hasChecked)
+  /// What the favorites of JM and Tachiyomi know of their newest chapters.
+  ({
+    SeriesLatest? Function(Gallery gallery) latestOf,
+    SeriesReadingService reading,
+    int Function(Gallery gallery) seriesIdOf,
+    int? Function(Gallery gallery)? singleChapterOf,
+    bool checked,
+  })? get _shownUpdates => state.showJmFavorites
+      ? (
+          latestOf: jmUpdateService.latestOf,
+          reading: jmReadingService,
+          seriesIdOf: (Gallery g) => g.galleryUrl.jmChapterId,
+          // An album of one chapter is that chapter.
+          singleChapterOf: (Gallery g) => g.galleryUrl.jmChapterId,
+          checked: jmUpdateService.hasChecked,
+        )
       : state.showTachiFavorites
-          ? (latestOf: tachiUpdateService.latestOf, reading: tachiReadingService, checked: tachiUpdateService.lastCheckedAt > 0)
+          ? (
+              latestOf: tachiUpdateService.latestOf,
+              reading: tachiReadingService,
+              seriesIdOf: (Gallery g) => TachiSource.idOf(g.galleryUrl),
+              singleChapterOf: null,
+              checked: tachiUpdateService.lastCheckedAt > 0,
+            )
           : null;
 
-  /// Once their source has been checked, favorites of JM and Tachiyomi
-  /// without new chapters show faded, as the watched list shows what was read.
+  /// Once their source has been checked, favorites of JM and Tachiyomi whose
+  /// newest chapter has been opened show faded: caught up with, nothing to
+  /// look at, as the watched list shows what was read.
   @override
   Widget Function(Gallery gallery, Widget card)? get cardWrapper => _shownUpdates?.checked == true
-      ? (Gallery gallery, Widget card) => _newChapters.containsKey(gallery.gid) ? card : Opacity(opacity: WatchedCard.readOpacity, child: card)
+      ? (Gallery gallery, Widget card) => _notCaughtUp.containsKey(gallery.gid) ? card : Opacity(opacity: WatchedCard.readOpacity, child: card)
       : null;
 
   @override
@@ -334,7 +354,7 @@ class FavoritePageLogic extends BasePageLogic {
   /// Reloads after a wnacg or JM favorite changed elsewhere.
   Future<void> reloadLocalSourceFavoriteGallerys() async {
     if (_shownLocalSourceService != null) {
-      _loadLocalSourceFavorites();
+      await _loadLocalSourceFavorites();
     } else if (state.mixedMode) {
       _mergeLocalFavoritesForDisplay();
       updateSafely();
@@ -431,9 +451,15 @@ class FavoritePageLogic extends BasePageLogic {
     );
     final updates = _shownUpdates;
     if (updates != null) {
-      final Map<int, DateTime> fresh = await favoritesWithNewChapters(favorites: favorites, latestOf: updates.latestOf, reading: updates.reading);
-      _newChapters = fresh;
-      // New chapters first, the newest on top; the rest as they were.
+      final Map<int, DateTime> fresh = await favoritesNotCaughtUp(
+        favorites: favorites,
+        latestOf: updates.latestOf,
+        reading: updates.reading,
+        seriesIdOf: updates.seriesIdOf,
+        singleChapterOf: updates.singleChapterOf,
+      );
+      _notCaughtUp = fresh;
+      // Not caught up with first, the newest chapter on top; the rest as they were.
       favorites = <Gallery>[
         ...favorites.where((Gallery g) => fresh.containsKey(g.gid)).toList()..sort((a, b) => fresh[b.gid]!.compareTo(fresh[a.gid]!)),
         ...favorites.where((Gallery g) => !fresh.containsKey(g.gid)),

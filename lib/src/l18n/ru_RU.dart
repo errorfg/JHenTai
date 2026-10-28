@@ -1318,8 +1318,8 @@ class ru_RU {
       'tachiClearCookies': 'Очистить cookie расширений',
       'tachiUpdatesFailed': 'Не удалось проверить манги: @count',
       'checkNewChaptersFailed': 'Не удалось проверить новые главы',
-      'noNewChapters': 'Новых глав нет',
-      'newChaptersFound': 'С новыми главами: @count',
+      'allCaughtUp': 'Все прочитаны до последней главы',
+      'notCaughtUpCount': 'Не прочитана последняя глава: @count',
       'newChaptersCheckFailed': 'Не удалось проверить: @count',
       'tachiUpdatesHint': 'Потяните вниз, чтобы проверить новые главы манги из избранного Tachiyomi. Для каждой манги сайт запрашивается один раз.',
     };
