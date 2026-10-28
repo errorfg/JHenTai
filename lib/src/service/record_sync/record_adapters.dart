@@ -18,6 +18,7 @@ import 'package:jhentai/src/service/nhentai_favorite_service.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/service/search_history_service.dart';
+import 'package:jhentai/src/service/watched_progress_service.dart';
 import 'package:jhentai/src/service/wnacg_favorite_service.dart';
 import 'package:jhentai/src/setting/eh2telegraph_setting.dart';
 import 'package:jhentai/src/setting/jm_account_setting.dart';
@@ -173,6 +174,9 @@ List<RecordAdapter> defaultRecordAdapters() => [
       EhAccountRecords(),
       TachiRepositoryRecords(),
       TachiSourceRecords(),
+      WatchedReadRecords(),
+      WatchedBookmarkRecords(),
+      WatchedPositionRecords(),
     ];
 
 /// Gallery history, a record for each gallery by its key (GalleryUrl.contentKey):
@@ -737,6 +741,113 @@ class EhAccountRecords extends WholeKindAdapter {
     SyncRecordData? record = records.firstWhereOrNull((r) => r.key == key);
     if (record != null) {
       await ehAccountSync.apply(record.value!, record.updatedAt);
+    }
+  }
+}
+
+/// The galleries of the watched list read (see [WatchedProgressService]),
+/// a record for each, by gid. Read stays read: no row is deleted, and a
+/// deletion, which no version makes, is not taken.
+class WatchedReadRecords extends RowKindAdapter {
+  @override
+  String get kind => 'watchedRead';
+
+  @override
+  CloudConfigTypeEnum get type => CloudConfigTypeEnum.watchedProgress;
+
+  @override
+  Future<List<RowItem>> read(Set<String>? keys) async {
+    List<LocalConfig> rows;
+    if (keys == null) {
+      rows = await localConfigService.readWithAllSubKeys(configKey: ConfigEnum.watchedRead);
+    } else {
+      rows = keys.isEmpty ? [] : await localConfigService.readBySubKeys(configKey: ConfigEnum.watchedRead, subConfigKeys: keys);
+    }
+    return rows.map((r) => RowItem(r.subConfigKey, r.value, SyncTimeUtil.canonicalize(r.utime))).toList();
+  }
+
+  @override
+  Set<String> pendingKeys(PendingSyncSnapshotToken token) => token.watchedKeys;
+
+  @override
+  Future<void> apply(List<SyncRecordData> records) async {
+    List<SyncRecordData> rows = records.where((r) => !r.deleted).toList();
+    int changed = await localConfigService.batchWriteIfNewer(
+      configKey: ConfigEnum.watchedRead,
+      localConfigs: rows
+          .map((r) => LocalConfigCompanion(
+                configKey: Value(ConfigEnum.watchedRead.key),
+                subConfigKey: Value(r.key),
+                value: Value(r.value!),
+                utime: Value(r.updatedAt),
+              ))
+          .toList(),
+    );
+    if (changed > 0) {
+      await watchedProgressService.reloadStored(read: rows.map((r) => int.tryParse(r.key)).whereType<int>().toSet());
+    }
+  }
+}
+
+/// The watched list's bookmarks, a record for each by gid, timed at when it
+/// was made.
+class WatchedBookmarkRecords extends WholeKindAdapter {
+  @override
+  bool get itemTimesAreOwn => true;
+
+  @override
+  String get kind => 'watchedBookmark';
+
+  @override
+  CloudConfigTypeEnum get type => CloudConfigTypeEnum.watchedProgress;
+
+  @override
+  Future<List<MapEntry<String, LocalItem>>> export() async {
+    await watchedProgressService.flush();
+    return [
+      for (WatchedGallery bookmark in watchedProgressService.bookmarks)
+        MapEntry('${bookmark.gid}', LocalItem(jsonEncode(bookmark.toJson()), firstTime: SyncTimeUtil.format(bookmark.at))),
+    ];
+  }
+
+  @override
+  Future<String> changeTime() => _configTime(ConfigEnum.watchedBookmarks);
+
+  @override
+  Future<void> replaceAll(List<SyncRecordData> records) => watchedProgressService.replaceBookmarks([
+        for (SyncRecordData record in records) WatchedGallery.fromJson(jsonDecode(record.value!) as Map<String, dynamic>),
+      ]);
+}
+
+/// Where the watched list was left: the latest of all devices, one record.
+class WatchedPositionRecords extends WholeKindAdapter {
+  static const String key = 'default';
+
+  /// When the list was left there.
+  @override
+  bool get itemTimesAreOwn => true;
+
+  @override
+  String get kind => 'watchedPosition';
+
+  @override
+  CloudConfigTypeEnum get type => CloudConfigTypeEnum.watchedProgress;
+
+  @override
+  Future<List<MapEntry<String, LocalItem>>> export() async {
+    await watchedProgressService.flush();
+    WatchedGallery? last = watchedProgressService.lastPosition;
+    return last == null ? [] : [MapEntry(key, LocalItem(jsonEncode(last.toJson()), firstTime: SyncTimeUtil.format(last.at)))];
+  }
+
+  @override
+  Future<String> changeTime() => _configTime(ConfigEnum.watchedBookmarks);
+
+  @override
+  Future<void> replaceAll(List<SyncRecordData> records) async {
+    SyncRecordData? record = records.firstWhereOrNull((r) => r.key == key);
+    if (record != null) {
+      await watchedProgressService.replaceLastPosition(WatchedGallery.fromJson(jsonDecode(record.value!) as Map<String, dynamic>));
     }
   }
 }

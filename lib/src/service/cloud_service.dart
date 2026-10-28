@@ -26,6 +26,7 @@ import 'jh_service.dart';
 import 'local_block_rule_service.dart';
 import 'log.dart';
 import 'read_progress_service.dart';
+import 'watched_progress_service.dart';
 import 'dart:async';
 import 'package:jhentai/src/service/tachi/tachi_extension_service.dart';
 import 'package:jhentai/src/service/tachi/tachi_favorite_service.dart';
@@ -54,6 +55,7 @@ class CloudConfigService
     CloudConfigTypeEnum.tachiExtensionList: '1.0.0',
     CloudConfigTypeEnum.tachiSourceSettings: '1.0.0',
     CloudConfigTypeEnum.tachiFavorite: '1.0.0',
+    CloudConfigTypeEnum.watchedProgress: '1.0.0',
   };
 
   static const int localConfigId = -1;
@@ -284,6 +286,34 @@ class CloudConfigService
         await tachiFavoriteService.refreshBean();
         log.info('  ✅ Tachiyomi favorites imported and refreshed');
         break;
+      case CloudConfigTypeEnum.watchedProgress:
+        List list = await isolateService.jsonDecodeAsync(config.config);
+        List<LocalConfig> rows = list.map((e) => LocalConfig.fromJson(e)).toList();
+        await watchedProgressService.flush();
+        // Row by row, where newer than here.
+        Set<int> read = {};
+        bool bookmarks = false;
+        for (ConfigEnum configKey in [ConfigEnum.watchedRead, ConfigEnum.watchedBookmarks]) {
+          List<LocalConfig> ofKey = rows.where((r) => r.configKey == configKey).toList();
+          int written = await localConfigService.batchWriteIfNewer(
+            configKey: configKey,
+            localConfigs: ofKey
+                .map((e) => LocalConfigCompanion(
+                      configKey: Value(e.configKey.key),
+                      subConfigKey: Value(e.subConfigKey),
+                      value: Value(e.value),
+                      utime: Value(e.utime),
+                    ))
+                .toList(),
+          );
+          if (written > 0 && configKey == ConfigEnum.watchedRead) {
+            read = ofKey.map((r) => int.tryParse(r.subConfigKey)).whereType<int>().toSet();
+          }
+          bookmarks = bookmarks || (written > 0 && configKey == ConfigEnum.watchedBookmarks);
+        }
+        await watchedProgressService.reloadStored(read: read, bookmarks: bookmarks);
+        log.info('  ✅ Watched-list progress imported');
+        break;
     }
   }
 
@@ -325,6 +355,17 @@ class CloudConfigService
         List<LocalBlockRule> blockRules = await localBlockRuleService
             .getBlockRules();
         configValue = await isolateService.jsonEncodeAsync(blockRules);
+        break;
+      case CloudConfigTypeEnum.watchedProgress:
+        await watchedProgressService.flush();
+        List<LocalConfig> rows = [
+          ...await localConfigService.readWithAllSubKeys(configKey: ConfigEnum.watchedRead),
+          ...await localConfigService.readWithAllSubKeys(configKey: ConfigEnum.watchedBookmarks),
+        ];
+        if (rows.isEmpty) {
+          return null;
+        }
+        configValue = await isolateService.jsonEncodeAsync(rows);
         break;
       case CloudConfigTypeEnum.history:
         List<GalleryHistoryV2Data> histories = await historyService

@@ -360,6 +360,15 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     return sync(types: types);
   }
 
+  /// The watched list's progress, read on here or about to be looked at:
+  /// synced by itself, after a sync already under way.
+  Future<SyncResult?> syncWatchedProgress() async {
+    if (!syncSetting.enableSync.value || !syncSetting.autoSync.value) {
+      return null;
+    }
+    return syncAfterLocalChange(types: const [CloudConfigTypeEnum.watchedProgress]);
+  }
+
   /// Reconcile read progress without letting foreground/reader-close bursts
   /// start concurrent cloud operations.
   ///
@@ -517,6 +526,11 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     CloudConfigTypeEnum.readIndexRecord,
   ];
 
+  /// The types latest.json of versions up to 8.1.1 could hold, and history
+  /// versions keep: not those that travel row by row.
+  static bool _inConfigFile(CloudConfigTypeEnum type) =>
+      !_legacyHotTypes.contains(type) && type != CloudConfigTypeEnum.watchedProgress;
+
   /// What versions up to 8.1.1 synced in the bucket, into this device's
   /// data, once, by the first device of a later version that syncs it (see
   /// [BucketRecordBackend]): the op packs of history and progress applied,
@@ -539,7 +553,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     }
 
     CloudConfigFile remoteConfigFile = CloudConfigFile.fromJson(await isolateService.jsonDecodeAsync(remoteData));
-    List<CloudConfigTypeEnum> types = CloudConfigTypeEnum.values.where((t) => !_legacyHotTypes.contains(t)).toList();
+    List<CloudConfigTypeEnum> types = CloudConfigTypeEnum.values.where(_inConfigFile).toList();
     List<CloudConfig> localConfigs = [
       for (CloudConfigTypeEnum type in types) ?await cloudConfigService.getLocalConfig(type),
     ];
@@ -561,7 +575,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     try {
       List<CloudConfig> configs = [
         for (CloudConfigTypeEnum type in CloudConfigTypeEnum.values)
-          if (!_legacyHotTypes.contains(type)) ?await cloudConfigService.getLocalConfig(type),
+          if (_inConfigFile(type)) ?await cloudConfigService.getLocalConfig(type),
       ];
       String data = await isolateService.jsonEncodeAsync(configs.map((c) => c.toJson()).toList());
       String hash = sha1.convert(utf8.encode(await isolateService.jsonEncodeAsync(configs.map((c) => c.config).toList()))).toString();

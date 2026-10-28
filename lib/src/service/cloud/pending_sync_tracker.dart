@@ -14,18 +14,25 @@ class PendingSyncSnapshotToken {
   PendingSyncSnapshotToken._({
     required Map<int, int> historyGenerations,
     required Map<String, int> progressGenerations,
+    required Map<String, int> watchedGenerations,
   }) : _historyGenerations = Map<int, int>.unmodifiable(historyGenerations),
        _progressGenerations = Map<String, int>.unmodifiable(
          progressGenerations,
-       );
+       ),
+       _watchedGenerations = Map<String, int>.unmodifiable(watchedGenerations);
 
   final Map<int, int> _historyGenerations;
   final Map<String, int> _progressGenerations;
+  final Map<String, int> _watchedGenerations;
 
   Set<int> get historyGids => Set<int>.unmodifiable(_historyGenerations.keys);
 
   Set<String> get progressKeys =>
       Set<String>.unmodifiable(_progressGenerations.keys);
+
+  /// Galleries of the watched list read here, by gid.
+  Set<String> get watchedKeys =>
+      Set<String>.unmodifiable(_watchedGenerations.keys);
 }
 
 /// Tracks which locally-originated rows still need to be pushed to the cloud.
@@ -37,7 +44,7 @@ class PendingSyncSnapshotToken {
 /// dirty set decouples "what changed here" from "when it happened".
 ///
 /// Only user-originated write paths mark rows pending (recording history,
-/// updating read progress). Rows applied FROM the cloud are deliberately not
+/// updating read progress, reading on in the watched list). Rows applied FROM the cloud are deliberately not
 /// marked - they already exist remotely.
 ///
 /// The in-memory sets are authoritative; persistence is write-through and
@@ -47,8 +54,10 @@ class PendingSyncSnapshotToken {
 class PendingSyncTracker {
   final Set<int> _historyGids = {};
   final Set<String> _progressKeys = {};
+  final Set<String> _watchedKeys = {};
   final Map<int, int> _historyGenerations = <int, int>{};
   final Map<String, int> _progressGenerations = <String, int>{};
+  final Map<String, int> _watchedGenerations = <String, int>{};
   int _nextGeneration = 0;
 
   Future<void>? _loadFuture;
@@ -71,11 +80,15 @@ class PendingSyncTracker {
       _progressKeys.addAll(
         (json['readProgress'] as List? ?? []).cast<String>(),
       );
+      _watchedKeys.addAll((json['watchedRead'] as List? ?? []).cast<String>());
       for (final int gid in _historyGids) {
         _historyGenerations[gid] = ++_nextGeneration;
       }
       for (final String key in _progressKeys) {
         _progressGenerations[key] = ++_nextGeneration;
+      }
+      for (final String key in _watchedKeys) {
+        _watchedGenerations[key] = ++_nextGeneration;
       }
     } catch (e) {
       log.warning('PendingSyncTracker: failed to load persisted state', e);
@@ -108,6 +121,19 @@ class PendingSyncTracker {
     }
   }
 
+  /// Rows of the watched list's read galleries, by gid.
+  Future<void> markWatchedPendingAll(Iterable<String> keys) async {
+    await ensureLoaded();
+    bool added = false;
+    for (final String key in keys.toSet()) {
+      added = _watchedKeys.add(key) || added;
+      _watchedGenerations[key] = ++_nextGeneration;
+    }
+    if (added) {
+      await _persist();
+    }
+  }
+
   /// Snapshot pending keys together with their current mutation generations.
   /// A successful push must be acknowledged with [removePushedSnapshot], so a
   /// key marked again while the push is in flight survives for the next push.
@@ -119,6 +145,9 @@ class PendingSyncTracker {
       },
       progressGenerations: <String, int>{
         for (final String key in _progressKeys) key: _progressGenerations[key]!,
+      },
+      watchedGenerations: <String, int>{
+        for (final String key in _watchedKeys) key: _watchedGenerations[key]!,
       },
     );
   }
@@ -151,6 +180,14 @@ class PendingSyncTracker {
         changed = true;
       }
     }
+    for (final MapEntry<String, int> entry
+        in snapshot._watchedGenerations.entries) {
+      if (_watchedGenerations[entry.key] == entry.value) {
+        _watchedKeys.remove(entry.key);
+        _watchedGenerations.remove(entry.key);
+        changed = true;
+      }
+    }
 
     if (changed) {
       await _persist();
@@ -177,8 +214,10 @@ class PendingSyncTracker {
     await ensureLoaded();
     _historyGids.clear();
     _progressKeys.clear();
+    _watchedKeys.clear();
     _historyGenerations.clear();
     _progressGenerations.clear();
+    _watchedGenerations.clear();
     await _persist();
   }
 
@@ -188,6 +227,7 @@ class PendingSyncTracker {
     String encoded = jsonEncode({
       'history': _historyGids.toList(),
       'readProgress': _progressKeys.toList(),
+      'watchedRead': _watchedKeys.toList(),
     });
     _persistChain = _persistChain.then((_) async {
       try {

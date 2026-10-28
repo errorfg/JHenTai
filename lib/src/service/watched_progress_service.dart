@@ -9,9 +9,12 @@ import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/extension/get_logic_extension.dart';
 import 'package:jhentai/src/model/gallery.dart';
 import 'package:jhentai/src/model/gallery_image.dart';
+import 'package:jhentai/src/service/cloud/pending_sync_tracker.dart';
 import 'package:jhentai/src/service/jh_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/log.dart';
+import 'package:jhentai/src/service/sync_service.dart';
+import 'package:jhentai/src/setting/sync_setting.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
 
 WatchedProgressService watchedProgressService = WatchedProgressService();
@@ -101,7 +104,9 @@ class WatchedReadRange {
 /// make a stretch of the reading map ([ranges]). Besides, where the list was
 /// left ([lastPosition]) and the galleries bookmarked by hand.
 ///
-/// On this device only. Rows are written a second after the last change.
+/// Rows are written a second after the last change; with automatic sync on,
+/// what changed goes to the other devices once the list has been left alone
+/// for [syncDelay] (see WatchedReadRecords and the records after it).
 class WatchedProgressService extends GetxController with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   static const String updateId = 'watchedProgress';
 
@@ -112,9 +117,12 @@ class WatchedProgressService extends GetxController with JHLifeCircleBeanErrorCa
   final Set<int> _dirty = <int>{};
   bool _bookmarksDirty = false;
   Timer? _flushTimer;
+  Timer? _syncTimer;
 
   /// Set by tests.
   Duration flushDelay = const Duration(seconds: 1);
+
+  static const Duration syncDelay = Duration(seconds: 30);
 
   /// Where the list was when it was last scrolled: the gallery at its top.
   WatchedGallery? lastPosition;
@@ -144,16 +152,66 @@ class WatchedProgressService extends GetxController with JHLifeCircleBeanErrorCa
         log.warning('Skip a broken watched-list row ${config.subConfigKey}', e);
       }
     }
+    await _readBookmarks();
+  }
+
+  Future<void> _readBookmarks() async {
     final String? saved = await localConfigService.read(configKey: ConfigEnum.watchedBookmarks);
-    if (saved != null) {
-      try {
-        final Map<String, dynamic> json = jsonDecode(saved) as Map<String, dynamic>;
-        lastPosition = json['last'] == null ? null : WatchedGallery.fromJson(json['last'] as Map<String, dynamic>);
-        bookmarks.addAll([for (final dynamic b in json['bookmarks'] as List? ?? const <dynamic>[]) WatchedGallery.fromJson(b as Map<String, dynamic>)]);
-      } catch (e) {
-        log.warning('Skip broken watched-list bookmarks', e);
+    if (saved == null) {
+      return;
+    }
+    try {
+      final Map<String, dynamic> json = jsonDecode(saved) as Map<String, dynamic>;
+      lastPosition = json['last'] == null ? null : WatchedGallery.fromJson(json['last'] as Map<String, dynamic>);
+      bookmarks
+        ..clear()
+        ..addAll([for (final dynamic b in json['bookmarks'] as List? ?? const <dynamic>[]) WatchedGallery.fromJson(b as Map<String, dynamic>)]);
+    } catch (e) {
+      log.warning('Skip broken watched-list bookmarks', e);
+    }
+  }
+
+  /// Rows a sync or an import stored: the read galleries of [read], and
+  /// with [bookmarks] the bookmarks and where the list was left. What was
+  /// changed here meanwhile stays, to be written over them.
+  Future<void> reloadStored({Set<int> read = const <int>{}, bool bookmarks = false}) async {
+    if (read.isNotEmpty) {
+      final List<LocalConfig> rows = await localConfigService.readBySubKeys(
+        configKey: ConfigEnum.watchedRead,
+        subConfigKeys: <String>{for (final int gid in read) '$gid'},
+      );
+      for (final LocalConfig config in rows) {
+        try {
+          final WatchedGallery gallery = WatchedGallery.fromJson(jsonDecode(config.value) as Map<String, dynamic>);
+          if (!_dirty.contains(gallery.gid)) {
+            _read[gallery.gid] = gallery;
+          }
+        } catch (e) {
+          log.warning('Skip a broken watched-list row ${config.subConfigKey}', e);
+        }
       }
     }
+    if (bookmarks && !_bookmarksDirty) {
+      await _readBookmarks();
+    }
+    updateSafely([updateId]);
+  }
+
+  /// The bookmarks as the other devices left them.
+  Future<void> replaceBookmarks(List<WatchedGallery> marks) async {
+    bookmarks
+      ..clear()
+      ..addAll(marks)
+      ..sort((a, b) => b.gid.compareTo(a.gid));
+    await _writeBookmarks();
+    updateSafely([updateId]);
+  }
+
+  /// Where the list was left on another device, later than here.
+  Future<void> replaceLastPosition(WatchedGallery gallery) async {
+    lastPosition = gallery;
+    await _writeBookmarks();
+    updateSafely([updateId]);
   }
 
   bool isRead(int gid) => _read.containsKey(gid);
@@ -300,18 +358,28 @@ class WatchedProgressService extends GetxController with JHLifeCircleBeanErrorCa
         ]);
       }
       if (bookmarksDirty) {
-        await localConfigService.write(
-          configKey: ConfigEnum.watchedBookmarks,
-          value: jsonEncode(<String, dynamic>{
-            'last': lastPosition?.toJson(),
-            'bookmarks': <Map<String, dynamic>>[for (final WatchedGallery b in bookmarks) b.toJson()],
-          }),
-        );
+        await _writeBookmarks();
       }
     } catch (e, s) {
       log.error('Save watched-list progress failed', e, s);
       _dirty.addAll(dirty);
       _bookmarksDirty = _bookmarksDirty || bookmarksDirty;
+      return;
+    }
+    if (dirty.isNotEmpty) {
+      await pendingSyncTracker.markWatchedPendingAll(<String>[for (final int gid in dirty) '$gid']);
+    }
+    if ((dirty.isNotEmpty || bookmarksDirty) && syncSetting.enableSync.value && syncSetting.autoSync.value) {
+      _syncTimer?.cancel();
+      _syncTimer = Timer(syncDelay, () => unawaited(syncService.syncWatchedProgress()));
     }
   }
+
+  Future<void> _writeBookmarks() => localConfigService.write(
+        configKey: ConfigEnum.watchedBookmarks,
+        value: jsonEncode(<String, dynamic>{
+          'last': lastPosition?.toJson(),
+          'bookmarks': <Map<String, dynamic>>[for (final WatchedGallery b in bookmarks) b.toJson()],
+        }),
+      );
 }

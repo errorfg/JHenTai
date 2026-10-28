@@ -84,6 +84,7 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - "Send to Telegraph bot" button on the details pages of every site (E-Hentai/ExHentai, `nhentai`, wnacg, JM), posting the gallery to a self-hosted eh2telegraph service that offers the HTTP interface described in the [wiki](https://github.com/errorfg/JHenTai/wiki/Send-to-Telegraph); its address and token are included in config sync.
 - Watched list:
   - galleries scrolled past count as read and show faded next time; a progress page shows what was read on a timeline, with where you left off and bookmarks; an "In Watched" button on details pages opens the watched list at that gallery.
+  - what was read, the bookmarks and where you left off are included in sync (sync server, or a bucket in the `records/v1/` layout), shortly after the list stops scrolling and when the progress page is opened.
 - Reading:
   - upscale pages while reading (experimental): with the upscaler programs on a desktop, or through an upscaling service (`sr_server/`) on another computer with a GPU, which phones and tablets can use too; see the [wiki](https://github.com/errorfg/JHenTai/wiki/Real-time-Upscaling).
   - split wide pages: an image wider than tall is cut in two, shown as two pages in single-page mode or one above the other in top-to-bottom mode.

@@ -28,6 +28,7 @@ import 'package:jhentai/src/service/record_sync/record_backend.dart';
 import 'package:jhentai/src/service/record_sync/record_sync_engine.dart';
 import 'package:jhentai/src/service/search_history_service.dart';
 import 'package:jhentai/src/service/sync_service.dart';
+import 'package:jhentai/src/service/watched_progress_service.dart';
 import 'package:jhentai/src/setting/komga_setting.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
@@ -127,6 +128,7 @@ class _Device {
   final LocalBlockRuleService rules = LocalBlockRuleService();
   final KomgaSetting komga = KomgaSetting();
   final SyncSetting settings = SyncSetting();
+  final WatchedProgressService watched = WatchedProgressService()..flushDelay = const Duration(days: 1);
   bool _initialized = false;
 
   Future<void> activate() async {
@@ -141,6 +143,7 @@ class _Device {
     localBlockRuleService = rules;
     komgaSetting = komga;
     syncSetting = settings;
+    watchedProgressService = watched;
     if (!_initialized) {
       _initialized = true;
       await rules.doInitBean();
@@ -169,7 +172,42 @@ class _Device {
     await activate();
     return search.histories.map((h) => h.rawKeyword).toList();
   }
+
+  /// The watched list's stretches read, each by its gids; the bookmarks;
+  /// where the list was left. As in memory, and as stored.
+  Future<(List<List<int>>, List<int>, int?)> watchedProgress({bool stored = false}) async {
+    await activate();
+    WatchedProgressService service = watched;
+    if (stored) {
+      service = WatchedProgressService();
+      await service.load();
+    }
+    return (
+      service.ranges.map((r) => r.gallerys.map((g) => g.gid).toList()).toList(),
+      service.bookmarks.map((b) => b.gid).toList(),
+      service.lastPosition?.gid,
+    );
+  }
 }
+
+/// The watched list: [count] galleries from [newestGid] down.
+List<Gallery> _watchedList(int count, {int newestGid = 3500000}) => [
+      for (int gid = newestGid; gid > newestGid - count; gid--)
+        Gallery(
+          galleryUrl: GalleryUrl(isEH: true, gid: gid, token: 'abcdef1234'),
+          title: 'Gallery $gid',
+          category: 'Manga',
+          cover: GalleryImage(url: 'https://ehgt.org/t/$gid.jpg', width: 250, height: 350),
+          pageCount: 20,
+          rating: 4,
+          hasRated: false,
+          language: 'japanese',
+          uploader: 'someone',
+          publishTime: '2026-10-18 12:00',
+          isExpunged: false,
+          tags: LinkedHashMap<String, List<GalleryTag>>(),
+        ),
+    ];
 
 GalleryHistoryModel _entry(int gid) => GalleryHistoryModel(
       galleryUrl: GalleryUrl(isEH: true, gid: gid, token: 't${gid.toString().padLeft(9, '0')}'),
@@ -276,6 +314,72 @@ void main() {
     await desktop.sync(server);
     await phone.sync(server);
     expect(await phone.favorites(), {101: 0, 102: 4, 103: 2});
+  });
+
+  test('the watched list read on two devices: each has all of it, the bookmarks of both, and where it was last left', () async {
+    final _MemoryServer server = _MemoryServer('db-1');
+    final _Device phone = _Device();
+    final _Device desktop = _Device();
+    final List<Gallery> list = _watchedList(20);
+    List<int> gids(int from, int to) => [for (int i = from; i <= to; i++) list[i].gid];
+
+    // Read on the phone before this version synced it.
+    await phone.activate();
+    watchedProgressService
+      ..markRead(list, 0, 9)
+      ..addBookmark(list[2])
+      ..setLastPosition(list[3]);
+    await watchedProgressService.flush();
+    await pendingSyncTracker.clearAll();
+    await phone.sync(server);
+
+    await _tick();
+    await desktop.activate();
+    watchedProgressService
+      ..markRead(list, 15, 19)
+      ..addBookmark(list[17]);
+    await watchedProgressService.flush();
+    await desktop.sync(server);
+    await phone.sync(server);
+
+    for (final _Device device in [phone, desktop]) {
+      for (final bool stored in [false, true]) {
+        final (List<List<int>> ranges, List<int> bookmarks, int? last) = await device.watchedProgress(stored: stored);
+        expect(ranges, [gids(0, 9), gids(15, 19)]);
+        expect(bookmarks, [list[2].gid, list[17].gid]);
+        expect(last, list[3].gid);
+      }
+    }
+    expect(phone.watched.isRead(list[17].gid), isTrue);
+
+    // Read on on the desktop across the gap, left further down; the phone
+    // removes a bookmark.
+    await _tick();
+    await desktop.activate();
+    watchedProgressService
+      ..markRead(list, 9, 15)
+      ..setLastPosition(list[18]);
+    await watchedProgressService.flush();
+    await phone.activate();
+    watchedProgressService.removeBookmark(list[17].gid);
+    await watchedProgressService.flush();
+    await desktop.sync(server);
+    await phone.sync(server);
+    await desktop.sync(server);
+
+    for (final _Device device in [phone, desktop]) {
+      final (List<List<int>> ranges, List<int> bookmarks, int? last) = await device.watchedProgress();
+      expect(ranges, [gids(0, 19)]);
+      expect(bookmarks, [list[2].gid]);
+      expect(last, list[18].gid);
+    }
+
+    // Met: nothing more goes either way.
+    final int pushed = server.pushedRecords;
+    await phone.sync(server);
+    await desktop.sync(server);
+    await phone.sync(server);
+    expect(server.pushedRecords, pushed);
   });
 
   test('devices that already hold the same data push nothing more once they have met', () async {

@@ -12,6 +12,7 @@ import '../../model/gallery.dart';
 import '../../model/search_config.dart';
 import '../../routes/routes.dart';
 import '../../service/local_config_service.dart';
+import '../../service/sync_service.dart';
 import '../../service/watched_progress_service.dart';
 import '../../utils/route_util.dart';
 import '../../utils/toast_util.dart';
@@ -219,7 +220,9 @@ class WatchedPageLogic extends BasePageLogic {
     }
   }
 
+  /// What the other devices read shows up there once their sync is in.
   void openProgress() {
+    unawaited(syncService.syncWatchedProgress());
     toRoute(Routes.watchedProgress);
   }
 }
