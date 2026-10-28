@@ -194,46 +194,54 @@ class WatchedProgressService extends GetxController with JHLifeCircleBeanErrorCa
     _scheduleFlush();
   }
 
+  /// The furthest down is kept: each link says what was read from the
+  /// gallery down to it (see [ranges]), and what was read stays read.
   void _link(WatchedGallery entry, int older) {
-    if (entry.older != older) {
+    if (entry.older == null || older < entry.older!) {
       entry.older = older;
       _dirty.add(entry.gid);
     }
   }
 
   /// The stretches read, the one highest in the list first.
+  ///
+  /// The list is in the order of gid, so two galleries scrolled past next
+  /// to each other were read across all the gids between them, and spans
+  /// that overlap are one stretch. A read gallery the list no longer shows
+  /// (a newer version replaced it) thus stays inside the span read across
+  /// it, though its neighbours now lead past it.
   List<WatchedReadRange> get ranges {
-    final List<WatchedGallery> byPlace = _read.values.toList()..sort((a, b) => b.gid.compareTo(a.gid));
-    // A gallery another one leads to does not start a stretch.
-    final Set<int> ledTo = <int>{
+    final List<(int, int)> spans = <(int, int)>[
       for (final WatchedGallery g in _read.values)
-        if (g.older != null && _read.containsKey(g.older)) g.older!,
-    };
-    final Set<int> placed = <int>{};
+        if (g.older != null && _read.containsKey(g.older)) (min(g.gid, g.older!), max(g.gid, g.older!)) else (g.gid, g.gid),
+    ]..sort((a, b) => b.$2.compareTo(a.$2));
+    // Lowest gid of each stretch, the highest stretch first.
+    final List<int> bottoms = <int>[];
+    for (final (int low, int high) in spans) {
+      if (bottoms.isNotEmpty && high >= bottoms.last) {
+        bottoms.last = min(bottoms.last, low);
+      } else {
+        bottoms.add(low);
+      }
+    }
+
+    final List<WatchedGallery> byPlace = _read.values.toList()..sort((a, b) => b.gid.compareTo(a.gid));
     final List<WatchedReadRange> ranges = <WatchedReadRange>[];
-
-    void collect(WatchedGallery start) {
-      final List<WatchedGallery> stretch = <WatchedGallery>[];
-      WatchedGallery? current = start;
-      while (current != null && placed.add(current.gid)) {
-        stretch.add(current);
-        current = current.older == null ? null : _read[current.older];
-      }
-      ranges.add(WatchedReadRange(stretch));
-    }
-
+    int stretch = 0;
+    List<WatchedGallery> gallerys = <WatchedGallery>[];
     for (final WatchedGallery gallery in byPlace) {
-      if (!ledTo.contains(gallery.gid) && !placed.contains(gallery.gid)) {
-        collect(gallery);
+      if (gallery.gid < bottoms[stretch]) {
+        ranges.add(WatchedReadRange(gallerys));
+        gallerys = <WatchedGallery>[];
+        while (gallery.gid < bottoms[stretch]) {
+          stretch++;
+        }
       }
+      gallerys.add(gallery);
     }
-    // Links gone round in a circle: whatever is left starts where it is.
-    for (final WatchedGallery gallery in byPlace) {
-      if (!placed.contains(gallery.gid)) {
-        collect(gallery);
-      }
+    if (gallerys.isNotEmpty) {
+      ranges.add(WatchedReadRange(gallerys));
     }
-    ranges.sort((a, b) => b.newest.gid.compareTo(a.newest.gid));
     return ranges;
   }
 
