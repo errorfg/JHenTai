@@ -1433,6 +1433,10 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'tachiImportAddRepos': 'The backup names no repositories. Add them under Repositories and import it again to install these extensions; nothing imported is doubled.',
       'tachiClearCookies': 'Clear extension cookies',
       'tachiUpdatesFailed': '@count manga could not be checked',
+      'checkNewChaptersFailed': 'Checking new chapters failed',
+      'noNewChapters': 'No new chapters',
+      'newChaptersFound': '@count with new chapters',
+      'newChaptersCheckFailed': '@count could not be checked',
       'tachiUpdatesHint': 'Pull to refresh to check the manga in your Tachiyomi favorites for new chapters. Each manga asks its site for its chapter list once.',
     };
   }

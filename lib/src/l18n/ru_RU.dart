@@ -1317,6 +1317,10 @@ class ru_RU {
       'tachiImportAddRepos': 'В копии нет репозиториев. Добавьте их на вкладке «Репозитории» и импортируйте снова, чтобы установить эти расширения; уже импортированное не задвоится.',
       'tachiClearCookies': 'Очистить cookie расширений',
       'tachiUpdatesFailed': 'Не удалось проверить манги: @count',
+      'checkNewChaptersFailed': 'Не удалось проверить новые главы',
+      'noNewChapters': 'Новых глав нет',
+      'newChaptersFound': 'С новыми главами: @count',
+      'newChaptersCheckFailed': 'Не удалось проверить: @count',
       'tachiUpdatesHint': 'Потяните вниз, чтобы проверить новые главы манги из избранного Tachiyomi. Для каждой манги сайт запрашивается один раз.',
     };
   }

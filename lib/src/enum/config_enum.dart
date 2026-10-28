@@ -74,6 +74,9 @@ enum ConfigEnum {
   jmFavorite('jmFavorite'),
   tachiFavorite('tachiFavorite'),
 
+  /// The newest chapter of each JM album in the favorites, as last checked.
+  jmUpdates('jmUpdates'),
+
   /// Tachiyomi: extension repositories and installed extensions; source
   /// settings; chapters seen, for the updates list.
   tachiExtensionSetting('tachiExtensionSetting'),

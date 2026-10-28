@@ -1266,6 +1266,10 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'tachiImportAddRepos': '백업에 확장 저장소가 없습니다. 저장소 탭에서 저장소를 추가한 뒤 다시 가져오면 이 확장들이 설치됩니다. 이미 가져온 내용은 중복되지 않습니다.',
       'tachiClearCookies': '확장 쿠키 삭제',
       'tachiUpdatesFailed': '만화 @count개를 확인하지 못했습니다',
+      'checkNewChaptersFailed': '새 챕터 확인 실패',
+      'noNewChapters': '새 챕터 없음',
+      'newChaptersFound': '새 챕터가 있는 작품 @count개',
+      'newChaptersCheckFailed': '@count개 확인 실패',
       'tachiUpdatesHint': '당겨서 새로고침하면 Tachiyomi 즐겨찾기 만화의 새 챕터를 확인합니다. 만화마다 사이트에 챕터 목록을 한 번 요청합니다.',
     };
   }
