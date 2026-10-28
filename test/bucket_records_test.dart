@@ -277,6 +277,33 @@ void main() {
     expect(await tablet.quickSearches(), <String, String?>{'v': 'saved by 8.1.1'});
   });
 
+  test('a history version restored wins over what was done since: a favorite deleted after it comes back, one added after it goes, on every device', () async {
+    final MemoryBucket bucket = MemoryBucket();
+    final _Device phone = _Device(), tablet = _Device();
+    phone.settings.enableHistory.value = true;
+    phone.activate();
+    for (final int id in <int>[101, 102]) {
+      await jmFavoriteService.addFavorite(_jm(id), favoriteCategoryIndex: 0, favoritedTime: DateTime.utc(2026, 10, 1));
+    }
+    await phone.sync(bucket);
+    final String saved = (await BucketRecordBackend(bucket, device: '').listBackups()).single.version;
+
+    phone.activate();
+    await jmFavoriteService.removeFavorite(_jm(102).gid);
+    await jmFavoriteService.addFavorite(_jm(103), favoriteCategoryIndex: 0);
+    await phone.sync(bucket);
+    await tablet.sync(bucket);
+    expect(tablet.favorites(), <int>{101, 103});
+
+    phone.activate();
+    expect((await phone.service(bucket).restoreFromHistory(version: saved)).success, isTrue);
+    expect(phone.favorites(), <int>{101, 102});
+    await tablet.sync(bucket);
+    await phone.sync(bucket);
+    expect(tablet.favorites(), <int>{101, 102});
+    expect(phone.favorites(), <int>{101, 102}, reason: 'a later sync does not undo it');
+  });
+
   test('records compacted into a snapshot reach a new device, deletions included, and packs go once old enough', () async {
     DateTime now = DateTime.utc(2026, 10, 21, 8);
     final MemoryBucket bucket = MemoryBucket(now: () => now);

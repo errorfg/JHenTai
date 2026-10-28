@@ -66,7 +66,9 @@ class CloudConfigService
   @override
   Future<void> doAfterBeanReady() async {}
 
-  Future<void> importConfig(CloudConfig config) async {
+  /// [replace]: the data of the type becomes [config]'s (a history version
+  /// restored); otherwise block rule groups already here are kept.
+  Future<void> importConfig(CloudConfig config, {bool replace = false}) async {
     log.info('📥 Importing config: ${config.type.name}');
 
     switch (config.type) {
@@ -129,10 +131,17 @@ class CloudConfigService
           blockRule.id = null;
         }
 
+        Map<String, List<LocalBlockRule>> groups = blockRules.groupListsBy((element) => element.groupId!);
+        if (replace) {
+          for (String groupId in (await localBlockRuleService.getBlockRules()).map((r) => r.groupId).whereType<String>().toSet()) {
+            if (!groups.containsKey(groupId)) {
+              await localBlockRuleService.removeLocalBlockRulesByGroupId(groupId);
+            }
+          }
+        }
         int imported = 0;
-        for (var group
-            in blockRules.groupListsBy((element) => element.groupId!).entries) {
-          bool exists = await localBlockRuleService.existsGroup(group.key);
+        for (var group in groups.entries) {
+          bool exists = !replace && await localBlockRuleService.existsGroup(group.key);
           if (!exists) {
             await localBlockRuleService.replaceBlockRulesByGroup(
               group.key,

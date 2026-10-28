@@ -87,13 +87,15 @@ class RecordSyncEngine {
     onProgress?.call(0.1);
 
     bool wanted(RecordAdapter adapter) => types == null || types.contains(adapter.type);
+    final Set<int> restored = await _restoredTypes();
+    bool restoring(RecordAdapter adapter) => restored.contains(adapter.type.code);
 
     // 1. Local changes of the kinds taken in before
     PendingSyncSnapshotToken token = await pendingSyncTracker.snapshotToken();
     await _takeRowChanges(device, state, token, firstTime: false);
     for (WholeKindAdapter adapter in _wholeAdapters) {
-      if (state.kinds.contains(adapter.kind) && wanted(adapter)) {
-        await _takeWholeChanges(adapter, device, state);
+      if (state.kinds.contains(adapter.kind) && (wanted(adapter) || restoring(adapter))) {
+        await _takeWholeChanges(adapter, device, state, restoring: restoring(adapter));
       }
     }
     onProgress?.call(0.3);
@@ -116,9 +118,9 @@ class RecordSyncEngine {
     await _takeRowChanges(device, state, token, firstTime: true);
     final Set<String> joined = {};
     for (WholeKindAdapter adapter in _wholeAdapters) {
-      if (!state.kinds.contains(adapter.kind) && wanted(adapter)) {
+      if (!state.kinds.contains(adapter.kind) && (wanted(adapter) || restoring(adapter))) {
         await _takeLegacy(adapter);
-        await _takeWholeChanges(adapter, device, state, joining: joining);
+        await _takeWholeChanges(adapter, device, state, joining: joining, restoring: restoring(adapter));
         if (joining) {
           joined.add(adapter.kind);
         }
@@ -168,8 +170,27 @@ class RecordSyncEngine {
     }
     onProgress?.call(1);
 
+    if (restored.isNotEmpty) {
+      await localConfigService.delete(configKey: ConfigEnum.recordRestoredTypes);
+    }
     log.info('🗄 Record sync: pulled $pulled, applied $applied, pushed $pushed records');
     return RecordSyncResult(pulled: pulled, applied: applied, pushed: pushed);
+  }
+
+  /// Types restored from a history version (see [markRestored]).
+  Future<Set<int>> _restoredTypes() async {
+    final String? raw = await localConfigService.read(configKey: ConfigEnum.recordRestoredTypes);
+    return raw == null ? const <int>{} : (jsonDecode(raw) as List).cast<int>().toSet();
+  }
+
+  /// [types] were just restored from a history version: until a sync is
+  /// done, their data here is taken as changed now, later than any record,
+  /// and what it does not hold as deleted; a restored favorite is not taken
+  /// back by its deletion after the version was saved, as it would be by
+  /// the time it carries.
+  Future<void> markRestored(Iterable<CloudConfigTypeEnum> types) async {
+    final Set<int> codes = <int>{...await _restoredTypes(), ...types.map((CloudConfigTypeEnum t) => t.code)};
+    await localConfigService.write(configKey: ConfigEnum.recordRestoredTypes, value: jsonEncode(codes.toList()..sort()));
   }
 
   /// The device synced history and read progress through a bucket: their
@@ -259,10 +280,12 @@ class RecordSyncEngine {
   ///   table, a record not yet written into the app), the item and the
   ///   record are compared by time, and nothing counts as deleted.
   /// [joining]: see [sync]; until the records are written into the app.
-  Future<void> _takeWholeChanges(WholeKindAdapter adapter, String device, _State state, {bool joining = false}) async {
+  /// [restoring]: see [markRestored].
+  Future<void> _takeWholeChanges(WholeKindAdapter adapter, String device, _State state, {bool joining = false, bool restoring = false}) async {
     List<MapEntry<String, LocalItem>> items = await adapter.export();
     String changeTime = await adapter.changeTime();
     bool first = !state.kinds.contains(adapter.kind);
+    String now = SyncTimeUtil.nowIso();
 
     await appDb.transaction(() async {
       Map<String, SyncRecordData> rows = {
@@ -279,6 +302,28 @@ class RecordSyncEngine {
         String hash = _hash(item.value);
         SyncRecordData? row = rows[key];
         String? promotedTime = promoted[key];
+
+        if (restoring) {
+          if (row == null || row.deleted || row.applyPending || row.value != item.value) {
+            // Its own time when that is later still, as a searched keyword's,
+            // which keeps the order; else just after the record's.
+            String time = item.firstTime ?? now;
+            writes.add(SyncRecordData(
+              kind: adapter.kind,
+              key: key,
+              value: item.value,
+              updatedAt: row == null ? time : _later(time, row.updatedAt),
+              device: device,
+              deleted: false,
+              dirty: true,
+              applyPending: false,
+              localHash: hash,
+            ));
+          } else if (row.localHash != hash) {
+            writes.add(row.copyWith(localHash: Value(hash)));
+          }
+          continue;
+        }
 
         if (row != null && promotedTime == null) {
           if (row.localHash == hash) {
@@ -315,7 +360,13 @@ class RecordSyncEngine {
         }
       }
 
-      if (!first) {
+      if (restoring) {
+        for (SyncRecordData row in rows.values) {
+          if (!held.contains(row.key) && !row.deleted) {
+            writes.add(_deletion(adapter.kind, row.key, _later(now, row.updatedAt), device));
+          }
+        }
+      } else if (!first) {
         for (SyncRecordData row in rows.values) {
           if (held.contains(row.key) || row.deleted || row.localHash == null) {
             continue;
