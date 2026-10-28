@@ -33,6 +33,7 @@ import 'package:jhentai/src/service/nhentai_favorite_service.dart';
 import 'package:jhentai/src/service/nhentai_tag_id_service.dart';
 import 'package:jhentai/src/service/wnacg_favorite_service.dart';
 import 'package:jhentai/src/service/jm_favorite_service.dart';
+import 'package:jhentai/src/service/jm_update_service.dart';
 import 'package:jhentai/src/service/tachi/tachi_extension_service.dart';
 import 'package:jhentai/src/service/tachi/tachi_favorite_service.dart';
 import 'package:jhentai/src/service/tachi/tachi_source_setting_service.dart';
@@ -106,6 +107,7 @@ List<JHLifeCircleBean> lifeCircleBeans = [
   nhentaiTagIdService,
   wnacgFavoriteService,
   jmFavoriteService,
+  jmUpdateService,
   tachiFavoriteService,
   tachiExtensionService,
   tachiSourceSettingService,

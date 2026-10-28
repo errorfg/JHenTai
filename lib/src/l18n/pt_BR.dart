@@ -1317,6 +1317,10 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'tachiImportAddRepos': 'O backup não traz repositórios. Adicione-os em Repositórios e importe de novo para instalar estas extensões; nada do que já foi importado se repete.',
       'tachiClearCookies': 'Limpar cookies das extensões',
       'tachiUpdatesFailed': '@count mangás não puderam ser verificados',
+      'checkNewChaptersFailed': 'Falha ao verificar novos capítulos',
+      'allCaughtUp': 'Todos lidos até o capítulo mais recente',
+      'notCaughtUpCount': '@count sem o capítulo mais recente lido',
+      'newChaptersCheckFailed': '@count não puderam ser verificados',
       'tachiUpdatesHint': 'Puxe para atualizar e verificar novos capítulos dos mangás nos favoritos do Tachiyomi. Cada mangá pede a lista de capítulos ao seu site uma vez.',
     };
   }

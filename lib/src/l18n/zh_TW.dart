@@ -1240,6 +1240,10 @@ favnote：配對收藏備註
       'tachiImportAddRepos': '備份中沒有插件倉庫。在「倉庫」頁新增倉庫後再匯入一次，即可安裝這些插件；已匯入的內容不會重複。',
       'tachiClearCookies': '清除插件的 Cookie',
       'tachiUpdatesFailed': '@count 部漫畫檢查失敗',
+      'checkNewChaptersFailed': '檢查新章節失敗',
+      'allCaughtUp': '都已讀到最新一章',
+      'notCaughtUpCount': '@count 部還沒讀到最新一章',
+      'newChaptersCheckFailed': '@count 部檢查失敗',
       'tachiUpdatesHint': '下拉重新整理，檢查 Tachiyomi 收藏中各部漫畫的新章節。每部漫畫向它的站點請求一次章節列表。',
     };
   }

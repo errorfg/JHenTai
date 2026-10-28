@@ -1370,6 +1370,10 @@ favnote：匹配收藏备注
       'tachiImportAddRepos': '备份中没有插件仓库。在“仓库”页添加仓库后再导入一次，即可安装这些插件；已导入的内容不会重复。',
       'tachiClearCookies': '清除插件的 Cookie',
       'tachiUpdatesFailed': '@count 部漫画检查失败',
+      'checkNewChaptersFailed': '检查新章节失败',
+      'allCaughtUp': '都已读到最新一章',
+      'notCaughtUpCount': '@count 部还没读到最新一章',
+      'newChaptersCheckFailed': '@count 部检查失败',
       'tachiUpdatesHint': '下拉刷新，检查 Tachiyomi 收藏中各部漫画的新章节。每部漫画向它的站点请求一次章节列表。',
     };
   }
