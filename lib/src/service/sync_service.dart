@@ -688,8 +688,9 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
 
       // 2. Import to local (replace current config)
       for (var config in file.configs) {
-        await cloudConfigService.importConfig(config);
+        await cloudConfigService.importConfig(config, replace: true);
       }
+      await recordSyncEngine.markRestored(file.configs.map((CloudConfig c) => c.type));
 
       // 3. (Optional) Sync, the restored settings taken as changed here now
       if (syncToCloud) {

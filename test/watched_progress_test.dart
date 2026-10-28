@@ -164,6 +164,18 @@ void main() {
       }
     });
 
+    test('a stretch read again that ends at a gallery new to the list keeps what was read below it', () {
+      final List<Gallery> list = <Gallery>[for (final int gid in <int>[100, 90, 80, 70]) _gallery(gid, day: 18)];
+      watchedProgressService.markRead(list, 0, 3);
+      // A gallery newly watched shows between 90 and 80; the list is read
+      // down to it, and no further.
+      watchedProgressService.markRead(<Gallery>[list[0], list[1], _gallery(85, day: 18)], 0, 2);
+
+      expect(_stretches(), <List<int>>[
+        <int>[100, 90, 85, 80, 70],
+      ]);
+    });
+
     test('what was read and bookmarked is there after a restart', () async {
       final List<Gallery> list = _list(10);
       watchedProgressService

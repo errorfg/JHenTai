@@ -24,6 +24,9 @@ enum ConfigEnum {
   recordPackLastKey('recordPackLastKey'),
   recordBackupHash('recordBackupHash'),
 
+  /// types restored from a history version and not synced since (codes)
+  recordRestoredTypes('recordRestoredTypes'),
+
   /// a login received through sync still has no igneous of this device's own
   ehIgneousPending('ehIgneousPending'),
 

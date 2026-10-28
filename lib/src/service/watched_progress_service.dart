@@ -252,8 +252,10 @@ class WatchedProgressService extends GetxController with JHLifeCircleBeanErrorCa
     _scheduleFlush();
   }
 
+  /// The furthest down is kept: each link says what was read from the
+  /// gallery down to it (see [ranges]), and what was read stays read.
   void _link(WatchedGallery entry, int older) {
-    if (entry.older != older) {
+    if (entry.older == null || older < entry.older!) {
       entry.older = older;
       _dirty.add(entry.gid);
     }
