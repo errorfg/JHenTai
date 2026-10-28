@@ -747,7 +747,10 @@ class EhAccountRecords extends WholeKindAdapter {
 
 /// The galleries of the watched list read (see [WatchedProgressService]),
 /// a record for each, by gid. Read stays read: no row is deleted, and a
-/// deletion, which no version makes, is not taken.
+/// deletion, which no version makes, is not taken. Of a gallery read on two
+/// devices, the link further down is kept (see WatchedProgressService.ranges):
+/// a record that would take back the one here is written with it instead,
+/// as a change of this device, so the other devices get it too.
 class WatchedReadRecords extends RowKindAdapter {
   @override
   String get kind => 'watchedRead';
@@ -772,19 +775,46 @@ class WatchedReadRecords extends RowKindAdapter {
   @override
   Future<void> apply(List<SyncRecordData> records) async {
     List<SyncRecordData> rows = records.where((r) => !r.deleted).toList();
-    int changed = await localConfigService.batchWriteIfNewer(
-      configKey: ConfigEnum.watchedRead,
-      localConfigs: rows
-          .map((r) => LocalConfigCompanion(
-                configKey: Value(ConfigEnum.watchedRead.key),
-                subConfigKey: Value(r.key),
-                value: Value(r.value!),
-                utime: Value(r.updatedAt),
-              ))
-          .toList(),
-    );
+    Map<String, LocalConfig> here = {
+      for (LocalConfig row in rows.isEmpty
+          ? <LocalConfig>[]
+          : await localConfigService.readBySubKeys(configKey: ConfigEnum.watchedRead, subConfigKeys: rows.map((r) => r.key).toSet()))
+        row.subConfigKey: row,
+    };
+    String now = SyncTimeUtil.nowIso();
+    Set<String> merged = {};
+    List<LocalConfigCompanion> writes = [];
+    for (SyncRecordData record in rows) {
+      String value = record.value!;
+      String time = record.updatedAt;
+      LocalConfig? local = here[record.key];
+      if (local != null) {
+        Map<String, dynamic> theirs = jsonDecode(value) as Map<String, dynamic>;
+        Map<String, dynamic> ours = jsonDecode(local.value) as Map<String, dynamic>;
+        int? older = <int?>[theirs['older'] as int?, ours['older'] as int?].whereType<int>().minOrNull;
+        bool theirsNewer = SyncTimeUtil.canonicalize(record.updatedAt).compareTo(SyncTimeUtil.canonicalize(local.utime)) > 0;
+        Map<String, dynamic> base = theirsNewer ? theirs : ours;
+        if (base['older'] != older) {
+          value = jsonEncode(<String, dynamic>{...base, 'older': older});
+          time = now;
+          merged.add(record.key);
+        } else if (!theirsNewer) {
+          continue;
+        }
+      }
+      writes.add(LocalConfigCompanion(
+        configKey: Value(ConfigEnum.watchedRead.key),
+        subConfigKey: Value(record.key),
+        value: Value(value),
+        utime: Value(time),
+      ));
+    }
+    int changed = await localConfigService.batchWriteIfNewer(configKey: ConfigEnum.watchedRead, localConfigs: writes);
+    if (merged.isNotEmpty) {
+      await pendingSyncTracker.markWatchedPendingAll(merged);
+    }
     if (changed > 0) {
-      await watchedProgressService.reloadStored(read: rows.map((r) => int.tryParse(r.key)).whereType<int>().toSet());
+      await watchedProgressService.reloadStored(read: writes.map((w) => int.tryParse(w.subConfigKey.value)).whereType<int>().toSet());
     }
   }
 }

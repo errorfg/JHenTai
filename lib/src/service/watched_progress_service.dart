@@ -183,8 +183,12 @@ class WatchedProgressService extends GetxController with JHLifeCircleBeanErrorCa
       for (final LocalConfig config in rows) {
         try {
           final WatchedGallery gallery = WatchedGallery.fromJson(jsonDecode(config.value) as Map<String, dynamic>);
-          if (!_dirty.contains(gallery.gid)) {
+          final WatchedGallery? changed = _dirty.contains(gallery.gid) ? _read[gallery.gid] : null;
+          if (changed == null) {
             _read[gallery.gid] = gallery;
+          } else if (gallery.older != null) {
+            // Written over it later; with the link further down of the two.
+            _link(changed, gallery.older!);
           }
         } catch (e) {
           log.warning('Skip a broken watched-list row ${config.subConfigKey}', e);

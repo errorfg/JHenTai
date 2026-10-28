@@ -16,6 +16,7 @@ import 'package:jhentai/src/service/cloud/sync_device_id.dart';
 import 'package:jhentai/src/service/record_sync/bucket_record_backend.dart';
 import 'package:jhentai/src/service/record_sync/record_backend.dart';
 import 'package:jhentai/src/service/record_sync/record_sync_engine.dart';
+import 'package:jhentai/src/service/watched_progress_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
@@ -366,6 +367,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     if (!syncSetting.enableSync.value || !syncSetting.autoSync.value) {
       return null;
     }
+    // What was read in the last second, not yet written, goes too.
+    await watchedProgressService.flush();
     return syncAfterLocalChange(types: const [CloudConfigTypeEnum.watchedProgress]);
   }
 

@@ -382,6 +382,50 @@ void main() {
     expect(server.pushedRecords, pushed);
   });
 
+  test('a gallery of the watched list read on two devices keeps the stretch read below it on both', () async {
+    final _MemoryServer server = _MemoryServer('db-1');
+    final _Device phone = _Device();
+    final _Device desktop = _Device();
+    final List<Gallery> list = _watchedList(11, newestGid: 100);
+
+    await phone.activate();
+    watchedProgressService.markRead(list, 0, 10);
+    await watchedProgressService.flush();
+    await phone.sync(server);
+    // The desktop, not synced yet, opens the list at its top and goes no
+    // further: its 100 is read later, and leads nowhere.
+    await _tick();
+    await desktop.activate();
+    watchedProgressService.markRead(list, 0, 0);
+    await watchedProgressService.flush();
+    await desktop.sync(server);
+    await phone.sync(server);
+    await phone.sync(server);
+    await desktop.sync(server);
+
+    for (final _Device device in [phone, desktop]) {
+      final (List<List<int>> ranges, _, _) = await device.watchedProgress();
+      expect(ranges, [list.map((Gallery g) => g.gid).toList()]);
+      expect((await device.watchedProgress(stored: true)).$1, ranges);
+    }
+  });
+
+  test('a sync of the watched list takes what was read in the last second too', () async {
+    final _MemoryServer server = _MemoryServer('db-1');
+    final _Device phone = _Device();
+    await phone.activate();
+    syncSetting
+      ..currentProvider.value = SyncService.serverProvider
+      ..enableSync.value = true
+      ..autoSync.value = true;
+    watchedProgressService.markRead(_watchedList(3), 0, 2);
+
+    syncService = SyncService(recordBackendFactory: () => server);
+    final SyncResult? result = await syncService.syncWatchedProgress();
+    expect(result?.success, isTrue, reason: result?.message);
+    expect(server.record('watchedRead', '3500000'), isNotNull);
+  });
+
   test('devices that already hold the same data push nothing more once they have met', () async {
     final _MemoryServer server = _MemoryServer('db-1');
     final _Device phone = _Device();
