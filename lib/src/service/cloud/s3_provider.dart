@@ -172,20 +172,21 @@ class S3Provider implements CloudProvider {
         size: stat.size ?? 0,
         etag: stat.etag,
       );
-    } on TimeoutException {
-      // The service does not answer: the sync stops rather than go on.
+    } on MinioS3Error catch (e) {
+      if (_isMissing(e)) {
+        return null;
+      }
+      log.warning('S3 statObject of latest.json failed (${e.runtimeType}, HTTP ${e.response?.statusCode})');
       rethrow;
-    } on MinioError catch (_) {
-      // File doesn't exist (NoSuchKey) or other S3 errors
-      // Don't access exception properties to avoid triggering null check issues in minio-dart
-      // Most common case: file doesn't exist (first sync)
-      return null;
-    } catch (_) {
-      // Catch any other unexpected errors
-      // Don't log exception to avoid potential null check issues
-      return null;
     }
   }
+
+  /// Whether the service said the object is not there (HTTP 404: NoSuchKey,
+  /// or the reason phrase for a HEAD request, which has no body). Any other
+  /// error fails the sync: taken for a missing object, it would have the
+  /// manifest or what earlier versions synced made anew. The status is read
+  /// with care: minio-dart error objects can throw on other properties.
+  static bool _isMissing(MinioS3Error e) => e.response?.statusCode == 404;
 
   @override
   Future<bool> testConnection() async {
@@ -235,11 +236,12 @@ class S3Provider implements CloudProvider {
     try {
       return await _get(fullKey);
     } on MinioS3Error catch (e) {
-      /// S3-level error: by far the most common case is NoSuchKey. Only the
-      /// runtime type is safe to log - minio-dart error objects can throw on
-      /// property access.
-      log.debug('S3 getObject miss for $fullKey (${e.runtimeType})');
-      return null;
+      if (_isMissing(e)) {
+        log.debug('S3 getObject miss for $fullKey');
+        return null;
+      }
+      log.warning('S3 getObject of $fullKey failed (${e.runtimeType}, HTTP ${e.response?.statusCode})');
+      rethrow;
     }
   }
 
