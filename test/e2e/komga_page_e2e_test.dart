@@ -1,3 +1,7 @@
+// Needs a Komga server (test/e2e/komga_e2e.json).
+@Tags(<String>['external'])
+library;
+
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
