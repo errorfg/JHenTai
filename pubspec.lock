@@ -997,6 +997,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.1"
+  liquid_glass_widgets:
+    dependency: "direct main"
+    description:
+      path: "third_party/liquid_glass_widgets"
+      relative: true
+    source: path
+    version: "1.14.2"
   loading_animation_widget:
     dependency: "direct main"
     description:

@@ -18,9 +18,7 @@ class WillPopInterceptor extends StatefulWidget {
   State<WillPopInterceptor> createState() => _WillPopInterceptorState();
 }
 
-class _WillPopInterceptorState extends State<WillPopInterceptor> {
-  DateTime? _lastPopTime;
-
+class _WillPopInterceptorState extends State<WillPopInterceptor> with _TapAgainToExit {
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -71,6 +69,44 @@ class _WillPopInterceptorState extends State<WillPopInterceptor> {
 
     return _handleDoubleTapPopApp();
   }
+}
+
+/// Back on the page of a scheme of its own (Komga, PDF). It stands in for
+/// the home of the sites, which stays underneath it, so back never returns
+/// there: [onBack] goes back inside the page first; then, on Android, a
+/// second back within 800 ms leaves the app, as on the home.
+class SchemePagePopScope extends StatefulWidget {
+  const SchemePagePopScope({super.key, required this.child, this.onBack});
+
+  final Widget child;
+
+  /// Goes back inside the page; false when there is nothing to go back to.
+  final bool Function()? onBack;
+
+  @override
+  State<SchemePagePopScope> createState() => _SchemePagePopScopeState();
+}
+
+class _SchemePagePopScopeState extends State<SchemePagePopScope> with _TapAgainToExit {
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) async {
+        if (didPop || (widget.onBack?.call() ?? false) || !Platform.isAndroid) {
+          return;
+        }
+        if (await _handleDoubleTapPopApp() && context.mounted) {
+          SystemNavigator.pop(animated: true);
+        }
+      },
+      child: widget.child,
+    );
+  }
+}
+
+mixin _TapAgainToExit<T extends StatefulWidget> on State<T> {
+  DateTime? _lastPopTime;
 
   /// double tap back button to exit app
   Future<bool> _handleDoubleTapPopApp() {
