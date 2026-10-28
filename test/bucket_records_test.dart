@@ -22,6 +22,7 @@ import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/service/record_sync/bucket_record_backend.dart';
+import 'package:jhentai/src/service/record_sync/record_backend.dart';
 import 'package:jhentai/src/service/record_sync/record_sync_engine.dart';
 import 'package:jhentai/src/service/sync_service.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
@@ -310,5 +311,68 @@ void main() {
     tablet.activate();
     await recordSyncEngine.sync(BucketRecordBackend(bucket, device: 'tablet', now: () => now));
     expect(await tablet.historyGids(), <int>{1, 2, 4, 5, 6}, reason: 'the deletion of 3 is in the snapshot, and later than the tablet\'s');
+  });
+
+  test('a device that keeps up takes the packs of a new snapshot, not the snapshot; one that fell behind the removed packs takes it', () async {
+    DateTime now = DateTime.utc(2026, 10, 21, 8);
+    final MemoryBucket bucket = MemoryBucket(now: () => now);
+    final _Device phone = _Device(), tablet = _Device(), laptop = _Device();
+    BucketRecordBackend backend(String device) => BucketRecordBackend(bucket, device: device, compactAfter: 3, now: () => now);
+    Future<void> record(_Device device, int gid) async {
+      device.activate();
+      await historyService.record(_history(gid));
+      await recordSyncEngine.sync(backend(device == phone ? 'phone' : device == tablet ? 'tablet' : 'laptop'));
+      now = now.add(const Duration(minutes: 1));
+    }
+
+    await record(phone, 1);
+    await record(tablet, 2);
+    await record(laptop, 3);
+    for (int gid = 4; gid <= 6; gid++) {
+      await record(phone, gid);
+    }
+    tablet.activate();
+    await recordSyncEngine.sync(backend('tablet'));
+    phone.activate();
+    await backend('phone').compact();
+    final String snapshot = (await bucket.listRawObjects(BucketRecordBackend.snapshotsPrefix)).single.key;
+
+    // The tablet has every pack the snapshot holds but its own.
+    await record(phone, 7);
+    bucket.reads.clear();
+    tablet.activate();
+    await recordSyncEngine.sync(backend('tablet'));
+    expect(bucket.reads, isNot(contains(snapshot)));
+    expect(await tablet.historyGids(), <int>{1, 2, 3, 4, 5, 6, 7});
+
+    // A week on, the packs the snapshot holds are removed: the laptop,
+    // which last took the tablet's first pack, takes the snapshot.
+    now = now.add(const Duration(days: 8));
+    await record(phone, 8);
+    phone.activate();
+    await backend('phone').compact();
+    bucket.reads.clear();
+    laptop.activate();
+    await recordSyncEngine.sync(backend('laptop'));
+    expect(bucket.reads.where((String key) => key.startsWith(BucketRecordBackend.snapshotsPrefix)), isNotEmpty);
+    expect(await laptop.historyGids(), <int>{1, 2, 3, 4, 5, 6, 7, 8});
+  });
+
+  test('a snapshot removed while a device was part way through it: the newest is taken from its start', () async {
+    final MemoryBucket bucket = MemoryBucket();
+    final _Device phone = _Device();
+    phone.activate();
+    BucketRecordBackend backend() => BucketRecordBackend(bucket, device: 'phone', compactAfter: 1);
+    for (int gid = 1; gid <= 3; gid++) {
+      await historyService.record(_history(gid));
+      await recordSyncEngine.sync(backend());
+    }
+    await backend().compact();
+
+    // Stopped at the second record of a snapshot compactions have removed.
+    final String cursor = jsonEncode(<String, dynamic>{'snapshot': null, 'packs': <String, String>{}, 'taking': '20260101000000000-gone', 'offset': 1});
+    final RecordPage page = await BucketRecordBackend(bucket, device: 'tablet').pull(since: cursor, device: 'tablet', limit: 200);
+    expect(page.records.map((RemoteRecord r) => r.key), hasLength(3));
+    expect((jsonDecode(page.next) as Map)['snapshot'], (await backend().manifest()).snapshot);
   });
 }

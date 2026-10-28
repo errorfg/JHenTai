@@ -76,8 +76,14 @@ class MemoryBucket implements CloudProvider {
     writes.add(key);
   }
 
+  /// Keys of the objects read, in order.
+  final List<String> reads = <String>[];
+
   @override
-  Future<List<int>?> getRawObject(String key) async => objects[key]?.bytes;
+  Future<List<int>?> getRawObject(String key) async {
+    reads.add(key);
+    return objects[key]?.bytes;
+  }
 
   @override
   Future<List<RemoteObjectInfo>> listRawObjects(String prefix) async => <RemoteObjectInfo>[

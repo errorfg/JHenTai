@@ -13,7 +13,7 @@ import 'record_backend.dart';
 
 /// What records/v1/manifest.json of a bucket says.
 class BucketManifest {
-  const BucketManifest({required this.database, this.snapshot, this.legacyDevice, this.legacyAt});
+  const BucketManifest({required this.database, this.snapshot, this.coverage, this.legacyDevice, this.legacyAt});
 
   /// Made with the layout; a new one (the folder emptied) has every device
   /// push all its records again, as for a sync server's new database.
@@ -21,6 +21,10 @@ class BucketManifest {
 
   /// The snapshot a device new to the records starts from.
   final String? snapshot;
+
+  /// The last pack of each device [snapshot] holds; null in a manifest
+  /// written before it was kept here.
+  final Map<String, String>? coverage;
 
   /// The device that took over what versions up to 8.1.1 synced in the
   /// bucket (latest.json and the op packs), and when; null until one has.
@@ -30,6 +34,7 @@ class BucketManifest {
   factory BucketManifest.fromJson(Map<String, dynamic> json) => BucketManifest(
         database: json['database'] as String,
         snapshot: json['snapshot'] as String?,
+        coverage: (json['coverage'] as Map?)?.cast<String, String>(),
         legacyDevice: (json['legacy'] as Map?)?['device'] as String?,
         legacyAt: (json['legacy'] as Map?)?['at'] as String?,
       );
@@ -38,6 +43,7 @@ class BucketManifest {
         'format': BucketRecordBackend.format,
         'database': database,
         'snapshot': snapshot,
+        if (coverage != null) 'coverage': coverage,
         'legacy': legacyDevice == null ? null : <String, dynamic>{'device': legacyDevice, 'at': legacyAt},
       };
 }
@@ -185,7 +191,13 @@ class BucketRecordBackend implements RecordBackend {
       _manifest = current;
       return;
     }
-    _manifest = BucketManifest(database: current.database, snapshot: current.snapshot, legacyDevice: device, legacyAt: SyncTimeUtil.nowIso());
+    _manifest = BucketManifest(
+      database: current.database,
+      snapshot: current.snapshot,
+      coverage: current.coverage,
+      legacyDevice: device,
+      legacyAt: SyncTimeUtil.nowIso(),
+    );
     await _writeManifest(_manifest!);
   }
 
@@ -208,16 +220,30 @@ class BucketRecordBackend implements RecordBackend {
     _packs = null;
   }
 
-  /// A snapshot newer than the one taken comes first, a page at a time;
+  /// A snapshot newer than the one taken comes first, a page at a time,
+  /// unless every pack it holds that this device lacks is still there;
   /// then the packs of other devices after the last taken of each, whole.
   @override
   Future<RecordPage> pull({required String since, required String device, required int limit}) async {
     final _Cursor cursor = _Cursor.parse(since);
     final BucketManifest manifest = await this.manifest();
-    final String? taking = cursor.taking ??
-        (manifest.snapshot != null && (cursor.snapshot == null || manifest.snapshot!.compareTo(cursor.snapshot!) > 0) ? manifest.snapshot : null);
+    String? taking = cursor.taking;
+    if (taking == null && manifest.snapshot != null && (cursor.snapshot == null || manifest.snapshot!.compareTo(cursor.snapshot!) > 0)) {
+      if (await _packsLeftFor(manifest.coverage, cursor, device)) {
+        cursor.snapshot = manifest.snapshot;
+      } else {
+        taking = manifest.snapshot;
+      }
+    }
     if (taking != null) {
-      final _Snapshot? snapshot = await _snapshot(taking);
+      _Snapshot? snapshot = await _snapshot(taking);
+      if (snapshot == null && manifest.snapshot != null && manifest.snapshot != taking) {
+        // Removed by compactions while this device was part way through it:
+        // the newest is taken instead, from its start.
+        taking = manifest.snapshot!;
+        cursor.offset = 0;
+        snapshot = await _snapshot(taking);
+      }
       if (snapshot == null) {
         throw StateError('Snapshot $taking of the bucket records is missing');
       }
@@ -265,6 +291,27 @@ class BucketRecordBackend implements RecordBackend {
       taken++;
     }
     return RecordPage(records: records, next: cursor.encode(), more: taken < pending.length);
+  }
+
+  /// Whether this device can go without the snapshot of [coverage] and take
+  /// packs only: for each other device with packs in it after the last one
+  /// taken here, that one is still in the bucket. Packs are removed oldest
+  /// first, so then none after it was.
+  Future<bool> _packsLeftFor(Map<String, String>? coverage, _Cursor cursor, String device) async {
+    if (coverage == null) {
+      return false;
+    }
+    final Set<String> listed = <String>{for (final _PackKey pack in _packs ??= await _listPacks()) pack.key};
+    for (final MapEntry<String, String> entry in coverage.entries) {
+      final String? taken = cursor.packs[entry.key];
+      if (entry.key == device || entry.value.compareTo(taken ?? '') <= 0) {
+        continue;
+      }
+      if (taken == null || !listed.contains('$packsPrefix${entry.key}/$taken.json.gz')) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /// See the class: a snapshot of all records once there are more than
@@ -326,7 +373,13 @@ class BucketRecordBackend implements RecordBackend {
       await _provider.deleteRawObject('$snapshotsPrefix$name.json.gz');
       return;
     }
-    _manifest = BucketManifest(database: current.database, snapshot: name, legacyDevice: current.legacyDevice, legacyAt: current.legacyAt);
+    _manifest = BucketManifest(
+      database: current.database,
+      snapshot: name,
+      coverage: coverage,
+      legacyDevice: current.legacyDevice,
+      legacyAt: current.legacyAt,
+    );
     await _writeManifest(_manifest!);
 
     final DateTime removable = _now().subtract(packRetention);
