@@ -6,6 +6,7 @@ import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/pages/base/base_page.dart';
 import 'package:jhentai/src/pages/gallerys/dashboard/dashboard_page_state.dart';
 import 'package:jhentai/src/routes/routes.dart';
+import 'package:jhentai/src/utils/iphone_duo.dart';
 import 'package:jhentai/src/utils/route_util.dart';
 import 'package:jhentai/src/widget/eh_wheel_speed_controller.dart';
 import 'package:jhentai/src/widget/eh_dashboard_card.dart';
@@ -60,11 +61,12 @@ class DashboardPage extends BasePage {
         icon: const Icon(Icons.search),
         onPressed: () => toRoute(Routes.mobileV2Search),
       ),
-      IconButton(
-        icon: const Icon(Icons.more_vert),
-        onPressed:
-            MobileLayoutPageV2State.scaffoldKey.currentState?.openEndDrawer,
-      ),
+      if (!isIPhoneDuo)
+        IconButton(
+          icon: const Icon(Icons.more_vert),
+          onPressed:
+              MobileLayoutPageV2State.scaffoldKey.currentState?.openEndDrawer,
+        ),
     ];
   }
 

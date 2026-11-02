@@ -6,6 +6,7 @@ import 'package:jhentai/src/setting/style_setting.dart';
 
 import '../../../model/jh_layout.dart';
 import '../../../routes/routes.dart';
+import '../../../utils/iphone_duo.dart';
 import '../../../utils/route_util.dart';
 
 class SettingStylePage extends StatelessWidget {
@@ -28,7 +29,7 @@ class SettingStylePage extends StatelessWidget {
             _buildCrossAxisCountInGridDownloadPageForGallery(),
             _buildCrossAxisCountInDetailPage(),
             if (!styleSetting.isInWaterFlowListMode) _buildMoveCover2RightSide().fadeIn(),
-            _buildLayout(context),
+            if (!isIPhoneDuo) _buildLayout(context),
             if (GetPlatform.isMobile) _buildShowRotationFAB().fadeIn(),
           ],
         ).withListTileTheme(context),

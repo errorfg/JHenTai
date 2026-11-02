@@ -24,6 +24,7 @@ import 'package:jhentai/src/service/local_block_rule_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/local_gallery_service.dart';
 import 'package:jhentai/src/service/log.dart';
+import 'package:jhentai/src/utils/iphone_duo.dart';
 import 'package:jhentai/src/service/path_service.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
@@ -174,6 +175,8 @@ void main(List<String> args) async {
   for (JHLifeCircleBean bean in lifeCircleBeans) {
     await bean.initBean();
   }
+
+  await detectIPhoneDuo();
 
   // Glass follows the app's light or dark theme, not only the system's.
   runApp(LiquidGlassWidgets.wrap(child: const MyApp(), brightnessResolver: Theme.maybeBrightnessOf));

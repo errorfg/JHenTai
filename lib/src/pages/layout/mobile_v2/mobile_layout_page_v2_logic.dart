@@ -57,7 +57,7 @@ class MobileLayoutPageV2Logic extends GetxController with DoubleTapToRefreshLogi
 
   void handleTapTabBarButton(int index) {
     if (state.icons[index].enterNewRoute) {
-      MobileLayoutPageV2State.scaffoldKey.currentState?.closeDrawer();
+      _closeDrawers();
       toRoute(state.icons[index].routeName);
       return;
     }
@@ -74,9 +74,25 @@ class MobileLayoutPageV2Logic extends GetxController with DoubleTapToRefreshLogi
     state.selectedDrawerTabIndex = index;
 
     if (prevIndex != index) {
-      MobileLayoutPageV2State.scaffoldKey.currentState?.closeDrawer();
+      _closeDrawers();
       update([bodyId, tabBarId]);
     }
+  }
+
+  /// The button of the page on screen scrolls it to the top, as on the bottom bar.
+  void handleTapSideRailButton(int index) {
+    if (index == state.selectedDrawerTabIndex && !state.icons[index].enterNewRoute) {
+      handleTap2Scroll2Top(state.icons[index].scrollController?.call());
+      return;
+    }
+
+    handleTapTabBarButton(index);
+  }
+
+  void _closeDrawers() {
+    MobileLayoutPageV2State.scaffoldKey.currentState
+      ?..closeDrawer()
+      ..closeEndDrawer();
   }
 
   void handleTapTabBarButtonByRouteName(String routeName) {
