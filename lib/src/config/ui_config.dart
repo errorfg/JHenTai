@@ -169,15 +169,10 @@ class UIConfig {
   static const double desktopLeftTabBarItemHeight = 60;
   static const double desktopLeftTabBarTextHeight = 18;
 
-  /// The bar along the edge on iPhone Duo, by Apple's design kit: a column of
-  /// buttons, with its margins. The status bar and camera take the top of the
-  /// inset along the edge, more of it on the outer display.
-  static const double sideRailItemSize = 48;
-  static const double sideRailInnerMargin = 12;
-  static const double sideRailBottomMargin = 24;
-  static const double sideRailMinWidth = 72;
-  static const double sideRailReservedHeightInnerDisplay = 119;
-  static const double sideRailReservedHeightOuterDisplay = 169;
+  /// The status bar on the inner display of iPhone Duo held upright takes this
+  /// much of the top right corner, measured on the iOS 27.1 simulator; used
+  /// until iOS reports the region.
+  static const double iPhoneDuoStatusCornerWidth = 134;
 
   /// mobile home page
   static Color loginAvatarBackGroundColor(BuildContext context) => Theme.of(context).colorScheme.surfaceContainerHighest;
