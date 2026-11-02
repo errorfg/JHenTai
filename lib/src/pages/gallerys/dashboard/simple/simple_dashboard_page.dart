@@ -14,10 +14,12 @@ class SimpleDashboardPage extends BasePage {
   const SimpleDashboardPage({Key? key})
       : super(
           key: key,
-          showMenuButton: true,
           showTitle: true,
           showScroll2TopButton: true,
         );
+
+  @override
+  bool get showMenuButton => !isIPhoneDuo;
 
   @override
   String get name => 'home'.tr;

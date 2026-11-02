@@ -35,7 +35,7 @@ class MobileLayoutPageV2 extends StatelessWidget {
           key: MobileLayoutPageV2State.scaffoldKey,
           drawerEdgeDragWidth: preferenceSetting.drawerGestureEdgeWidth.value.toDouble(),
           drawerScrimColor: isIPhoneDuo ? Colors.black12 : null,
-          drawer: buildLeftDrawer(context),
+          drawer: isIPhoneDuo ? null : buildLeftDrawer(context),
           drawerEnableOpenDragGesture: preferenceSetting.enableLeftMenuDrawerGesture.isTrue,
           endDrawer: isIPhoneDuo ? buildPanel() : buildRightDrawer(),
           endDrawerEnableOpenDragGesture: isIPhoneDuo || preferenceSetting.enableQuickSearchDrawerGesture.isTrue,
@@ -47,20 +47,19 @@ class MobileLayoutPageV2 extends StatelessWidget {
   }
 
   Widget buildLeftDrawer(BuildContext context) {
-    return MobileLeftDrawer(logic: logic, state: state, glass: isIPhoneDuo);
+    return MobileLeftDrawer(logic: logic, state: state);
   }
 
   Widget buildRightDrawer() {
     return Drawer(width: 278, child: QuickSearchPage(scrollController: quickSearchService.drawerScrollController));
   }
 
-  /// iPhone Duo: the drawer's content, pulled out on the side of the bar.
+  /// iPhone Duo: the drawer's content, pulled out at the right edge.
   Widget buildPanel() {
     return MobileLeftDrawer(
       logic: logic,
       state: state,
       atEnd: true,
-      glass: true,
       onBeforeSwitch: () => MobileLayoutPageV2State.scaffoldKey.currentState?.closeEndDrawer(),
     );
   }
@@ -136,7 +135,6 @@ class MobileLeftDrawer extends StatelessWidget {
     this.onDestinationSelected,
     this.showSelectedDestination = true,
     this.atEnd = false,
-    this.glass = false,
   }) : assert(logic != null || onDestinationSelected != null);
 
   final MobileLayoutPageV2State state;
@@ -149,11 +147,9 @@ class MobileLeftDrawer extends StatelessWidget {
   final ValueChanged<int>? onDestinationSelected;
   final bool showSelectedDestination;
 
-  /// Opens from the right edge.
+  /// iPhone Duo's panel: a card of iOS's own glass from the right edge, across
+  /// the inset there.
   final bool atEnd;
-
-  /// A card of iOS's own glass, across the inset at the edge it opens from.
-  final bool glass;
 
   @override
   Widget build(BuildContext context) {
@@ -164,7 +160,7 @@ class MobileLeftDrawer extends StatelessWidget {
             builder: (_) => _buildContent(context),
           );
 
-    if (!glass) {
+    if (!atEnd) {
       return Drawer(
         key: const ValueKey<String>('mobileLeftDrawer'),
         width: 278,

@@ -17,6 +17,7 @@ import '../../../../service/gallery_download_service.dart';
 import '../../../../service/super_resolution_service.dart';
 import '../../../../setting/performance_setting.dart';
 import '../../../../utils/date_util.dart';
+import '../../../../utils/iphone_duo.dart';
 import '../../../../utils/route_util.dart';
 import '../../../../widget/eh_gallery_category_tag.dart';
 import '../../../../widget/eh_image.dart';
@@ -62,7 +63,7 @@ class GalleryListDownloadPage extends StatelessWidget with Scroll2TopPageMixin, 
   AppBar buildAppBar(BuildContext context) {
     return AppBar(
       centerTitle: true,
-      leading: styleSetting.isInV2Layout
+      leading: styleSetting.isInV2Layout && (!isIPhoneDuo || isRouteAtTop(Routes.download))
           ? IconButton(
               icon: isRouteAtTop(Routes.download) ? const Icon(Icons.arrow_back) : Icon(Icons.menu, size: 20),
               onPressed: () {

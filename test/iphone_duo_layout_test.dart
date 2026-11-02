@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:jhentai/src/model/jh_layout.dart';
 import 'package:jhentai/src/model/tab_bar_icon.dart';
 import 'package:jhentai/src/pages/gallerys/dashboard/dashboard_page.dart';
+import 'package:jhentai/src/pages/gallerys/dashboard/simple/simple_dashboard_page.dart';
 import 'package:jhentai/src/pages/home_page.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2_logic.dart';
@@ -134,22 +135,20 @@ void main() {
     expect(find.byType(NavigationBar), findsNothing);
 
     final Rect bar = tester.getRect(_bar);
-    final bool atLeft = pose.viewPadding.left > 0;
     expect(bar.width, 84);
-    expect(atLeft ? bar.left : bar.right, atLeft ? 0 : pose.size.width);
+    expect(bar.right, pose.size.width);
 
     // A column 48 wide, 24 from the edge, as the system's.
     final Rect menu = tester.getRect(_menuButton);
     expect(menu.width, 48);
-    expect(menu.center.dx, atLeft ? 48 : pose.size.width - 48);
+    expect(menu.center.dx, pose.size.width - 48);
     expect(menu.top, top);
     expect(tester.getRect(_tabs).bottom, pose.size.height - bottom);
     expect(tester.getRect(_tabs).top, greaterThanOrEqualTo(menu.bottom));
 
     // The page stops at the bar, and does not leave room for it again.
-    final Rect page = tester.getRect(find.byKey(const ValueKey<String>('page:home')));
-    expect(atLeft ? page.left : page.right, atLeft ? bar.right : bar.left);
-    expect(atLeft ? _pagePadding!.left : _pagePadding!.right, 0);
+    expect(tester.getRect(find.byKey(const ValueKey<String>('page:home'))).right, bar.left);
+    expect(_pagePadding!.right, 0);
   }
 
   group('the bar goes where the system puts its own', () {
@@ -163,9 +162,12 @@ void main() {
       expectStrip(tester, _outer, top: 170, bottom: 24);
     });
 
-    testWidgets(_outerLeft.name, (WidgetTester tester) async {
+    testWidgets('${_outerLeft.name}: still on the right, nothing to avoid there', (WidgetTester tester) async {
       await _pumpHome(tester, _outerLeft);
-      expectStrip(tester, _outerLeft, top: 82, bottom: 24);
+      expectStrip(tester, _outerLeft, top: 24, bottom: 24);
+
+      // The system's strip on the left stays clear for the page.
+      expect(_pagePadding!.left, 84);
     });
 
     testWidgets(_outerRight.name, (WidgetTester tester) async {
@@ -293,15 +295,26 @@ void main() {
     expect(logic.state.selectedDrawerTabIndex, _destinations.indexOf(TabBarIconNameEnum.history));
   });
 
-  testWidgets('with the bar on the left, the menu button opens the card on the left', (WidgetTester tester) async {
+  testWidgets('the panel opens on the right only', (WidgetTester tester) async {
     await _pumpHome(tester, _outerLeft);
+
+    expect(_scaffold.hasDrawer, isFalse);
+
+    await tester.dragFrom(const Offset(4, 200), const Offset(300, 0));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey<String>('mobileLeftDrawer')), findsNothing);
 
     await tester.tap(_menuButton);
     await tester.pumpAndSettle();
+    expect(_scaffold.isEndDrawerOpen, isTrue);
+    expect(tester.getRect(_panel).right, 678);
+  });
 
-    expect(_scaffold.isDrawerOpen, isTrue);
-    expect(tester.getRect(_panel).left, 0);
-    expect(tester.getRect(_panel).width, 278 + 84);
+  test('the simple dashboard has no menu button', () {
+    expect(const SimpleDashboardPage().showMenuButton, isFalse);
+
+    isIPhoneDuo = false;
+    expect(const SimpleDashboardPage().showMenuButton, isTrue);
   });
 
   testWidgets('the layout setting does not apply: always the phone layout', (WidgetTester tester) async {

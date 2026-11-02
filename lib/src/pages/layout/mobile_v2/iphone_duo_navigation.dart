@@ -10,11 +10,11 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:liquid_glass_widgets/src/widgets/surfaces/status_bar_row.dart';
 import 'package:liquid_glass_widgets/src/widgets/surfaces/vertical_bar_regions.dart';
 
-/// The home's navigation on iPhone Duo, in place of the bottom bar, where the
-/// system puts its own bars: a strip along the edge in every pose but one, and
-/// beside the status bar at the top of the inner display held upright. The tabs
-/// scroll along the bar; a swipe away from the edge, or the menu button, pulls
-/// out the drawer that names them.
+/// The home's navigation on iPhone Duo, in place of the bottom bar and the left
+/// drawer: a strip along the right edge in every pose but one, and beside the
+/// status bar at the top of the inner display held upright. The tabs scroll
+/// along the bar; a swipe away from the edge, or the menu button, pulls out the
+/// panel that names them.
 class IPhoneDuoNavigation extends StatelessWidget {
   const IPhoneDuoNavigation({super.key, required this.logic, required this.state, required this.child});
 
@@ -46,28 +46,26 @@ class IPhoneDuoNavigation extends StatelessWidget {
     );
   }
 
+  /// On the right whichever edge the system chose. Where it chose the left, its
+  /// status bar and camera are over there, with nothing to avoid on the right.
   Widget _buildWithStrip(BuildContext context, GlassVerticalBarData strip) {
-    final bool atLeft = (strip.edge == GlassVerticalBarEdge.leading) == (Directionality.of(context) == TextDirection.ltr);
-    final double outerMargin = strip.width - GlassVerticalBarMetrics.controlExtent - GlassVerticalBarMetrics.inset;
-
-    final Widget bar = Container(
-      key: const ValueKey<String>('mobileSideRail'),
-      width: strip.width,
-      color: UIConfig.backGroundColor(context),
-      padding: EdgeInsets.only(
-        left: atLeft ? outerMargin : GlassVerticalBarMetrics.inset,
-        top: strip.top,
-        right: atLeft ? GlassVerticalBarMetrics.inset : outerMargin,
-        bottom: strip.bottom,
-      ),
-      child: _buildControls(Axis.vertical, atLeft),
-    );
+    final bool systemStripOnRight = (strip.edge == GlassVerticalBarEdge.trailing) == (Directionality.of(context) == TextDirection.ltr);
 
     return Row(
       children: [
-        if (atLeft) bar,
-        Expanded(child: MediaQuery.removePadding(context: context, removeLeft: atLeft, removeRight: !atLeft, child: child)),
-        if (!atLeft) bar,
+        Expanded(child: MediaQuery.removePadding(context: context, removeRight: true, child: child)),
+        Container(
+          key: const ValueKey<String>('mobileSideRail'),
+          width: strip.width,
+          color: UIConfig.backGroundColor(context),
+          padding: EdgeInsets.only(
+            left: GlassVerticalBarMetrics.inset,
+            top: systemStripOnRight ? strip.top : strip.rowTop,
+            right: strip.width - GlassVerticalBarMetrics.controlExtent - GlassVerticalBarMetrics.inset,
+            bottom: systemStripOnRight ? strip.bottom : GlassVerticalBarMetrics.edgeMargin,
+          ),
+          child: _buildControls(Axis.vertical),
+        ),
       ],
     );
   }
@@ -86,17 +84,17 @@ class IPhoneDuoNavigation extends StatelessWidget {
           top: GlassVerticalBarMetrics.edgeMargin,
           right: row?.right ?? UIConfig.iPhoneDuoStatusCornerWidth + GlassVerticalBarMetrics.rowInset,
           height: GlassVerticalBarMetrics.rowHeight,
-          child: _buildControls(Axis.horizontal, false),
+          child: _buildControls(Axis.horizontal),
         ),
       ],
     );
   }
 
-  Widget _buildControls(Axis axis, bool atLeft) {
+  Widget _buildControls(Axis axis) {
     return Flex(
       direction: axis,
       children: [
-        _buildMenuButton(atLeft),
+        _buildMenuButton(),
         SizedBox.square(dimension: GlassVerticalBarMetrics.spacing),
         Expanded(
           child: Align(
@@ -108,7 +106,7 @@ class IPhoneDuoNavigation extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuButton(bool atLeft) {
+  Widget _buildMenuButton() {
     return SizedBox.square(
       key: const ValueKey<String>('sideRail:panel'),
       dimension: GlassVerticalBarMetrics.controlExtent,
@@ -122,10 +120,7 @@ class IPhoneDuoNavigation extends StatelessWidget {
                 child: IconButton(
                   icon: const Icon(Icons.menu),
                   color: UIConfig.desktopLeftTabIconColor(context),
-                  onPressed: () {
-                    final ScaffoldState? scaffold = MobileLayoutPageV2State.scaffoldKey.currentState;
-                    atLeft ? scaffold?.openDrawer() : scaffold?.openEndDrawer();
-                  },
+                  onPressed: () => MobileLayoutPageV2State.scaffoldKey.currentState?.openEndDrawer(),
                 ),
               ),
             ),

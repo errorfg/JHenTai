@@ -41,10 +41,12 @@ class DashboardPage extends BasePage {
   @override
   AppBar? buildAppBar(BuildContext context) {
     return AppBar(
-      leading: IconButton(
-        icon: Icon(Icons.menu, size: 20),
-        onPressed: () => TapMenuButtonNotification().dispatch(context),
-      ),
+      leading: isIPhoneDuo
+          ? null
+          : IconButton(
+              icon: Icon(Icons.menu, size: 20),
+              onPressed: () => TapMenuButtonNotification().dispatch(context),
+            ),
       title: GestureDetector(
         onTap: logic.handleTapHomeSync,
         child: Text(name),
