@@ -10,6 +10,7 @@ import 'package:jhentai/src/pages/setting/eh/tagsets/tag_sets_page_state.dart';
 import '../../../../widget/eh_tag_edit_dialog.dart';
 import '../../../../widget/eh_wheel_speed_controller.dart';
 import '../../../../widget/loading_state_indicator.dart';
+import 'package:jhentai/src/utils/iphone_duo.dart';
 
 class TagSetsPage extends StatelessWidget {
   final TagSetsLogic logic = Get.put<TagSetsLogic>(TagSetsLogic());
@@ -147,6 +148,7 @@ class TagSetsPage extends StatelessWidget {
           successWidgetBuilder: () => EHWheelSpeedController(
             controller: state.scrollController,
             child: SafeArea(
+              bottom: !isIPhoneDuo,
               child: Column(
                 children: [
                   if (state.searchMode && state.searchKeyword.isNotEmpty) _buildAutoCompleteSuggestions(context),

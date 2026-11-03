@@ -5,10 +5,9 @@ import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2_logic.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2_state.dart';
+import 'package:jhentai/src/widget/iphone_duo_bar.dart';
 import 'package:jhentai/src/widget/native_glass.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
-import 'package:liquid_glass_widgets/src/widgets/surfaces/status_bar_row.dart';
-import 'package:liquid_glass_widgets/src/widgets/surfaces/vertical_bar_regions.dart';
 
 /// The home's navigation on iPhone Duo, in place of the bottom bar and the left
 /// drawer: a strip along the right edge in every pose but one, and beside the
@@ -25,75 +24,15 @@ class IPhoneDuoNavigation extends StatelessWidget {
   /// Inside the capsule, before the first tab and after the last.
   static const double _capsuleInset = 6;
 
-  @override
-  Widget build(BuildContext context) {
-    VerticalBarRegions.instance.observe();
-
-    return ListenableBuilder(
-      listenable: Listenable.merge([VerticalBarRegions.instance, VerticalBarRegions.instance.edge]),
-      builder: (BuildContext context, _) {
-        final GlassVerticalBarData? strip = GlassVerticalBar.resolve(
-          viewPadding: MediaQuery.viewPaddingOf(context),
-          size: MediaQuery.sizeOf(context),
-          platform: TargetPlatform.iOS,
-          textDirection: Directionality.of(context),
-          displayFeatures: VerticalBarRegions.instance.value,
-          systemEdge: VerticalBarRegions.instance.edge.value,
-        );
-
-        return strip == null ? _buildWithTopRow(context) : _buildWithStrip(context, strip);
-      },
-    );
-  }
-
   /// The bottom bar this replaces is what took up the bottom inset. Without it
   /// the pages would keep an empty band there, instead of running to the bottom
   /// of the screen.
-  Widget _page(BuildContext context, {bool removeRight = false}) {
-    return MediaQuery.removePadding(context: context, removeRight: removeRight, removeBottom: true, child: child);
-  }
-
-  /// On the right whichever edge the system chose. Where it chose the left, its
-  /// status bar and camera are over there, with nothing to avoid on the right.
-  Widget _buildWithStrip(BuildContext context, GlassVerticalBarData strip) {
-    final bool systemStripOnRight = (strip.edge == GlassVerticalBarEdge.trailing) == (Directionality.of(context) == TextDirection.ltr);
-
-    return Row(
-      children: [
-        Expanded(child: _page(context, removeRight: true)),
-        Container(
-          key: const ValueKey<String>('mobileSideRail'),
-          width: strip.width,
-          color: UIConfig.backGroundColor(context),
-          padding: EdgeInsets.only(
-            left: GlassVerticalBarMetrics.inset,
-            top: systemStripOnRight ? strip.top : strip.rowTop,
-            right: strip.width - GlassVerticalBarMetrics.controlExtent - GlassVerticalBarMetrics.inset,
-            bottom: systemStripOnRight ? strip.bottom : GlassVerticalBarMetrics.edgeMargin,
-          ),
-          child: _buildControls(Axis.vertical),
-        ),
-      ],
-    );
-  }
-
-  /// The inner display held upright keeps the page's top inset clear for the
-  /// status bar, which takes only the corner of it: the bar goes beside that.
-  Widget _buildWithTopRow(BuildContext context) {
-    final StatusBarRow? row = StatusBarRow.of(context);
-
-    return Stack(
-      children: [
-        Positioned.fill(child: _page(context)),
-        Positioned(
-          key: const ValueKey<String>('mobileSideRail'),
-          left: row?.left ?? GlassVerticalBarMetrics.titleInset,
-          top: GlassVerticalBarMetrics.edgeMargin,
-          right: row?.right ?? UIConfig.iPhoneDuoStatusCornerWidth + GlassVerticalBarMetrics.rowInset,
-          height: GlassVerticalBarMetrics.rowHeight,
-          child: _buildControls(Axis.horizontal),
-        ),
-      ],
+  @override
+  Widget build(BuildContext context) {
+    return IPhoneDuoBar(
+      controlsBesideStatusBar: true,
+      controls: _buildControls,
+      builder: (BuildContext context, _) => MediaQuery.removePadding(context: context, removeBottom: true, child: child),
     );
   }
 
@@ -114,24 +53,13 @@ class IPhoneDuoNavigation extends StatelessWidget {
   }
 
   Widget _buildMenuButton() {
-    return SizedBox.square(
+    return IPhoneDuoBarButton(
       key: const ValueKey<String>('sideRail:panel'),
-      dimension: GlassVerticalBarMetrics.controlExtent,
       child: Builder(
-        builder: (BuildContext context) => Stack(
-          children: [
-            const Positioned.fill(child: NativeGlass()),
-            Material(
-              type: MaterialType.transparency,
-              child: Center(
-                child: IconButton(
-                  icon: const Icon(Icons.menu),
-                  color: UIConfig.desktopLeftTabIconColor(context),
-                  onPressed: () => MobileLayoutPageV2State.scaffoldKey.currentState?.openEndDrawer(),
-                ),
-              ),
-            ),
-          ],
+        builder: (BuildContext context) => IconButton(
+          icon: const Icon(Icons.menu),
+          color: UIConfig.desktopLeftTabIconColor(context),
+          onPressed: () => MobileLayoutPageV2State.scaffoldKey.currentState?.openEndDrawer(),
         ),
       ),
     );

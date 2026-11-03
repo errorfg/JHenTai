@@ -3,6 +3,7 @@ import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/service/frame_rate_service.dart';
+import 'package:jhentai/src/utils/iphone_duo.dart';
 
 class SettingFrameRatePage extends StatefulWidget {
   const SettingFrameRatePage({super.key});
@@ -39,6 +40,7 @@ class _SettingFrameRatePageState extends State<SettingFrameRatePage> {
     return Scaffold(
       appBar: AppBar(centerTitle: true, title: Text('refreshRate'.tr)),
       body: SafeArea(
+        bottom: !isIPhoneDuo,
         child: ListView(
           padding: const EdgeInsets.only(top: 16),
           children: [

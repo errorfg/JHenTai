@@ -15,6 +15,8 @@ import '../../widget/eh_gallery_collection.dart';
 import '../../widget/loading_state_indicator.dart';
 import 'base_page_logic.dart';
 import 'base_page_state.dart';
+import 'package:jhentai/src/utils/iphone_duo.dart';
+import 'package:jhentai/src/widget/iphone_duo_bar.dart';
 
 abstract class BasePage<L extends BasePageLogic, S extends BasePageState> extends StatelessWidget with Scroll2TopPageMixin {
   /// For mobile layout v2
@@ -50,21 +52,37 @@ abstract class BasePage<L extends BasePageLogic, S extends BasePageState> extend
     return GetBuilder<L>(
       global: false,
       init: logic,
-      builder: (_) => Scaffold(
-        backgroundColor: UIConfig.backGroundColor(context),
-        appBar: showFilterButton || showJumpButton || showMenuButton || showTitle ? buildAppBar(context) : null,
-        body: SafeArea(
-          child: _homeSync == null
-              ? buildBody(context)
-              : Column(
-                  children: [
-                    HomeSyncProgressBar(logic: _homeSync!),
-                    Expanded(child: buildBody(context)),
-                  ],
-                ),
-        ),
-        floatingActionButton: showScroll2TopButton ? buildFloatingActionButton() : null,
+      builder: (_) => isIPhoneDuo && controlsInIPhoneDuoBar
+          ? IPhoneDuoBar(
+              controls: (_) => IPhoneDuoPageControls(navigation: const [BackButton()], actions: buildAppBarActions()),
+              builder: (BuildContext context, bool inStrip) => _buildScaffold(context, controlsInStrip: inStrip),
+            )
+          : _buildScaffold(context, controlsInStrip: false),
+    );
+  }
+
+  /// iPhone Duo: this page is above the home, so the strip is free for its back button and actions.
+  bool get controlsInIPhoneDuoBar => false;
+
+  Widget _buildScaffold(BuildContext context, {required bool controlsInStrip}) {
+    return Scaffold(
+      backgroundColor: UIConfig.backGroundColor(context),
+      appBar: controlsInStrip
+          ? (showTitle ? AppBar(automaticallyImplyLeading: false, title: Text(name!), centerTitle: true) : null)
+          : (showFilterButton || showJumpButton || showMenuButton || showTitle ? buildAppBar(context) : null),
+      // A page that is all one scrolling list runs to the bottom of the screen.
+      body: SafeArea(
+        bottom: !isIPhoneDuo,
+        child: _homeSync == null
+            ? buildBody(context)
+            : Column(
+                children: [
+                  HomeSyncProgressBar(logic: _homeSync!),
+                  Expanded(child: buildBody(context)),
+                ],
+              ),
       ),
+      floatingActionButton: showScroll2TopButton ? buildFloatingActionButton() : null,
     );
   }
 

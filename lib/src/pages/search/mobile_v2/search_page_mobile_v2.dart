@@ -13,6 +13,7 @@ import '../../base/base_page.dart';
 import '../mixin/search_page_mixin.dart';
 import '../mixin/search_page_state_mixin.dart';
 import '../quick_search/quick_search_page.dart';
+import 'package:jhentai/src/utils/iphone_duo.dart';
 
 class SearchPageMobileV2 extends BasePage<SearchPageMobileV2Logic, SearchPageMobileV2State>
     with SearchPageMixin<SearchPageMobileV2Logic, SearchPageMobileV2State> {
@@ -41,7 +42,7 @@ class SearchPageMobileV2 extends BasePage<SearchPageMobileV2Logic, SearchPageMob
           drawerEdgeDragWidth: preferenceSetting.drawerGestureEdgeWidth.value.toDouble(),
           endDrawer: Drawer(width: 278, child: QuickSearchPage(scrollController: quickSearchService.drawerScrollController)),
           endDrawerEnableOpenDragGesture: preferenceSetting.enableQuickSearchDrawerGesture.isTrue,
-          body: SafeArea(child: buildBody(context)),
+          body: SafeArea(bottom: !isIPhoneDuo, child: buildBody(context)),
           floatingActionButton: buildFloatingActionButton(),
           resizeToAvoidBottomInset: false,
         ),

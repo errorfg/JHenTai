@@ -36,8 +36,10 @@ import 'package:jhentai/src/setting/style_setting.dart';
 import 'package:jhentai/src/utils/route_util.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
 import 'package:jhentai/src/widget/eh_context_menu.dart';
+import 'package:jhentai/src/widget/iphone_duo_bar.dart';
 import 'package:jhentai/src/widget/will_pop_interceptor.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:jhentai/src/utils/iphone_duo.dart';
 
 class KomgaPage extends StatefulWidget {
   const KomgaPage({super.key, this.clientFactory = KomgaClient.fromSetting});
@@ -119,7 +121,6 @@ class _KomgaPageState extends State<KomgaPage> {
   @override
   Widget build(BuildContext context) {
     final KomgaBrowseController? controller = _controller;
-    final bool canGoBack = controller?.canGoBack ?? false;
     final KomgaLevel? level = controller?.current;
     final KomgaQuery? query = switch (level) {
       final KomgaListLevel level => level.query,
@@ -131,8 +132,11 @@ class _KomgaPageState extends State<KomgaPage> {
         (query.progress != KomgaProgressFilter.all || !query.filters.isEmpty);
     return SchemePagePopScope(
       onBack: () {
-        if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
-          _scaffoldKey.currentState?.closeDrawer();
+        final ScaffoldState? scaffold = _scaffoldKey.currentState;
+        if (scaffold != null && (scaffold.isDrawerOpen || scaffold.isEndDrawerOpen)) {
+          scaffold
+            ..closeDrawer()
+            ..closeEndDrawer();
           return true;
         }
         if (controller?.canGoBack ?? false) {
@@ -145,107 +149,217 @@ class _KomgaPageState extends State<KomgaPage> {
       child: Scaffold(
         key: _scaffoldKey,
         backgroundColor: UIConfig.backGroundColor(context),
-        drawer: MobileLeftDrawer(
-          state: _drawerState,
-          currentScheme: ContentScheme.komga,
-          onBeforeSwitch: _prepareSourceSwitch,
-          onDestinationSelected: _openJhentaiDestination,
-          showSelectedDestination: false,
+        drawerScrimColor: isIPhoneDuo ? Colors.black12 : null,
+        drawer: isIPhoneDuo ? null : _buildPanel(atEnd: false),
+        endDrawer: isIPhoneDuo ? _buildPanel(atEnd: true) : null,
+        body: isIPhoneDuo
+            ? IPhoneDuoBar(
+                controls: (_) => _buildIPhoneDuoControls(controller, level, query, filtered),
+                builder: (BuildContext context, bool inStrip) => _buildGlassScaffold(
+                  context,
+                  controller,
+                  level,
+                  query,
+                  filtered,
+                  controlsInStrip: inStrip,
+                ),
+              )
+            : _buildGlassScaffold(context, controller, level, query, filtered, controlsInStrip: false),
+      ),
+    );
+  }
+
+  Widget _buildPanel({required bool atEnd}) {
+    return MobileLeftDrawer(
+      state: _drawerState,
+      currentScheme: ContentScheme.komga,
+      onBeforeSwitch: _prepareSourceSwitch,
+      onDestinationSelected: _openJhentaiDestination,
+      showSelectedDestination: false,
+      atEnd: atEnd,
+    );
+  }
+
+  /// iPhone Duo has the panel at the right edge, as on the home.
+  void _openPanel() {
+    if (isIPhoneDuo) {
+      _scaffoldKey.currentState?.openEndDrawer();
+    } else {
+      _scaffoldKey.currentState?.openDrawer();
+    }
+  }
+
+  /// What the bar at the top holds elsewhere, in the strip on iPhone Duo.
+  Widget _buildIPhoneDuoControls(
+    KomgaBrowseController? controller,
+    KomgaLevel? level,
+    KomgaQuery? query,
+    bool filtered,
+  ) {
+    final Color color = UIConfig.desktopLeftTabIconColor(context);
+
+    Widget menu({required Key key, required Widget icon, required String label, required List<Widget> items}) {
+      return GlassMenu(
+        key: key,
+        menuWidth: 260,
+        autoAdjustToScreen: true,
+        quality: GlassQuality.premium,
+        items: items,
+        triggerBuilder: (BuildContext context, VoidCallback toggleMenu) => IconButton(icon: icon, tooltip: label, color: color, onPressed: toggleMenu),
+      );
+    }
+
+    return IPhoneDuoPageControls(
+      navigation: <Widget>[
+        IconButton(
+          key: const ValueKey<String>('komgaPanelButton'),
+          icon: const Icon(CupertinoIcons.sidebar_right),
+          tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+          color: color,
+          onPressed: _openPanel,
         ),
-        // The bars float over the content, which scrolls under them and fades
-        // at their edges; GlassScaffold renders their glass at premium.
-        // Glass only on these controls, the icons of one group sharing one
-        // piece (Apple's Human Interface Guidelines).
-        body: GlassScaffold(
-          backgroundColor: UIConfig.backGroundColor(context),
-          contentAwareBrightness: true,
-          appBar: GlassAppBar(
-            leading: GlassButtonGroup.icons(
+        if (controller?.canGoBack ?? false)
+          IconButton(
+            key: const ValueKey<String>('komgaBackButton'),
+            icon: const Icon(CupertinoIcons.back),
+            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+            color: color,
+            onPressed: controller!.goBack,
+          ),
+      ],
+      actions: <Widget>[
+        if (controller != null)
+          IconButton(
+            key: const ValueKey<String>('komgaSearchButton'),
+            icon: const Icon(CupertinoIcons.search),
+            tooltip: 'komgaSearch'.tr,
+            color: color,
+            onPressed: _openSearch,
+          ),
+        if (controller != null && level != null && query != null)
+          menu(
+            key: const ValueKey<String>('komgaSortAndFilterMenu'),
+            icon: Icon(filtered ? CupertinoIcons.line_horizontal_3_decrease_circle_fill : CupertinoIcons.line_horizontal_3_decrease_circle),
+            label: 'komgaSortAndFilter'.tr,
+            items: _sortAndFilterItems(controller, level, query),
+          ),
+        menu(
+          key: const ValueKey<String>('komgaMoreMenu'),
+          icon: _syncingAll
+              ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(CupertinoIcons.ellipsis),
+          label: 'komgaMore'.tr,
+          items: _moreItems(controller),
+        ),
+      ],
+    );
+  }
+
+  // The bars float over the content, which scrolls under them and fades
+  // at their edges; GlassScaffold renders their glass at premium.
+  // Glass only on these controls, the icons of one group sharing one
+  // piece (Apple's Human Interface Guidelines).
+  Widget _buildGlassScaffold(
+    BuildContext context,
+    KomgaBrowseController? controller,
+    KomgaLevel? level,
+    KomgaQuery? query,
+    bool filtered, {
+    required bool controlsInStrip,
+  }) {
+    final bool canGoBack = controller?.canGoBack ?? false;
+    return GlassScaffold(
+      backgroundColor: UIConfig.backGroundColor(context),
+      contentAwareBrightness: true,
+      appBar: GlassAppBar(
+        leading: controlsInStrip
+            ? null
+            : GlassButtonGroup.icons(
+                items: <GlassButtonGroupItem>[
+                  GlassButtonGroupItem(
+                    icon: const Icon(CupertinoIcons.sidebar_left),
+                    label: MaterialLocalizations.of(context).openAppDrawerTooltip,
+                    onTap: _openPanel,
+                  ),
+                  if (canGoBack)
+                    GlassButtonGroupItem(
+                      icon: const Icon(CupertinoIcons.back),
+                      label: MaterialLocalizations.of(context).backButtonTooltip,
+                      onTap: controller!.goBack,
+                    ),
+                ],
+              ),
+        title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        // A group holds one menu at most, so More is a group of its own.
+        actions: controlsInStrip
+            ? null
+            : <Widget>[
+          if (controller != null)
+            GlassButtonGroup.icons(
               items: <GlassButtonGroupItem>[
                 GlassButtonGroupItem(
-                  icon: const Icon(CupertinoIcons.sidebar_left),
-                  label: MaterialLocalizations.of(context).openAppDrawerTooltip,
-                  onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                  icon: const Icon(CupertinoIcons.search),
+                  label: 'komgaSearch'.tr,
+                  onTap: _openSearch,
                 ),
-                if (canGoBack)
-                  GlassButtonGroupItem(
-                    icon: const Icon(CupertinoIcons.back),
-                    label: MaterialLocalizations.of(context).backButtonTooltip,
-                    onTap: controller!.goBack,
+                if (level != null && query != null)
+                  GlassButtonGroupItem.menu(
+                    // Filled while anything is filtered out, as in Photos.
+                    icon: Icon(
+                      filtered
+                          ? CupertinoIcons
+                                .line_horizontal_3_decrease_circle_fill
+                          : CupertinoIcons
+                                .line_horizontal_3_decrease_circle,
+                    ),
+                    label: 'komgaSortAndFilter'.tr,
+                    menuWidth: 260,
+                    menuItems: _sortAndFilterItems(
+                      controller,
+                      level,
+                      query,
+                    ),
                   ),
               ],
             ),
-            title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis),
-            // A group holds one menu at most, so More is a group of its own.
-            actions: <Widget>[
-              if (controller != null)
-                GlassButtonGroup.icons(
-                  items: <GlassButtonGroupItem>[
-                    GlassButtonGroupItem(
-                      icon: const Icon(CupertinoIcons.search),
-                      label: 'komgaSearch'.tr,
-                      onTap: _openSearch,
-                    ),
-                    if (level != null && query != null)
-                      GlassButtonGroupItem.menu(
-                        // Filled while anything is filtered out, as in Photos.
-                        icon: Icon(
-                          filtered
-                              ? CupertinoIcons
-                                    .line_horizontal_3_decrease_circle_fill
-                              : CupertinoIcons
-                                    .line_horizontal_3_decrease_circle,
-                        ),
-                        label: 'komgaSortAndFilter'.tr,
-                        menuWidth: 260,
-                        menuItems: _sortAndFilterItems(
-                          controller,
-                          level,
-                          query,
-                        ),
-                      ),
-                  ],
-                ),
-              const SizedBox(width: 8),
-              GlassButtonGroup.icons(
-                items: <GlassButtonGroupItem>[
-                  GlassButtonGroupItem.menu(
-                    icon: _syncingAll
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(CupertinoIcons.ellipsis),
-                    label: 'komgaMore'.tr,
-                    menuWidth: 260,
-                    menuItems: _moreItems(controller),
-                  ),
-                ],
+          const SizedBox(width: 8),
+          GlassButtonGroup.icons(
+            items: <GlassButtonGroupItem>[
+              GlassButtonGroupItem.menu(
+                icon: _syncingAll
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(CupertinoIcons.ellipsis),
+                label: 'komgaMore'.tr,
+                menuWidth: 260,
+                menuItems: _moreItems(controller),
               ),
             ],
           ),
-          bottomBar: level is KomgaListLevel
-              ? _targetBar(controller!, level)
-              : null,
-          bottomBarHeight: _targetBarHeight,
-          body: Builder(
-            // Clear of the bars: lists pad themselves by this.
-            builder: (BuildContext context) {
-              final MediaQueryData media = MediaQuery.of(context);
-              return MediaQuery(
-                data: media.copyWith(
-                  padding: media.padding.copyWith(
-                    top: media.padding.top + 44,
-                    bottom:
-                        media.padding.bottom +
-                        (level is KomgaListLevel ? _targetBarHeight : 0),
-                  ),
-                ),
-                child: _buildBody(context),
-              );
-            },
-          ),
-        ),
+        ],
+      ),
+      bottomBar: level is KomgaListLevel
+          ? _targetBar(controller!, level)
+          : null,
+      bottomBarHeight: _targetBarHeight,
+      body: Builder(
+        // Clear of the bars: lists pad themselves by this.
+        builder: (BuildContext context) {
+          final MediaQueryData media = MediaQuery.of(context);
+          return MediaQuery(
+            data: media.copyWith(
+              padding: media.padding.copyWith(
+                top: media.padding.top + 44,
+                bottom:
+                    media.padding.bottom +
+                    (level is KomgaListLevel ? _targetBarHeight : 0),
+              ),
+            ),
+            child: _buildBody(context),
+          );
+        },
       ),
     );
   }
@@ -868,7 +982,9 @@ class _KomgaPageState extends State<KomgaPage> {
     if (_openingBookId != null && mounted) {
       setState(() => _openingBookId = null);
     }
-    _scaffoldKey.currentState?.closeDrawer();
+    _scaffoldKey.currentState
+      ?..closeDrawer()
+      ..closeEndDrawer();
   }
 
   void _openJhentaiDestination(int index) {

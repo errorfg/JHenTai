@@ -13,6 +13,7 @@ import '../../../../widget/eh_wheel_speed_controller.dart';
 import '../../../download/download_base_page.dart';
 import 'blocking_rule_page_logic.dart';
 import 'blocking_rule_page_state.dart';
+import 'package:jhentai/src/utils/iphone_duo.dart';
 
 class BlockingRulePage extends StatelessWidget {
   final BlockingRulePageLogic logic = Get.put<BlockingRulePageLogic>(BlockingRulePageLogic());
@@ -76,7 +77,7 @@ class BlockingRulePage extends StatelessWidget {
 
         return EHWheelSpeedController(
           controller: state.scrollController,
-          child: SafeArea(child: child..withListTileTheme(context)),
+          child: SafeArea(bottom: !isIPhoneDuo, child: child..withListTileTheme(context)),
         );
       },
     );
