@@ -17,6 +17,7 @@ import 'package:jhentai/src/setting/advanced_setting.dart';
 import 'package:jhentai/src/setting/style_setting.dart';
 import 'package:jhentai/src/utils/iphone_duo.dart';
 import 'package:jhentai/src/utils/snack_util.dart';
+import 'package:jhentai/src/widget/native_glass.dart';
 import 'package:liquid_glass_widgets/src/widgets/surfaces/vertical_bar_regions.dart';
 
 /// The window and insets iOS 27.1 gives an app in a pose of the device.
@@ -257,6 +258,17 @@ void main() {
 
       expect((await showSnack(tester)).width, outer.size.width);
     });
+  });
+
+  testWidgets('the native view takes in what its glass draws past the capsule', (WidgetTester tester) async {
+    await _pumpHome(tester, _innerFlat);
+
+    final Finder glass = find.descendant(of: _tabs, matching: find.byType(NativeGlass));
+    final Rect capsule = tester.getRect(glass);
+    expect(tester.getRect(find.descendant(of: glass, matching: find.byType(UiKitView))), capsule.inflate(NativeGlass.margin));
+
+    final UiKitView view = tester.widget<UiKitView>(find.descendant(of: glass, matching: find.byType(UiKitView)));
+    expect((view.creationParams! as Map<String, Object?>)['margin'], NativeGlass.margin);
   });
 
   testWidgets('the bar is drawn on iOS\'s own glass', (WidgetTester tester) async {
