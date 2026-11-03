@@ -46,6 +46,13 @@ class IPhoneDuoNavigation extends StatelessWidget {
     );
   }
 
+  /// The bottom bar this replaces is what took up the bottom inset. Without it
+  /// the pages would keep an empty band there, instead of running to the bottom
+  /// of the screen.
+  Widget _page(BuildContext context, {bool removeRight = false}) {
+    return MediaQuery.removePadding(context: context, removeRight: removeRight, removeBottom: true, child: child);
+  }
+
   /// On the right whichever edge the system chose. Where it chose the left, its
   /// status bar and camera are over there, with nothing to avoid on the right.
   Widget _buildWithStrip(BuildContext context, GlassVerticalBarData strip) {
@@ -53,7 +60,7 @@ class IPhoneDuoNavigation extends StatelessWidget {
 
     return Row(
       children: [
-        Expanded(child: MediaQuery.removePadding(context: context, removeRight: true, child: child)),
+        Expanded(child: _page(context, removeRight: true)),
         Container(
           key: const ValueKey<String>('mobileSideRail'),
           width: strip.width,
@@ -77,7 +84,7 @@ class IPhoneDuoNavigation extends StatelessWidget {
 
     return Stack(
       children: [
-        Positioned.fill(child: child),
+        Positioned.fill(child: _page(context)),
         Positioned(
           key: const ValueKey<String>('mobileSideRail'),
           left: row?.left ?? GlassVerticalBarMetrics.titleInset,
