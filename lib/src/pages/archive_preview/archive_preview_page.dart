@@ -1,3 +1,4 @@
+import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -343,8 +344,8 @@ class _ArchivePreviewPageState extends State<ArchivePreviewPage> {
     }
 
     images ??= await archiveDownloadService.getUnpackedImages(archive!.gid);
-    int readIndexRecord =
-        initialIndex ?? await readProgressService.getReadProgress(archive!.gid);
+    final ({String key, String? legacy}) progress = GalleryUrl.keysOf(archive!.galleryUrl, archive!.gid);
+    int readIndexRecord = initialIndex ?? await readProgressService.getReadProgressOfKeys(progress.key, progress.legacy);
 
     toRoute(
       Routes.read,
@@ -356,7 +357,8 @@ class _ArchivePreviewPageState extends State<ArchivePreviewPage> {
         initialIndex: readIndexRecord,
         pageCount: images.length,
         isOriginal: archive!.isOriginal,
-        readProgressRecordStorageKey: archive!.gid.toString(),
+        readProgressRecordStorageKey: progress.key,
+        legacyProgressKey: progress.legacy,
         images: images,
         useSuperResolution: superResolutionService.get(
                 archive!.gid, SuperResolutionType.archive) !=

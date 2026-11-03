@@ -144,6 +144,38 @@ void main() {
       ]);
     });
 
+    test('a read gallery gone from the list, as when a new version replaces it, stays in its stretch', () {
+      final List<Gallery> list = _list(10);
+      watchedProgressService.markRead(list, 0, 9);
+      // A new version of 3499995 is posted: it shows at the top, and the
+      // old one is no longer listed. The list is opened and read again.
+      final List<Gallery> later = <Gallery>[_gallery(3500001, day: 18), ...list.where((Gallery g) => g.gid != 3499995)];
+      watchedProgressService.markRead(later, 0, later.length - 1);
+      // Another list, further down.
+      watchedProgressService.markRead(_list(3, newestGid: 3499980), 0, 2);
+
+      expect(_stretches(), <List<int>>[
+        <int>[for (int gid = 3500001; gid > 3499990; gid--) gid],
+        <int>[3499980, 3499979, 3499978],
+      ]);
+      final List<WatchedReadRange> ranges = watchedProgressService.ranges;
+      for (int i = 0; i + 1 < ranges.length; i++) {
+        expect(ranges[i].oldest.gid, greaterThan(ranges[i + 1].newest.gid), reason: 'a stretch lies wholly above the next');
+      }
+    });
+
+    test('a stretch read again that ends at a gallery new to the list keeps what was read below it', () {
+      final List<Gallery> list = <Gallery>[for (final int gid in <int>[100, 90, 80, 70]) _gallery(gid, day: 18)];
+      watchedProgressService.markRead(list, 0, 3);
+      // A gallery newly watched shows between 90 and 80; the list is read
+      // down to it, and no further.
+      watchedProgressService.markRead(<Gallery>[list[0], list[1], _gallery(85, day: 18)], 0, 2);
+
+      expect(_stretches(), <List<int>>[
+        <int>[100, 90, 85, 80, 70],
+      ]);
+    });
+
     test('what was read and bookmarked is there after a restart', () async {
       final List<Gallery> list = _list(10);
       watchedProgressService

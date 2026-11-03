@@ -573,10 +573,12 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
       }
 
       GalleryDownloadedData gallery = GalleryDownloadedData.fromJson(metadata['gallery']);
+      // Metadata of 8.1.1 and earlier has nhentai and wnacg galleries under the bare number.
+      gallery = gallery.copyWith(gid: GalleryUrl.storageGidOfStored(gallery.galleryUrl, gallery.gid));
 
       /// Back-fill sanitizedTitle for metadata files written before this field was introduced.
       if (gallery.sanitizedTitle == null) {
-        final int reservedBytes = utf8.encode('${gallery.gid} - ').length;
+        final int reservedBytes = utf8.encode('${GalleryUrl.siteNumberOf(gallery.gid)} - ').length;
         gallery = gallery.copyWith(sanitizedTitle: Value(_computeSanitizedGalleryTitle(gallery.title, reservedBytes)));
       }
       List<GalleryImage?> images = (jsonDecode(metadata['images']) as List).map((_map) => _map == null ? null : GalleryImage.fromJson(_map)).toList();
@@ -884,8 +886,9 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
   }
 
   String computeGalleryDownloadAbsolutePath(GalleryDownloadedData gallery) {
-    /// Directory name format: '{gid} - {title}'
-    return path.join(downloadSetting.downloadPath.value, '${gallery.gid} - ${gallery.sanitizedTitle}');
+    /// Directory name format: '{gid} - {title}', by the site's own number
+    /// (GalleryUrl.siteNumberOf), as up to 8.1.1
+    return path.join(downloadSetting.downloadPath.value, '${GalleryUrl.siteNumberOf(gallery.gid)} - ${gallery.sanitizedTitle}');
   }
 
   String _computeImageDownloadAbsolutePath(GalleryDownloadedData gallery, String imageUrl, int serialNo) {
@@ -1551,7 +1554,7 @@ class GalleryDownloadService extends GetxController with GridBasePageServiceMixi
   Future<GalleryDownloadedData?> _initGalleryInfo(GalleryDownloadedData gallery) async {
     /// Compute and attach the sanitized title before the first DB write so the
     /// path is frozen for the lifetime of this download task.
-    final int reservedBytes = utf8.encode('${gallery.gid} - ').length;
+    final int reservedBytes = utf8.encode('${GalleryUrl.siteNumberOf(gallery.gid)} - ').length;
     gallery = gallery.copyWith(sanitizedTitle: Value(_computeSanitizedGalleryTitle(gallery.title, reservedBytes)));
 
     if (!await _saveGalleryInfoAndGroupInDB(gallery)) {

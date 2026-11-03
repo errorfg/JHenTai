@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:jhentai/src/setting/style_setting.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 
+import '../utils/iphone_duo.dart';
 import '../utils/screen_size_util.dart';
 
 class UIConfig {
@@ -168,6 +169,11 @@ class UIConfig {
   static const double desktopLeftTabBarWidth = 56;
   static const double desktopLeftTabBarItemHeight = 60;
   static const double desktopLeftTabBarTextHeight = 18;
+
+  /// The status bar on the inner display of iPhone Duo held upright takes this
+  /// much of the top right corner, measured on the iOS 27.1 simulator; used
+  /// until iOS reports the region.
+  static const double iPhoneDuoStatusCornerWidth = 134;
 
   /// mobile home page
   static Color loginAvatarBackGroundColor(BuildContext context) => Theme.of(context).colorScheme.surfaceContainerHighest;
@@ -672,8 +678,22 @@ class EHScrollBehaviourWithScrollBar extends MaterialScrollBehavior {
             radius: styleSetting.isInMobileLayout ? CupertinoScrollbar.defaultRadius : const Radius.circular(8),
             thickness: WidgetStateProperty.all(styleSetting.isInMobileLayout ? CupertinoScrollbar.defaultThickness : 8),
           ),
-          child: Scrollbar(controller: details.controller, child: child),
+          child: isIPhoneDuo ? _buildAtScreenEdge(context, child, details) : Scrollbar(controller: details.controller, child: child),
         );
     }
+  }
+
+  /// A scrollbar insets itself by the padding, which on iPhone Duo includes the
+  /// strip the system keeps along the right edge. The scrollbar belongs at the
+  /// edge of the screen; what it scrolls keeps the padding.
+  Widget _buildAtScreenEdge(BuildContext context, Widget child, ScrollableDetails details) {
+    return MediaQuery.removePadding(
+      context: context,
+      removeRight: true,
+      child: Scrollbar(
+        controller: details.controller,
+        child: MediaQuery(data: MediaQuery.of(context), child: child),
+      ),
+    );
   }
 }

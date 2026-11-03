@@ -34,7 +34,7 @@ class SpreadPages {
     if (_loaded.isCompleted) {
       return;
     }
-    _flags = List<bool>.filled(_state.readPageInfo.pageCount, false, growable: true);
+    _flags = List<bool>.filled(_state.pageCount, false, growable: true);
     try {
       for (final ReadSegment segment in List<ReadSegment>.of(_state.segments)) {
         await _read(segment);
@@ -47,7 +47,7 @@ class SpreadPages {
   /// Pages of another book were added after the last.
   Future<void> onPagesAppended() async {
     final int known = _flags.length;
-    _flags.addAll(List<bool>.filled(_state.readPageInfo.pageCount - known, false));
+    _flags.addAll(List<bool>.filled(_state.pageCount - known, false));
     if (!_loaded.isCompleted) {
       return;
     }
@@ -84,7 +84,9 @@ class SpreadPages {
   }
 
   Future<void> _read(ReadSegment segment) async {
-    final String? text = await localConfigService.read(configKey: ConfigEnum.isSpreadPage, subConfigKey: segment.info.readProgressRecordStorageKey);
+    final String? legacy = segment.info.legacyProgressKey;
+    final String? text = await localConfigService.read(configKey: ConfigEnum.isSpreadPage, subConfigKey: segment.info.readProgressRecordStorageKey) ??
+        (legacy == null ? null : await localConfigService.read(configKey: ConfigEnum.isSpreadPage, subConfigKey: legacy));
     if (text == null) {
       return;
     }

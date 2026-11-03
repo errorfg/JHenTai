@@ -1,3 +1,5 @@
+import 'package:jhentai/src/service/read_progress_service.dart';
+import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -252,8 +254,8 @@ class DownloadSearchLogic extends GetxController with UpdateGlobalGalleryStatusL
       GalleryDownloadedData galleryData = galleryDownloadService.gallerys.firstWhere((g) => g.gid == gallery.gid);
       openThirdPartyViewer(galleryDownloadService.computeGalleryDownloadAbsolutePath(galleryData));
     } else {
-      String? string = await localConfigService.read(configKey: ConfigEnum.readIndexRecord, subConfigKey: gallery.gid.toString());
-      int readIndexRecord = (string == null ? 0 : (int.tryParse(string) ?? 0));
+      final ({String key, String? legacy}) progress = GalleryUrl.keysOf(gallery.galleryUrl, gallery.gid);
+      int readIndexRecord = await readProgressService.getReadProgressOfKeys(progress.key, progress.legacy);
 
       ReadDirection? readDirection = isWebtoonGalleryFromTagDataList(gallery.tags) ? ReadDirection.top2bottomList : null;
 
@@ -266,7 +268,8 @@ class DownloadSearchLogic extends GetxController with UpdateGlobalGalleryStatusL
           galleryTitle: gallery.title,
           galleryUrl: gallery.galleryUrl,
           initialIndex: readIndexRecord,
-          readProgressRecordStorageKey: gallery.gid.toString(),
+          readProgressRecordStorageKey: progress.key,
+          legacyProgressKey: progress.legacy,
           pageCount: gallery.pageCount,
           useSuperResolution: superResolutionService.get(gallery.gid, SuperResolutionType.gallery) != null,
           readDirection: readDirection,
@@ -284,8 +287,8 @@ class DownloadSearchLogic extends GetxController with UpdateGlobalGalleryStatusL
       ArchiveDownloadedData archiveData = archiveDownloadService.archives.firstWhere((a) => a.gid == archive.gid);
       openThirdPartyViewer(archiveDownloadService.computeArchiveUnpackingPath(archiveData));
     } else {
-      String? string = await localConfigService.read(configKey: ConfigEnum.readIndexRecord, subConfigKey: archive.gid.toString());
-      int readIndexRecord = (string == null ? 0 : (int.tryParse(string) ?? 0));
+      final ({String key, String? legacy}) progress = GalleryUrl.keysOf(archive.galleryUrl, archive.gid);
+      int readIndexRecord = await readProgressService.getReadProgressOfKeys(progress.key, progress.legacy);
 
       List<GalleryImage> images = await archiveDownloadService.getUnpackedImages(archive.gid);
 
@@ -301,7 +304,8 @@ class DownloadSearchLogic extends GetxController with UpdateGlobalGalleryStatusL
           initialIndex: readIndexRecord,
           pageCount: images.length,
           isOriginal: archive.isOriginal,
-          readProgressRecordStorageKey: archive.gid.toString(),
+          readProgressRecordStorageKey: progress.key,
+          legacyProgressKey: progress.legacy,
           images: images,
           useSuperResolution: superResolutionService.get(archive.gid, SuperResolutionType.archive) != null,
           readDirection: readDirection,

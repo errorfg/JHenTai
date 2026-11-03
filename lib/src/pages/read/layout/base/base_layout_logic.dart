@@ -7,6 +7,7 @@ import 'package:extended_image/extended_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/network/jm/jm_image.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get_core/src/get_main.dart';
@@ -709,7 +710,7 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
 
     String fileName = basename(image.path);
     if (readPageState.readPageInfo.gid != null && readPageState.readPageInfo.token != null) {
-      fileName = '${readPageState.readPageInfo.gid!}_${readPageState.readPageInfo.token!}_$index${extension(image.path)}';
+      fileName = '${GalleryUrl.siteNumberOf(readPageState.readPageInfo.gid!)}_${readPageState.readPageInfo.token!}_$index${extension(image.path)}';
     }
 
     if (GetPlatform.isDesktop) {
@@ -726,7 +727,7 @@ abstract class BaseLayoutLogic extends GetxController with GetTickerProviderStat
 
     String fileName = basename(image.path);
     if (readPageState.readPageInfo.gid != null && readPageState.readPageInfo.token != null) {
-      fileName = '${readPageState.readPageInfo.gid!}_${readPageState.readPageInfo.token!}_$index${extension(image.path)}';
+      fileName = '${GalleryUrl.siteNumberOf(readPageState.readPageInfo.gid!)}_${readPageState.readPageInfo.token!}_$index${extension(image.path)}';
     }
 
     if (GetPlatform.isDesktop) {

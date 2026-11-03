@@ -140,6 +140,9 @@ dependencies:
   webdav_client: ^1.2.2
   minio: ^3.5.8
   sensors_plus: ^7.1.1
+  # 1.14.2 with the selection drawn as a lens; see third_party/liquid_glass_widgets/PATCHES.md
+  liquid_glass_widgets:
+    path: third_party/liquid_glass_widgets
 
 dependency_overrides:
   # Flutter 3.44 tool no longer tolerates the legacy `pluginClass: none` declaration

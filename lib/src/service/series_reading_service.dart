@@ -125,6 +125,13 @@ class SeriesReadingService {
     return _chapterIds((await readProgressService.getProgressRecords(<String>{key}))[key]?.value);
   }
 
+  /// [chaptersOf] of each of [albumIds], read at once.
+  Future<Map<int, List<int>>> chaptersOfAll(Iterable<int> albumIds) async {
+    final Map<String, ReadProgressRecord> records =
+        await readProgressService.getProgressRecords(<String>{for (final int id in albumIds) keyOfChapters(id)});
+    return <int, List<int>>{for (final int id in albumIds) id: _chapterIds(records[keyOfChapters(id)]?.value)};
+  }
+
   /// How far the multi-chapter album [albumId] has been read; null when it
   /// is not known as one, or nothing of it has a record.
   Future<SeriesProgress?> albumProgress(int albumId) async {

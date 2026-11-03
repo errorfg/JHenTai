@@ -7,8 +7,8 @@ import 'package:jhentai/src/pages/komga/komga_browse_controller.dart';
 import 'package:jhentai/src/pages/komga/komga_item_widgets.dart';
 
 /// Header above the books of a series: metadata that has values, reading
-/// counts, "continue reading" and series actions. Metadata chips open the
-/// matching filter.
+/// counts and "continue reading"; the series actions are in the page's More
+/// menu. Metadata chips open the matching filter.
 class KomgaSeriesHeader extends StatefulWidget {
   const KomgaSeriesHeader({
     super.key,
@@ -16,14 +16,12 @@ class KomgaSeriesHeader extends StatefulWidget {
     required this.views,
     required this.onContinue,
     required this.onFilter,
-    required this.onSeriesAction,
   });
 
   final KomgaSeriesLevel level;
   final KomgaItemViews views;
   final void Function(KomgaBook book) onContinue;
   final void Function(String title, KomgaFilters filters) onFilter;
-  final void Function(KomgaSeriesAction action) onSeriesAction;
 
   @override
   State<KomgaSeriesHeader> createState() => _KomgaSeriesHeaderState();
@@ -108,48 +106,23 @@ class _KomgaSeriesHeaderState extends State<KomgaSeriesHeader> {
                       Text(facts.join(' · '), style: theme.textTheme.bodySmall),
                     ],
                     const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: <Widget>[
-                        FilledButton.icon(
-                          key: const ValueKey<String>('komgaContinueSeries'),
-                          onPressed: target == null
-                              ? null
-                              : () => widget.onContinue(target),
-                          icon: const Icon(Icons.play_arrow),
-                          label: Text(
-                            target == null
-                                ? 'komgaContinueReading'.tr
-                                : widget.level.continueRestarts
-                                ? 'komgaReadFromStart'.tr
-                                : 'komgaContinueBook'.trParams(
-                                    <String, String>{'title': target.title},
-                                  ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        PopupMenuButton<KomgaSeriesAction>(
-                          key: const ValueKey<String>('komgaSeriesMenu'),
-                          onSelected: widget.onSeriesAction,
-                          itemBuilder: (_) => <PopupMenuEntry<KomgaSeriesAction>>[
-                            PopupMenuItem<KomgaSeriesAction>(
-                              value: KomgaSeriesAction.markRead,
-                              child: Text('komgaMarkSeriesRead'.tr),
-                            ),
-                            PopupMenuItem<KomgaSeriesAction>(
-                              value: KomgaSeriesAction.markUnread,
-                              child: Text('komgaMarkSeriesUnread'.tr),
-                            ),
-                            PopupMenuItem<KomgaSeriesAction>(
-                              value: KomgaSeriesAction.download,
-                              child: Text('komgaDownloadSeries'.tr),
-                            ),
-                          ],
-                        ),
-                      ],
+                    FilledButton.icon(
+                      key: const ValueKey<String>('komgaContinueSeries'),
+                      onPressed: target == null
+                          ? null
+                          : () => widget.onContinue(target),
+                      icon: const Icon(Icons.play_arrow),
+                      label: Text(
+                        target == null
+                            ? 'komgaContinueReading'.tr
+                            : widget.level.continueRestarts
+                            ? 'komgaReadFromStart'.tr
+                            : 'komgaContinueBook'.trParams(
+                                <String, String>{'title': target.title},
+                              ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),

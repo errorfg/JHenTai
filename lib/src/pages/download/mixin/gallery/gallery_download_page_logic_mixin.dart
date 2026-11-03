@@ -1,3 +1,4 @@
+import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
@@ -153,7 +154,8 @@ mixin GalleryDownloadPageLogicMixin on GetxController
     if (readSetting.useThirdPartyViewer.isTrue && readSetting.thirdPartyViewerPath.value != null) {
       openThirdPartyViewer(downloadService.computeGalleryDownloadAbsolutePath(gallery));
     } else {
-      int readIndexRecord = await readProgressService.getReadProgress(gallery.gid);
+      final ({String key, String? legacy}) progress = GalleryUrl.keysOf(gallery.galleryUrl, gallery.gid);
+      int readIndexRecord = await readProgressService.getReadProgressOfKeys(progress.key, progress.legacy);
 
 
       ReadDirection? readDirection = isWebtoonGalleryFromTagString(gallery.tags) ? ReadDirection.top2bottomList : null;
@@ -167,7 +169,8 @@ mixin GalleryDownloadPageLogicMixin on GetxController
           galleryTitle: gallery.title,
           galleryUrl: gallery.galleryUrl,
           initialIndex: readIndexRecord,
-          readProgressRecordStorageKey: gallery.gid.toString(),
+          readProgressRecordStorageKey: progress.key,
+          legacyProgressKey: progress.legacy,
           pageCount: gallery.pageCount,
           useSuperResolution: superResolutionService.get(gallery.gid, SuperResolutionType.gallery) != null,
           readDirection: readDirection,

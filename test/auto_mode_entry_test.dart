@@ -116,7 +116,7 @@ void main() {
 
     await settle();
     final ReadPageLogic reader = Get.find<ReadPageLogic>();
-    int page() => reader.state.readPageInfo.currentImageIndex;
+    int page() => reader.state.currentImageIndex;
     expect(page(), 0);
 
     Future<void> openSettingsFromMenu() async {

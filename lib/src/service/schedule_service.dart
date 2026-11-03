@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
@@ -100,17 +101,21 @@ class ScheduleService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBea
   }
 
   Future<void> refreshGalleryTags() async {
-    int pageNo = 1;
-    List<GalleryDownloadedData> page = await GalleryDao.selectGallerysForTagRefresh(pageNo, 25);
-    while (page.isNotEmpty) {
-      // The E-Hentai API answers galleries of other sources with an error
-      // entry, which fails the whole batch.
-      List<GalleryDownloadedData> gallerys = page.where(_isEHGallery).toList();
-      if (gallerys.isEmpty) {
-        pageNo++;
-        page = await GalleryDao.selectGallerysForTagRefresh(pageNo, 25);
-        continue;
+    // All read first: a row refreshed goes to the end of the order, and
+    // paging on would skip as many rows.
+    List<GalleryDownloadedData> all = [];
+    for (int pageNo = 1;; pageNo++) {
+      List<GalleryDownloadedData> page = await GalleryDao.selectGallerysForTagRefresh(pageNo, 25);
+      if (page.isEmpty) {
+        break;
       }
+      all.addAll(page);
+    }
+    // The E-Hentai API answers galleries of other sources with an error
+    // entry, which fails the whole batch.
+    List<GalleryDownloadedData> ehGallerys = all.where((g) => _isEHGallery(g.galleryUrl)).toList();
+    for (int i = 0; i < ehGallerys.length; i += 25) {
+      List<GalleryDownloadedData> gallerys = ehGallerys.sublist(i, min(i + 25, ehGallerys.length));
       try {
         List<GalleryMetadata> metadatas = await ehRequest.requestGalleryMetadatas<List<GalleryMetadata>>(
           list: gallerys.map((a) => (gid: a.gid, token: a.token)).toList(),
@@ -128,25 +133,32 @@ class ScheduleService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBea
               )
               .toList(),
         );
-        log.trace('refreshGalleryTags success, pageNo: $pageNo, archives: ${gallerys.map((a) => a.gid).toList()}');
+        log.trace('refreshGalleryTags success, gallerys: ${gallerys.map((a) => a.gid).toList()}');
       } catch (e) {
         log.warning('refreshGalleryTags error, gallerys: ${gallerys.map((a) => (gid: a.gid, token: a.token)).toList()}', e, true);
       }
-
-      pageNo++;
-      page = await GalleryDao.selectGallerysForTagRefresh(pageNo, 25);
     }
   }
 
-  bool _isEHGallery(GalleryDownloadedData gallery) {
-    GalleryUrl? url = GalleryUrl.tryParse(gallery.galleryUrl);
-    return url != null && !url.isNH && !url.isWN && !url.isJM;
+  bool _isEHGallery(String galleryUrl) {
+    GalleryUrl? url = GalleryUrl.tryParse(galleryUrl);
+    return url != null && url.isEHGallery;
   }
 
   Future<void> refreshArchiveTags() async {
-    int pageNo = 1;
-    List<ArchiveDownloadedData> archives = await ArchiveDao.selectArchivesForTagRefresh(pageNo, 25);
-    while (archives.isNotEmpty) {
+    // All read first, as for the galleries.
+    List<ArchiveDownloadedData> all = [];
+    for (int pageNo = 1;; pageNo++) {
+      List<ArchiveDownloadedData> page = await ArchiveDao.selectArchivesForTagRefresh(pageNo, 25);
+      if (page.isEmpty) {
+        break;
+      }
+      all.addAll(page);
+    }
+    // Archives of nhentai too; the E-Hentai API fails a batch with one in it.
+    List<ArchiveDownloadedData> ehArchives = all.where((a) => _isEHGallery(a.galleryUrl)).toList();
+    for (int i = 0; i < ehArchives.length; i += 25) {
+      List<ArchiveDownloadedData> archives = ehArchives.sublist(i, min(i + 25, ehArchives.length));
       try {
         List<GalleryMetadata> metadatas = await ehRequest.requestGalleryMetadatas<List<GalleryMetadata>>(
           list: archives.map((a) => (gid: a.gid, token: a.token)).toList(),
@@ -164,13 +176,10 @@ class ScheduleService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBea
               )
               .toList(),
         );
-        log.trace('refreshArchiveTags success, pageNo: $pageNo, archives: ${archives.map((a) => a.gid).toList()}');
+        log.trace('refreshArchiveTags success, archives: ${archives.map((a) => a.gid).toList()}');
       } catch (e) {
         log.warning('refreshArchiveTags error, archives: ${archives.map((a) => a.gid).toList()}', e, true);
       }
-
-      pageNo++;
-      archives = await ArchiveDao.selectArchivesForTagRefresh(pageNo, 25);
     }
   }
 

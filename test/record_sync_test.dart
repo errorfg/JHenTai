@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 
@@ -27,6 +28,7 @@ import 'package:jhentai/src/service/record_sync/record_backend.dart';
 import 'package:jhentai/src/service/record_sync/record_sync_engine.dart';
 import 'package:jhentai/src/service/search_history_service.dart';
 import 'package:jhentai/src/service/sync_service.dart';
+import 'package:jhentai/src/service/watched_progress_service.dart';
 import 'package:jhentai/src/setting/komga_setting.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
@@ -89,7 +91,8 @@ class _MemoryServer implements RecordBackend {
   }
 
   @override
-  Future<RecordPage> pull({required int since, required String device, required int limit}) async {
+  Future<RecordPage> pull({required String since, required String device, required int limit}) async {
+    final int after = int.tryParse(since) ?? 0;
     if (pullsBeforeFailure != null) {
       if (pullsBeforeFailure == 0) {
         throw RecordServerException(null, 'connection reset');
@@ -97,14 +100,14 @@ class _MemoryServer implements RecordBackend {
       pullsBeforeFailure = pullsBeforeFailure! - 1;
     }
     pulls++;
-    List<_Stored> page = (stored.values.where((s) => s.seq > since && s.record.device != device).toList()
+    List<_Stored> page = (stored.values.where((s) => s.seq > after && s.record.device != device).toList()
           ..sort((a, b) => a.seq.compareTo(b.seq)))
         .take(limit)
         .toList();
     bool more = page.length == limit;
     return RecordPage(
       records: page.map((s) => s.record).toList(),
-      next: more ? page.last.seq : (seq > since ? seq : since),
+      next: '${more ? page.last.seq : (seq > after ? seq : after)}',
       more: more,
     );
   }
@@ -125,6 +128,7 @@ class _Device {
   final LocalBlockRuleService rules = LocalBlockRuleService();
   final KomgaSetting komga = KomgaSetting();
   final SyncSetting settings = SyncSetting();
+  final WatchedProgressService watched = WatchedProgressService()..flushDelay = const Duration(days: 1);
   bool _initialized = false;
 
   Future<void> activate() async {
@@ -139,6 +143,7 @@ class _Device {
     localBlockRuleService = rules;
     komgaSetting = komga;
     syncSetting = settings;
+    watchedProgressService = watched;
     if (!_initialized) {
       _initialized = true;
       await rules.doInitBean();
@@ -167,7 +172,42 @@ class _Device {
     await activate();
     return search.histories.map((h) => h.rawKeyword).toList();
   }
+
+  /// The watched list's stretches read, each by its gids; the bookmarks;
+  /// where the list was left. As in memory, and as stored.
+  Future<(List<List<int>>, List<int>, int?)> watchedProgress({bool stored = false}) async {
+    await activate();
+    WatchedProgressService service = watched;
+    if (stored) {
+      service = WatchedProgressService();
+      await service.load();
+    }
+    return (
+      service.ranges.map((r) => r.gallerys.map((g) => g.gid).toList()).toList(),
+      service.bookmarks.map((b) => b.gid).toList(),
+      service.lastPosition?.gid,
+    );
+  }
 }
+
+/// The watched list: [count] galleries from [newestGid] down.
+List<Gallery> _watchedList(int count, {int newestGid = 3500000}) => [
+      for (int gid = newestGid; gid > newestGid - count; gid--)
+        Gallery(
+          galleryUrl: GalleryUrl(isEH: true, gid: gid, token: 'abcdef1234'),
+          title: 'Gallery $gid',
+          category: 'Manga',
+          cover: GalleryImage(url: 'https://ehgt.org/t/$gid.jpg', width: 250, height: 350),
+          pageCount: 20,
+          rating: 4,
+          hasRated: false,
+          language: 'japanese',
+          uploader: 'someone',
+          publishTime: '2026-10-18 12:00',
+          isExpunged: false,
+          tags: LinkedHashMap<String, List<GalleryTag>>(),
+        ),
+    ];
 
 GalleryHistoryModel _entry(int gid) => GalleryHistoryModel(
       galleryUrl: GalleryUrl(isEH: true, gid: gid, token: 't${gid.toString().padLeft(9, '0')}'),
@@ -274,6 +314,116 @@ void main() {
     await desktop.sync(server);
     await phone.sync(server);
     expect(await phone.favorites(), {101: 0, 102: 4, 103: 2});
+  });
+
+  test('the watched list read on two devices: each has all of it, the bookmarks of both, and where it was last left', () async {
+    final _MemoryServer server = _MemoryServer('db-1');
+    final _Device phone = _Device();
+    final _Device desktop = _Device();
+    final List<Gallery> list = _watchedList(20);
+    List<int> gids(int from, int to) => [for (int i = from; i <= to; i++) list[i].gid];
+
+    // Read on the phone before this version synced it.
+    await phone.activate();
+    watchedProgressService
+      ..markRead(list, 0, 9)
+      ..addBookmark(list[2])
+      ..setLastPosition(list[3]);
+    await watchedProgressService.flush();
+    await pendingSyncTracker.clearAll();
+    await phone.sync(server);
+
+    await _tick();
+    await desktop.activate();
+    watchedProgressService
+      ..markRead(list, 15, 19)
+      ..addBookmark(list[17]);
+    await watchedProgressService.flush();
+    await desktop.sync(server);
+    await phone.sync(server);
+
+    for (final _Device device in [phone, desktop]) {
+      for (final bool stored in [false, true]) {
+        final (List<List<int>> ranges, List<int> bookmarks, int? last) = await device.watchedProgress(stored: stored);
+        expect(ranges, [gids(0, 9), gids(15, 19)]);
+        expect(bookmarks, [list[2].gid, list[17].gid]);
+        expect(last, list[3].gid);
+      }
+    }
+    expect(phone.watched.isRead(list[17].gid), isTrue);
+
+    // Read on on the desktop across the gap, left further down; the phone
+    // removes a bookmark.
+    await _tick();
+    await desktop.activate();
+    watchedProgressService
+      ..markRead(list, 9, 15)
+      ..setLastPosition(list[18]);
+    await watchedProgressService.flush();
+    await phone.activate();
+    watchedProgressService.removeBookmark(list[17].gid);
+    await watchedProgressService.flush();
+    await desktop.sync(server);
+    await phone.sync(server);
+    await desktop.sync(server);
+
+    for (final _Device device in [phone, desktop]) {
+      final (List<List<int>> ranges, List<int> bookmarks, int? last) = await device.watchedProgress();
+      expect(ranges, [gids(0, 19)]);
+      expect(bookmarks, [list[2].gid]);
+      expect(last, list[18].gid);
+    }
+
+    // Met: nothing more goes either way.
+    final int pushed = server.pushedRecords;
+    await phone.sync(server);
+    await desktop.sync(server);
+    await phone.sync(server);
+    expect(server.pushedRecords, pushed);
+  });
+
+  test('a gallery of the watched list read on two devices keeps the stretch read below it on both', () async {
+    final _MemoryServer server = _MemoryServer('db-1');
+    final _Device phone = _Device();
+    final _Device desktop = _Device();
+    final List<Gallery> list = _watchedList(11, newestGid: 100);
+
+    await phone.activate();
+    watchedProgressService.markRead(list, 0, 10);
+    await watchedProgressService.flush();
+    await phone.sync(server);
+    // The desktop, not synced yet, opens the list at its top and goes no
+    // further: its 100 is read later, and leads nowhere.
+    await _tick();
+    await desktop.activate();
+    watchedProgressService.markRead(list, 0, 0);
+    await watchedProgressService.flush();
+    await desktop.sync(server);
+    await phone.sync(server);
+    await phone.sync(server);
+    await desktop.sync(server);
+
+    for (final _Device device in [phone, desktop]) {
+      final (List<List<int>> ranges, _, _) = await device.watchedProgress();
+      expect(ranges, [list.map((Gallery g) => g.gid).toList()]);
+      expect((await device.watchedProgress(stored: true)).$1, ranges);
+    }
+  });
+
+  test('a sync of the watched list takes what was read in the last second too', () async {
+    final _MemoryServer server = _MemoryServer('db-1');
+    final _Device phone = _Device();
+    await phone.activate();
+    syncSetting
+      ..currentProvider.value = SyncService.serverProvider
+      ..enableSync.value = true
+      ..autoSync.value = true;
+    watchedProgressService.markRead(_watchedList(3), 0, 2);
+
+    syncService = SyncService(recordBackendFactory: () => server);
+    final SyncResult? result = await syncService.syncWatchedProgress();
+    expect(result?.success, isTrue, reason: result?.message);
+    expect(server.record('watchedRead', '3500000'), isNotNull);
   });
 
   test('devices that already hold the same data push nothing more once they have met', () async {
@@ -389,7 +539,38 @@ void main() {
     final _MemoryServer second = _MemoryServer('db-2');
     await phone.sync(second);
     expect(second.record('laterKind', 'k')!.device, 'other');
-    expect(second.record('history', '1'), isNotNull);
+    expect(second.record('galleryHistory', 'eh:1'), isNotNull);
+  });
+
+  test('history synced by 8.1.1, by the bare number, is taken over once by the gallery it holds; its deletions are not', () async {
+    final _MemoryServer server = _MemoryServer('db-1');
+    final String time = SyncTimeUtil.nowIso();
+    final GalleryHistoryModel nh = GalleryHistoryModel(
+      galleryUrl: GalleryUrl(isEH: true, isNH: true, gid: 5, token: 'nhentai', sourceHost: 'nhentai.net'),
+      title: 'nhentai 5',
+      category: 'Manga',
+      coverUrl: 'https://cdn.example.test/5.jpg',
+      pageCount: 20,
+      rating: 0,
+      language: '',
+      uploader: '',
+      publishTime: '',
+      isExpunged: false,
+      tags: const <String>[],
+    );
+    await server.push([
+      RemoteRecord(kind: 'history', key: '5', value: jsonEncode(nh), updatedAt: time, device: 'old', deleted: false),
+      RemoteRecord(kind: 'history', key: '6', value: jsonEncode(_entry(6)), updatedAt: time, device: 'old', deleted: false),
+      RemoteRecord(kind: 'history', key: '8', value: null, updatedAt: time, device: 'old', deleted: true),
+    ]);
+
+    final _Device desktop = _Device();
+    await desktop.activate();
+    await historyService.record(_entry(8));
+    await desktop.sync(server);
+    expect(await desktop.historyGids(), {GalleryUrl.nhStorageOffset + 5, 6, 8}, reason: 'which gallery 8 the deletion was of is not known');
+    expect(server.record('galleryHistory', 'nh:5'), isNull, reason: 'taken over the same way on each device, not pushed');
+    expect(server.record('galleryHistory', 'eh:8'), isNotNull);
   });
 
   test('a pull cut short goes on from where it stopped', () async {
@@ -398,8 +579,8 @@ void main() {
     await server.push([
       for (int gid = 1; gid <= 450; gid++)
         RemoteRecord(
-          kind: 'history',
-          key: '$gid',
+          kind: 'galleryHistory',
+          key: 'eh:$gid',
           value: jsonEncode(_entry(gid)),
           updatedAt: time,
           device: 'other',
@@ -411,7 +592,7 @@ void main() {
     server.pullsBeforeFailure = 2;
     await expectLater(desktop.sync(server), throwsA(isA<RecordServerException>()));
     await desktop.activate();
-    expect((await SyncRecordDao.selectByKind('history')).length, 2 * RecordSyncEngine.pullLimit);
+    expect((await SyncRecordDao.selectByKind('galleryHistory')).length, 2 * RecordSyncEngine.pullLimit);
 
     server.pullsBeforeFailure = null;
     server.pulls = 0;
@@ -431,6 +612,54 @@ void main() {
     final SyncService service = SyncService(recordBackendFactory: () => server);
     SyncResult result = await service.sync(types: const [CloudConfigTypeEnum.history]);
     expect(result.success, isTrue, reason: result.message);
-    expect(server.record('history', '7'), isNotNull);
+    expect(server.record('galleryHistory', 'eh:7'), isNotNull);
   });
+
+  test('a sync given up stops before it writes, and the next sync waits for it', () async {
+    final _MemoryServer server = _MemoryServer('db-1');
+    final _HeldServer held = _HeldServer(server);
+    final _Device phone = _Device();
+    await phone.activate();
+    syncSetting.currentProvider.value = SyncService.serverProvider;
+    await historyService.record(_entry(7));
+
+    final SyncService service = SyncService(
+      recordBackendFactory: () => held,
+      syncTimeout: const Duration(milliseconds: 50),
+    );
+    SyncResult result = await service.sync(types: const [CloudConfigTypeEnum.history]);
+    expect(result.message, startsWith('Sync timed out'));
+    result = await service.sync(types: const [CloudConfigTypeEnum.history]);
+    expect(result.message, 'Sync already in progress');
+
+    // The pull answers after the sync was given up: nothing more is written.
+    held.release.complete();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(server.pushedRecords, 0);
+    expect(await SyncRecordDao.selectByKind('galleryHistory'), isEmpty);
+
+    result = await service.sync(types: const [CloudConfigTypeEnum.history]);
+    expect(result.success, isTrue, reason: result.message);
+    expect(server.record('galleryHistory', 'eh:7'), isNotNull);
+  });
+}
+
+/// [server] with its first pull held until [release] completes.
+class _HeldServer implements RecordBackend {
+  _HeldServer(this.server);
+
+  final _MemoryServer server;
+  final Completer<void> release = Completer<void>();
+
+  @override
+  Future<RecordServerInfo> info() => server.info();
+
+  @override
+  Future<RecordPage> pull({required String since, required String device, required int limit}) async {
+    await release.future;
+    return server.pull(since: since, device: device, limit: limit);
+  }
+
+  @override
+  Future<void> push(List<RemoteRecord> records) => server.push(records);
 }

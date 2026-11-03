@@ -78,7 +78,7 @@ class ArchiveGridDownloadPageLogic extends GetxController
     toRoute(
       Routes.details,
       arguments:
-          DetailsPageArgument(galleryUrl: GalleryUrl.parse(archive.galleryUrl)),
+          DetailsPageArgument(galleryUrl: GalleryUrl.parseStored(archive.galleryUrl)),
     );
   }
 

@@ -35,7 +35,7 @@ Across sources:
 - an `EH` button on nhentai, wnacg and JM details searches the same title on E-Hentai;
 - one login page with a site picker (E-Hentai, nhentai, JM);
 - favorites of all sources can be shown mixed with E-Hentai favorites or separately;
-- cloud sync (WebDAV, S3-compatible, or a self-hosted sync server) of settings, local favorites, history, reading progress, logins, and Tachiyomi extensions with their settings;
+- cloud sync (WebDAV, S3-compatible, or a self-hosted sync server) of settings, local favorites, history, reading progress, logins, and Tachiyomi extension repositories and extension settings, which can include a source's login (each device installs its own extensions);
 - a "Send to Telegraph bot" button for a self-hosted eh2telegraph service.
 
 ## Changes Compared With Upstream
@@ -58,12 +58,14 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - JM local favorites included in config sync.
   - config sync keeps remote entries it does not understand (written by newer versions) and the types it is not syncing, and aborts instead of uploading when the remote file cannot be read.
   - sync server provider (a Cloudflare Worker with a D1 database in `sync_server/`, deployed by yourself): item-by-item sync where deletions reach other devices too; see the [wiki](https://github.com/errorfg/JHenTai/wiki/Sync-Service).
+  - WebDAV and S3-compatible buckets sync item by item as the sync server does, deletions included, in a `records/v1/` folder: the first device of a later version takes over once what 8.1.1 and earlier synced in the bucket; those versions keep syncing among themselves in their own files, which later versions no longer read or write, so every device syncing a bucket needs the same later version.
+  - galleries of the same number on two sites (E-Hentai, `nhentai`, wnacg) keep their own history, downloads, read progress and double pages; data of 8.1.1 and earlier is moved by the address it holds, and progress kept under the bare number stays a fallback for each of them.
   - E-Hentai login included in sync (each device fetches its own `igneous`); the sync provider and switches stay each device's own choice.
 - Tachiyomi extensions:
   - a host (`ext_host/`) runs Tachiyomi/Mihon extensions inside the app: on Android the system loads the extension APKs; on iOS an embedded OpenJDK (Zero interpreter) runs them after dex2jar conversion, with a compatibility layer for the Android classes they use and native networking; desktop builds bundle a Java runtime.
   - Tachiyomi is a site beside E-Hentai, nhentai, wnacg and JM, with sources, search across all sources, updates (manual refresh) and an extensions page; manga and chapters reuse the details page, reader, favorites, history, progress and downloads, as JM's chapters do, and pages can be upscaled while reading.
   - extensions that need a web page (for logging in) get one from the app's WKWebView on iOS and macOS and the system WebView on Android, with cookies shared both ways; "Open in web view" lets you complete such steps yourself.
-  - Tachiyomi/Mihon backups (`.tachibk`) can be imported; extensions and repositories, extension settings and Tachiyomi favorites are included in cloud sync (all syncing devices need 8.0.28 or later).
+  - Tachiyomi/Mihon backups (`.tachibk`) can be imported; extension repositories, extension settings and Tachiyomi favorites are included in cloud sync (all syncing devices need 8.0.28 or later); which extensions are installed is each device's own.
 - Gallery and search UX:
   - multi-tag selection in detail page, searching or copying the selected tags.
   - client-side filters for Popular and Ranklist pages.
@@ -77,11 +79,13 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - three-way EH/NH/WN search toggle and `wn:` keyword-prefix support.
   - JM (18comic) source integration: search via the site toggle or `jm:` prefix, latest list, album-number jump, details with chapter list and read-only comments, descrambled online reading and downloads, previous/next chapter in the reader, download of all chapters, and selectable API and image lines.
   - EH/NH/WN/JM favorites support both mixed insertion and split display with menu switching.
+  - pulling down the JM or Tachiyomi favorites checks them for new chapters: favorites whose newest chapter is not opened yet (never read ones too) come first, those read up to it show faded. JM is checked through its newest list (about two pages a day since the last check) and asks for the details of the updated favorites only; the first check, or one after a month, asks for every favorite; Tachiyomi asks each manga for its chapters.
   - single login page with a site picker (E-Hentai, `nhentai`, JM); the account page shows and logs out each site separately, and the `nhentai` API key is entered there and verified before it is saved.
   - wnacg URL link jumping with automatic domain rewriting.
   - "Send to Telegraph bot" button on the details pages of every site (E-Hentai/ExHentai, `nhentai`, wnacg, JM), posting the gallery to a self-hosted eh2telegraph service that offers the HTTP interface described in the [wiki](https://github.com/errorfg/JHenTai/wiki/Send-to-Telegraph); its address and token are included in config sync.
 - Watched list:
   - galleries scrolled past count as read and show faded next time; a progress page shows what was read on a timeline, with where you left off and bookmarks; an "In Watched" button on details pages opens the watched list at that gallery.
+  - what was read, the bookmarks and where you left off are included in sync (sync server, or a bucket in the `records/v1/` layout), shortly after the list stops scrolling and when the progress page is opened.
 - Reading:
   - upscale pages while reading (experimental): with the upscaler programs on a desktop, or through an upscaling service (`sr_server/`) on another computer with a GPU, which phones and tablets can use too; see the [wiki](https://github.com/errorfg/JHenTai/wiki/Real-time-Upscaling).
   - split wide pages: an image wider than tall is cut in two, shown as two pages in single-page mode or one above the other in top-to-bottom mode.

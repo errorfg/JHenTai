@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:collection/collection.dart';
 import 'package:drift/drift.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
@@ -24,6 +26,7 @@ import 'jh_service.dart';
 import 'local_block_rule_service.dart';
 import 'log.dart';
 import 'read_progress_service.dart';
+import 'watched_progress_service.dart';
 import 'dart:async';
 import 'package:jhentai/src/service/tachi/tachi_extension_service.dart';
 import 'package:jhentai/src/service/tachi/tachi_favorite_service.dart';
@@ -52,6 +55,7 @@ class CloudConfigService
     CloudConfigTypeEnum.tachiExtensionList: '1.0.0',
     CloudConfigTypeEnum.tachiSourceSettings: '1.0.0',
     CloudConfigTypeEnum.tachiFavorite: '1.0.0',
+    CloudConfigTypeEnum.watchedProgress: '1.0.0',
   };
 
   static const int localConfigId = -1;
@@ -64,7 +68,9 @@ class CloudConfigService
   @override
   Future<void> doAfterBeanReady() async {}
 
-  Future<void> importConfig(CloudConfig config) async {
+  /// [replace]: the data of the type becomes [config]'s (a history version
+  /// restored); otherwise block rule groups already here are kept.
+  Future<void> importConfig(CloudConfig config, {bool replace = false}) async {
     log.info('📥 Importing config: ${config.type.name}');
 
     switch (config.type) {
@@ -127,10 +133,17 @@ class CloudConfigService
           blockRule.id = null;
         }
 
+        Map<String, List<LocalBlockRule>> groups = blockRules.groupListsBy((element) => element.groupId!);
+        if (replace) {
+          for (String groupId in (await localBlockRuleService.getBlockRules()).map((r) => r.groupId).whereType<String>().toSet()) {
+            if (!groups.containsKey(groupId)) {
+              await localBlockRuleService.removeLocalBlockRulesByGroupId(groupId);
+            }
+          }
+        }
         int imported = 0;
-        for (var group
-            in blockRules.groupListsBy((element) => element.groupId!).entries) {
-          bool exists = await localBlockRuleService.existsGroup(group.key);
+        for (var group in groups.entries) {
+          bool exists = !replace && await localBlockRuleService.existsGroup(group.key);
           if (!exists) {
             await localBlockRuleService.replaceBlockRulesByGroup(
               group.key,
@@ -241,18 +254,25 @@ class CloudConfigService
         log.info('  ✅ E-Hentai account imported');
         break;
       case CloudConfigTypeEnum.tachiExtensionList:
+        // The repositories; which extensions are installed is each device's own.
+        List<String> repos = (((jsonDecode(config.config) as Map)['repos'] as List?) ?? []).whereType<String>().toList();
+        String? stored = await localConfigService.read(configKey: ConfigEnum.tachiExtensionSetting);
+        Map<String, dynamic> local = stored == null ? {} : Map<String, dynamic>.from(jsonDecode(stored) as Map);
+        if (const ListEquality<dynamic>().equals(local['repos'] as List?, repos)) {
+          log.info('  ✅ Tachiyomi repositories unchanged');
+          break;
+        }
+        String reposTime = (jsonDecode(config.config) as Map)['reposUpdatedAt'] as String? ?? SyncTimeUtil.format(config.ctime);
         await localConfigService.batchWrite([
           LocalConfigCompanion(
             configKey: Value(ConfigEnum.tachiExtensionSetting.key),
             subConfigKey: const Value(LocalConfigService.defaultSubConfigKey),
-            value: Value(config.config),
+            value: Value(jsonEncode({...local, 'repos': repos, 'updatedAt': SyncTimeUtil.format(config.ctime), 'reposUpdatedAt': reposTime})),
             utime: Value(SyncTimeUtil.format(config.ctime)),
           ),
         ]);
         await tachiExtensionService.refreshBean();
-        // Installs what arrived, when the host runs already.
-        unawaited(tachiExtensionService.applyInstalledList());
-        log.info('  ✅ Tachiyomi extensions imported');
+        log.info('  ✅ Tachiyomi repositories imported');
         break;
       case CloudConfigTypeEnum.tachiSourceSettings:
         await localConfigService.batchWrite([
@@ -274,6 +294,34 @@ class CloudConfigService
         );
         await tachiFavoriteService.refreshBean();
         log.info('  ✅ Tachiyomi favorites imported and refreshed');
+        break;
+      case CloudConfigTypeEnum.watchedProgress:
+        List list = await isolateService.jsonDecodeAsync(config.config);
+        List<LocalConfig> rows = list.map((e) => LocalConfig.fromJson(e)).toList();
+        await watchedProgressService.flush();
+        // Row by row, where newer than here.
+        Set<int> read = {};
+        bool bookmarks = false;
+        for (ConfigEnum configKey in [ConfigEnum.watchedRead, ConfigEnum.watchedBookmarks]) {
+          List<LocalConfig> ofKey = rows.where((r) => r.configKey == configKey).toList();
+          int written = await localConfigService.batchWriteIfNewer(
+            configKey: configKey,
+            localConfigs: ofKey
+                .map((e) => LocalConfigCompanion(
+                      configKey: Value(e.configKey.key),
+                      subConfigKey: Value(e.subConfigKey),
+                      value: Value(e.value),
+                      utime: Value(e.utime),
+                    ))
+                .toList(),
+          );
+          if (written > 0 && configKey == ConfigEnum.watchedRead) {
+            read = ofKey.map((r) => int.tryParse(r.subConfigKey)).whereType<int>().toSet();
+          }
+          bookmarks = bookmarks || (written > 0 && configKey == ConfigEnum.watchedBookmarks);
+        }
+        await watchedProgressService.reloadStored(read: read, bookmarks: bookmarks);
+        log.info('  ✅ Watched-list progress imported');
         break;
     }
   }
@@ -316,6 +364,17 @@ class CloudConfigService
         List<LocalBlockRule> blockRules = await localBlockRuleService
             .getBlockRules();
         configValue = await isolateService.jsonEncodeAsync(blockRules);
+        break;
+      case CloudConfigTypeEnum.watchedProgress:
+        await watchedProgressService.flush();
+        List<LocalConfig> rows = [
+          ...await localConfigService.readWithAllSubKeys(configKey: ConfigEnum.watchedRead),
+          ...await localConfigService.readWithAllSubKeys(configKey: ConfigEnum.watchedBookmarks),
+        ];
+        if (rows.isEmpty) {
+          return null;
+        }
+        configValue = await isolateService.jsonEncodeAsync(rows);
         break;
       case CloudConfigTypeEnum.history:
         List<GalleryHistoryV2Data> histories = await historyService

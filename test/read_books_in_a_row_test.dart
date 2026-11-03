@@ -16,6 +16,7 @@ import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/model/gallery_image.dart';
 import 'package:jhentai/src/model/gallery_thumbnail.dart';
 import 'package:jhentai/src/model/read_page_info.dart';
+import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/pages/read/layout/horizontal_double_column/horizontal_double_column_layout_logic.dart';
 import 'package:jhentai/src/pages/read/layout/horizontal_page/horizontal_page_layout_logic.dart';
 import 'package:jhentai/src/pages/read/layout/vertical_list/vertical_list_layout_logic.dart';
@@ -30,6 +31,7 @@ import 'package:jhentai/src/service/sr/realtime_sr_service.dart';
 import 'package:jhentai/src/service/sr/sr_tools.dart';
 import 'package:jhentai/src/setting/read_setting.dart';
 import 'package:jhentai/src/setting/super_resolution_setting.dart';
+import 'package:jhentai/src/utils/eh_spider_parser.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 class _SilentLogService extends LogService {
@@ -52,6 +54,7 @@ ReadPageInfo _chapter(
   int chapter, {
   required List<String> shown,
   Future<ReadPageInfo?> Function({required bool next})? next,
+  Set<int> missing = const <int>{},
 }) {
   return ReadPageInfo(
     mode: ReadMode.online,
@@ -65,15 +68,23 @@ ReadPageInfo _chapter(
     thumbnails: <GalleryThumbnail?>[
       for (int i = 0; i < _pages; i++) GalleryThumbnail(href: 'test://$chapter/$i', isLarge: true, thumbUrl: ''),
     ],
+    // Pages [missing] are still to be found, as online pages are.
     images: <GalleryImage?>[
       for (int i = 0; i < _pages; i++)
-        GalleryImage(url: 'test://$chapter/$i', path: 'c$chapter-$i.png', downloadStatus: DownloadStatus.downloaded),
+        missing.contains(i) ? null : GalleryImage(url: 'test://$chapter/$i', path: 'c$chapter-$i.png', downloadStatus: DownloadStatus.downloaded),
     ],
     onShown: () => shown.add('Chapter $chapter'),
     useSuperResolution: false,
     loadSiblingBook: next,
     siblingsAreChapters: true,
   );
+}
+
+/// Image pages that are still being looked for.
+class _UnansweredImagePages extends EHRequest {
+  @override
+  Future<T> requestImagePage<T>(String href, {String? reloadKey, CancelToken? cancelToken, bool useCacheIfAvailable = true, required HtmlParser<T> parser}) =>
+      Completer<T>().future;
 }
 
 /// Where the upscaler programs are, from test/e2e/sr_e2e.json; null to skip
@@ -152,14 +163,14 @@ void main() {
     await settle();
     final ReadPageLogic reader = Get.find<ReadPageLogic>();
     expect(shown, <String>['Chapter 1']);
-    expect(reader.state.readPageInfo.pageCount, _pages);
+    expect(reader.state.pageCount, _pages);
 
     // Down to the last page of chapter 1: chapter 2 is appended below it.
     Get.find<VerticalListLayoutLogic>().state.itemScrollController.jumpTo(index: _pages - 1);
     await settle();
     expect(loads, 1);
     expect(reader.state.segments, hasLength(2));
-    expect(reader.state.readPageInfo.pageCount, 2 * _pages);
+    expect(reader.state.pageCount, 2 * _pages);
     expect(reader.currentSegment.info.galleryTitle, 'Chapter 1');
     expect(reader.reachedEnd, isTrue);
     // The next chapter is already there: no button to it.
@@ -169,7 +180,7 @@ void main() {
     Get.find<VerticalListLayoutLogic>().state.itemScrollController.jumpTo(index: _pages + 1);
     await settle();
     expect(reader.currentSegment.info.galleryTitle, 'Chapter 2');
-    expect(reader.pageNumberOf(reader.state.readPageInfo.currentImageIndex), 2);
+    expect(reader.pageNumberOf(reader.state.currentImageIndex), 2);
     expect(shown, <String>['Chapter 1', 'Chapter 2']);
     expect(find.text('Chapter 2'), findsWidgets);
 
@@ -199,6 +210,9 @@ void main() {
     }
   }
 
+  /// What the reader opened last closes with.
+  Future<dynamic>? readerResult;
+
   /// Opens the reader on [info], in [direction].
   Future<ReadPageLogic> openReader(WidgetTester tester, ReadPageInfo info, {ReadDirection direction = ReadDirection.top2bottomList}) async {
     appDb = (await tester.runAsync(() async => AppDb.forTesting(NativeDatabase.memory())))!;
@@ -227,7 +241,7 @@ void main() {
           getPages: [GetPage(name: '/read', page: () => const ReadPage())],
         ),
       );
-      Get.toNamed('/read', arguments: info);
+      readerResult = Get.toNamed('/read', arguments: info);
       await Future<void>.delayed(const Duration(milliseconds: 300));
     });
     await settle(tester);
@@ -287,13 +301,13 @@ void main() {
 
     expect(opened.asked, <bool>[false]);
     expect(reader.state.segments.map((ReadSegment s) => s.info.galleryTitle), <String>['Chapter 1', 'Chapter 2']);
-    expect(reader.state.readPageInfo.pageCount, 2 * _pages);
+    expect(reader.state.pageCount, 2 * _pages);
     expect(reader.state.segments.last.start, _pages);
     // Still on the first page of chapter 2, at the same place on screen, the
     // image decoded before (not loaded again).
-    expect(reader.state.readPageInfo.currentImageIndex, _pages);
+    expect(reader.state.currentImageIndex, _pages);
     expect(reader.currentSegment.info.galleryTitle, 'Chapter 2');
-    expect(reader.pageNumberOf(reader.state.readPageInfo.currentImageIndex), 1);
+    expect(reader.pageNumberOf(reader.state.currentImageIndex), 1);
     final ({ui.Image image, Rect rect}) after = topPage(tester);
     expect(after.rect.top, moreOrLessEquals(before.rect.top, epsilon: 0.5));
     expect(after.image.isCloneOf(before.image), isTrue);
@@ -303,7 +317,7 @@ void main() {
     Get.find<VerticalListLayoutLogic>().state.itemScrollController.jumpTo(index: _pages - 1);
     await settle(tester);
     expect(reader.currentSegment.info.galleryTitle, 'Chapter 1');
-    expect(reader.pageNumberOf(reader.state.readPageInfo.currentImageIndex), _pages);
+    expect(reader.pageNumberOf(reader.state.currentImageIndex), _pages);
     expect(opened.shown, <String>['Chapter 2', 'Chapter 1']);
 
     // Going back to the top of chapter 1 looks for the chapter before it,
@@ -338,6 +352,38 @@ void main() {
     });
   });
 
+  testWidgets('a page of the chapter that follows, still being found, shows its number in that chapter', (WidgetTester tester) async {
+    final List<String> shown = <String>[];
+    final ReadPageInfo first = _chapter(
+      1,
+      shown: shown,
+      next: ({required bool next}) async => next ? _chapter(2, shown: shown, missing: <int>{2}) : null,
+    );
+    final EHRequest appRequests = ehRequest;
+    ehRequest = _UnansweredImagePages();
+    addTearDown(() => ehRequest = appRequests);
+    final ReadPageLogic reader = await openReader(tester, first);
+    Get.find<VerticalListLayoutLogic>().state.itemScrollController.jumpTo(index: _pages - 1);
+    await settle(tester);
+    expect(reader.state.segments, hasLength(2));
+
+    Get.find<VerticalListLayoutLogic>().state.itemScrollController.jumpTo(index: _pages + 2);
+    await settle(tester);
+    expect(find.text('parsingURL'.tr), findsWidgets);
+    expect(find.text('3'), findsWidgets);
+    expect(find.text('${_pages + 3}'), findsNothing);
+
+    await tester.runAsync(() async {
+      Get.back();
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    await settle(tester);
+    await tester.runAsync(() async {
+      Get.reset();
+      await appDb.close();
+    });
+  });
+
   testWidgets('the button to the previous chapter puts it above and goes to its first page', (WidgetTester tester) async {
     final ({ReadPageInfo info, List<String> shown, List<bool> asked}) opened = chapterTwo();
     final ReadPageLogic reader = await openReader(tester, opened.info);
@@ -347,9 +393,84 @@ void main() {
     await settle(tester);
     expect(reader.state.segments.map((ReadSegment s) => s.info.galleryTitle), <String>['Chapter 1', 'Chapter 2']);
     expect(reader.currentSegment.info.galleryTitle, 'Chapter 1');
-    expect(reader.state.readPageInfo.currentImageIndex, 0);
+    expect(reader.state.currentImageIndex, 0);
     // The reader stays open: the chapter is read in it.
     expect(Get.isRegistered<ReadPageLogic>(), isTrue);
+
+    await tester.runAsync(() async {
+      Get.back();
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    });
+    await settle(tester);
+    await tester.runAsync(() async {
+      Get.reset();
+      await appDb.close();
+    });
+  });
+
+  testWidgets('a downloaded volume after the last, which can not follow in the reader, is opened by itself', (WidgetTester tester) async {
+    ReadPageInfo volume(int number, {Future<ReadPageInfo?> Function({required bool next})? siblings}) => ReadPageInfo(
+          mode: ReadMode.local,
+          galleryTitle: 'Volume $number',
+          initialIndex: 0,
+          pageCount: _pages,
+          readProgressRecordStorageKey: 'komga:test:book-$number',
+          images: <GalleryImage?>[
+            for (int i = 0; i < _pages; i++)
+              GalleryImage(url: '', path: '${files.path}/c$number-$i.png', downloadStatus: DownloadStatus.downloaded),
+          ],
+          useSuperResolution: false,
+          loadSiblingBook: siblings,
+        );
+    int loads = 0;
+    final ReadPageLogic reader = await openReader(
+      tester,
+      volume(1, siblings: ({required bool next}) async {
+        loads++;
+        return next ? volume(2) : null;
+      }),
+    );
+    expect(reader.readsBooksInARow, isTrue);
+
+    // The end of the list reached: the volume is found, and not looked for
+    // again each time the end is reached.
+    expect(await tester.runAsync(reader.appendNextSegment), isA<SiblingApart>());
+    expect(await tester.runAsync(reader.appendNextSegment), isA<SiblingApart>());
+    expect(loads, 1);
+    expect(reader.state.segments, hasLength(1));
+
+    // Its button closes the reader with it, for the page that opened the
+    // reader to open it: the volume found, not loaded again.
+    await tester.runAsync(() => reader.openSiblingBook(next: true));
+    await settle(tester);
+    expect(loads, 1);
+    final dynamic result = await tester.runAsync<dynamic>(() => readerResult!);
+    expect(result is ReadPageInfo ? result.galleryTitle : result, 'Volume 2');
+    expect(Get.currentRoute, isNot('/read'));
+
+    await tester.runAsync(() async {
+      Get.reset();
+      await appDb.close();
+    });
+  });
+
+  testWidgets('a chapter that could not be loaded is looked for again, and then follows', (WidgetTester tester) async {
+    final List<String> shown = <String>[];
+    int loads = 0;
+    final ReadPageLogic reader = await openReader(
+      tester,
+      _chapter(1, shown: shown, next: ({required bool next}) async {
+        loads++;
+        if (loads == 1) {
+          throw StateError('connection reset');
+        }
+        return next ? _chapter(2, shown: shown) : null;
+      }),
+    );
+    expect(await tester.runAsync(reader.appendNextSegment), isA<SiblingFailed>());
+    expect(await tester.runAsync(reader.appendNextSegment), isA<SiblingJoined>());
+    expect(reader.state.segments.map((ReadSegment s) => s.info.galleryTitle), <String>['Chapter 1', 'Chapter 2']);
+    expect(loads, 2);
 
     await tester.runAsync(() async {
       Get.back();
@@ -376,14 +497,14 @@ void main() {
     expect(reader.state.segments, hasLength(2));
     Get.find<VerticalListLayoutLogic>().state.itemScrollController.jumpTo(index: 2);
     await settle(tester);
-    expect(reader.state.readPageInfo.currentImageIndex, 2);
+    expect(reader.state.currentImageIndex, 2);
 
     // Both layouts were made when chapter 2 alone was read, at its first
     // page.
     readSetting.readDirection.value = ReadDirection.left2rightSinglePage;
     await settle(tester);
     expect(Get.find<HorizontalPageLayoutLogic>().pageController.page, 2);
-    expect(reader.state.readPageInfo.currentImageIndex, 2);
+    expect(reader.state.currentImageIndex, 2);
     expect(reader.currentSegment.info.galleryTitle, 'Chapter 1');
 
     readSetting.readDirection.value = ReadDirection.left2rightDoubleColumn;
@@ -534,7 +655,7 @@ void main() {
       Get.reset();
       await appDb.close();
     });
-  }, skip: _srToolsRoot() == null);
+  }, skip: _srToolsRoot() == null, tags: 'external');
 
   /// Reads [info] with upscaling on until the pages [upscaled] have their
   /// upscaled copy, and checks that the first page shows as it: the reader's
@@ -672,7 +793,7 @@ void main() {
 
     expect(refused, 0);
     expect(served.keys.toSet(), <String>{for (int i = 1; i <= _pages; i++) '/api/v1/books/book-1/pages/$i'});
-  }, skip: _srToolsRoot() == null);
+  }, skip: _srToolsRoot() == null, tags: 'external');
 
   testWidgets('a downloaded Komga book is upscaled as it is read', (WidgetTester tester) async {
     await readUpscaled(
@@ -690,7 +811,7 @@ void main() {
         useSuperResolution: false,
       ),
     );
-  }, skip: _srToolsRoot() == null);
+  }, skip: _srToolsRoot() == null, tags: 'external');
 
   testWidgets('a downloaded gallery is upscaled as it is read, but for a page still downloading', (WidgetTester tester) async {
     const int gid = 4242;
@@ -738,5 +859,5 @@ void main() {
       upscaled: const <int>[0, 1, 2, 4],
       left: const <int>[3],
     );
-  }, skip: _srToolsRoot() == null);
+  }, skip: _srToolsRoot() == null, tags: 'external');
 }

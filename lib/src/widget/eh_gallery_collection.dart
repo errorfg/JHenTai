@@ -47,7 +47,7 @@ Widget EHGalleryCollection({
             padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
             child: EHGalleryListCard(
               gallery: gallerys[index],
-              downloaded: galleryDownloadService.containGallery(gallerys[index].gid) || archiveDownloadService.containArchive(gallerys[index].gid),
+              downloaded: galleryDownloadService.containGallery(gallerys[index].galleryUrl.storageGid) || archiveDownloadService.containArchive(gallerys[index].galleryUrl.storageGid),
               listMode: listMode,
               handleTapCard: (gallery) => handleTapCard(gallery),
               handleLongPressCard: handleLongPressCard == null ? null : (gallery, position) => handleLongPressCard(gallery, position),
@@ -88,7 +88,7 @@ Widget EHGalleryCollection({
 
             return wrap(gallerys[index], EHGalleryWaterFlowCard(
               gallery: gallerys[index],
-              downloaded: galleryDownloadService.containGallery(gallerys[index].gid) || archiveDownloadService.containArchive(gallerys[index].gid),
+              downloaded: galleryDownloadService.containGallery(gallerys[index].galleryUrl.storageGid) || archiveDownloadService.containArchive(gallerys[index].galleryUrl.storageGid),
               listMode: listMode,
               handleTapCard: handleTapCard,
               handleLongPressCard: handleLongPressCard == null ? null : (gallery, position) => handleLongPressCard(gallery, position),

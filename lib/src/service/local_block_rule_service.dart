@@ -308,6 +308,8 @@ mixin GalleryUploaderAttributeGetter on AttributeGetter<String, Gallery> {
   }
 }
 
+/// A gallery by its number ('123'), which a rule up to 8.1.1 blocks on
+/// every site that has it, or by its key ('nh:123'), on its own site only.
 mixin GalleryGidAttributeGetter on AttributeGetter<String, Gallery> {
   @override
   bool matchRuleAttribute(LocalBlockAttributeEnum attribute) {
@@ -316,7 +318,7 @@ mixin GalleryGidAttributeGetter on AttributeGetter<String, Gallery> {
 
   @override
   List<String> getItemAttributes(covariant Gallery item) {
-    return [item.gid.toString()];
+    return {item.gid.toString(), item.galleryUrl.contentKey}.toList();
   }
 }
 mixin CommentUsernameAttributeGetter on AttributeGetter<String, GalleryComment> {

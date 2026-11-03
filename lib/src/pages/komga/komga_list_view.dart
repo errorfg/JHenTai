@@ -5,12 +5,11 @@ import 'package:jhentai/src/model/komga/komga_models.dart';
 import 'package:jhentai/src/model/komga/komga_query.dart';
 import 'package:jhentai/src/network/komga_client.dart';
 import 'package:jhentai/src/pages/komga/komga_browse_controller.dart';
-import 'package:jhentai/src/pages/komga/komga_filter_sheet.dart';
 import 'package:jhentai/src/pages/komga/komga_item_widgets.dart';
 import 'package:jhentai/src/pages/komga/komga_paged_loader.dart';
 
-/// A paged series or book list with its toolbar. [header] is shown above the
-/// toolbar (the series header on a series level).
+/// A paged series or book list. [header] is shown above the items (the
+/// series header on a series level).
 class KomgaListView extends StatefulWidget {
   const KomgaListView({
     super.key,
@@ -114,141 +113,26 @@ class _KomgaListViewState extends State<KomgaListView> {
             ),
           );
 
+    // The page's bars float over the top and bottom of the list; the
+    // padding clears them.
+    final EdgeInsets inset = MediaQuery.paddingOf(context);
     return RefreshIndicator(
       onRefresh: widget.onRefresh,
+      edgeOffset: inset.top,
       child: CustomScrollView(
         controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: <Widget>[
-          if (widget.header != null) SliverToBoxAdapter(child: widget.header),
-          SliverToBoxAdapter(child: _toolbar(context)),
+          SliverToBoxAdapter(child: SizedBox(height: inset.top)),
+          if (widget.header != null) ...<Widget>[
+            SliverToBoxAdapter(child: widget.header),
+            const SliverToBoxAdapter(child: Divider(height: 1)),
+          ],
           if (!_query.filters.isEmpty)
             SliverToBoxAdapter(child: _activeFilters()),
-          const SliverToBoxAdapter(child: Divider(height: 1)),
           body,
           SliverToBoxAdapter(child: _footer(context)),
-        ],
-      ),
-    );
-  }
-
-  Widget _toolbar(BuildContext context) {
-    final KomgaLevel level = widget.level;
-    final bool isList = level is KomgaListLevel;
-    final bool isSeriesTarget = _query.target == KomgaTarget.series;
-    final List<KomgaSortMode> sortModes = <KomgaSortMode>[
-      if (_query.hasSearch) KomgaSortMode.relevance,
-      if (!isSeriesTarget) KomgaSortMode.number,
-      KomgaSortMode.addedAt,
-      KomgaSortMode.lastReadAt,
-      KomgaSortMode.title,
-    ];
-    final List<KomgaProgressFilter> progressFilters = <KomgaProgressFilter>[
-      KomgaProgressFilter.all,
-      KomgaProgressFilter.unread,
-      KomgaProgressFilter.inProgress,
-      KomgaProgressFilter.read,
-      if (level is KomgaListLevel && level.library != null)
-        KomgaProgressFilter.newlyAdded,
-    ];
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: <Widget>[
-          if (isList)
-            SegmentedButton<KomgaTarget>(
-              key: const ValueKey<String>('komgaTargetToggle'),
-              segments: <ButtonSegment<KomgaTarget>>[
-                ButtonSegment<KomgaTarget>(
-                  value: KomgaTarget.series,
-                  icon: const Icon(Icons.collections_bookmark_outlined),
-                  label: Text('komgaSeriesView'.tr),
-                ),
-                ButtonSegment<KomgaTarget>(
-                  value: KomgaTarget.books,
-                  icon: const Icon(Icons.menu_book_outlined),
-                  label: Text('komgaAllBooksView'.tr),
-                ),
-              ],
-              selected: <KomgaTarget>{_query.target},
-              showSelectedIcon: false,
-              onSelectionChanged: (Set<KomgaTarget> value) =>
-                  _controller.setTarget(level, value.single),
-            ),
-          _menu<KomgaProgressFilter>(
-            icon: Icons.filter_list,
-            label: progressFilterLabel(_query.progress),
-            values: progressFilters,
-            selected: _query.progress,
-            labelOf: progressFilterLabel,
-            onSelected: (KomgaProgressFilter value) =>
-                _controller.setProgressFilter(level, value),
-          ),
-          _menu<KomgaSortMode>(
-            icon: Icons.sort,
-            label: sortModeLabel(_query.sortMode),
-            values: sortModes,
-            selected: _query.sortMode,
-            labelOf: sortModeLabel,
-            onSelected: (KomgaSortMode value) => _controller.setSort(
-              level,
-              value,
-              value == KomgaSortMode.title || value == KomgaSortMode.number
-                  ? false
-                  : true,
-            ),
-          ),
-          if (_query.sortMode != KomgaSortMode.relevance)
-            IconButton.filledTonal(
-              tooltip: _query.descending
-                  ? 'komgaDescending'.tr
-                  : 'komgaAscending'.tr,
-              onPressed: () => _controller.setSort(
-                level,
-                _query.sortMode,
-                !_query.descending,
-              ),
-              icon: Icon(
-                _query.descending ? Icons.arrow_downward : Icons.arrow_upward,
-              ),
-            ),
-          if (level is KomgaListLevel)
-            Badge(
-              isLabelVisible: !_query.filters.isEmpty,
-              label: Text(_query.filters.count.toString()),
-              child: IconButton.filledTonal(
-                key: const ValueKey<String>('komgaFilterButton'),
-                tooltip: 'komgaFilters'.tr,
-                onPressed: () => _openFilterSheet(level),
-                icon: const Icon(Icons.tune),
-              ),
-            ),
-          SegmentedButton<KomgaDisplayMode>(
-            segments: <ButtonSegment<KomgaDisplayMode>>[
-              ButtonSegment<KomgaDisplayMode>(
-                value: KomgaDisplayMode.grid,
-                icon: const Icon(Icons.grid_view_outlined),
-                tooltip: 'komgaCardView'.tr,
-              ),
-              ButtonSegment<KomgaDisplayMode>(
-                value: KomgaDisplayMode.list,
-                icon: const Icon(Icons.view_list_outlined),
-                tooltip: 'komgaListView'.tr,
-              ),
-              ButtonSegment<KomgaDisplayMode>(
-                value: KomgaDisplayMode.detail,
-                icon: const Icon(Icons.view_agenda_outlined),
-                tooltip: 'komgaDetailView'.tr,
-              ),
-            ],
-            selected: <KomgaDisplayMode>{_controller.preferences.displayMode},
-            showSelectedIcon: false,
-            onSelectionChanged: (Set<KomgaDisplayMode> value) =>
-                _controller.setDisplayMode(value.single),
-          ),
+          SliverToBoxAdapter(child: SizedBox(height: inset.bottom)),
         ],
       ),
     );
@@ -280,19 +164,6 @@ class _KomgaListViewState extends State<KomgaListView> {
         ],
       ),
     );
-  }
-
-  Future<void> _openFilterSheet(KomgaListLevel level) async {
-    final KomgaFilters? result = await showKomgaFilterSheet(
-      context,
-      controller: _controller,
-      libraryId: level.query.libraryId,
-      target: level.query.target,
-      initial: level.query.filters,
-    );
-    if (result != null) {
-      await _controller.setFilters(level, result);
-    }
   }
 
   Widget _footer(BuildContext context) {
@@ -349,56 +220,6 @@ class _KomgaListViewState extends State<KomgaListView> {
     return const SizedBox(height: 40);
   }
 
-  Widget _menu<T>({
-    required IconData icon,
-    required String label,
-    required List<T> values,
-    required T selected,
-    required String Function(T) labelOf,
-    required void Function(T) onSelected,
-  }) {
-    return PopupMenuButton<T>(
-      tooltip: label,
-      initialValue: selected,
-      onSelected: onSelected,
-      itemBuilder: (_) => values
-          .map(
-            (T value) => PopupMenuItem<T>(
-              value: value,
-              child: Row(
-                children: <Widget>[
-                  SizedBox(
-                    width: 28,
-                    child: value == selected
-                        ? const Icon(Icons.check, size: 20)
-                        : null,
-                  ),
-                  Expanded(child: Text(labelOf(value))),
-                ],
-              ),
-            ),
-          )
-          .toList(),
-      child: Container(
-        height: 48,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          border: Border.all(color: Theme.of(context).colorScheme.outline),
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(icon, size: 18),
-            const SizedBox(width: 8),
-            Text(label),
-            const SizedBox(width: 4),
-            const Icon(Icons.arrow_drop_down, size: 18),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 String progressFilterLabel(KomgaProgressFilter value) {

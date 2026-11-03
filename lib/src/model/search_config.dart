@@ -1,5 +1,6 @@
 import 'package:jhentai/src/consts/eh_consts.dart';
 import 'package:jhentai/src/database/database.dart';
+import 'package:jhentai/src/model/content_source.dart';
 import 'package:json_annotation/json_annotation.dart';
 
 enum SearchType {
@@ -58,6 +59,15 @@ class SearchConfig {
   List<dynamic>? tachiFilters;
 
   bool get isTachiSearch => tachiSource != null;
+
+  /// A search of the site of [source] (E-Hentai when it is none of the
+  /// others).
+  void searchOn(ContentSource source) {
+    isNhSearch = source.kind == SourceKind.nhentai;
+    isWnacgSearch = source.kind == SourceKind.wnacg;
+    isJmSearch = source.kind == SourceKind.jm;
+    tachiSource = source.kind == SourceKind.tachiyomi ? source.instance : null;
+  }
 
   SearchConfig({
     this.searchType = SearchType.gallery,

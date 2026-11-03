@@ -5,11 +5,13 @@ import 'package:get/get.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/model/gallery.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
+import 'package:jhentai/src/model/series.dart';
 import 'package:jhentai/src/network/eh_request.dart';
 import 'package:jhentai/src/network/tachi/tachi_models.dart';
 import 'package:jhentai/src/network/tachi/tachi_source.dart';
 import 'package:jhentai/src/service/jh_service.dart';
 import 'package:jhentai/src/service/log.dart';
+import 'package:jhentai/src/service/series_update.dart';
 import 'package:jhentai/src/service/tachi/tachi_favorite_service.dart';
 
 TachiUpdateService tachiUpdateService = TachiUpdateService();
@@ -65,10 +67,10 @@ class TachiUpdate {
       };
 }
 
-/// New chapters of the Tachiyomi manga in the favorites. Only a manual
-/// refresh asks the sites, one chapter list request per manga; the first
-/// check of a manga records its chapters without listing them as new. Kept
-/// on this device.
+/// New chapters of the Tachiyomi manga in the favorites, and the newest
+/// chapter of each. Only a manual refresh asks the sites, one chapter list
+/// request per manga; the first check of a manga records its chapters
+/// without listing them as new. Kept on this device.
 class TachiUpdateService with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBean {
   static const int _keptUpdates = 500;
   static const int _parallel = 3;
@@ -78,6 +80,9 @@ class TachiUpdateService with JHLifeCircleBeanWithConfigStorage implements JHLif
 
   /// Chapter paths seen, by manga gid.
   Map<int, Set<String>> _known = <int, Set<String>>{};
+
+  /// By manga gid.
+  Map<int, SeriesLatest> _latest = <int, SeriesLatest>{};
 
   final RxList<TachiUpdate> updates = <TachiUpdate>[].obs;
   final RxBool checking = false.obs;
@@ -99,6 +104,10 @@ class TachiUpdateService with JHLifeCircleBeanWithConfigStorage implements JHLif
       for (final MapEntry<String, dynamic> e in ((json['known'] as Map?) ?? const <String, dynamic>{}).cast<String, dynamic>().entries)
         int.parse(e.key): (e.value as List).cast<String>().toSet(),
     };
+    _latest = <int, SeriesLatest>{
+      for (final MapEntry<String, dynamic> e in ((json['latest'] as Map?) ?? const <String, dynamic>{}).cast<String, dynamic>().entries)
+        int.parse(e.key): SeriesLatest.fromJson((e.value as Map).cast<String, dynamic>()),
+    };
     updates.value = ((json['updates'] as List?) ?? const <dynamic>[]).map((dynamic u) => TachiUpdate.fromJson(u as Map<String, dynamic>)).toList();
     lastCheckedAt = (json['checkedAt'] as num?)?.toInt() ?? 0;
   }
@@ -106,6 +115,7 @@ class TachiUpdateService with JHLifeCircleBeanWithConfigStorage implements JHLif
   @override
   String toConfigString() => jsonEncode(<String, dynamic>{
         'known': <String, dynamic>{for (final MapEntry<int, Set<String>> e in _known.entries) '${e.key}': e.value.toList()},
+        'latest': <String, dynamic>{for (final MapEntry<int, SeriesLatest> e in _latest.entries) '${e.key}': e.value.toJson()},
         'updates': updates.map((TachiUpdate u) => u.toJson()).toList(),
         'checkedAt': lastCheckedAt,
       });
@@ -147,6 +157,19 @@ class TachiUpdateService with JHLifeCircleBeanWithConfigStorage implements JHLif
             }
           }
           _known[url.gid] = paths;
+          final List<SeriesChapter> order = entry.readingOrder;
+          if (order.isNotEmpty) {
+            final SeriesChapter newest = order.last;
+            final SeriesLatest? before = _latest[url.gid];
+            final bool foundNow = known != null && !known.contains(entry.chapters.first.url);
+            _latest[url.gid] = SeriesLatest(
+              chapterId: newest.id,
+              at: before?.chapterId == newest.id
+                  ? before!.at
+                  : newest.date?.toUtc() ?? DateTime.fromMillisecondsSinceEpoch(foundNow ? now : 0, isUtc: true),
+            );
+            await tachiReadingService.remember(albumId: TachiSource.idOf(url), chapterIds: order.map((SeriesChapter c) => c.id).toList());
+          }
         } catch (e) {
           failed.value++;
           log.warning('Check updates of ${gallery.title} failed', e);
@@ -168,9 +191,12 @@ class TachiUpdateService with JHLifeCircleBeanWithConfigStorage implements JHLif
     }
   }
 
+  SeriesLatest? latestOf(Gallery gallery) => _latest[gallery.gid];
+
   /// Forgets what is known of [mangaGid], e.g. after it left the favorites.
   Future<void> forget(int mangaGid) async {
-    if (_known.remove(mangaGid) != null) {
+    final bool known = _known.remove(mangaGid) != null;
+    if (_latest.remove(mangaGid) != null || known) {
       await saveBeanConfig();
     }
   }

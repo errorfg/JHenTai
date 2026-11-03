@@ -18,6 +18,7 @@ import '../../../../setting/preference_setting.dart';
 import '../../../../setting/style_setting.dart';
 import '../../../../utils/byte_util.dart';
 import '../../../../utils/date_util.dart';
+import '../../../../utils/iphone_duo.dart';
 import '../../../../utils/route_util.dart';
 import '../../../../widget/eh_gallery_category_tag.dart';
 import '../../../../widget/eh_image.dart';
@@ -69,7 +70,7 @@ class ArchiveListDownloadPage extends StatelessWidget
   AppBar buildAppBar(BuildContext context) {
     return AppBar(
       centerTitle: true,
-      leading: styleSetting.isInV2Layout
+      leading: styleSetting.isInV2Layout && (!isIPhoneDuo || isRouteAtTop(Routes.download))
           ? IconButton(
               icon: isRouteAtTop(Routes.download) ? const Icon(Icons.arrow_back) : Icon(Icons.menu, size: 20),
               onPressed: () {
@@ -316,7 +317,7 @@ class ArchiveListDownloadPage extends StatelessWidget
           : toRoute(
               Routes.details,
               arguments: DetailsPageArgument(
-                  galleryUrl: GalleryUrl.parse(archive.galleryUrl)),
+                  galleryUrl: GalleryUrl.parseStored(archive.galleryUrl)),
             ),
       child: EHImage(
         galleryImage: archiveDownloadService.buildArchiveCoverImage(archive),

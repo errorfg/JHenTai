@@ -80,7 +80,7 @@ class GalleryGridDownloadPageLogic extends GetxController
   void goToDetailPage(GalleryDownloadedData gallery) {
     toRoute(
       Routes.details,
-      arguments: DetailsPageArgument(galleryUrl: GalleryUrl.parse(gallery.galleryUrl)),
+      arguments: DetailsPageArgument(galleryUrl: GalleryUrl.parseStored(gallery.galleryUrl)),
     );
   }
 

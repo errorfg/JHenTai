@@ -1,0 +1,67 @@
+name: Tests
+
+# Called by Build Check and by Build & Release, which builds only once these
+# pass. Tests that need real accounts, sites or tools are tagged `external`
+# (see dart_test.yaml) and left out; every other test must run, none skipped.
+on:
+  workflow_call:
+
+jobs:
+  Test:
+    runs-on: ubuntu-latest
+    env:
+      FLUTTER_VERSION: 3.44.8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'master'
+          cache: true
+
+      - name: Setup Node (sync server)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: sync_server/package-lock.json
+
+      - name: Setup JDK 21 (extension host)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: gradle
+          cache-dependency-path: ext_host/**/*.gradle.kts
+
+      - name: Setup uv (upscaling service)
+        uses: astral-sh/setup-uv@v6
+
+      - name: Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-warnings --no-fatal-infos
+
+      # Installed before the Flutter tests too: the sync tests run it locally.
+      - name: Sync server tests
+        working-directory: sync_server
+        run: |
+          npm ci
+          npm test
+
+      - name: Flutter tests
+        run: |
+          flutter test --exclude-tags external --file-reporter json:build/test-report.json
+          dart run .github/scripts/require_all_ran.dart build/test-report.json
+
+      - name: Extension host tests
+        working-directory: ext_host
+        run: ./gradlew :jvm:test --console=plain
+
+      - name: Upscaling service tests
+        working-directory: sr_server
+        run: uv run pytest

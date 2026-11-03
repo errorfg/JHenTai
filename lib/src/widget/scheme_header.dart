@@ -13,7 +13,10 @@ import 'package:jhentai/src/utils/route_util.dart';
 import 'package:jhentai/src/widget/eh_alert_dialog.dart';
 
 /// Shows [target] in place of [current]. A site becomes the saved site and
-/// fills the navigation; Komga and PDF open their own pages on top.
+/// fills the navigation; Komga and PDF open their own pages on top, which
+/// never go back to the site underneath (SchemePagePopScope): schemes
+/// are switched only here. The pages save themselves as open
+/// (SchemeSetting.ownPage).
 Future<void> switchScheme(
   ContentScheme current,
   ContentScheme target, {
@@ -32,12 +35,25 @@ Future<void> switchScheme(
     return;
   }
 
-  final String routeName = target == ContentScheme.komga ? Routes.komga : Routes.pdfLibrary;
+  final String routeName = _ownPageRoute(target);
   if (current.isSite) {
     Get.toNamed(routeName);
   } else {
     Get.offNamed(routeName);
   }
+}
+
+String _ownPageRoute(ContentScheme scheme) => scheme == ContentScheme.komga ? Routes.komga : Routes.pdfLibrary;
+
+/// Opens again, without a transition, the page of its own (Komga, PDF) that
+/// was open over the home when the app was left.
+void reopenOwnPage() {
+  final ContentScheme? scheme = schemeSetting.ownPage.value;
+  if (scheme == null) {
+    return;
+  }
+  final GetPage page = Routes.pages.firstWhere((GetPage page) => page.name == _ownPageRoute(scheme));
+  Get.to<void>(page.page, routeName: page.name, transition: Transition.noTransition, duration: Duration.zero);
 }
 
 /// Logs in to [site], or offers to log out when already logged in.

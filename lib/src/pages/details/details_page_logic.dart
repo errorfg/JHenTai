@@ -19,6 +19,7 @@ import 'package:jhentai/src/model/gallery.dart';
 import 'package:jhentai/src/model/gallery_comment.dart';
 import 'package:jhentai/src/model/gallery_tag.dart';
 import 'package:jhentai/src/model/content_scheme.dart';
+import 'package:jhentai/src/model/content_source.dart';
 import 'package:jhentai/src/model/gallery_history_model.dart';
 import 'package:jhentai/src/model/gallery_thumbnail.dart';
 import 'package:jhentai/src/model/gallery_url.dart';
@@ -162,11 +163,11 @@ class DetailsPageLogic extends GetxController
   /// The source of a JM or Tachiyomi gallery: chapters of series.
   SeriesSource? get _seriesSource => _seriesSourceOf(state.galleryUrl);
 
-  static SeriesSource? _seriesSourceOf(GalleryUrl url) => url.isJM
-      ? ehRequest.jmSource
-      : url.isTachi
-      ? ehRequest.tachiSource
-      : null;
+  static SeriesSource? _seriesSourceOf(GalleryUrl url) => switch (url.source.kind) {
+        SourceKind.jm => ehRequest.jmSource,
+        SourceKind.tachiyomi => ehRequest.tachiSource,
+        SourceKind.ehentai || SourceKind.nhentai || SourceKind.wnacg => null,
+      };
 
   /// Reading state of the chapters of this page's series.
   SeriesReadingService get seriesReading => _seriesSource?.reading ?? jmReadingService;
@@ -259,6 +260,9 @@ class DetailsPageLogic extends GetxController
 
   bool get hasNhentaiOfficialApi =>
       ehRequest.supportsNhentaiOfficialApi(_effectiveGalleryUrl);
+
+  /// What the site of this gallery offers besides reading it.
+  SourceFeatures get features => SourceFeatures(state.galleryUrl.source, nhentaiApi: hasNhentaiOfficialApi);
 
   Future<void> getDetails({
     bool refreshPageImmediately = true,
@@ -361,14 +365,14 @@ class DetailsPageLogic extends GetxController
     );
     SchedulerBinding.instance.scheduleTask(
       () => GalleryDao.updateGalleryTags(
-        state.galleryDetails!.galleryUrl.gid,
+        state.galleryDetails!.galleryUrl.storageGid,
         tagMap2TagString(state.galleryDetails!.tags),
       ),
       Priority.animation,
     );
     SchedulerBinding.instance.scheduleTask(
       () => ArchiveDao.updateArchiveTags(
-        state.galleryDetails!.galleryUrl.gid,
+        state.galleryDetails!.galleryUrl.storageGid,
         tagMap2TagString(state.galleryDetails!.tags),
       ),
       Priority.animation,
@@ -481,9 +485,9 @@ class DetailsPageLogic extends GetxController
   Future<void> handleTapDownload() async {
     GalleryDownloadedData? galleryDownloadedData = galleryDownloadService
         .gallerys
-        .singleWhereOrNull((g) => g.gid == state.galleryUrl.gid);
+        .singleWhereOrNull((g) => g.gid == state.galleryUrl.storageGid);
     GalleryDownloadProgress? downloadProgress = galleryDownloadService
-        .galleryDownloadInfos[state.galleryUrl.gid]
+        .galleryDownloadInfos[state.galleryUrl.storageGid]
         ?.downloadProgress;
 
     /// new download
@@ -511,8 +515,8 @@ class DetailsPageLogic extends GetxController
 
       GalleryDownloadedData galleryDownloadedData = GalleryDownloadedData(
         gid:
-            state.galleryDetails?.galleryUrl.gid ??
-            state.gallery!.galleryUrl.gid,
+            state.galleryDetails?.galleryUrl.storageGid ??
+            state.gallery!.galleryUrl.storageGid,
         token:
             state.galleryDetails?.galleryUrl.token ??
             state.gallery!.galleryUrl.token,
@@ -969,15 +973,13 @@ class DetailsPageLogic extends GetxController
     _applyNhFavoriteStatus(favoriteCategoryIndex: localIndex);
   }
 
-  /// Favorites of wnacg and JM galleries live on the device.
-  LocalSourceFavoriteService? get _localSourceFavoriteService =>
-      state.galleryUrl.isWN
-      ? wnacgFavoriteService
-      : state.galleryUrl.isJM
-      ? jmFavoriteService
-      : state.galleryUrl.isTachi
-      ? tachiFavoriteService
-      : null;
+  /// Favorites of wnacg, JM and Tachiyomi galleries live on the device.
+  LocalSourceFavoriteService? get _localSourceFavoriteService => switch (state.galleryUrl.source.kind) {
+        SourceKind.wnacg => wnacgFavoriteService,
+        SourceKind.jm => jmFavoriteService,
+        SourceKind.tachiyomi => tachiFavoriteService,
+        SourceKind.ehentai || SourceKind.nhentai => null,
+      };
 
   void _syncLocalSourceFavoriteStatus() {
     LocalSourceFavoriteService? service = _localSourceFavoriteService;
@@ -1137,10 +1139,7 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleTapRating() async {
-    if (state.galleryUrl.isNH ||
-        state.galleryUrl.isWN ||
-        state.galleryUrl.isJM ||
-        state.galleryUrl.isTachi) {
+    if (!features.rating) {
       return;
     }
 
@@ -1224,15 +1223,12 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleTapArchive(BuildContext context) async {
-    if (state.galleryUrl.isWN ||
-        state.galleryUrl.isJM ||
-        state.galleryUrl.isTachi ||
-        (state.galleryUrl.isNH && !hasNhentaiOfficialApi)) {
+    if (!features.archives) {
       return;
     }
 
     ArchiveStatus? archiveStatus = archiveDownloadService
-        .archiveDownloadInfos[state.galleryUrl.gid]
+        .archiveDownloadInfos[state.galleryUrl.storageGid]
         ?.archiveStatus;
 
     /// new download
@@ -1258,7 +1254,7 @@ class DetailsPageLogic extends GetxController
         }
 
         ArchiveDownloadedData archive = ArchiveDownloadedData(
-          gid: state.galleryDetails!.galleryUrl.gid,
+          gid: state.galleryDetails!.galleryUrl.storageGid,
           token: state.galleryDetails!.galleryUrl.token,
           title: mainTitleText,
           category: state.galleryDetails!.category,
@@ -1311,7 +1307,7 @@ class DetailsPageLogic extends GetxController
       }
 
       ArchiveDownloadedData archive = ArchiveDownloadedData(
-        gid: state.galleryDetails!.galleryUrl.gid,
+        gid: state.galleryDetails!.galleryUrl.storageGid,
         token: state.galleryDetails!.galleryUrl.token,
         title: mainTitleText,
         category: state.galleryDetails!.category,
@@ -1348,7 +1344,7 @@ class DetailsPageLogic extends GetxController
     }
 
     ArchiveDownloadedData archive = archiveDownloadService.archives.firstWhere(
-      (a) => a.gid == state.galleryUrl.gid,
+      (a) => a.gid == state.galleryUrl.storageGid,
     );
 
     if (archiveStatus == ArchiveStatus.needReUnlock) {
@@ -1393,7 +1389,9 @@ class DetailsPageLogic extends GetxController
           initialIndex: await getReadIndexRecord(),
           pageCount: images.length,
           isOriginal: archive.isOriginal,
-          readProgressRecordStorageKey: archive.gid.toString(),
+          // An archive of the gallery: the gallery's progress.
+          readProgressRecordStorageKey: state.galleryUrl.contentKey,
+          legacyProgressKey: state.galleryUrl.legacyKey,
           images: images,
           useSuperResolution: superResolutionService.get(archive.gid, SuperResolutionType.archive) != null,
           readDirection: readDirection,
@@ -1403,10 +1401,7 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleTapHH() async {
-    if (state.galleryUrl.isNH ||
-        state.galleryUrl.isWN ||
-        state.galleryUrl.isJM ||
-        state.galleryUrl.isTachi) {
+    if (!features.hathDownload) {
       return;
     }
 
@@ -1449,8 +1444,7 @@ class DetailsPageLogic extends GetxController
   }
 
   void searchSimilar() {
-    if ((state.galleryUrl.isJM ||
-            (state.galleryUrl.isNH && hasNhentaiOfficialApi)) &&
+    if (features.relatedGalleries &&
         (state.galleryDetails?.relatedGallerys.isNotEmpty ?? false)) {
       Get.dialog(
         NHentaiRelatedDialog(
@@ -1476,54 +1470,28 @@ class DetailsPageLogic extends GetxController
     if (keyword == null) {
       return;
     }
+    _searchOwnSite(keyword);
+  }
 
-    if (state.galleryUrl.isNH) {
-      newSearch(
-        rewriteSearchConfig: SearchConfig(keyword: keyword, isNhSearch: true),
-        forceNewRoute: true,
-      );
-    } else if (state.galleryUrl.isWN) {
-      newSearch(
-        rewriteSearchConfig: SearchConfig(
-          keyword: keyword,
-          isWnacgSearch: true,
-        ),
-        forceNewRoute: true,
-      );
-    } else if (state.galleryUrl.isJM) {
-      newSearch(
-        rewriteSearchConfig: SearchConfig(keyword: keyword, isJmSearch: true),
-        forceNewRoute: true,
-      );
-    } else if (state.galleryUrl.isTachi) {
-      newSearch(
-        rewriteSearchConfig: SearchConfig(keyword: keyword, tachiSource: state.galleryUrl.tachiSource),
-        forceNewRoute: true,
-      );
-    } else {
+  /// [keyword] searched on the site this gallery is from (its own source,
+  /// for a Tachiyomi gallery).
+  void _searchOwnSite(String keyword) {
+    final ContentSource source = state.galleryUrl.source;
+    if (source.kind == SourceKind.ehentai) {
       newSearch(keyword: keyword, forceNewRoute: true, site: ContentScheme.ehentai);
+      return;
     }
+    newSearch(rewriteSearchConfig: SearchConfig(keyword: keyword)..searchOn(source), forceNewRoute: true);
   }
 
   /// The site this gallery is from: where a keyword taken from it is
   /// searched, whatever site the app is switched to.
-  ContentScheme get ownSite => state.galleryUrl.isNH
-      ? ContentScheme.nhentai
-      : state.galleryUrl.isWN
-      ? ContentScheme.wnacg
-      : state.galleryUrl.isJM
-      ? ContentScheme.jm
-      : state.galleryUrl.isTachi
-      ? ContentScheme.tachiyomi
-      : ContentScheme.ehentai;
+  ContentScheme get ownSite => state.galleryUrl.source.kind.scheme;
 
   /// The "EH" action of a gallery from another site: its title, searched on
   /// E-Hentai.
   void searchInEhByNhTitle() {
-    if (!state.galleryUrl.isNH &&
-        !state.galleryUrl.isWN &&
-        !state.galleryUrl.isJM &&
-        !state.galleryUrl.isTachi) {
+    if (!features.searchOnEHentai) {
       return;
     }
 
@@ -1541,41 +1509,14 @@ class DetailsPageLogic extends GetxController
       return;
     }
 
-    String keyword =
-        'uploader:"${state.galleryDetails?.uploader ?? state.gallery!.uploader}"';
-    if (state.galleryUrl.isNH) {
-      newSearch(
-        rewriteSearchConfig: SearchConfig(keyword: keyword, isNhSearch: true),
-        forceNewRoute: true,
-      );
-    } else if (state.galleryUrl.isWN) {
-      newSearch(
-        rewriteSearchConfig: SearchConfig(
-          keyword: keyword,
-          isWnacgSearch: true,
-        ),
-        forceNewRoute: true,
-      );
-    } else if (state.galleryUrl.isJM) {
-      newSearch(
-        rewriteSearchConfig: SearchConfig(keyword: keyword, isJmSearch: true),
-        forceNewRoute: true,
-      );
-    } else if (state.galleryUrl.isTachi) {
-      newSearch(
-        rewriteSearchConfig: SearchConfig(keyword: keyword, tachiSource: state.galleryUrl.tachiSource),
-        forceNewRoute: true,
-      );
-    } else {
-      newSearch(keyword: keyword, forceNewRoute: true, site: ContentScheme.ehentai);
-    }
+    _searchOwnSite('uploader:"${state.galleryDetails?.uploader ?? state.gallery!.uploader}"');
   }
 
   Future<void> handleTapTorrent() async {
+    if (!features.torrents) {
+      return;
+    }
     if (state.galleryUrl.isNH) {
-      if (!hasNhentaiOfficialApi) {
-        return;
-      }
       try {
         var link = await ehRequest.requestNhDownload(
           state.galleryUrl.gid,
@@ -1589,10 +1530,6 @@ class DetailsPageLogic extends GetxController
         log.error('Get nhentai torrent failed', e, s);
         snack('getGalleryTorrentsFailed'.tr, e.toString());
       }
-      return;
-    }
-
-    if (state.galleryUrl.isWN || state.galleryUrl.isJM || state.galleryUrl.isTachi) {
       return;
     }
 
@@ -1628,10 +1565,7 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleTapStatistic() async {
-    if (state.galleryUrl.isNH ||
-        state.galleryUrl.isWN ||
-        state.galleryUrl.isJM ||
-        state.galleryUrl.isTachi) {
+    if (!features.statistics) {
       return;
     }
 
@@ -1784,11 +1718,7 @@ class DetailsPageLogic extends GetxController
   }
 
   void showTagDialog(GalleryTag tag) {
-    if (state.galleryUrl.isNH ||
-        state.galleryUrl.isWN ||
-        state.galleryUrl.isJM ||
-        state.galleryUrl.isTachi ||
-        state.apikey == null) {
+    if (!features.tagVotes || state.apikey == null) {
       return;
     }
 
@@ -1849,10 +1779,7 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleAddTag(BuildContext context) async {
-    if (state.galleryUrl.isNH ||
-        state.galleryUrl.isWN ||
-        state.galleryUrl.isJM ||
-        state.galleryUrl.isTachi) {
+    if (!features.tagVotes) {
       return;
     }
 
@@ -1997,9 +1924,7 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<void> handleResetReadProgress() async {
-    await readProgressService.deleteReadProgress(
-      state.galleryUrl.gid.toString(),
-    );
+    await readProgressService.deleteReadProgress(state.galleryUrl.contentKey);
     updateSafely([readButtonId]);
     toast('success'.tr);
   }
@@ -2011,7 +1936,8 @@ class DetailsPageLogic extends GetxController
         target: LocalBlockTargetEnum.gallery,
         attribute: LocalBlockAttributeEnum.gid,
         pattern: LocalBlockPatternEnum.equal,
-        expression: state.galleryUrl.gid.toString(),
+        // This site's gallery only, not another site's of the same number.
+        expression: state.galleryUrl.contentKey,
       ),
     );
     toast('blockGallerySuccess'.tr);
@@ -2034,7 +1960,7 @@ class DetailsPageLogic extends GetxController
 
     /// online
     if (galleryDownloadService
-            .galleryDownloadInfos[state.galleryUrl.gid]
+            .galleryDownloadInfos[state.galleryUrl.storageGid]
             ?.downloadProgress ==
         null) {
       unawaited(
@@ -2046,7 +1972,8 @@ class DetailsPageLogic extends GetxController
             galleryTitle: mainTitleText,
             galleryUrl: state.galleryUrl.url,
             initialIndex: forceIndex ?? await getReadIndexRecord(),
-            readProgressRecordStorageKey: state.galleryUrl.gid.toString(),
+            readProgressRecordStorageKey: state.galleryUrl.contentKey,
+            legacyProgressKey: state.galleryUrl.legacyKey,
             pageCount: state.galleryDetails?.pageCount ?? state.gallery?.pageCount ?? state.galleryMetadata!.pageCount,
             useSuperResolution: false,
             readDirection: webtoonReadDirection,
@@ -2058,7 +1985,7 @@ class DetailsPageLogic extends GetxController
 
     /// use GalleryDownloadedData's title
     GalleryDownloadedData gallery = galleryDownloadService.gallerys.firstWhere(
-      (g) => g.gid == state.galleryUrl.gid,
+      (g) => g.gid == state.galleryUrl.storageGid,
     );
 
     if (readSetting.useThirdPartyViewer.isTrue &&
@@ -2078,9 +2005,10 @@ class DetailsPageLogic extends GetxController
           galleryTitle: gallery.title,
           galleryUrl: gallery.galleryUrl,
           initialIndex: forceIndex ?? await getReadIndexRecord(),
-          readProgressRecordStorageKey: state.galleryUrl.gid.toString(),
+          readProgressRecordStorageKey: state.galleryUrl.contentKey,
+          legacyProgressKey: state.galleryUrl.legacyKey,
           pageCount: gallery.pageCount,
-          useSuperResolution: superResolutionService.get(state.galleryUrl.gid, SuperResolutionType.gallery) != null,
+          useSuperResolution: superResolutionService.get(state.galleryUrl.storageGid, SuperResolutionType.gallery) != null,
           readDirection: webtoonReadDirection,
         ),
       ),
@@ -2170,9 +2098,8 @@ class DetailsPageLogic extends GetxController
       token: url.token,
       galleryTitle: chapter.title,
       galleryUrl: url.url,
-      initialIndex:
-          initialIndex ?? await readProgressService.getReadProgress(url.gid),
-      readProgressRecordStorageKey: url.gid.toString(),
+      initialIndex: initialIndex ?? await readProgressService.getReadProgressOf(url),
+      readProgressRecordStorageKey: url.contentKey,
       pageCount: chapter.pageCount,
       images: downloaded,
       thumbnails: chapter.pageThumbnails(),
@@ -2327,13 +2254,13 @@ class DetailsPageLogic extends GetxController
   Future<void> _carryProgressFromOlderVersion() async {
     final GalleryUrl? parent = state.galleryDetails?.parentGalleryUrl;
     final GalleryUrl url = state.galleryUrl;
-    if (parent == null || url.isNH || url.isWN || url.isJM || url.isTachi) {
+    if (parent == null || !features.olderVersions) {
       return;
     }
     try {
       await readProgressService.takeOverFromOlderVersion(
-        gid: url.gid,
-        olderGid: parent.gid,
+        url: url,
+        older: parent,
         pageCount: state.galleryDetails!.pageCount,
       );
     } catch (e) {
@@ -2342,7 +2269,7 @@ class DetailsPageLogic extends GetxController
   }
 
   Future<int> getReadIndexRecord() async {
-    return readProgressService.getReadProgress(state.galleryUrl.gid);
+    return readProgressService.getReadProgressOf(state.galleryUrl);
   }
 
   /// The history entry of this page. A multi-chapter series is one entry,
@@ -2458,10 +2385,7 @@ class DetailsPageLogic extends GetxController
 
   Future<({GalleryDetail galleryDetails, String apikey})>
   _getDetailsWithRedirectAndFallback({bool useCache = true}) async {
-    if (state.galleryUrl.isNH ||
-        state.galleryUrl.isWN ||
-        state.galleryUrl.isJM ||
-        state.galleryUrl.isTachi) {
+    if (!features.twoDomains) {
       return ehRequest
           .requestDetailPage<({GalleryDetail galleryDetails, String apikey})>(
             galleryUrl: state.galleryUrl.url,
@@ -2698,23 +2622,13 @@ class DetailsPageLogic extends GetxController
       return;
     }
 
-    SearchConfig searchConfig = SearchConfig();
+    SearchConfig searchConfig = SearchConfig()..searchOn(state.galleryUrl.source);
     searchConfig.tags = state.selectedTags.map((t) => t.tagData).toList();
-    if (state.galleryUrl.isNH) {
-      searchConfig.isNhSearch = true;
-    }
-    if (state.galleryUrl.isWN) {
-      searchConfig.isWnacgSearch = true;
-    }
-    if (state.galleryUrl.isJM) {
-      searchConfig.isJmSearch = true;
-    }
     if (state.galleryUrl.isTachi) {
       // A Tachiyomi source searches plain text.
       searchConfig
         ..keyword = state.selectedTags.map((t) => t.tagData.key).join(' ')
-        ..tags = null
-        ..tachiSource = state.galleryUrl.tachiSource;
+        ..tags = null;
     }
 
     newSearch(rewriteSearchConfig: searchConfig, forceNewRoute: true);

@@ -32,8 +32,8 @@ class NHentaiRelatedDialog extends StatelessWidget {
             return EHGalleryListCard(
               gallery: gallery,
               downloaded:
-                  galleryDownloadService.containGallery(gallery.gid) ||
-                  archiveDownloadService.containArchive(gallery.gid),
+                  galleryDownloadService.containGallery(gallery.galleryUrl.storageGid) ||
+                  archiveDownloadService.containArchive(gallery.galleryUrl.storageGid),
               listMode: ListMode.listWithoutTags,
               withTags: false,
               handleTapCard: onTap,

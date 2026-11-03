@@ -7,7 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:jhentai/src/database/database.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/enum/config_type_enum.dart';
-import 'package:jhentai/src/service/cloud/cloud_provider.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/log.dart';
@@ -17,6 +16,8 @@ import 'package:jhentai/src/service/record_sync/record_sync_engine.dart';
 import 'package:jhentai/src/service/sync_service.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
+
+import 'memory_bucket.dart';
 
 /// Which way a device syncs, and whether it does, is its own choice: a sync
 /// carries the other sync settings (addresses, keys) but not those.
@@ -43,35 +44,19 @@ class _InlineIsolateService extends IsolateService {
 }
 
 /// latest.json of another device; downloading it waits for [release].
-class _SlowBucket implements CloudProvider {
-  _SlowBucket(this.latest);
+/// A bucket whose latest.json comes when the test says.
+class _SlowBucket extends MemoryBucket {
+  _SlowBucket(String latest) : super(latest: latest);
 
-  String? latest;
   final Completer<void> release = Completer<void>();
   final Completer<void> downloading = Completer<void>();
-
-  @override
-  String get name => 'memory';
-
-  @override
-  Future<CloudFile?> getFileMetadata() async =>
-      CloudFile(version: 'latest', modifiedTime: DateTime.now().toUtc(), size: latest!.length);
 
   @override
   Future<String?> download() async {
     downloading.complete();
     await release.future;
-    return latest;
+    return super.download();
   }
-
-  @override
-  Future<CloudFile> upload(String data, {bool saveHistory = false}) async {
-    latest = data;
-    return CloudFile(version: 'latest', modifiedTime: DateTime.now().toUtc(), size: data.length);
-  }
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError('${invocation.memberName}');
 }
 
 class _OneRecordServer implements RecordBackend {
@@ -86,8 +71,8 @@ class _OneRecordServer implements RecordBackend {
   Future<void> push(List<RemoteRecord> records) async {}
 
   @override
-  Future<RecordPage> pull({required int since, required String device, required int limit}) async =>
-      since == 0 ? RecordPage(records: [record], next: 1, more: false) : const RecordPage(records: [], next: 1, more: false);
+  Future<RecordPage> pull({required String since, required String device, required int limit}) async =>
+      since.isEmpty || since == '0' ? RecordPage(records: [record], next: '1', more: false) : const RecordPage(records: [], next: '1', more: false);
 }
 
 /// Sync settings of another device: on the bucket, with its own keys.

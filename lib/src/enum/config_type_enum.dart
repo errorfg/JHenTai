@@ -15,7 +15,11 @@ enum CloudConfigTypeEnum {
   ehAccount(14, 'ehAccount'),
   tachiExtensionList(15, 'tachiExtensionList'),
   tachiSourceSettings(16, 'tachiSourceSettings'),
-  tachiFavorite(17, 'tachiFavorite');
+  tachiFavorite(17, 'tachiFavorite'),
+
+  /// Records only (the sync server, and buckets from the version after
+  /// 8.1.1 on); the layout of earlier versions never held it.
+  watchedProgress(18, 'watchedProgress');
 
   final int code;
 
@@ -69,6 +73,8 @@ enum CloudConfigTypeEnum {
         return CloudConfigTypeEnum.tachiSourceSettings;
       case 17:
         return CloudConfigTypeEnum.tachiFavorite;
+      case 18:
+        return CloudConfigTypeEnum.watchedProgress;
       default:
         throw Exception('Unknown CloudConfigTypeEnum code: $code');
     }

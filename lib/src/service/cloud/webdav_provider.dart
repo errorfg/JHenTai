@@ -42,12 +42,17 @@ class WebDavProvider implements CloudProvider {
       throw Exception('WebDAV server URL and username are required');
     }
 
+    // Without time limits a stalled request would keep its sync running,
+    // and every later sync waiting for it.
     return webdav.newClient(
       serverUrl,
       user: username,
       password: password,
       debug: false,
-    );
+    )
+      ..setConnectTimeout(20 * 1000)
+      ..setSendTimeout(60 * 1000)
+      ..setReceiveTimeout(90 * 1000);
   }
 
   /// Ensure remote directory exists
@@ -189,9 +194,13 @@ class WebDavProvider implements CloudProvider {
         modifiedTime: targetFile.mTime ?? DateTime.now(),
         size: targetFile.size ?? 0,
       );
-    } catch (e) {
+    } on DioException catch (e) {
+      // The folder is not there yet; any other error fails the sync.
+      if (e.response?.statusCode == 404) {
+        return null;
+      }
       log.error('Failed to get file metadata from WebDAV', e);
-      return null;
+      rethrow;
     }
   }
 
@@ -251,9 +260,13 @@ class WebDavProvider implements CloudProvider {
       List<webdav.File> files;
       try {
         files = await _client!.readDir('$_root$relativeDir');
-      } catch (_) {
-        /// Directory does not exist yet
-        return;
+      } on DioException catch (e) {
+        /// The directory does not exist yet. Any other error fails the
+        /// sync: an empty listing would pass for no records at all.
+        if (e.response?.statusCode == 404) {
+          return;
+        }
+        rethrow;
       }
       for (webdav.File file in files) {
         String? name = file.name;

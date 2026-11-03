@@ -9,6 +9,7 @@ import '../../../mixin/double_tap_to_refresh_state_mixin.dart';
 import '../../../model/content_scheme.dart';
 import '../../../model/tab_bar_icon.dart';
 import '../../../setting/scheme_setting.dart';
+import '../../../utils/iphone_duo.dart';
 import '../site_scheme_icons.dart';
 import '../../../routes/routes.dart';
 import '../../../setting/preference_setting.dart';
@@ -53,7 +54,7 @@ class MobileLayoutPageV2State with DoubleTapToRefreshStateMixin {
         ? _ehIcons()
         : siteSchemeIcons(
             scheme,
-            mobile: true,
+            mobile: !isIPhoneDuo,
             search: _searchIcon(),
             shared: [_favoriteIcon(), _historyIcon(), _downloadIcon(), _settingIcon()],
           );
@@ -81,7 +82,7 @@ class MobileLayoutPageV2State with DoubleTapToRefreshStateMixin {
         routeName: Routes.popular,
         selectedIcon: const Icon(Icons.whatshot),
         unselectedIcon: const Icon(Icons.whatshot_outlined),
-        page: () => PopularPage(showMenuButton: true, showTitle: true, name: 'popular'.tr),
+        page: () => PopularPage(showMenuButton: !isIPhoneDuo, showTitle: true, name: 'popular'.tr),
         scrollController: () => Get.find<PopularPageLogic>().scroll2TopState.scrollController,
         shouldRender: false,
       ),
@@ -90,7 +91,7 @@ class MobileLayoutPageV2State with DoubleTapToRefreshStateMixin {
         routeName: Routes.ranklist,
         selectedIcon: const Icon(Icons.bar_chart_rounded, shadows: [Shadow(blurRadius: 2)]),
         unselectedIcon: const Icon(Icons.bar_chart_outlined),
-        page: () => const RanklistPage(showMenuButton: true, showTitle: true),
+        page: () => RanklistPage(showMenuButton: !isIPhoneDuo, showTitle: true),
         scrollController: () => Get.find<RanklistPageLogic>().scroll2TopState.scrollController,
         shouldRender: false,
       ),
@@ -100,7 +101,7 @@ class MobileLayoutPageV2State with DoubleTapToRefreshStateMixin {
         routeName: Routes.watched,
         selectedIcon: const Icon(Icons.visibility),
         unselectedIcon: const Icon(Icons.visibility_outlined),
-        page: () => WatchedPage(showMenuButton: true, showTitle: true, name: 'watched'.tr),
+        page: () => WatchedPage(showMenuButton: !isIPhoneDuo, showTitle: true, name: 'watched'.tr),
         scrollController: () => Get.find<WatchedPageLogic>().scroll2TopState.scrollController,
         shouldRender: false,
       ),
@@ -125,7 +126,7 @@ class MobileLayoutPageV2State with DoubleTapToRefreshStateMixin {
         routeName: Routes.favorite,
         selectedIcon: const Icon(Icons.favorite),
         unselectedIcon: const Icon(Icons.favorite_outline),
-        page: () => FavoritePage(showMenuButton: true, showTitle: true, name: 'favorite'.tr),
+        page: () => FavoritePage(showMenuButton: !isIPhoneDuo, showTitle: true, name: 'favorite'.tr),
         scrollController: () => Get.find<FavoritePageLogic>().scroll2TopState.scrollController,
         shouldRender: false,
       );
@@ -135,7 +136,7 @@ class MobileLayoutPageV2State with DoubleTapToRefreshStateMixin {
         routeName: Routes.history,
         selectedIcon: const Icon(Icons.history, shadows: [Shadow(blurRadius: 2)]),
         unselectedIcon: const Icon(Icons.history_outlined),
-        page: () => HistoryPage(showMenuButton: true, showTitle: true, name: 'history'.tr),
+        page: () => HistoryPage(showMenuButton: !isIPhoneDuo, showTitle: true, name: 'history'.tr),
         scrollController: () => Get.find<HistoryPageLogic>().scroll2TopState.scrollController,
         shouldRender: false,
       );

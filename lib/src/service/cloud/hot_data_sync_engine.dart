@@ -8,6 +8,7 @@ import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/model/config.dart';
 import 'package:jhentai/src/service/cloud/cloud_provider.dart';
 import 'package:jhentai/src/service/cloud/pending_sync_tracker.dart';
+import 'package:jhentai/src/service/cloud/sync_cancel_token.dart';
 import 'package:jhentai/src/service/cloud/sync_device_id.dart';
 import 'package:jhentai/src/service/history_service.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
@@ -67,8 +68,9 @@ class HotDataSyncEngine {
   /// Op packs applied, and their cursors stored, per round.
   static const int _applyChunk = 20;
 
-  /// Op packs downloaded at once.
-  static const int _downloadParallel = 4;
+  /// Op packs downloaded at once: only read now, once, when a later version
+  /// takes this layout over (see [sync]'s readOnly).
+  static const int _downloadParallel = 16;
 
   /// A download that failed is tried once more after this.
   static const Duration _retryDelay = Duration(seconds: 2);
@@ -79,9 +81,17 @@ class HotDataSyncEngine {
   /// caller already downloaded it. Used to bootstrap v2 from v1 data, and -
   /// during the transition period while not-yet-upgraded clients still write
   /// hot data into latest.json - to keep absorbing their changes.
+  ///
+  /// [cancel]: looked at before each step that writes.
+  ///
+  /// [readOnly]: what other devices wrote is applied here, and nothing is
+  /// written to the remote (no bootstrap, push or compaction): how a device
+  /// takes over this layout once into the records of a newer one.
   Future<HotSyncResult> sync(
     CloudProvider provider, {
     String? legacyRemoteConfigJson,
+    SyncCancelToken? cancel,
+    bool readOnly = false,
   }) async {
     /// Timestamp format migrations must complete before any timestamp
     /// comparison below: bean ready hooks are fired without being awaited
@@ -94,8 +104,14 @@ class HotDataSyncEngine {
     bool bootstrapped = false;
     int applied = 0;
 
-    if (manifest == null) {
+    if (manifest == null && readOnly) {
+      if (legacyRemoteConfigJson != null) {
+        cancel?.throwIfCancelled();
+        applied += await _applyLegacyConfig(legacyRemoteConfigJson);
+      }
+    } else if (manifest == null) {
       log.info('🔁 Hot sync: no manifest found, bootstrapping format v2');
+      cancel?.throwIfCancelled();
       applied += await _bootstrap(provider, legacyRemoteConfigJson);
       bootstrapped = true;
     } else {
@@ -112,6 +128,7 @@ class HotDataSyncEngine {
           '$snapshotPrefix${manifest.snapshot}.json.gz',
         );
         if (bytes != null) {
+          cancel?.throwIfCancelled();
           applied += await _applyPacks([await _decodePack(bytes)]);
           await localConfigService.write(
             configKey: ConfigEnum.oplogAppliedSnapshot,
@@ -128,6 +145,7 @@ class HotDataSyncEngine {
       /// into latest.json. Absorb it with guarded upserts (cheap once those
       /// clients are upgraded and latest.json no longer carries hot types).
       if (legacyRemoteConfigJson != null) {
+        cancel?.throwIfCancelled();
         try {
           applied += await _applyLegacyConfig(legacyRemoteConfigJson);
         } catch (e) {
@@ -170,6 +188,7 @@ class HotDataSyncEngine {
         start + _applyChunk > pending.length ? pending.length : start + _applyChunk,
       );
       List<Map<String, dynamic>> packs = await _downloadPacks(provider, chunk);
+      cancel?.throwIfCancelled();
       applied += await _applyPacks(packs);
       for (RemoteObjectInfo obj in chunk) {
         _OpKey parsed = _OpKey.tryParse(obj.key)!;
@@ -184,10 +203,16 @@ class HotDataSyncEngine {
       );
     }
 
+    if (readOnly) {
+      return HotSyncResult(success: true, appliedRows: applied, pushedRows: 0, appliedPacks: pending.length, bootstrapped: false);
+    }
+
     // 3. Push local changes as a new op pack
+    cancel?.throwIfCancelled();
     int pushed = await _pushLocalChanges(provider, deviceId);
 
     // 4. Compaction
+    cancel?.throwIfCancelled();
     await _maybeCompact(provider, opObjects.length + (pushed > 0 ? 1 : 0));
 
     return HotSyncResult(

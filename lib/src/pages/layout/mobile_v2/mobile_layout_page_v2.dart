@@ -6,12 +6,15 @@ import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/model/content_scheme.dart';
 import 'package:jhentai/src/pages/download/download_base_page.dart';
+import 'package:jhentai/src/pages/layout/mobile_v2/iphone_duo_navigation.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2_logic.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2_state.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/notification/tap_menu_button_notification.dart';
 import 'package:jhentai/src/pages/search/quick_search/quick_search_page.dart';
 import 'package:jhentai/src/pages/setting/setting_page.dart';
 import 'package:jhentai/src/service/quick_search_service.dart';
+import 'package:jhentai/src/utils/iphone_duo.dart';
+import 'package:jhentai/src/widget/native_glass.dart';
 import 'package:jhentai/src/widget/will_pop_interceptor.dart';
 
 import '../../../setting/preference_setting.dart';
@@ -31,12 +34,13 @@ class MobileLayoutPageV2 extends StatelessWidget {
         child: Scaffold(
           key: MobileLayoutPageV2State.scaffoldKey,
           drawerEdgeDragWidth: preferenceSetting.drawerGestureEdgeWidth.value.toDouble(),
-          drawer: buildLeftDrawer(context),
+          drawerScrimColor: isIPhoneDuo ? Colors.black12 : null,
+          drawer: isIPhoneDuo ? null : buildLeftDrawer(context),
           drawerEnableOpenDragGesture: preferenceSetting.enableLeftMenuDrawerGesture.isTrue,
-          endDrawer: buildRightDrawer(),
-          endDrawerEnableOpenDragGesture: preferenceSetting.enableQuickSearchDrawerGesture.isTrue,
-          body: buildBody(),
-          bottomNavigationBar: preferenceSetting.hideBottomBar.isTrue ? null : buildBottomNavigationBar(context),
+          endDrawer: isIPhoneDuo ? buildPanel() : buildRightDrawer(),
+          endDrawerEnableOpenDragGesture: isIPhoneDuo || preferenceSetting.enableQuickSearchDrawerGesture.isTrue,
+          body: isIPhoneDuo ? IPhoneDuoNavigation(logic: logic, state: state, child: buildBody()) : buildBody(),
+          bottomNavigationBar: isIPhoneDuo || preferenceSetting.hideBottomBar.isTrue ? null : buildBottomNavigationBar(context),
         ),
       ),
     );
@@ -48,6 +52,16 @@ class MobileLayoutPageV2 extends StatelessWidget {
 
   Widget buildRightDrawer() {
     return Drawer(width: 278, child: QuickSearchPage(scrollController: quickSearchService.drawerScrollController));
+  }
+
+  /// iPhone Duo: the drawer's content, pulled out at the right edge.
+  Widget buildPanel() {
+    return MobileLeftDrawer(
+      logic: logic,
+      state: state,
+      atEnd: true,
+      onBeforeSwitch: () => MobileLayoutPageV2State.scaffoldKey.currentState?.closeEndDrawer(),
+    );
   }
 
   Widget buildBottomNavigationBar(BuildContext context) {
@@ -76,8 +90,8 @@ class MobileLayoutPageV2 extends StatelessWidget {
           builder: (_) => Stack(
             children: [
               Offstage(offstage: state.selectedNavigationIndex != 0, child: buildHomeBody()),
-              Offstage(offstage: state.selectedNavigationIndex != 1, child: const DownloadPage()),
-              Offstage(offstage: state.selectedNavigationIndex != 2, child: const SettingPage()),
+              if (!isIPhoneDuo) Offstage(offstage: state.selectedNavigationIndex != 1, child: const DownloadPage()),
+              if (!isIPhoneDuo) Offstage(offstage: state.selectedNavigationIndex != 2, child: const SettingPage()),
             ],
           ),
         ),
@@ -120,6 +134,7 @@ class MobileLeftDrawer extends StatelessWidget {
     this.onBeforeSwitch,
     this.onDestinationSelected,
     this.showSelectedDestination = true,
+    this.atEnd = false,
   }) : assert(logic != null || onDestinationSelected != null);
 
   final MobileLayoutPageV2State state;
@@ -132,17 +147,45 @@ class MobileLeftDrawer extends StatelessWidget {
   final ValueChanged<int>? onDestinationSelected;
   final bool showSelectedDestination;
 
+  /// iPhone Duo's panel: a card of iOS's own glass from the right edge, across
+  /// the inset there.
+  final bool atEnd;
+
   @override
   Widget build(BuildContext context) {
+    final Widget content = logic == null
+        ? _buildContent(context)
+        : GetBuilder<MobileLayoutPageV2Logic>(
+            id: logic!.tabBarId,
+            builder: (_) => _buildContent(context),
+          );
+
+    if (!atEnd) {
+      return Drawer(
+        key: const ValueKey<String>('mobileLeftDrawer'),
+        width: 278,
+        child: content,
+      );
+    }
+
     return Drawer(
       key: const ValueKey<String>('mobileLeftDrawer'),
-      width: 278,
-      child: logic == null
-          ? _buildContent(context)
-          : GetBuilder<MobileLayoutPageV2Logic>(
-              id: logic!.tabBarId,
-              builder: (_) => _buildContent(context),
-            ),
+      width: 278 + MediaQuery.paddingOf(context).horizontal,
+      backgroundColor: Colors.transparent,
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: const RoundedRectangleBorder(),
+      clipBehavior: Clip.none,
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Stack(
+          children: [
+            const Positioned.fill(child: NativeGlass(cornerRadius: 28)),
+            Material(type: MaterialType.transparency, child: content),
+          ],
+        ),
+      ),
     );
   }
 
@@ -182,11 +225,16 @@ class MobileLeftDrawer extends StatelessWidget {
                     context,
                   ),
                   leading: state.icons[index].unselectedIcon,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadiusDirectional.only(
-                      topEnd: Radius.circular(32),
-                      bottomEnd: Radius.circular(32),
-                    ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: atEnd
+                        ? const BorderRadiusDirectional.only(
+                            topStart: Radius.circular(32),
+                            bottomStart: Radius.circular(32),
+                          )
+                        : const BorderRadiusDirectional.only(
+                            topEnd: Radius.circular(32),
+                            bottomEnd: Radius.circular(32),
+                          ),
                   ),
                   onTap: () {
                     if (onDestinationSelected != null) {
@@ -195,7 +243,7 @@ class MobileLeftDrawer extends StatelessWidget {
                     }
                     logic!.handleTapTabBarButton(index);
                   },
-                ).marginOnly(right: 8, top: 2),
+                ).marginOnly(left: atEnd ? 8 : 0, right: atEnd ? 0 : 8, top: 2),
               ),
             ),
           ),

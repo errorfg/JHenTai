@@ -4,6 +4,7 @@ import 'package:jhentai/src/pages/gallerys/dashboard/simple/simple_dashboard_pag
 import 'package:jhentai/src/pages/gallerys/dashboard/simple/simple_dashboard_page_state.dart';
 
 import '../../../../routes/routes.dart';
+import '../../../../utils/iphone_duo.dart';
 import '../../../../utils/route_util.dart';
 import '../../../base/base_page.dart';
 import '../../../layout/mobile_v2/mobile_layout_page_v2_state.dart';
@@ -13,10 +14,12 @@ class SimpleDashboardPage extends BasePage {
   const SimpleDashboardPage({Key? key})
       : super(
           key: key,
-          showMenuButton: true,
           showTitle: true,
           showScroll2TopButton: true,
         );
+
+  @override
+  bool get showMenuButton => !isIPhoneDuo;
 
   @override
   String get name => 'home'.tr;
@@ -32,7 +35,7 @@ class SimpleDashboardPage extends BasePage {
     return [
       IconButton(icon: const Icon(Icons.settings), onPressed: logic.handleTapFilterButton),
       IconButton(icon: const Icon(Icons.search), onPressed: () => toRoute(Routes.mobileV2Search)),
-      IconButton(icon: const Icon(Icons.more_vert), onPressed: MobileLayoutPageV2State.scaffoldKey.currentState?.openEndDrawer),
+      if (!isIPhoneDuo) IconButton(icon: const Icon(Icons.more_vert), onPressed: MobileLayoutPageV2State.scaffoldKey.currentState?.openEndDrawer),
     ];
   }
 }

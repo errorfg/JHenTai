@@ -136,7 +136,7 @@ class ArchiveDownloadService extends GetxController
   }
 
   bool _isNhentaiArchive(ArchiveDownloadedData archive) =>
-      GalleryUrl.tryParse(archive.galleryUrl)?.isNH == true;
+      GalleryUrl.tryParseStored(archive.galleryUrl)?.isNH == true;
 
   String _nhentaiArchiveFormat(ArchiveDownloadedData archive) {
     String format =
@@ -523,6 +523,8 @@ class ArchiveDownloadService extends GetxController
 
       ArchiveDownloadedData archive =
           ArchiveDownloadedData.fromJson(metadata as Map<String, dynamic>);
+      // Metadata of 8.1.1 and earlier has nhentai galleries under the bare number.
+      archive = archive.copyWith(gid: GalleryUrl.storageGidOfStored(archive.galleryUrl, archive.gid));
 
       archive = archive.copyWith(archiveStatusCode: ArchiveStatus.completed.code);
 
@@ -532,7 +534,7 @@ class ArchiveDownloadService extends GetxController
       /// #823) can store a title that points at a directory which never existed.
       /// Reconcile the title to the real on-disk directory in both cases.
       final String restoredSanitizedTitle = DownloadPathResolver.resolveArchiveSanitizedTitleForRestore(
-        gid: archive.gid,
+        gid: GalleryUrl.siteNumberOf(archive.gid),
         rawTitle: archive.title,
         persistedSanitizedTitle: archive.sanitizedTitle,
         archiveDirectoryPath: galleryDir.path,
@@ -1040,13 +1042,13 @@ class ArchiveDownloadService extends GetxController
   }
 
   String computePackingFileDownloadPath(ArchiveDownloadedData archive) {
-    /// File name format: 'ArchiveV2 - {gid} - {title}.zip'
-    return join(downloadSetting.downloadPath.value, 'ArchiveV2 - ${archive.gid} - ${archive.sanitizedTitle}.zip');
+    /// File name format: 'ArchiveV2 - {gid} - {title}.zip', by the site's own number
+    return join(downloadSetting.downloadPath.value, 'ArchiveV2 - ${GalleryUrl.siteNumberOf(archive.gid)} - ${archive.sanitizedTitle}.zip');
   }
 
   String computeArchiveUnpackingPath(ArchiveDownloadedData archive) {
-    /// Directory name format: 'Archive - {gid} - {title}'
-    return join(downloadSetting.downloadPath.value, 'Archive - ${archive.gid} - ${archive.sanitizedTitle}');
+    /// Directory name format: 'Archive - {gid} - {title}', by the site's own number
+    return join(downloadSetting.downloadPath.value, 'Archive - ${GalleryUrl.siteNumberOf(archive.gid)} - ${archive.sanitizedTitle}');
   }
 
   void _sortArchives() {
@@ -1287,7 +1289,7 @@ class ArchiveDownloadService extends GetxController
       log.download('Request official nhentai archive: ${archive.title}');
       try {
         var link = await ehRequest.requestNhDownload(
-          archive.gid,
+          GalleryUrl.siteNumberOf(archive.gid),
           format: _nhentaiArchiveFormat(archive),
         );
         await archiveDownloadInfo.downloadTask?.dispose();
@@ -1755,7 +1757,7 @@ class ArchiveDownloadService extends GetxController
   Future<ArchiveDownloadedData?> _initArchiveInfo(ArchiveDownloadedData archive) async {
     /// Compute and attach the sanitized title before the first DB write so the
     /// path is frozen for the lifetime of this download task.
-    final int reservedBytes = utf8.encode('Archive - ${archive.gid} - ').length;
+    final int reservedBytes = utf8.encode('Archive - ${GalleryUrl.siteNumberOf(archive.gid)} - ').length;
     archive = archive.copyWith(sanitizedTitle: Value(_computeSanitizedArchiveTitle(archive.title, reservedBytes)));
 
     if (!await _saveArchiveAndGroupInDatabase(archive)) {

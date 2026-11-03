@@ -13,6 +13,7 @@ import '../../../routes/routes.dart';
 import '../../../service/tag_translation_service.dart';
 import '../../../setting/preference_setting.dart';
 import '../../../setting/style_setting.dart';
+import '../../../utils/iphone_duo.dart';
 import '../../../utils/locale_util.dart';
 import '../../../utils/route_util.dart';
 import '../../../widget/loading_state_indicator.dart';
@@ -35,7 +36,7 @@ class SettingPreferencePage extends StatelessWidget {
               _buildDefaultTab(),
               _buildDefaultDownloadTab(),
               if (styleSetting.isInV2Layout) _buildSimpleDashboardMode(),
-              if (styleSetting.isInV2Layout) _buildShowBottomNavigation(),
+              if (styleSetting.isInV2Layout && !isIPhoneDuo) _buildShowBottomNavigation(),
               if (styleSetting.isInV2Layout || styleSetting.actualLayout == LayoutMode.desktop) _buildHideScroll2TopButton(),
               _buildPreloadGalleryCover(),
               _buildEnableSwipeBackGesture(),

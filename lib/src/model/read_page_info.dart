@@ -30,18 +30,20 @@ class ReadPageInfo {
 
   String? galleryUrl;
 
-  int initialIndex;
+  /// The page of the book to open it on.
+  final int initialIndex;
 
-  int currentImageIndex;
-
-  /// Pages of the whole reader: grows as later books are appended to a
-  /// running reader, or earlier ones put before it (see [ReadSegment]).
-  int pageCount;
+  /// Pages of the book; those of all the books in a reader are its state's.
+  final int pageCount;
 
   /// used for archive
   bool isOriginal;
 
   String readProgressRecordStorageKey;
+
+  /// Where versions up to 8.1.1 kept the progress and double pages of the
+  /// book (see GalleryUrl.legacyKey), read while it has none of its own.
+  final String? legacyProgressKey;
 
   /// used for archive, local and remote; in online mode, pages already
   /// downloaded, the others null
@@ -84,6 +86,7 @@ class ReadPageInfo {
     required this.pageCount,
     this.isOriginal = false,
     required this.readProgressRecordStorageKey,
+    this.legacyProgressKey,
     this.images,
     this.thumbnails,
     this.onShown,
@@ -92,20 +95,66 @@ class ReadPageInfo {
     this.loadSiblingBook,
     this.siblingsAreChapters = false,
     this.readDirection,
-  }) : currentImageIndex = initialIndex;
+  });
 }
 
 /// One book of a reader that reads several in a row: [info] describes the
 /// book, whose pages are [start] to [start] + [pageCount] - 1 of the reader.
 /// [start] moves on when a book is put before the first.
 class ReadSegment {
-  ReadSegment({required this.info, required this.start, required this.pageCount});
+  ReadSegment({required this.info, required this.start, required this.pageCount, this.id = 0});
 
   final ReadPageInfo info;
+
+  /// Unique among the books of a reader (see PageId).
+  final int id;
   int start;
   final int pageCount;
 
   int get end => start + pageCount;
 
   bool contains(int index) => index >= start && index < end;
+}
+
+/// A page of a book in a reader, by the book and its number there: the same
+/// page when books are put before it, unlike its index among all pages
+/// (ReadPageState.pageIdAt, ReadPageState.indexOf).
+typedef PageId = ({int segment, int page});
+
+/// What looking for the book before or after those in a reader came to.
+sealed class SiblingOutcome {
+  const SiblingOutcome();
+}
+
+/// Put in the reader.
+final class SiblingJoined extends SiblingOutcome {
+  const SiblingJoined(this.segment);
+
+  final ReadSegment segment;
+}
+
+/// It can not be shown with the books in the reader (a downloaded volume
+/// after one read from the server, say): read by itself, as loaded.
+final class SiblingApart extends SiblingOutcome {
+  const SiblingApart(this.book);
+
+  final ReadPageInfo book;
+}
+
+/// There is none.
+final class SiblingNone extends SiblingOutcome {
+  const SiblingNone();
+}
+
+/// It could not be loaded; asked for again, it is looked for again.
+final class SiblingFailed extends SiblingOutcome {
+  const SiblingFailed(this.error);
+
+  final Object error;
+}
+
+/// Not looked for: it is being looked for already, or the reader closed or
+/// left the layout it was looked for in meanwhile.
+final class SiblingNotNow extends SiblingOutcome {
+  const SiblingNotNow();
 }

@@ -690,8 +690,9 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
       );
     }
 
-    if (GalleryUrl.tryParse(galleryUrl)?.isWN == true ||
-        _isWnacgUrl(galleryUrl)) {
+    // As stored: on a wnacg or nhentai domain other than the ones set now too.
+    final GalleryUrl? stored = GalleryUrl.tryParseStored(galleryUrl);
+    if (stored?.isWN == true || _isWnacgUrl(galleryUrl)) {
       return _requestWnDetailPage(
         galleryUrl: galleryUrl,
         thumbnailsPageIndex: thumbnailsPageIndex,
@@ -699,8 +700,7 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
       );
     }
 
-    if (GalleryUrl.tryParse(galleryUrl)?.isNH == true ||
-        _isNhentaiUrl(galleryUrl)) {
+    if (stored?.isNH == true || _isNhentaiUrl(galleryUrl)) {
       return _requestNhDetailPage(
         galleryUrl: galleryUrl,
         thumbnailsPageIndex: thumbnailsPageIndex,
@@ -1602,7 +1602,7 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     int thumbnailsPageIndex = 0,
     required HtmlParser<T> parser,
   }) async {
-    GalleryUrl parsedUrl = GalleryUrl.parse(galleryUrl);
+    GalleryUrl parsedUrl = GalleryUrl.parseStored(galleryUrl);
     String host = _nhHostFromGalleryUrl(parsedUrl);
     _NHentaiGalleryCache cache = await _getNhGalleryCache(
       parsedUrl.gid,
@@ -3619,7 +3619,7 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
     int thumbnailsPageIndex = 0,
     required HtmlParser<T> parser,
   }) async {
-    GalleryUrl parsedUrl = GalleryUrl.parse(galleryUrl);
+    GalleryUrl parsedUrl = GalleryUrl.parseStored(galleryUrl);
     _WnacgGalleryCache cache = await _getWnGalleryCache(parsedUrl.gid);
 
     if (parser == EHSpiderParser.detailPage2GalleryAndDetailAndApikey) {

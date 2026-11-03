@@ -186,7 +186,7 @@ void main() {
 
       layout.toNext();
       await settle(tester);
-      expect(reader.state.readPageInfo.currentImageIndex, 1);
+      expect(reader.state.currentImageIndex, 1);
       expect(layout.parts.partOf(layout.pageController.page!.round()), ImagePart.first);
       expect(onScreen(halfRect(tester, right: true)), isTrue, reason: 'the right half is the page shown');
       // The half is a page of its own: 300 x 400 fitted to the 600 x 800 screen.
@@ -194,13 +194,13 @@ void main() {
 
       layout.toNext();
       await settle(tester);
-      expect(reader.state.readPageInfo.currentImageIndex, 1, reason: 'both halves are image 1');
+      expect(reader.state.currentImageIndex, 1, reason: 'both halves are image 1');
       expect(layout.parts.partOf(layout.pageController.page!.round()), ImagePart.second);
       expect(onScreen(halfRect(tester, right: false)), isTrue, reason: 'then the left half');
 
       layout.toNext();
       await settle(tester);
-      expect(reader.state.readPageInfo.currentImageIndex, 2);
+      expect(reader.state.currentImageIndex, 2);
 
       // The wide images found are kept for the book.
       final String? kept = await tester.runAsync<String?>(
@@ -213,14 +213,14 @@ void main() {
       await settle(tester);
       expect(layout.parts.length, _wide.length);
       expect(layout.pageController.page!.round(), 2);
-      expect(reader.state.readPageInfo.currentImageIndex, 2);
+      expect(reader.state.currentImageIndex, 2);
 
       // On again, from the slider: image 3 opens on its first half.
       readSetting.splitWidePages.value = true;
       await settle(tester);
       reader.jump2ImageIndex(3);
       await settle(tester);
-      expect(reader.state.readPageInfo.currentImageIndex, 3);
+      expect(reader.state.currentImageIndex, 3);
       expect(layout.parts.partOf(layout.pageController.page!.round()), ImagePart.first);
       expect(layout.parts.length, 6);
 
@@ -275,7 +275,7 @@ void main() {
 
       layout.toNext();
       await settle(tester);
-      expect(reader.state.readPageInfo.currentImageIndex, 1);
+      expect(reader.state.currentImageIndex, 1);
       expect(onScreen(halfRect(tester, right: true)), isTrue);
       expect(halfRect(tester, right: true).size, const Size(600, 800));
 

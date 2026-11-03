@@ -30,7 +30,7 @@ class HorizontalPageLayoutLogic extends BaseLayoutLogic {
   Future<void> _init() async {
     await readPageState.spreadPages.loaded;
     parts = _computeParts();
-    pageController = PageController(initialPage: parts.firstPageOf(readPageState.readPageInfo.currentImageIndex));
+    pageController = PageController(initialPage: parts.firstPageOf(readPageState.currentImageIndex));
 
     /// record reading progress and sync thumbnails list index
     pageController.addListener(_readProgressListener);
@@ -47,11 +47,11 @@ class HorizontalPageLayoutLogic extends BaseLayoutLogic {
       ? super.fitHalf(half)
       : applyBoxFit(BoxFit.contain, half, readPageState.displayRegionSize).destination;
 
-  List<bool> _splitImages() => <bool>[for (int i = 0; i < readPageState.readPageInfo.pageCount; i++) isSplit(i)];
+  List<bool> _splitImages() => <bool>[for (int i = 0; i < readPageState.pageCount; i++) isSplit(i)];
 
   PageParts _computeParts() => PageParts(_splitImages());
 
-  int get _currentPage => pageController.hasClients ? pageController.page!.toInt() : parts.firstPageOf(readPageState.readPageInfo.currentImageIndex);
+  int get _currentPage => pageController.hasClients ? pageController.page!.toInt() : parts.firstPageOf(readPageState.currentImageIndex);
 
   /// The layout is built for the reading direction: wide images found
   /// while another layout was shown, or a change of the setting, change the
@@ -67,7 +67,7 @@ class HorizontalPageLayoutLogic extends BaseLayoutLogic {
     if (changed) {
       parts = PageParts(split);
     }
-    final int target = parts.firstPageOf(readPageState.readPageInfo.currentImageIndex);
+    final int target = parts.firstPageOf(readPageState.currentImageIndex);
     if (!pageController.hasClients) {
       if (pageController.initialPage != target) {
         pageController

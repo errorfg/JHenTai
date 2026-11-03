@@ -13,6 +13,8 @@ import 'package:jhentai/src/pages/layout/tablet_v2/tablet_layout_page_v2.dart';
 import 'package:jhentai/src/setting/style_setting.dart';
 import 'package:jhentai/src/setting/user_setting.dart';
 import 'package:jhentai/src/service/log.dart';
+import 'package:jhentai/src/widget/scheme_header.dart';
+import 'package:jhentai/src/utils/iphone_duo.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:window_manager/window_manager.dart';
@@ -44,6 +46,10 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with LoginRequiredMixin, WindowListener, WindowWidgetMixin {
+  /// Komga or PDF left open last time is opened again over the first home of
+  /// a run, after the lock page if any; a later home is a switch to a site.
+  static bool _ownPageReopened = false;
+
   StreamSubscription? _intentDataStreamSubscription;
   String? _lastDetectedText;
 
@@ -52,6 +58,10 @@ class _HomePageState extends State<HomePage> with LoginRequiredMixin, WindowList
   @override
   void initState() {
     super.initState();
+    if (!_ownPageReopened) {
+      _ownPageReopened = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => reopenOwnPage());
+    }
     initToast(context);
     _initSharingIntent();
     _handleUrlInClipBoard();
@@ -72,7 +82,8 @@ class _HomePageState extends State<HomePage> with LoginRequiredMixin, WindowList
       child: LayoutBuilder(
         builder: (_, __) => Obx(
           () {
-            if (styleSetting.layout.value == LayoutMode.mobileV2 || styleSetting.layout.value == LayoutMode.mobile) {
+            /// The inner display of iPhone Duo is too small for two columns.
+            if (styleSetting.layout.value == LayoutMode.mobileV2 || styleSetting.layout.value == LayoutMode.mobile || isIPhoneDuo) {
               styleSetting.actualLayout = LayoutMode.mobileV2;
               return MobileLayoutPageV2();
             }

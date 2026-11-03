@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:jhentai/src/exception/internal_exception.dart';
+import 'package:jhentai/src/model/content_source.dart';
 import 'package:jhentai/src/setting/eh_setting.dart';
 
 class GalleryUrl {
@@ -79,6 +80,85 @@ class GalleryUrl {
       );
 
   bool get isTachiChapter => isTachi && tachiChapterPath != null;
+
+  /// The site the gallery is from. [isEH] tells E-Hentai from ExHentai for
+  /// an E-Hentai gallery only; galleries of the other sites set it as well.
+  ContentSource get source => isTachi
+      ? ContentSource(SourceKind.tachiyomi, tachiSource)
+      : isJM
+          ? ContentSource.jm
+          : isWN
+              ? ContentSource.wnacg
+              : isNH
+                  ? ContentSource.nhentai
+                  : ContentSource.ehentai;
+
+  /// A gallery of E-Hentai or ExHentai.
+  bool get isEHGallery => source.kind == SourceKind.ehentai;
+
+  /// The gallery's key in data kept by key (read progress, double pages,
+  /// block rules, synced history): the site's key and number for E-Hentai,
+  /// nhentai and wnacg, whose numbers overlap ('nh:123'); the gid of a JM
+  /// or Tachiyomi gallery, which is unique already.
+  String get contentKey => switch (source.kind) {
+        SourceKind.ehentai || SourceKind.nhentai || SourceKind.wnacg => '${source.kind.key}:$gid',
+        SourceKind.jm || SourceKind.tachiyomi => '$gid',
+      };
+
+  /// What versions up to 8.1.1 kept such data under: the bare number, which
+  /// any of E-Hentai, nhentai and wnacg may have had; null where that is
+  /// [contentKey].
+  String? get legacyKey => contentKey == '$gid' ? null : '$gid';
+
+  /// nhentai and wnacg galleries in tables keyed by number: in ranges of
+  /// their own, above E-Hentai's gids and below JM's.
+  static const int nhStorageOffset = 7000000000;
+  static const int wnStorageOffset = 8000000000;
+
+  /// The gallery's number in tables keyed by number (history): its gid,
+  /// but for nhentai and wnacg galleries, in the ranges above, so that a
+  /// number of two sites is two rows. Up to 8.1.1 their rows had the bare
+  /// number.
+  int get storageGid => switch (source.kind) {
+        SourceKind.nhentai => nhStorageOffset + gid,
+        SourceKind.wnacg => wnStorageOffset + gid,
+        SourceKind.ehentai || SourceKind.jm || SourceKind.tachiyomi => gid,
+      };
+
+  /// The site's own number of the gallery kept under [storageGid]: what
+  /// folders of downloads are named by, as up to 8.1.1.
+  static int siteNumberOf(int storageGid) => storageGid >= nhStorageOffset && storageGid < wnStorageOffset
+      ? storageGid - nhStorageOffset
+      : storageGid >= wnStorageOffset && storageGid < jmGidOffset
+          ? storageGid - wnStorageOffset
+          : storageGid;
+
+  /// [storageGid] of the gallery stored with the address [url]; [gid] when
+  /// it can not be read.
+  static int storageGidOfStored(String url, int gid) => tryParseStored(url)?.storageGid ?? gid;
+
+  /// [storageGid] of the gallery of [contentKey]; null for a key of no
+  /// gallery.
+  static int? storageGidOfKey(String contentKey) {
+    final Match? match = RegExp(r'^(?:(eh|nh|wn):)?(\d+)$').firstMatch(contentKey);
+    if (match == null) {
+      return null;
+    }
+    final int number = int.parse(match.group(2)!);
+    return switch (match.group(1)) {
+      'nh' => nhStorageOffset + number,
+      'wn' => wnStorageOffset + number,
+      _ => number,
+    };
+  }
+
+  /// [contentKey] and [legacyKey] of the gallery stored with the address
+  /// [url] and the number [gid]; the number alone when the address can not
+  /// be read.
+  static ({String key, String? legacy}) keysOf(String url, int gid) {
+    final GalleryUrl? parsed = tryParseStored(url);
+    return parsed == null ? (key: '$gid', legacy: null) : (key: parsed.contentKey, legacy: parsed.legacyKey);
+  }
 
   /// The manga of a Tachiyomi chapter (or the manga itself).
   GalleryUrl get tachiMangaUrl => GalleryUrl.tachiManga(tachiSource!, tachiMangaPath!);

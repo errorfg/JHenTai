@@ -13,6 +13,10 @@ import UIKit
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
 
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "NativeGlass") {
+      registrar.register(NativeGlassFactory(), withId: "jhentai/native_glass")
+    }
+
     // Whether this is an iPad, where the app turns its interface within the
     // window, and the way up the screen is shown (UIInterfaceOrientation).
     if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "ScreenOrientation") {

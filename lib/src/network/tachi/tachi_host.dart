@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show protected;
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/service/log.dart';
@@ -31,6 +32,7 @@ class TachiHost {
   Future<TachiClient>? _starting;
   TachiClient? _client;
   Process? _process;
+  final List<void Function()> _startListeners = <void Function()>[];
 
   /// The client once the host runs, without starting it.
   TachiClient? get clientIfRunning => _client;
@@ -49,8 +51,20 @@ class TachiHost {
     return _starting ??= _start().then((TachiClient client) {
       _client = client;
       tachiBrowser.relay();
+      notifyStarted();
       return client;
     }).whenComplete(() => _starting = null);
+  }
+
+  /// [listener] runs each time the host has started; not when only its
+  /// port is opened again ([recover]), the host keeping what it had.
+  void addStartListener(void Function() listener) => _startListeners.add(listener);
+
+  @protected
+  void notifyStarted() {
+    for (final void Function() listener in List<void Function()>.of(_startListeners)) {
+      listener();
+    }
   }
 
   /// On iOS the host starts in the app's process, where a failed start can

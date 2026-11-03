@@ -6,6 +6,7 @@ enum ConfigEnum {
   migrateStorageConfig('migrateStorageConfig'),
   migrateLocalConfigUtimeToUtc('migrateLocalConfigUtimeToUtc'),
   migrateHistoryTimeToUtc('migrateHistoryTimeToUtc'),
+  migrateHistoryKeys('migrateHistoryKeys'),
 
   /// oplog-based cloud sync (format v2) state
   syncDeviceId('syncDeviceId'),
@@ -17,6 +18,14 @@ enum ConfigEnum {
 
   /// sync server state: its database, the pull cursor, the kinds taken in
   recordSyncState('recordSyncState'),
+
+  /// records kept in a bucket: the key of this device's last pack, and what
+  /// the last history version of the settings held
+  recordPackLastKey('recordPackLastKey'),
+  recordBackupHash('recordBackupHash'),
+
+  /// types restored from a history version and not synced since (codes)
+  recordRestoredTypes('recordRestoredTypes'),
 
   /// a login received through sync still has no igneous of this device's own
   ehIgneousPending('ehIgneousPending'),
@@ -74,12 +83,21 @@ enum ConfigEnum {
   jmFavorite('jmFavorite'),
   tachiFavorite('tachiFavorite'),
 
+  /// The newest chapter of each JM album in the favorites, as last checked.
+  jmUpdates('jmUpdates'),
+
   /// Tachiyomi: extension repositories and installed extensions; source
   /// settings; chapters seen, for the updates list.
   tachiExtensionSetting('tachiExtensionSetting'),
   tachiSourceSetting('tachiSourceSetting'),
   tachiUpdates('tachiUpdates'),
   tachiRecentSources('tachiRecentSources'),
+
+  /// Tachiyomi, kept on the device only: the settings of each source the
+  /// host has (their updatedAt), and those of the host that settings from
+  /// elsewhere replaced the first time.
+  tachiSourceSettingInHost('tachiSourceSettingInHost'),
+  tachiSourceSettingReplaced('tachiSourceSettingReplaced'),
   myTagsSetting('MyTagsSetting'),
   builtInBlockedUser('builtInBlockedUser'),
 

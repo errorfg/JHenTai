@@ -1,15 +1,22 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/widgets.dart';
+import 'package:intl/intl.dart';
 import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/model/config.dart';
 import 'package:jhentai/src/service/cloud/cloud_provider.dart';
 import 'package:jhentai/src/service/cloud/hot_data_sync_engine.dart';
 import 'package:jhentai/src/service/cloud/s3_provider.dart';
+import 'package:jhentai/src/service/cloud/sync_cancel_token.dart';
 import 'package:jhentai/src/service/cloud/webdav_provider.dart';
 import 'package:jhentai/src/service/history_service.dart';
+import 'package:jhentai/src/service/cloud/sync_device_id.dart';
+import 'package:jhentai/src/service/record_sync/bucket_record_backend.dart';
 import 'package:jhentai/src/service/record_sync/record_backend.dart';
 import 'package:jhentai/src/service/record_sync/record_sync_engine.dart';
+import 'package:jhentai/src/service/watched_progress_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
@@ -17,6 +24,7 @@ import 'package:jhentai/src/service/cloud_service.dart';
 import 'package:jhentai/src/service/isolate_service.dart';
 import 'package:jhentai/src/service/sync_merger.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
+import 'package:jhentai/src/setting/test_build.dart';
 import 'package:jhentai/src/widget/app_manager.dart';
 
 import 'jh_service.dart';
@@ -57,11 +65,13 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     RecordBackendFactory? recordBackendFactory,
     DateTime Function()? now,
     Duration progressCooldown = const Duration(seconds: 5),
+    Duration syncTimeout = const Duration(minutes: 15),
   }) : _syncRunner = executeSync,
        _providerFactory = providerFactory,
        _recordBackendFactory = recordBackendFactory,
        _now = now ?? DateTime.now,
-       _readProgressSyncCooldown = progressCooldown;
+       _readProgressSyncCooldown = progressCooldown,
+       _syncTimeout = syncTimeout;
 
   /// Provider name of a sync server (record by record), as opposed to the
   /// buckets 's3' and 'webdav'.
@@ -83,9 +93,11 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   bool _historyAutoSyncInProgress = false;
   static const _minSyncInterval = Duration(seconds: 30);
 
-  /// A sync that has not ended by then is given up, so that one stuck request
-  /// cannot keep every later sync "already in progress".
-  static const Duration _syncTimeout = Duration(minutes: 15);
+  /// A sync that has not ended by then is given up: its caller is answered,
+  /// and the sync stops before its next write (see [SyncCancelToken]).
+  /// Later syncs wait until it has stopped, so that two never write at once;
+  /// every request of a provider has a time limit, so it does stop.
+  final Duration _syncTimeout;
   static const int _historyAutoSyncStep = 5;
 
   @override
@@ -285,21 +297,26 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     }
     final Completer<void> done = Completer<void>();
     _inFlightSync = done.future;
+    final SyncCancelToken cancel = SyncCancelToken();
+    Future<SyncResult>? run;
     try {
-      final SyncResult result =
-          await (_syncRunner?.call(
-                types: types,
-                providerName: providerName,
-                onProgress: onProgress,
-              ) ??
-              _doSync(
-                types: types,
-                providerName: providerName,
-                onProgress: onProgress,
-              )).timeout(
+      run =
+          _syncRunner?.call(
+            types: types,
+            providerName: providerName,
+            onProgress: onProgress,
+          ) ??
+          _doSync(
+            types: types,
+            providerName: providerName,
+            onProgress: onProgress,
+            cancel: cancel,
+          );
+      final SyncResult result = await run.timeout(
         _syncTimeout,
         onTimeout: () {
-          log.error('Sync gave up after $_syncTimeout');
+          log.error('Sync gave up after $_syncTimeout, it stops before its next write');
+          cancel.cancel();
           return SyncResult(
             success: false,
             message: 'Sync timed out after ${_syncTimeout.inMinutes} minutes',
@@ -318,9 +335,17 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       }
       return result;
     } finally {
-      _inFlightSync = null;
-      done.complete();
-      _drainQueuedReadProgressSync();
+      void release() {
+        _inFlightSync = null;
+        done.complete();
+        _drainQueuedReadProgressSync();
+      }
+
+      if (cancel.isCancelled && run != null) {
+        unawaited(run.then<void>((_) {}, onError: (Object _) {}).whenComplete(release));
+      } else {
+        release();
+      }
     }
   }
 
@@ -334,6 +359,17 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       await _inFlightSync;
     }
     return sync(types: types);
+  }
+
+  /// The watched list's progress, read on here or about to be looked at:
+  /// synced by itself, after a sync already under way.
+  Future<SyncResult?> syncWatchedProgress() async {
+    if (!syncSetting.enableSync.value || !syncSetting.autoSync.value) {
+      return null;
+    }
+    // What was read in the last second, not yet written, goes too.
+    await watchedProgressService.flush();
+    return syncAfterLocalChange(types: const [CloudConfigTypeEnum.watchedProgress]);
   }
 
   /// Reconcile read progress without letting foreground/reader-close bursts
@@ -417,6 +453,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     required List<CloudConfigTypeEnum> types,
     String? providerName,
     void Function(double progress)? onProgress,
+    required SyncCancelToken cancel,
   }) async {
     void reportProgress(double progress) {
       onProgress?.call(progress.clamp(0, 1).toDouble());
@@ -426,8 +463,11 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       reportProgress(0.03);
 
       String provider = providerName ?? syncSetting.currentProvider.value;
+      if (!_testBuildAllows(provider)) {
+        return SyncResult(success: false, message: _testBuildRefusal, statistics: {});
+      }
       if (provider == serverProvider) {
-        return await _doRecordSync(types: types, onProgress: reportProgress);
+        return await _doRecordSync(types: types, onProgress: reportProgress, cancel: cancel);
       }
       CloudProvider? cloudProvider = _createProvider(provider);
       if (cloudProvider == null) {
@@ -440,156 +480,129 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
 
       log.info('🔄 Starting sync with provider: ${cloudProvider.name}');
       reportProgress(0.08);
-
-      // 1. Download remote config (shared by hot-data bootstrap and legacy merge).
-      // Only a missing file counts as a first sync. A failed download or an
-      // unreadable file aborts here: continuing would upload local configs
-      // alone and delete everything else the remote holds.
-      CloudFile? remoteFile = await cloudProvider.getFileMetadata();
-      String? remoteData = await cloudProvider.download();
-      if (remoteData == null && remoteFile != null) {
-        // The S3 provider reports every S3-level read error as a missing
-        // object; metadata proves the file is there.
-        throw StateError('Remote config exists but could not be downloaded');
-      }
-      CloudConfigFile remoteConfigFile = CloudConfigFile.empty;
-      if (remoteData == null) {
-        log.info(
-          'No remote config found (first sync), will upload local configs',
-        );
-      } else {
-        remoteConfigFile = CloudConfigFile.fromJson(
-          await isolateService.jsonDecodeAsync(remoteData),
-        );
-        log.info(
-          'Downloaded ${remoteConfigFile.configs.length} remote configs'
-          '${remoteConfigFile.unknownEntries.isEmpty ? '' : ' and kept ${remoteConfigFile.unknownEntries.length} entries of unknown types'}',
-        );
-
-        // If download succeeded but metadata failed, create a placeholder
-        if (remoteFile == null) {
-          log.warning(
-            'Metadata fetch failed but download succeeded, using current time as fallback',
-          );
-          remoteFile = CloudFile(
-            version: 'latest',
-            modifiedTime: DateTime.now(),
-            size: remoteData.length,
-            etag: null,
-          );
-        }
-      }
-      reportProgress(0.2);
-
-      // 2. Hot data types (history / read progress) sync incrementally through
-      // the oplog engine instead of travelling inside latest.json
-      const List<CloudConfigTypeEnum> hotTypes = [
-        CloudConfigTypeEnum.history,
-        CloudConfigTypeEnum.readIndexRecord,
-      ];
-      List<CloudConfigTypeEnum> effectiveTypes = types;
-      HotSyncResult? hotResult;
-
-      if (types.any(hotTypes.contains)) {
-        try {
-          hotResult = await _hotEngine.sync(
-            cloudProvider,
-            legacyRemoteConfigJson: remoteData,
-          );
-          effectiveTypes = types.where((t) => !hotTypes.contains(t)).toList();
-        } catch (e, stack) {
-          log.error(
-            'Hot data sync failed, falling back to legacy full-file sync',
-            e,
-            stack,
-          );
-        }
-      }
-      if (hotResult != null) {
-        // History and read progress changes went to the bucket, not to a
-        // sync server: should the device use one again, it reads them whole.
+      final BucketRecordBackend backend = BucketRecordBackend(cloudProvider, device: await ensureSyncDeviceId());
+      final BucketManifest manifest = await backend.manifest();
+      final bool takesLegacy = manifest.legacyDevice == null;
+      if (takesLegacy) {
+        cancel.throwIfCancelled();
+        await _takeOverLegacyLayout(cloudProvider, cancel);
+        // Rows it brought in are not in the pending sets: they go up whole.
         await recordSyncEngine.forgetRowChanges();
       }
-      reportProgress(0.5);
+      reportProgress(0.3);
 
-      if (effectiveTypes.isEmpty) {
-        log.info('Sync completed successfully (hot data only)');
-        reportProgress(1);
-        return SyncResult(
-          success: true,
-          message: 'Sync completed successfully',
-          statistics: {},
-        );
-      }
-
-      // 3. Get local configs for the remaining (small) types
-      List<CloudConfig> localConfigs = [];
-      for (CloudConfigTypeEnum type in effectiveTypes) {
-        CloudConfig? config = await cloudConfigService.getLocalConfig(type);
-        if (config != null) {
-          localConfigs.add(config);
-          log.info('  Local ${type.name}: ${config.config.length} bytes');
-        } else {
-          log.info('  Local ${type.name}: empty (skipped)');
-        }
-      }
-      reportProgress(0.6);
-
-      // 4. Merge configs (merger handles import internally).
-      // The "latest local activity" heuristic used by whole-file LWW types is
-      // computed from the hot tables directly since they no longer travel here.
-      DateTime? latestLocalTime = await _computeLatestLocalActivityTime();
-      var mergeResult = await syncMerger.merge(
-        localConfigs,
-        remoteConfigFile.configs,
-        remoteFile?.modifiedTime ?? DateTime.now(),
-        effectiveTypes,
-        latestLocalTimeOverride: latestLocalTime,
+      await recordSyncEngine.sync(
+        backend,
+        types: types.toSet(),
+        onProgress: (double progress) => reportProgress(0.3 + progress * 0.55),
+        cancel: cancel,
+        joining: !takesLegacy && manifest.legacyDevice != backend.device,
       );
-      reportProgress(0.74);
+      if (takesLegacy) {
+        await backend.markLegacyTaken();
+      }
+      reportProgress(0.9);
 
-      // 5. Upload merged result, unless it is identical to what the remote
-      // already holds (avoids churning latest.json and its version history).
-      // Remote entries of types outside this sync are carried over unchanged;
-      // hot types handled by the oplog engine no longer travel in this file.
-      bool saveHistory = syncSetting.enableHistory.value;
-      List<Map<String, dynamic>> uploadEntries = remoteConfigFile.toUploadJson(
-        mergeResult.merged,
-        dropped: hotResult == null
-            ? const {}
-            : types.where(hotTypes.contains).toSet(),
-      );
-      String encodedData = await isolateService.jsonEncodeAsync(uploadEntries);
-
-      if (remoteData != null && encodedData == remoteData) {
-        log.info('Merged result identical to remote, skipping upload');
-      } else {
-        log.info(
-          'Uploading ${uploadEntries.length} configs to remote (${encodedData.length} bytes)',
-        );
-        await cloudProvider.upload(encodedData, saveHistory: saveHistory);
-        log.info('Upload complete');
-        reportProgress(0.92);
-
-        // 6. If history is enabled and auto cleanup is on, clean up old versions
-        if (saveHistory && syncSetting.autoCleanHistory.value) {
-          await _cleanupOldVersions(cloudProvider);
-        }
+      cancel.throwIfCancelled();
+      try {
+        await backend.compact();
+      } catch (e) {
+        log.warning('Compacting the bucket records failed, tried again next time', e);
+      }
+      if (syncSetting.enableHistory.value && CloudConfigTypeEnum.values.every(types.contains)) {
+        await _saveBackup(backend);
       }
       reportProgress(1);
 
-      log.info(
-        'Sync completed successfully'
-        '${hotResult != null ? ' (hot: +${hotResult.appliedRows} applied, ${hotResult.pushedRows} pushed)' : ''}',
-      );
-      return SyncResult(
-        success: true,
-        message: 'Sync completed successfully',
-        statistics: mergeResult.statistics,
-      );
+      log.info('Sync completed successfully');
+      return SyncResult(success: true, message: 'Sync completed successfully', statistics: {});
     } catch (e) {
       log.error('Sync failed', e);
       return SyncResult(success: false, message: e.toString(), statistics: {});
+    }
+  }
+
+  /// History and read progress travel in op packs in a bucket of versions
+  /// up to 8.1.1, the rest in latest.json.
+  static const List<CloudConfigTypeEnum> _legacyHotTypes = [
+    CloudConfigTypeEnum.history,
+    CloudConfigTypeEnum.readIndexRecord,
+  ];
+
+  /// The types latest.json of versions up to 8.1.1 could hold, and history
+  /// versions keep: not those that travel row by row.
+  static bool _inConfigFile(CloudConfigTypeEnum type) =>
+      !_legacyHotTypes.contains(type) && type != CloudConfigTypeEnum.watchedProgress;
+
+  /// What versions up to 8.1.1 synced in the bucket, into this device's
+  /// data, once, by the first device of a later version that syncs it (see
+  /// [BucketRecordBackend]): the op packs of history and progress applied,
+  /// and latest.json merged the way those versions merged it, every type.
+  /// Nothing is written to that layout; what they write to it later is not
+  /// taken. A file that is there but can not be read fails the sync.
+  Future<void> _takeOverLegacyLayout(CloudProvider provider, SyncCancelToken cancel) async {
+    CloudFile? remoteFile = await provider.getFileMetadata();
+    String? remoteData = await provider.download();
+    if (remoteData == null && remoteFile != null) {
+      // The S3 provider reports every S3-level read error as a missing
+      // object; metadata proves the file is there.
+      throw StateError('Remote config exists but could not be downloaded');
+    }
+    cancel.throwIfCancelled();
+    HotSyncResult hot = await _hotEngine.sync(provider, legacyRemoteConfigJson: remoteData, cancel: cancel, readOnly: true);
+    log.info('Took over ${hot.appliedRows} history and progress rows of the earlier bucket layout');
+    if (remoteData == null) {
+      return;
+    }
+
+    CloudConfigFile remoteConfigFile = CloudConfigFile.fromJson(await isolateService.jsonDecodeAsync(remoteData));
+    List<CloudConfigTypeEnum> types = CloudConfigTypeEnum.values.where(_inConfigFile).toList();
+    List<CloudConfig> localConfigs = [
+      for (CloudConfigTypeEnum type in types) ?await cloudConfigService.getLocalConfig(type),
+    ];
+    DateTime? latestLocalTime = await _computeLatestLocalActivityTime();
+    cancel.throwIfCancelled();
+    await syncMerger.merge(
+      localConfigs,
+      remoteConfigFile.configs,
+      remoteFile?.modifiedTime ?? DateTime.now(),
+      types,
+      latestLocalTimeOverride: latestLocalTime,
+    );
+    log.info('Took over ${remoteConfigFile.configs.length} configs of the earlier bucket layout');
+  }
+
+  /// The settings as a history version (in the format of latest.json of
+  /// earlier versions), when they changed since the last one.
+  Future<void> _saveBackup(BucketRecordBackend backend) async {
+    try {
+      List<CloudConfig> configs = [
+        for (CloudConfigTypeEnum type in CloudConfigTypeEnum.values)
+          if (_inConfigFile(type)) ?await cloudConfigService.getLocalConfig(type),
+      ];
+      String data = await isolateService.jsonEncodeAsync(configs.map((c) => c.toJson()).toList());
+      String hash = sha1.convert(utf8.encode(await isolateService.jsonEncodeAsync(configs.map((c) => c.config).toList()))).toString();
+      if (hash == await localConfigService.read(configKey: ConfigEnum.recordBackupHash)) {
+        return;
+      }
+      // Named by the second, after the newest there.
+      DateFormat format = DateFormat('yyyyMMddHHmmss');
+      DateTime time = _now().toUtc();
+      List<CloudFile> versions = await backend.listBackups();
+      if (versions.isNotEmpty && format.format(time).compareTo(versions.first.version) <= 0) {
+        String v = versions.first.version;
+        int at(int start, int end) => int.parse(v.substring(start, end));
+        time = DateTime.utc(at(0, 4), at(4, 6), at(6, 8), at(8, 10), at(10, 12), at(12, 14)).add(const Duration(seconds: 1));
+      }
+      await backend.writeBackup(format.format(time), data);
+      await localConfigService.write(configKey: ConfigEnum.recordBackupHash, value: hash);
+      if (syncSetting.autoCleanHistory.value) {
+        for (CloudFile version in (await backend.listBackups()).skip(syncSetting.maxHistoryVersions.value)) {
+          await backend.deleteBackup(version.version);
+        }
+      }
+    } catch (e) {
+      log.error('Saving a history version failed', e);
     }
   }
 
@@ -599,6 +612,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   Future<SyncResult> _doRecordSync({
     required List<CloudConfigTypeEnum> types,
     required void Function(double progress) onProgress,
+    required SyncCancelToken cancel,
   }) async {
     try {
       RecordBackend? backend = _recordBackendFactory != null ? _recordBackendFactory() : _createRecordBackend();
@@ -606,7 +620,7 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         return SyncResult(success: false, message: 'The sync server address is not set', statistics: {});
       }
       log.info('🔄 Starting sync with the sync server');
-      await recordSyncEngine.sync(backend, types: types.toSet(), onProgress: onProgress);
+      await recordSyncEngine.sync(backend, types: types.toSet(), onProgress: onProgress, cancel: cancel);
       log.info('Sync completed successfully');
       return SyncResult(success: true, message: 'Sync completed successfully', statistics: {});
     } catch (e, stack) {
@@ -622,7 +636,8 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     return HttpRecordBackend(url: syncSetting.syncServerUrl.value, token: syncSetting.syncServerToken.value);
   }
 
-  /// List history versions
+  /// List history versions: those of the records layout, and those earlier
+  /// versions saved beside latest.json.
   /// [providerName]: Optional provider name, defaults to current provider
   Future<List<CloudFile>> listHistory({String? providerName}) async {
     try {
@@ -633,12 +648,19 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         return [];
       }
 
-      return await cloudProvider.listVersions();
+      List<CloudFile> versions = await _backups(cloudProvider).listBackups();
+      Set<String> known = versions.map((v) => v.version).toSet();
+      versions.addAll((await cloudProvider.listVersions()).where((v) => !known.contains(v.version)));
+      return versions..sort((a, b) => b.version.compareTo(a.version));
     } catch (e) {
       log.error('Failed to list history versions', e);
       return [];
     }
   }
+
+  /// The history versions of the records layout; reading and writing them
+  /// needs no device.
+  BucketRecordBackend _backups(CloudProvider provider) => BucketRecordBackend(provider, device: '');
 
   /// Restore from history version
   /// [version]: Version to restore (timestamp format)
@@ -662,22 +684,23 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       log.info('Restoring from version: $version');
 
       // 1. Download specified history version
-      String data = await cloudProvider.downloadVersion(version);
+      String data = await _backups(cloudProvider).readBackup(version) ?? await cloudProvider.downloadVersion(version);
       CloudConfigFile file = CloudConfigFile.fromJson(
         await isolateService.jsonDecodeAsync(data),
       );
 
       // 2. Import to local (replace current config)
       for (var config in file.configs) {
-        await cloudConfigService.importConfig(config);
+        await cloudConfigService.importConfig(config, replace: true);
       }
+      await recordSyncEngine.markRestored(file.configs.map((CloudConfig c) => c.type));
 
-      // 3. (Optional) Sync to cloud, making the restored version the new latest
+      // 3. (Optional) Sync, the restored settings taken as changed here now
       if (syncToCloud) {
-        await cloudProvider.upload(
-          data,
-          saveHistory: syncSetting.enableHistory.value,
-        );
+        SyncResult result = await sync(types: CloudConfigTypeEnum.values);
+        if (!result.success) {
+          return RestoreResult(success: false, version: version, error: result.message);
+        }
       }
 
       log.info('Restored from version: $version');
@@ -703,7 +726,11 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         return false;
       }
 
-      await cloudProvider.deleteVersion(version);
+      if (await _backups(cloudProvider).readBackup(version) != null) {
+        await _backups(cloudProvider).deleteBackup(version);
+      } else {
+        await cloudProvider.deleteVersion(version);
+      }
       log.info('Deleted version: $version');
       return true;
     } catch (e) {
@@ -723,13 +750,16 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         return false;
       }
 
+      List<CloudFile> backups = await _backups(cloudProvider).listBackups();
+      for (var version in backups) {
+        await _backups(cloudProvider).deleteBackup(version.version);
+      }
       List<CloudFile> versions = await cloudProvider.listVersions();
-
       for (var version in versions) {
         await cloudProvider.deleteVersion(version.version);
       }
 
-      log.info('Cleared all ${versions.length} history versions');
+      log.info('Cleared all ${backups.length + versions.length} history versions');
       return true;
     } catch (e) {
       log.error('Failed to clear all history', e);
@@ -742,6 +772,10 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   Future<bool> testConnection(String providerName) async {
     try {
       log.info('Testing connection for provider: $providerName');
+      if (!_testBuildAllows(providerName)) {
+        log.warning(_testBuildRefusal);
+        return false;
+      }
 
       if (providerName == serverProvider) {
         RecordBackend? backend = _recordBackendFactory != null ? _recordBackendFactory() : _createRecordBackend();
@@ -807,6 +841,12 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
     }
   }
 
+  static const String _testBuildRefusal = 'A test build syncs only with a test bucket or a test sync server';
+
+  /// A test build syncs only with the test ones (see TestBuild).
+  bool _testBuildAllows(String provider) =>
+      !TestBuild.on || TestBuild.allows(provider: provider, bucket: syncSetting.s3BucketName.value, serverUrl: syncSetting.syncServerUrl.value);
+
   /// Create a provider from the latest settings; null for unknown names.
   CloudProvider? _createProvider(String provider) {
     if (_providerFactory != null) {
@@ -849,43 +889,6 @@ class SyncService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       }
     }
     return latest;
-  }
-
-  /// Cleanup old versions exceeding the limit
-  Future<void> _cleanupOldVersions(CloudProvider provider) async {
-    // Check if auto cleanup is enabled
-    if (!syncSetting.enableHistory.value ||
-        !syncSetting.autoCleanHistory.value) {
-      return;
-    }
-
-    try {
-      // List all history versions
-      List<CloudFile> versions = await provider.listVersions();
-      int maxVersions = syncSetting.maxHistoryVersions.value;
-
-      log.info(
-        'Found ${versions.length} history versions, max allowed: $maxVersions',
-      );
-
-      if (versions.length > maxVersions) {
-        // Sort by version (timestamp) in descending order (newest first)
-        versions.sort((a, b) => b.version.compareTo(a.version));
-
-        // Delete versions exceeding the limit
-        int deletedCount = 0;
-        for (int i = maxVersions; i < versions.length; i++) {
-          await provider.deleteVersion(versions[i].version);
-          log.info('Deleted old version: ${versions[i].version}');
-          deletedCount++;
-        }
-
-        log.info('Cleaned up $deletedCount old versions');
-      }
-    } catch (e) {
-      log.error('Failed to cleanup old versions', e);
-      // Cleanup failure does not affect main flow, just log the error
-    }
   }
 }
 

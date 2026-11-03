@@ -13,13 +13,13 @@ import 'package:jhentai/src/service/jh_service.dart';
 import 'package:jhentai/src/service/local_config_service.dart';
 import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/path_service.dart';
+import 'package:jhentai/src/service/tachi/tachi_source_setting_service.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
 import 'package:path/path.dart' as p;
 
 TachiExtensionService tachiExtensionService = TachiExtensionService();
 
-/// Where an installed extension came from, so another device can install
-/// the same one.
+/// Where an extension installed here came from.
 class TachiInstalledOrigin {
   const TachiInstalledOrigin({required this.pkg, required this.name, required this.repo, required this.apk, required this.versionCode});
 
@@ -44,23 +44,26 @@ class TachiInstalledOrigin {
 
 /// Extension repositories and installed extensions.
 ///
-/// The repositories and the list of installed extensions (with the
-/// repository each came from) are a setting that cloud sync carries; a
-/// device that receives it installs what it lacks and removes what was
-/// removed elsewhere (see [applyInstalledList]). What the host has actually
-/// installed is [installed].
+/// Cloud sync carries the repositories; what each device installs is its
+/// own. What the host has actually installed is [installed].
 class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JHLifeCircleBean {
   @override
   ConfigEnum get configEnum => ConfigEnum.tachiExtensionSetting;
 
   final RxList<String> repos = <String>[].obs;
 
-  /// Extensions to have, by package; synced.
+  /// Extensions installed here, by package.
   final RxMap<String, TachiInstalledOrigin> origins = <String, TachiInstalledOrigin>{}.obs;
 
-  /// When [repos] or [origins] last changed here or arrived from another
-  /// device, as stored (fixed-width UTC ISO 8601).
+  /// When [repos] or [origins] last changed here, or [repos] arrived from
+  /// another device, as stored (fixed-width UTC ISO 8601).
   String updatedAt = '';
+
+  /// When [repos] last changed here, or the list of another device that
+  /// changed later was taken: what syncs compare, as installing an
+  /// extension changes [updatedAt] too. Configs of 8.1.1 and earlier have
+  /// only [updatedAt].
+  String reposUpdatedAt = '';
 
   /// What the host has installed, once asked.
   final RxList<TachiExtension> installed = <TachiExtension>[].obs;
@@ -91,22 +94,16 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
   @override
   void doAfterBeanReady() {}
 
-  /// Packages a received list no longer has: removed on another device.
-  final Set<String> _removedElsewhere = <String>{};
-
   @override
   void applyBeanConfig(String configString) {
     final Map<String, dynamic> json = jsonDecode(configString) as Map<String, dynamic>;
-    final Set<String> before = origins.keys.toSet();
     repos.value = ((json['repos'] as List?) ?? const <dynamic>[]).cast<String>();
     origins.value = <String, TachiInstalledOrigin>{
       for (final dynamic e in (json['extensions'] as List?) ?? const <dynamic>[])
         (e as Map<String, dynamic>)['pkg'] as String: TachiInstalledOrigin.fromJson(e),
     };
     updatedAt = json['updatedAt'] as String? ?? '';
-    _removedElsewhere
-      ..addAll(before.difference(origins.keys.toSet()))
-      ..removeAll(origins.keys);
+    reposUpdatedAt = json['reposUpdatedAt'] as String? ?? updatedAt;
   }
 
   @override
@@ -114,10 +111,14 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
         'repos': repos,
         'extensions': origins.values.map((TachiInstalledOrigin o) => o.toJson()).toList(),
         'updatedAt': updatedAt,
+        'reposUpdatedAt': reposUpdatedAt,
       });
 
-  Future<void> _saveChanged() async {
+  Future<void> _saveChanged({bool repos = false}) async {
     updatedAt = SyncTimeUtil.nowIso();
+    if (repos) {
+      reposUpdatedAt = updatedAt;
+    }
     await saveBeanConfig();
   }
 
@@ -202,7 +203,7 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
     }
     if (!repos.contains(repo)) {
       repos.add(repo);
-      await _saveChanged();
+      await _saveChanged(repos: true);
     }
     await _fetchRepo(repo);
     return repoErrors[repo];
@@ -212,7 +213,7 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
     repos.remove(repo);
     available.remove(repo);
     repoErrors.remove(repo);
-    await _saveChanged();
+    await _saveChanged(repos: true);
   }
 
   /// Every extension the repositories offer, the newest version of each package.
@@ -253,6 +254,8 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
       );
       await _saveChanged();
       await refreshInstalled();
+      // Settings of its sources that arrived from another device.
+      await tachiSourceSettingService.applyToHost();
     } finally {
       busy.remove(extension.pkg);
       if (apk.existsSync()) {
@@ -267,6 +270,7 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
     origins[extension.pkg] = TachiInstalledOrigin(pkg: extension.pkg, name: extension.name, repo: '', apk: '', versionCode: extension.versionCode);
     await _saveChanged();
     await refreshInstalled();
+    await tachiSourceSettingService.applyToHost();
     return extension;
   }
 
@@ -280,54 +284,5 @@ class TachiExtensionService with JHLifeCircleBeanWithConfigStorage implements JH
     } finally {
       busy.remove(pkg);
     }
-  }
-
-  /// Makes the host's extensions match [origins], after they arrived from
-  /// another device: missing ones are installed from their repositories
-  /// (whose newest version is taken), and ones removed there are
-  /// uninstalled. An extension this device installed before it had a list
-  /// is kept. Only
-  /// when the host runs or [startHost] is set: the host is not started
-  /// just for this on a phone.
-  Future<void> applyInstalledList({bool startHost = false}) async {
-    if (tachiHost.clientIfRunning == null && !startHost) {
-      return;
-    }
-    await refreshInstalled();
-    final Set<String> have = installed.map((TachiExtension e) => e.pkg).toSet();
-    final Iterable<TachiInstalledOrigin> missing = origins.values.where((TachiInstalledOrigin o) => !have.contains(o.pkg) && o.repo.isNotEmpty);
-    if (missing.isNotEmpty) {
-      for (final String repo in missing.map((TachiInstalledOrigin o) => o.repo).toSet()) {
-        if (!repos.contains(repo)) {
-          repos.add(repo);
-        }
-        if (!available.containsKey(repo)) {
-          await _fetchRepo(repo);
-        }
-      }
-      for (final TachiInstalledOrigin origin in missing.toList()) {
-        final TachiRepoExtension? offer = available[origin.repo]?.firstWhereOrNull((TachiRepoExtension e) => e.pkg == origin.pkg);
-        if (offer == null) {
-          log.warning('Synced extension ${origin.pkg} is not in ${origin.repo}');
-          continue;
-        }
-        try {
-          await install(offer);
-        } catch (e) {
-          log.error('Install synced extension ${origin.pkg} failed', e);
-        }
-      }
-    }
-    for (final TachiExtension extension in installed.toList()) {
-      if (_removedElsewhere.contains(extension.pkg) && !origins.containsKey(extension.pkg)) {
-        try {
-          await tachiHost.run((TachiClient c) => c.uninstall(extension.pkg));
-        } catch (e) {
-          log.error('Remove extension ${extension.pkg} failed', e);
-        }
-      }
-    }
-    _removedElsewhere.clear();
-    await refreshInstalled();
   }
 }

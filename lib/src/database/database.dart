@@ -8,6 +8,7 @@ import 'package:drift/native.dart';
 import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_instance/src/extension_instance.dart';
 import 'package:get/get_utils/get_utils.dart';
+import 'package:jhentai/src/model/gallery_url.dart';
 import 'package:jhentai/src/database/dao/gallery_group_dao.dart';
 import 'package:jhentai/src/database/dao/gallery_history_dao.dart';
 import 'package:jhentai/src/database/dao/super_resolution_info_dao.dart';
@@ -71,7 +72,7 @@ class AppDb extends _$AppDb {
   AppDb.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 25;
+  int get schemaVersion => 26;
 
   @override
   MigrationStrategy get migration {
@@ -176,6 +177,9 @@ class AppDb extends _$AppDb {
               await m.createIndex(srIdxDirty).ignoreDuplicateIndex();
               await m.createIndex(srIdxApplyPending).ignoreDuplicateIndex();
             }
+            if (from < 26) {
+              await moveNhentaiAndWnacgDownloads();
+            }
           });
         } on Exception catch (e) {
           log.error(e);
@@ -184,6 +188,25 @@ class AppDb extends _$AppDb {
         }
       },
     );
+  }
+
+  /// Run by the migration to schema 26: downloads of nhentai and wnacg
+  /// galleries move from the bare number to their own (GalleryUrl.storageGid),
+  /// told by their token; their pages and upscaled copies (type 0 a
+  /// gallery's, 1 an archive's) with them. Folders keep their names: those
+  /// are by the site's own number. Run again, it moves nothing.
+  Future<void> moveNhentaiAndWnacgDownloads() async {
+    await transaction(() async {
+      for (final (String token, int offset) in <(String, int)>[('nhentai', GalleryUrl.nhStorageOffset), ('wnacg', GalleryUrl.wnStorageOffset)]) {
+        final String galleries = 'SELECT gid FROM gallery_downloaded_v2 WHERE token = ? AND gid > 0 AND gid < ${GalleryUrl.nhStorageOffset}';
+        final String archives = 'SELECT gid FROM archive_downloaded_v2 WHERE token = ? AND gid > 0 AND gid < ${GalleryUrl.nhStorageOffset}';
+        await customStatement('UPDATE image SET gid = gid + $offset WHERE gid IN ($galleries)', [token]);
+        await customStatement('UPDATE super_resolution_info_v2 SET gid = gid + $offset WHERE type = 0 AND gid IN ($galleries)', [token]);
+        await customStatement('UPDATE super_resolution_info_v2 SET gid = gid + $offset WHERE type = 1 AND gid IN ($archives)', [token]);
+        await customStatement('UPDATE gallery_downloaded_v2 SET gid = gid + $offset WHERE token = ? AND gid > 0 AND gid < ${GalleryUrl.nhStorageOffset}', [token]);
+        await customStatement('UPDATE archive_downloaded_v2 SET gid = gid + $offset WHERE token = ? AND gid > 0 AND gid < ${GalleryUrl.nhStorageOffset}', [token]);
+      }
+    });
   }
 
   Future<void> _updateArchive(Migrator m) async {

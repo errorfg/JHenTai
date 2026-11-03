@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/extension/string_extension.dart';
 import 'package:jhentai/src/model/gallery_image.dart';
+import 'package:jhentai/src/utils/iphone_duo.dart';
 import 'package:jhentai/src/utils/route_util.dart';
 import 'package:jhentai/src/widget/eh_image.dart';
 import 'package:jhentai/src/widget/eh_wheel_speed_controller.dart';
@@ -46,7 +47,7 @@ mixin GridBasePage on StatelessWidget implements Scroll2TopPageMixin {
   AppBar buildAppBar(BuildContext context) {
     return AppBar(
       centerTitle: true,
-      leading: styleSetting.isInV2Layout
+      leading: styleSetting.isInV2Layout && (!isIPhoneDuo || isRouteAtTop(Routes.download))
           ? IconButton(
               icon: isRouteAtTop(Routes.download) ? const Icon(Icons.arrow_back) : Icon(Icons.menu, size: 20),
               onPressed: () {

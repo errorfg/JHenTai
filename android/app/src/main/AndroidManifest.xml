@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           xmlns:tools="http://schemas.android.com/tools" package="com.gallery.reader">
     <application
-            android:label="Gallery Reader"
+            android:label="${appLabel}"
             android:name="${applicationName}"
             android:requestLegacyExternalStorage="true"
             android:icon="@mipmap/launcher_icon">
@@ -80,7 +80,7 @@
 
         <provider
                 android:name="androidx.core.content.FileProvider"
-                android:authorities="top.jtmonster.jhentai.provider"
+                android:authorities="${fileProviderAuthority}"
                 android:exported="false"
                 android:grantUriPermissions="true">
             <meta-data

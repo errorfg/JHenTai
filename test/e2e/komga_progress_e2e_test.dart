@@ -1,3 +1,6 @@
+@Tags(<String>['external'])
+library;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:jhentai/src/model/komga/komga_models.dart';
 import 'package:jhentai/src/network/komga_client.dart';
