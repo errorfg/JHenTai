@@ -94,6 +94,7 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - a new E-Hentai version of a gallery takes over the reading progress of the version it replaces.
 - Foldable device support:
   - a rotation button that shows for 5 seconds when the device is turned away from the screen's orientation, in every layout; on iPad, which does not let apps turn the screen, it turns the app's interface within its window.
+  - iPhone Duo: full screen and following the fold (the iOS build uses the iOS 27.1 SDK), always in the phone layout, with the navigation on the system's Liquid Glass along the right edge, or beside the status bar on the inner display held upright. Other devices keep their layout.
 - Local library & downloads:
   - archive preview page for browsing images inside downloaded archives.
   - switchable JHenTai, Komga, and PDF reading sources with a shared reader.
