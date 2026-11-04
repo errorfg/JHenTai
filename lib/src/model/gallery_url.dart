@@ -52,6 +52,18 @@ class GalleryUrl {
 
   int get jmChapterId => gid - jmGidOffset;
 
+  /// A JM number as people pass it around: the whole text is `JM123456`, in
+  /// either case, a space allowed after the letters. Not part of [tryParse],
+  /// which reads links: such text in a comment or a search is not an address.
+  static GalleryUrl? tryParseJmNumber(String text) {
+    final Match? match = RegExp(r'^\s*jm\s*(\d{1,9})\s*$', caseSensitive: false).firstMatch(text);
+    if (match == null) {
+      return null;
+    }
+    final int id = int.parse(match.group(1)!);
+    return id == 0 ? null : GalleryUrl.jm(id);
+  }
+
   /// Tachiyomi gids: a hash of the source and the source's URL, in
   /// [tachiGidOffset, 2 * tachiGidOffset). Above JM's range, and below 2^53
   /// so that JavaScript (the sync server) reads them exactly.
