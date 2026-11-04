@@ -200,7 +200,7 @@ class _HomePageState extends State<HomePage> with LoginRequiredMixin, WindowList
     }
 
     String rawText = await FlutterClipboard.paste();
-    GalleryUrl? galleryUrl = GalleryUrl.tryParse(rawText);
+    GalleryUrl? galleryUrl = GalleryUrl.tryParse(rawText) ?? GalleryUrl.tryParseJmNumber(rawText);
     GalleryImagePageUrl? galleryImagePageUrl = GalleryImagePageUrl.tryParse(rawText);
 
     if (galleryUrl == null && galleryImagePageUrl == null) {
