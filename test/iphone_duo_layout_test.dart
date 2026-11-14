@@ -67,6 +67,7 @@ List<TabBarIcon> _icons() => _destinations
           },
         ),
         shouldRender: name == TabBarIconNameEnum.home,
+        enterNewRoute: name == TabBarIconNameEnum.search || name == TabBarIconNameEnum.setting,
       ),
     )
     .toList();
@@ -291,6 +292,113 @@ void main() {
     expect(logic.state.selectedDrawerTabIndex, _destinations.indexOf(TabBarIconNameEnum.favorite));
     expect(find.text('page:favorite'), findsOneWidget);
     expect(find.text('page:home'), findsNothing);
+  });
+
+  group('inner display, upright: a swipe across the page goes to the tab beside', () {
+    final Finder home = find.byKey(const ValueKey<String>('page:home'));
+    final Finder popular = find.byKey(const ValueKey<String>('page:popular'));
+    const Offset start = Offset(400, 500);
+
+    testWidgets('the next page comes in under the finger; letting go past halfway switches', (WidgetTester tester) async {
+      final MobileLayoutPageV2Logic logic = await _pumpHome(tester, _upright);
+
+      final TestGesture gesture = await tester.startGesture(start);
+      await gesture.moveBy(const Offset(-40, 0));
+      await gesture.moveBy(const Offset(-160, 0));
+      await tester.pump();
+
+      // Search opens a route of its own: the page after home's is popular's.
+      final double moved = tester.getRect(home).left;
+      expect(moved, lessThan(0));
+      expect(tester.getRect(popular).left, moved + 669);
+      expect(logic.state.selectedDrawerTabIndex, 0);
+
+      await gesture.moveBy(const Offset(-200, 0));
+      await tester.pump(const Duration(seconds: 1));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(logic.state.selectedDrawerTabIndex, _destinations.indexOf(TabBarIconNameEnum.popular));
+      expect(tester.getRect(popular).left, 0);
+      expect(home, findsNothing);
+    });
+
+    testWidgets('a short slow swipe leaves the page where it was', (WidgetTester tester) async {
+      final MobileLayoutPageV2Logic logic = await _pumpHome(tester, _upright);
+
+      final TestGesture gesture = await tester.startGesture(start);
+      await gesture.moveBy(const Offset(-40, 0));
+      await gesture.moveBy(const Offset(-100, 0));
+      await tester.pump(const Duration(seconds: 1));
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(logic.state.selectedDrawerTabIndex, 0);
+      expect(tester.getRect(home).left, 0);
+      expect(popular, findsNothing);
+    });
+
+    testWidgets('a quick flick switches, and back', (WidgetTester tester) async {
+      final MobileLayoutPageV2Logic logic = await _pumpHome(tester, _upright);
+
+      await tester.flingFrom(start, const Offset(-120, 0), 1500);
+      await tester.pumpAndSettle();
+      expect(logic.state.selectedDrawerTabIndex, _destinations.indexOf(TabBarIconNameEnum.popular));
+
+      await tester.flingFrom(start, const Offset(120, 0), 1500);
+      await tester.pumpAndSettle();
+      expect(logic.state.selectedDrawerTabIndex, 0);
+      expect(tester.getRect(home).left, 0);
+      expect(popular, findsNothing);
+    });
+
+    testWidgets('nothing moves past the first and the last page', (WidgetTester tester) async {
+      final MobileLayoutPageV2Logic logic = await _pumpHome(tester, _upright);
+
+      await tester.dragFrom(start, const Offset(400, 0));
+      await tester.pumpAndSettle();
+      expect(logic.state.selectedDrawerTabIndex, 0);
+      expect(tester.getRect(home).left, 0);
+
+      // Settings opens a route of its own: download's page is the last.
+      logic.handleTapTabBarButton(_destinations.indexOf(TabBarIconNameEnum.download));
+      await tester.pumpAndSettle();
+      await tester.dragFrom(start, const Offset(-400, 0));
+      await tester.pumpAndSettle();
+      expect(logic.state.selectedDrawerTabIndex, _destinations.indexOf(TabBarIconNameEnum.download));
+      expect(Get.currentRoute, '/');
+    });
+
+    testWidgets('from the right edge the swipe still pulls out the menu card', (WidgetTester tester) async {
+      final MobileLayoutPageV2Logic logic = await _pumpHome(tester, _upright);
+
+      await tester.dragFrom(const Offset(665, 500), const Offset(-400, 0));
+      await tester.pumpAndSettle();
+
+      expect(_scaffold.isEndDrawerOpen, isTrue);
+      expect(logic.state.selectedDrawerTabIndex, 0);
+    });
+
+    testWidgets('a vertical drag is the page\'s own', (WidgetTester tester) async {
+      final MobileLayoutPageV2Logic logic = await _pumpHome(tester, _upright);
+
+      await tester.dragFrom(start, const Offset(0, -400));
+      await tester.pumpAndSettle();
+
+      expect(logic.state.selectedDrawerTabIndex, 0);
+      expect(popular, findsNothing);
+    });
+
+    testWidgets('with the strip on the right, a swipe across the page does nothing', (WidgetTester tester) async {
+      final MobileLayoutPageV2Logic logic = await _pumpHome(tester, _innerFlat);
+
+      await tester.dragFrom(const Offset(400, 300), const Offset(-400, 0));
+      await tester.pumpAndSettle();
+
+      expect(logic.state.selectedDrawerTabIndex, 0);
+      expect(tester.getRect(home).left, 0);
+      expect(popular, findsNothing);
+    });
   });
 
   testWidgets('where the tabs do not fit, they scroll along the bar', (WidgetTester tester) async {

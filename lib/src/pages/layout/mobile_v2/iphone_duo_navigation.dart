@@ -14,12 +14,15 @@ import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 /// status bar at the top of the inner display held upright. The tabs scroll
 /// along the bar; a swipe away from the edge, or the menu button, pulls out the
 /// panel that names them.
+///
+/// Along the top the tabs lie side by side, and [builder] is told to let a swipe
+/// across the page go from one to the next.
 class IPhoneDuoNavigation extends StatelessWidget {
-  const IPhoneDuoNavigation({super.key, required this.logic, required this.state, required this.child});
+  const IPhoneDuoNavigation({super.key, required this.logic, required this.state, required this.builder});
 
   final MobileLayoutPageV2Logic logic;
   final MobileLayoutPageV2State state;
-  final Widget child;
+  final Widget Function(bool swipeTabs) builder;
 
   /// Inside the capsule, before the first tab and after the last.
   static const double _capsuleInset = 6;
@@ -32,7 +35,7 @@ class IPhoneDuoNavigation extends StatelessWidget {
     return IPhoneDuoBar(
       controlsBesideStatusBar: true,
       controls: _buildControls,
-      builder: (BuildContext context, _) => MediaQuery.removePadding(context: context, removeBottom: true, child: child),
+      builder: (BuildContext context, bool inStrip) => MediaQuery.removePadding(context: context, removeBottom: true, child: builder(!inStrip)),
     );
   }
 
