@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:jhentai/src/utils/iphone_duo.dart';
 
 class ThemeConfig {
   /// Since Flutter 3.35, Material buttons default to the basic arrow cursor on desktop; restore the hand cursor.
@@ -13,6 +14,9 @@ class ThemeConfig {
       /// default w500 is not supported for chinese characters in some devices
       textTheme: const TextTheme(titleMedium: TextStyle(fontWeight: FontWeight.w400)),
       appBarTheme: const AppBarTheme(scrolledUnderElevation: 0),
+
+      /// a fixed snack bar spans the whole window, over the strip the system keeps on iPhone Duo; a floating one stays within the safe area
+      snackBarTheme: isIPhoneDuo ? const SnackBarThemeData(behavior: SnackBarBehavior.floating) : null,
       navigationBarTheme: const NavigationBarThemeData(
         height: 48,
         surfaceTintColor: Colors.transparent,

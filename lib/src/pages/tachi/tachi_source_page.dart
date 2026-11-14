@@ -54,6 +54,9 @@ class TachiSourcePage extends BasePage<TachiSourcePageLogic, TachiSourcePageStat
   String get name => tachiExtensionService.source(state.sourceId)?.name ?? '';
 
   @override
+  bool get controlsInIPhoneDuoBar => true;
+
+  @override
   List<Widget> buildAppBarActions() {
     final TachiSourceInfo? info = tachiExtensionService.source(state.sourceId);
     return [

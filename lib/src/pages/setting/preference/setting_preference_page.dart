@@ -27,6 +27,7 @@ class SettingPreferencePage extends StatelessWidget {
       appBar: AppBar(centerTitle: true, title: Text('preferenceSetting'.tr)),
       body: Obx(
         () => SafeArea(
+          bottom: !isIPhoneDuo,
           child: ListView(
             padding: const EdgeInsets.only(top: 16),
             children: [

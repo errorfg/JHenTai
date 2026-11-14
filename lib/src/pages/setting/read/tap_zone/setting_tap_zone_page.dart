@@ -4,6 +4,7 @@ import 'package:jhentai/src/extension/widget_extension.dart';
 import 'package:jhentai/src/model/tap_zone_config.dart';
 import 'package:jhentai/src/setting/read_setting.dart';
 import 'package:jhentai/src/widget/tap_zone_guide_overlay.dart';
+import 'package:jhentai/src/utils/iphone_duo.dart';
 
 class SettingTapZonePage extends StatefulWidget {
   const SettingTapZonePage({super.key});
@@ -62,6 +63,7 @@ class _SettingTapZonePageState extends State<SettingTapZonePage> {
     return Scaffold(
       appBar: AppBar(centerTitle: true, title: Text('tapZoneStyle'.tr)),
       body: SafeArea(
+        bottom: !isIPhoneDuo,
         child: ListView(
           padding: const EdgeInsets.only(top: 16, bottom: 32),
           children: [

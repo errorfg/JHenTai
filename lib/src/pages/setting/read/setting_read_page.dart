@@ -19,6 +19,7 @@ import '../../../utils/text_input_formatter.dart';
 import '../../../utils/toast_util.dart';
 import '../../home_page.dart';
 import '../../read/read_page_logic.dart';
+import 'package:jhentai/src/utils/iphone_duo.dart';
 
 class SettingReadPage extends StatelessWidget {
   final TextEditingController imageRegionWidthRatioController = TextEditingController(text: readSetting.imageRegionWidthRatio.value.toString());
@@ -36,6 +37,7 @@ class SettingReadPage extends StatelessWidget {
       body: Obx(
             () =>
             SafeArea(
+              bottom: !isIPhoneDuo,
               child: ListView(
                 padding: const EdgeInsets.only(top: 16),
                 children: [

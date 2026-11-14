@@ -7,6 +7,7 @@ import 'package:jhentai/src/config/ui_config.dart';
 import 'package:jhentai/src/model/content_scheme.dart';
 import 'package:jhentai/src/pages/download/download_base_page.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/iphone_duo_navigation.dart';
+import 'package:jhentai/src/pages/layout/mobile_v2/iphone_duo_tab_pager.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2_logic.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/mobile_layout_page_v2_state.dart';
 import 'package:jhentai/src/pages/layout/mobile_v2/notification/tap_menu_button_notification.dart';
@@ -39,7 +40,7 @@ class MobileLayoutPageV2 extends StatelessWidget {
           drawerEnableOpenDragGesture: preferenceSetting.enableLeftMenuDrawerGesture.isTrue,
           endDrawer: isIPhoneDuo ? buildPanel() : buildRightDrawer(),
           endDrawerEnableOpenDragGesture: isIPhoneDuo || preferenceSetting.enableQuickSearchDrawerGesture.isTrue,
-          body: isIPhoneDuo ? IPhoneDuoNavigation(logic: logic, state: state, child: buildBody()) : buildBody(),
+          body: isIPhoneDuo ? IPhoneDuoNavigation(logic: logic, state: state, builder: (bool swipeTabs) => buildBody(swipeTabs: swipeTabs)) : buildBody(),
           bottomNavigationBar: isIPhoneDuo || preferenceSetting.hideBottomBar.isTrue ? null : buildBottomNavigationBar(context),
         ),
       ),
@@ -82,14 +83,16 @@ class MobileLayoutPageV2 extends StatelessWidget {
     );
   }
 
-  Widget buildBody() {
+  /// [swipeTabs]: a swipe across the page goes to the tab beside; iPhone Duo's
+  /// inner display held upright.
+  Widget buildBody({bool swipeTabs = false}) {
     return NotificationListener<TapTabBarButtonNotification>(
       child: NotificationListener<TapMenuButtonNotification>(
         child: GetBuilder<MobileLayoutPageV2Logic>(
           id: logic.bodyId,
           builder: (_) => Stack(
             children: [
-              Offstage(offstage: state.selectedNavigationIndex != 0, child: buildHomeBody()),
+              Offstage(offstage: state.selectedNavigationIndex != 0, child: swipeTabs ? IPhoneDuoTabPager(logic: logic, state: state) : buildHomeBody()),
               if (!isIPhoneDuo) Offstage(offstage: state.selectedNavigationIndex != 1, child: const DownloadPage()),
               if (!isIPhoneDuo) Offstage(offstage: state.selectedNavigationIndex != 2, child: const SettingPage()),
             ],
