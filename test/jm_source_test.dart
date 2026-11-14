@@ -69,6 +69,38 @@ void main() {
     });
   });
 
+  group('a JM number in the clipboard', () {
+    test('the whole text being JM and digits opens that gallery', () {
+      for (final String text in <String>['JM1234567', 'jm1234567', 'Jm1234567', 'JM 1234567', '  JM1234567\n']) {
+        final GalleryUrl? url = GalleryUrl.tryParseJmNumber(text);
+        expect(url?.isJM, isTrue, reason: text);
+        expect(url?.jmChapterId, 1234567, reason: text);
+      }
+    });
+
+    test('anything else is not a JM number', () {
+      for (final String text in <String>[
+        '',
+        'JM',
+        '1234567',
+        'JM0',
+        'JM12a34',
+        'JMX123',
+        'XJM123',
+        'see JM123 please',
+        'JM123 JM456',
+        'JM1234567890',
+        'JM123\nJM456',
+      ]) {
+        expect(GalleryUrl.tryParseJmNumber(text), isNull, reason: text);
+      }
+    });
+
+    test('it stays out of the parser for links', () {
+      expect(GalleryUrl.tryParse('JM1234567'), isNull);
+    });
+  });
+
   group('JM search keywords', () {
     test('free text is passed as typed and the source prefix dropped', () {
       expect(JmSource.normalizeKeyword('jm: MANA -蘿莉'), 'MANA -蘿莉');
