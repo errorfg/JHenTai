@@ -26,7 +26,8 @@
 
 - 应用用的是 8.x 的接口（`FilePicker.platform.…`）。8.x 没有鸿蒙实现；它的 Windows 代码要 win32 5.x，而鸿蒙版的 plus 系列插件要 win32 6.x，两者不能同时解析。
 - 鸿蒙构建把它整包换成 `ohos/packages/file_picker`：8.3.7 去掉桌面与网页实现的副本，保留公开接口和方法通道实现。原生部分用 `file_picker_ohos`，两者的通道协议相同。
-- 尚未在真机验证。已知 `file_picker_ohos` 保存文件时不预填文件名（见 PiliPlus 文档第 5 节第 8 条），需要同样的补丁。
+- 8.x 靠各平台的插件注册来设定实现。鸿蒙上副本声明的 `dartPluginClass` 没有被注册，`FilePicker.platform` 未初始化，一调用就抛出 `LateInitializationError`。副本里只有一种实现，直接把它设为默认值。
+- 选取文件已在真机验证（导入 PDF）。未处理：`getDirectoryPath` 返回的是系统的文件地址而不是普通路径（影响下载路径、额外扫描路径两个设置项）；`file_picker_ohos` 保存文件时不预填文件名（见 PiliPlus 文档第 5 节第 8 条）。
 
 ### 2.4 `GetPlatform.isMobile`
 
@@ -54,14 +55,34 @@
 
 ### 2.8 Tachiyomi 扩展
 
-- 扩展宿主是 JVM 程序（`ext_host/`）。鸿蒙上的做法与 iOS 相同：在应用进程内运行 Zero 解释器版的 OpenJDK。手机上没有依据可以启动子进程；带即时编译的虚拟机需要受限权限。
-- 进行中，尚不可用。虚拟机的交叉编译在本机构建区的 `jdk-build/`。
+- 扩展宿主是 JVM 程序（`ext_host/`）。鸿蒙上的做法与 iOS 相同：在应用进程内运行 Zero 解释器版的 OpenJDK。没有找到第三方应用在手机上启动子进程的依据；带即时编译的虚拟机需要受限权限。
+- 虚拟机：与 iOS 相同的 OpenJDK 源码提交和模块集合，用鸿蒙 NDK 交叉编译成静态库，再连同 libffi 链接成 `libjdkhost.so`（约 8.7 MB）。为鸿蒙打了 5 个补丁。构建脚本、补丁和说明在本机构建区的 `jdk-build/`，不在仓库里。
+- 桥接：`ohos/entry/src/main/cpp/exthost.c`（`libexthost.so`），在一个 8 MB 栈的独立线程里创建虚拟机并调用宿主的 `Embedded.start`。创建前先检查运行时镜像和宿主 jar 是否存在，因为虚拟机找不到运行时镜像时会直接结束进程。`libjdkhost.so` 或 JDK 头文件不在时，这个库照样能编译，启动时报告「本构建不含扩展宿主」。
+- 插件：`TachiHostPlugin.ets` 实现 `ext_host/flutter` 的通道协议（`com.gallery.reader/exthost`）。
+- 运行时镜像（约 12.3 MB）和宿主 jar（约 9.1 MB）放在 `resources/resfile/exthost/`，系统在安装时解包到磁盘，路径取自 `context.resourceDir`。
+- 启动防护与 iOS 相同（启动前写标记文件，启动返回后删除）。另外，标记存在而上次停留在 Tachiyomi 时，应用打开后回到 E-Hentai。
+- 网络走 JDK 自带的 TLS（iOS 为了速度改用了系统的网络接口，鸿蒙没有做）。扩展用的不显示网页视图没有实现，需要加载网页的扩展会报错，与 Windows、Linux 相同。
+- 仓库所有者在真机上确认能安装插件并正常使用（2026-11-16）。整个包因此从 43.8 MB 增加到 75.7 MB。
+- 命令行（`hdc shell`）不能执行未签名的可执行文件（`Permission denied`，退出码 126），所以虚拟机只能在已签名的应用里验证。
+
+### 2.9 PDF
+
+- 渲染：`pdfx` 没有鸿蒙实现。宿主里的 `PdfRendererPlugin.ets` 用系统的 PDF Kit 实现 `pdfx` 的方法通道协议（`io.scer.pdf_renderer`）。
+- `pdfx` 用 `universal_platform` 判断平台，后者把不认识的系统都当作安卓，于是在鸿蒙上选了 Pigeon 实现。`PdfService` 在鸿蒙上显式选用方法通道实现；宿主按安卓分支的约定把渲染结果写成临时文件返回，`pdfx` 读完后删除。
+- 导入：书库页的加号选取 PDF，拷进应用自己的 `pdf` 目录（与下载目录同级），该目录与额外扫描路径一起扫描。这是共用代码，各平台都有。原因是鸿蒙上应用读不到沙箱以外的目录，只靠扫描路径没有办法把文件放进来。
+- 真机上导入、扫描、读页数都成功（日志）；封面与翻页由仓库所有者测试。
+
+### 2.10 启动窗
+
+- 系统在应用画面出来之前画启动窗，`module.json5` 必须给出图标和背景色。图标用一张透明图，背景用应用默认主题的底色（浅色 `#FDF7FF`、深色 `#141218`，由默认主题色算出）。
+- 启动窗跟随系统的深浅色，读不到应用里的主题设置；换了主题色之后底色也不会跟着变。
 
 ## 3. 构建
 
 构建脚本和下面这些补丁不在仓库里：
 
 - `sqlite3` 的 `hooks` 配置与 SQLite 源文件：见 2.5。
+- Tachiyomi 的虚拟机、JDK 头文件、运行时镜像和宿主 jar：见 2.8，构建时拷入宿主工程。
 
 - `flex_color_picker`、`chewie`：`switch (TargetPlatform)` 没有覆盖鸿蒙，补上（与安卓同组）。
 - `get`：见 2.4。
@@ -72,22 +93,33 @@
 
 ## 4. 插件状况
 
-已接上鸿蒙实现（均未在真机验证）：path_provider、url_launcher、webview_flutter、video_player、local_auth、permission_handler、battery_plus、device_info_plus、package_info_plus、sensors_plus、share_plus、wakelock_plus、file_picker、saver_gallery、screen_brightness。
+已接上鸿蒙实现：path_provider、url_launcher、webview_flutter、video_player、local_auth、permission_handler、battery_plus、device_info_plus、package_info_plus、sensors_plus、share_plus、wakelock_plus、file_picker、saver_gallery、screen_brightness、pdfx（宿主实现）、tachi_host（宿主实现）。其中在真机上用到并确认的：path_provider、file_picker（选文件）、pdfx、tachi_host；其余由仓库所有者在使用中测试，没有逐项记录。
 
 没有鸿蒙实现、尚未处理：
 
-- fluttertoast、pasteboard、pdfx、receive_sharing_intent、volume_button_override。
+- fluttertoast（原生提示；应用内的提示用的是 Dart 画的 FToast，不受影响）、pasteboard（复制图片到剪贴板）、receive_sharing_intent、volume_button_override。
 - system_network_proxy、http_proxy：鸿蒙上不调用，见 2.6。
 - sqflite（`flutter_cache_manager` 用它记录图片缓存）。
-- tachi_host（Tachiyomi 扩展的运行环境）、jni、just_audio、audio_session。
+- jni、just_audio、audio_session。
 - 只有安卓有意义的：android_intent_plus、flutter_displaymode、flutter_windowmanager_plus。
 
-## 5. 待办
+## 5. 待办与已知问题
 
-- PDF 书库页已能打开（顺带修了一个各平台共有的缺陷：`PdfService.refresh()` 覆盖了 `GetxController.refresh()`，每次 `update()` 都变成又一次扫描，界面一直转圈）。打开 PDF 文件（生成封面、渲染页面）用的 `pdfx` 没有鸿蒙实现，真机上只验证过空书库。仓库所有者要求在 Tachiyomi 之后处理这一项。
-- 2026-11-16 曾见到一次界面全黑（切换来源后点底栏「设置」），未复现，原因不明。
-
-- 真机：2026-11-16 在 Mate XTs 上启动成功，主页的排行榜、热门、最新能加载出图片（手机布局）。其余功能未验证。
+- 界面全黑：切到 Komga 再回到 E-Hentai 时出现过（仓库所有者报告，2026-11-16）。带异常输出的版本上没有抓到异常，原因不明。
+- 选目录返回的不是普通路径（见 2.3）。
+- 安装 Tachiyomi 插件后转圈不结束：出现过一次，之后没有复现，没有针对它改动。读代码可知转圈标记要等安装之后的保存、重新读取列表、写回来源设置三步都结束才清除。
 - 逐个核对 `isAndroid` 的分支：返回键拦截（`will_pop_interceptor.dart`）、存储权限（`permission_util.dart`）、下载路径（`path_service.dart`）、音量键翻页、后台模糊与恢复时验证。
-- 第 4 节里没有实现的插件：先确认哪些在启动或常用路径上会被调用。
 - 应用图标在桌面上的实际显示（前景图用的是安卓自适应图标的前景，安卓端另有 16% 的内缩）。
+
+## 6. 顺带修的共用代码缺陷
+
+移植中发现、各平台都受影响的问题：
+
+- `PdfService.refresh()` 覆盖了 `GetxController.refresh()`，每次 `update()` 都变成又一次扫描，PDF 书库一直转圈。改名为 `scan()`。
+- 带操作按钮的提示条不自动消失：Flutter 新版本里 `SnackBar` 有 `action` 时 `persist` 默认为真。显式设为 `false`。
+- 从 Komga、PDF 切回站点后画廊链接提示重复出现：已提示过的链接记在主页的实例字段里，主页重建后丢失。改为静态字段。
+
+## 7. 调试方法
+
+- 正式包里 Dart 的 `print` 会进系统日志（`hilog`，标签里带 `flutter settings log message`）。框架层的异常和各服务初始化时被捕获的异常不会进，要看的话在构建副本里临时加输出（本机 `tools/diag_boot.py`）。
+- 测试版：用 `local-debug/dev-sync/test-build.json` 作为 `--dart-define-from-file` 构建，只与测试用的同步环境通信；本机 `tools/preset_test.py` 让它启动时自动打开同步，账号和 Komga 配置随之进来，不用在设置页里操作。
