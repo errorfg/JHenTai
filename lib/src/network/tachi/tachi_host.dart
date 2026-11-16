@@ -37,7 +37,18 @@ class TachiHost {
   /// The client once the host runs, without starting it.
   TachiClient? get clientIfRunning => _client;
 
-  bool get supported => Platform.isAndroid || Platform.isIOS || _desktopRuntime() != null;
+  bool get supported => Platform.isAndroid || Platform.isIOS || _isOhos || _desktopRuntime() != null;
+
+  /// OpenHarmony: the host runs in the app's process, as on Android and iOS.
+  static bool get _isOhos => Platform.operatingSystem == 'ohos';
+
+  /// Where the host runs on a JVM carried by the app, in the app's process:
+  /// a VM that fails to start ends the app, so a start that did not return
+  /// is remembered ([_startMarker]).
+  static bool get _guardsStart => Platform.isIOS || _isOhos;
+
+  /// Whether the last start of the host ended the app.
+  bool get lastStartEndedApp => _guardsStart && _startMarker.existsSync();
 
   Directory get dataDir => Directory(p.join((pathService.appSupportDir ?? pathService.getVisibleDir()).path, 'tachiyomi'));
 
@@ -76,7 +87,7 @@ class TachiHost {
 
   /// The user asked to start the host again after a start ended the app.
   void allowStartAfterFailure() {
-    if (Platform.isIOS && _startMarker.existsSync()) {
+    if (_guardsStart && _startMarker.existsSync()) {
       _startMarker.deleteSync();
     }
   }
@@ -88,7 +99,7 @@ class TachiHost {
     if (current != null && await current.ping()) {
       return current;
     }
-    if (current != null && (Platform.isIOS || Platform.isAndroid)) {
+    if (current != null && (Platform.isIOS || Platform.isAndroid || _isOhos)) {
       final int port = await _channel.invokeMethod<int>('restartServer') ?? -1;
       if (port > 0) {
         current.close();
@@ -136,7 +147,7 @@ class TachiHost {
     });
     final Stopwatch watch = Stopwatch()..start();
     final int port;
-    if (Platform.isIOS) {
+    if (_guardsStart) {
       if (_startMarker.existsSync()) {
         throw TachiHostException('tachiHostEndedApp'.tr);
       }

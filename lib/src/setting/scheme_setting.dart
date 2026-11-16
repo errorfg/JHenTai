@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:get/get.dart';
 import 'package:jhentai/src/enum/config_enum.dart';
 import 'package:jhentai/src/model/content_scheme.dart';
+import 'package:jhentai/src/network/tachi/tachi_host.dart';
 import 'package:jhentai/src/service/jh_service.dart';
 import 'package:jhentai/src/service/log.dart';
 
@@ -24,6 +25,13 @@ class SchemeSetting with JHLifeCircleBeanWithConfigStorage implements JHLifeCirc
     final Map<String, dynamic> map = (jsonDecode(configString) as Map).cast<String, dynamic>();
     final ContentScheme? saved = ContentScheme.values.firstWhereOrNull((ContentScheme s) => s.name == map['site']);
     site.value = saved != null && saved.isSite ? saved : ContentScheme.ehentai;
+    // The app would open on Tachiyomi and start the host again, which ended
+    // the app the last time: open on E-Hentai instead. The host starts again
+    // only when the user goes to Tachiyomi and asks for it.
+    if (site.value == ContentScheme.tachiyomi && tachiHost.lastStartEndedApp) {
+      log.warning('The extension host ended the app at its last start; opening on E-Hentai');
+      site.value = ContentScheme.ehentai;
+    }
     final ContentScheme? page = ContentScheme.values.firstWhereOrNull((ContentScheme s) => s.name == map['ownPage']);
     ownPage.value = page != null && !page.isSite ? page : null;
   }

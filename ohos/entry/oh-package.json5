@@ -6,6 +6,8 @@
   "main": "",
   "author": "",
   "license": "",
-  "dependencies": {},
+  "dependencies": {
+    "libexthost.so": "file:./src/main/cpp/types/libexthost"
+  },
 }
 

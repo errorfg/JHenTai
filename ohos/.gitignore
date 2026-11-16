@@ -18,3 +18,8 @@
 **/libs/**/libapp.so
 **/libs/**/libflutter.so
 **/libs/**/libvmservice_snapshot.so
+
+# The JVM of the Tachiyomi extension host, copied in by the build
+**/src/main/cpp/jdk/
+**/libs/**/libjdkhost.so
+**/src/main/resources/resfile/exthost/
