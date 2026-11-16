@@ -11,6 +11,10 @@
     {
       "name": "EntryAbility_label",
       "value": "Gallery Reader"
+    },
+    {
+      "name": "reason_read_pasteboard",
+      "value": "Detect gallery links in the clipboard"
     }
   ]
 }

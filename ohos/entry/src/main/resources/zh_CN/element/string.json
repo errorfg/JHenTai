@@ -11,6 +11,10 @@
     {
       "name": "EntryAbility_label",
       "value": "Gallery Reader"
+    },
+    {
+      "name": "reason_read_pasteboard",
+      "value": "识别剪贴板中的画廊链接"
     }
   ]
 }
