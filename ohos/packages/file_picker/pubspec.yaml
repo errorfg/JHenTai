@@ -1,0 +1,21 @@
+name: file_picker
+description: file_picker 8.3.7 reduced to what OpenHarmony needs. Replaces the hosted package only in OpenHarmony builds (see ohos/pubspec_ohos.yaml).
+version: 8.3.7
+publish_to: none
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.1.8
+  path: ^1.9.0
+  cross_file: ^0.3.4+2
+
+flutter:
+  plugin:
+    platforms:
+      ohos:
+        dartPluginClass: FilePickerIO

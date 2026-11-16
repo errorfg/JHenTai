@@ -1,0 +1,90 @@
+# Merged into pubspec.yaml only when building for OpenHarmony; other platforms
+# never read this file. An entry here replaces the entry of the same name.
+# dependencies: packages that only carry the OpenHarmony implementation; the
+#   app-facing package stays at the version in pubspec.yaml.
+# dependency_overrides: packages whose OpenHarmony implementation lives in the
+#   app-facing package, replaced as a whole.
+dependencies:
+  path_provider_ohos:
+    git:
+      url: https://gitcode.com/CPF-Flutter/flutter_packages.git
+      path: packages/path_provider/path_provider_ohos
+      ref: a0e6cebef8ca58767fcd6d2afdedc3fa1b5a88c1
+  url_launcher_ohos:
+    git:
+      url: https://gitcode.com/CPF-Flutter/flutter_packages.git
+      path: packages/url_launcher/url_launcher_ohos
+      ref: a0e6cebef8ca58767fcd6d2afdedc3fa1b5a88c1
+  webview_flutter_ohos:
+    git:
+      url: https://gitcode.com/CPF-Flutter/flutter_packages.git
+      path: packages/webview_flutter/webview_flutter_ohos
+      ref: a0e6cebef8ca58767fcd6d2afdedc3fa1b5a88c1
+  video_player_ohos:
+    git:
+      url: https://gitcode.com/CPF-Flutter/flutter_packages.git
+      path: packages/video_player/video_player_ohos
+      ref: a0e6cebef8ca58767fcd6d2afdedc3fa1b5a88c1
+  local_auth_ohos:
+    git:
+      url: https://gitcode.com/CPF-Flutter/flutter_packages.git
+      path: packages/local_auth/local_auth_ohos
+      ref: a0e6cebef8ca58767fcd6d2afdedc3fa1b5a88c1
+  permission_handler_ohos:
+    git:
+      url: https://gitcode.com/CPF-Flutter/flutter_permission_handler.git
+      path: permission_handler_ohos
+      ref: 07aab6eb3b0999f5892a9f383a9afd391e47cce3
+  # native side of the file picker; the Dart API is ohos/packages/file_picker
+  file_picker_ohos:
+    git:
+      url: https://gitcode.com/CPF-Flutter/fluttertpc_file_picker.git
+      path: packages/file_picker_ohos
+      ref: 094f80934d9391a191fea4a4c238415302d204d0
+
+dependency_overrides:
+  # the OpenHarmony SDK (3.47.7) pins test_api 0.7.12; pubspec.yaml pins test 1.31.0 for 3.44
+  test: any
+  # flutter_localizations of 3.47.7 needs intl ^0.20.3; pubspec.yaml pins 0.20.2
+  intl: ^0.20.3
+  battery_plus:
+    git:
+      url: https://gitcode.com/CPF-Flutter/flutter_plus_plugins.git
+      path: packages/battery_plus/battery_plus
+      ref: 247dec1a66da0c0b8b368f79efe63783421bdd27
+  device_info_plus:
+    git:
+      url: https://gitcode.com/CPF-Flutter/flutter_plus_plugins.git
+      path: packages/device_info_plus/device_info_plus
+      ref: 247dec1a66da0c0b8b368f79efe63783421bdd27
+  package_info_plus:
+    git:
+      url: https://gitcode.com/CPF-Flutter/flutter_plus_plugins.git
+      path: packages/package_info_plus/package_info_plus
+      ref: 247dec1a66da0c0b8b368f79efe63783421bdd27
+  sensors_plus:
+    git:
+      url: https://gitcode.com/CPF-Flutter/flutter_plus_plugins.git
+      path: packages/sensors_plus/sensors_plus
+      ref: 247dec1a66da0c0b8b368f79efe63783421bdd27
+  share_plus:
+    git:
+      url: https://gitcode.com/CPF-Flutter/flutter_plus_plugins.git
+      path: packages/share_plus/share_plus
+      ref: 247dec1a66da0c0b8b368f79efe63783421bdd27
+  wakelock_plus:
+    git:
+      url: https://gitcode.com/CPF-Flutter/fluttertpc_wakelock_plus.git
+      path: wakelock_plus
+      ref: a5ae85fe13d7b92ad9d48bdabd69e4117f665be6
+  # the share_plus branch points path_provider at an old git branch; use pub.dev's
+  path_provider: ^2.1.5
+  # file_picker 8.x has no OpenHarmony implementation; see ohos/packages/file_picker
+  file_picker:
+    path: ohos/packages/file_picker
+  # video_player_ohos is written against the interface in the same repository
+  video_player_platform_interface:
+    git:
+      url: https://gitcode.com/CPF-Flutter/flutter_packages.git
+      path: packages/video_player/video_player_platform_interface
+      ref: a0e6cebef8ca58767fcd6d2afdedc3fa1b5a88c1
