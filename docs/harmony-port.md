@@ -36,33 +36,44 @@
 
 ### 2.5 数据库
 
-- `sqlite3` 3.x 用构建钩子编译原生库。3.47.7 的鸿蒙工具链能直接跑这个钩子，包里带有 `libs/arm64-v8a/libsqlite3.so`，不需要另外的原生模块。
+- `sqlite3` 3.x 用构建钩子准备原生库，默认是下载预编译库。Flutter OpenHarmony 把目标系统报给钩子时写的是 Linux，钩子于是取了 glibc 的 Linux 版本；它依赖 `ld-linux-aarch64.so.1`，在鸿蒙上加载失败，表现为启动后白屏（所有读写数据库的初始化都失败）。
+- 做法：让钩子从源码编译（`hooks.user_defines.sqlite3.source: source`，SQLite 3.50.2 的合并源文件，与该包默认版本相同）。Flutter OpenHarmony 传给钩子的编译器是鸿蒙 NDK 的 clang，只需再加 `--target=aarch64-linux-ohos`。编出的库只依赖 `libc.so`。
+- 这段 `hooks` 配置由构建脚本在构建时追加到 `pubspec.yaml`，源文件放在本机构建区，不进仓库。
+
+### 2.6 系统代理
+
+- 鸿蒙版不读系统代理（仓库所有者的决定：手机上不需要）。`http_proxy` 没有鸿蒙实现，而 `GetPlatform.isMobile` 在鸿蒙上为真，所以 `getSystemProxyAddress` 里读取系统代理的条件从 `isMobile` 改成了 `isAndroid || isIOS`，对其他平台等价。
+- 不改的话，网络请求模块的初始化会在这一步抛出异常，后面的 Cookie、缓存等初始化都不会执行。
+- 设置里手动填写的代理不受影响。
 
 ## 3. 构建
 
 构建脚本和下面这些补丁不在仓库里：
+
+- `sqlite3` 的 `hooks` 配置与 SQLite 源文件：见 2.5。
 
 - `flex_color_picker`、`chewie`：`switch (TargetPlatform)` 没有覆盖鸿蒙，补上（与安卓同组）。
 - `get`：见 2.4。
 
 仓库内与构建有关的文件：`ohos/`（宿主工程）、`ohos/pubspec_ohos.yaml`、`ohos/packages/`、`ohos/patches/`（只在鸿蒙构建时应用的补丁，目前为空）。
 
-步骤：并入鸿蒙依赖 → 应用 `ohos/patches` → `pub get` → 包补丁 → `flutter build hap --release --no-codesign -t lib/src/main.dart`。
+步骤：并入鸿蒙依赖 → 应用 `ohos/patches` → 追加 `hooks` 配置 → `pub get` → 包补丁 → `flutter build hap --release --no-codesign -t lib/src/main.dart`。
 
 ## 4. 插件状况
 
-已接上鸿蒙实现（均未在真机验证）：path_provider、url_launcher、webview_flutter、video_player、local_auth、permission_handler、battery_plus、device_info_plus、package_info_plus、sensors_plus、share_plus、wakelock_plus、file_picker、saver_gallery、screen_brightness、sqlite3。
+已接上鸿蒙实现（均未在真机验证）：path_provider、url_launcher、webview_flutter、video_player、local_auth、permission_handler、battery_plus、device_info_plus、package_info_plus、sensors_plus、share_plus、wakelock_plus、file_picker、saver_gallery、screen_brightness。
 
 没有鸿蒙实现、尚未处理：
 
-- fluttertoast、pasteboard、pdfx、receive_sharing_intent、volume_button_override、http_proxy、system_network_proxy。
+- fluttertoast、pasteboard、pdfx、receive_sharing_intent、volume_button_override。
+- system_network_proxy、http_proxy：鸿蒙上不调用，见 2.6。
 - sqflite（`flutter_cache_manager` 用它记录图片缓存）。
 - tachi_host（Tachiyomi 扩展的运行环境）、jni、just_audio、audio_session。
 - 只有安卓有意义的：android_intent_plus、flutter_displaymode、flutter_windowmanager_plus。
 
 ## 5. 待办
 
-- 真机启动与基本浏览、阅读、下载。
+- 真机：2026-11-16 在 Mate XTs 上启动成功，主页的排行榜、热门、最新能加载出图片（手机布局）。其余功能未验证。
 - 逐个核对 `isAndroid` 的分支：返回键拦截（`will_pop_interceptor.dart`）、存储权限（`permission_util.dart`）、下载路径（`path_service.dart`）、音量键翻页、后台模糊与恢复时验证。
 - 第 4 节里没有实现的插件：先确认哪些在启动或常用路径上会被调用。
 - 应用图标在桌面上的实际显示（前景图用的是安卓自适应图标的前景，安卓端另有 16% 的内缩）。

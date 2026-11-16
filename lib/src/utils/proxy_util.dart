@@ -14,7 +14,8 @@ Future<String> getSystemProxyAddress() async {
     SystemNetworkProxy.init();
     systemProxyAddress = await SystemNetworkProxy.getProxyServer();
   }
-  if (GetPlatform.isMobile) {
+  // OpenHarmony does not read the system proxy.
+  if (GetPlatform.isAndroid || GetPlatform.isIOS) {
     HttpProxy httpProxy = await HttpProxy.createHttpProxy();
     if (!isEmptyOrNull(httpProxy.host) && !isEmptyOrNull(httpProxy.port)) {
       systemProxyAddress = '${httpProxy.host}:${httpProxy.port}';
