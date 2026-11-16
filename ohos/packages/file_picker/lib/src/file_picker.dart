@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:file_picker/src/file_picker_io.dart';
 import 'package:file_picker/src/file_picker_result.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
@@ -32,7 +33,9 @@ abstract class FilePicker extends PlatformInterface {
 
   static final Object _token = Object();
 
-  static late FilePicker _instance;
+  // The hosted package sets this from each platform's registration. Here
+  // there is one implementation, so it does not depend on registration.
+  static FilePicker _instance = FilePickerIO();
 
   static FilePicker get platform => _instance;
 
