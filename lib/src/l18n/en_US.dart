@@ -1365,8 +1365,10 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
           '@completed read · @ongoing in progress · @remaining unread',
       'komgaNoMatchingItems': 'No items match the current filters',
       'pdfLibrary': 'PDF library',
-      'pdfLibraryEmpty':
-          'No PDFs were found in the additional gallery scan paths.',
+      'pdfLibraryEmpty': 'No PDF yet. Import one with the plus button, or put PDF files in an extra gallery scan path.',
+      'importPdf': 'Import PDF',
+      'importPdfNone': 'No PDF file was selected',
+      'importPdfFailed': 'Import failed',
       'pdfHasNoPages': 'This PDF has no readable pages',
 
       /// tag dialog actions

@@ -1249,7 +1249,10 @@ class ru_RU {
           'Прочитано: @completed · в процессе: @ongoing · не прочитано: @remaining',
       'komgaNoMatchingItems': 'Нет элементов, соответствующих текущим фильтрам',
       'pdfLibrary': 'Библиотека PDF',
-      'pdfLibraryEmpty': 'PDF не найдены в дополнительных путях сканирования.',
+      'pdfLibraryEmpty': 'PDF пока нет. Импортируйте кнопкой «плюс» или поместите PDF в дополнительный путь сканирования.',
+      'importPdf': 'Импортировать PDF',
+      'importPdfNone': 'PDF-файл не выбран',
+      'importPdfFailed': 'Не удалось импортировать',
       'pdfHasNoPages': 'В этом PDF нет доступных страниц',
 
       /// tag dialog actions

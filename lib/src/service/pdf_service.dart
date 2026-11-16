@@ -23,6 +23,9 @@ PdfService pdfService = PdfService();
 
 class PdfService extends GetxController {
   static const String pageCacheDirectoryName = '.pdf_page_cache';
+
+  /// Where imported PDF files are kept, beside the download directory.
+  static const String importDirectoryName = 'pdf';
   static const double _renderBaseScale = 2.0;
   static const double _renderMinLongSide = 1800;
   static const double _renderMaxLongSide = 2600;
@@ -45,7 +48,7 @@ class PdfService extends GetxController {
     update();
 
     try {
-      for (final String scanRootPath in downloadSetting.extraGalleryScanPath) {
+      for (final String scanRootPath in <String>{importDirectory.path, ...downloadSetting.extraGalleryScanPath}) {
         final Directory scanRoot = Directory(scanRootPath);
         await _scanDirectory(scanRoot, scanRoot);
       }
@@ -79,6 +82,39 @@ class PdfService extends GetxController {
     } finally {
       await document.close();
     }
+  }
+
+  Directory get importDirectory => Directory(join(pathService.getVisibleDir().path, importDirectoryName));
+
+  /// Copies the PDF files at [paths] into [importDirectory] and scans again.
+  /// Returns how many were copied; files that are not PDF are skipped.
+  Future<int> importFiles(List<String> paths) async {
+    final Directory directory = importDirectory;
+    await directory.create(recursive: true);
+    int imported = 0;
+    for (final String path in paths) {
+      final File source = File(path);
+      if (!FileUtil.isPdfExtension(path) || !await source.exists()) {
+        continue;
+      }
+      await source.copy(_freeImportPath(directory, basename(path)));
+      imported++;
+    }
+    if (imported > 0) {
+      await scan();
+    }
+    return imported;
+  }
+
+  /// A path in [directory] for [fileName] that no file has yet.
+  String _freeImportPath(Directory directory, String fileName) {
+    final String stem = basenameWithoutExtension(fileName);
+    final String suffix = extension(fileName);
+    String candidate = join(directory.path, fileName);
+    for (int i = 1; File(candidate).existsSync(); i++) {
+      candidate = join(directory.path, '$stem ($i)$suffix');
+    }
+    return candidate;
   }
 
   Future<void> deleteDocument(PdfDocumentEntry entry) async {

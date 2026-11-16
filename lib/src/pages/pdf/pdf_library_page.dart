@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jhentai/src/model/read_page_info.dart';
 import 'package:jhentai/src/model/content_scheme.dart';
 import 'package:jhentai/src/routes/routes.dart';
+import 'package:jhentai/src/service/log.dart';
 import 'package:jhentai/src/service/pdf_service.dart';
 import 'package:jhentai/src/service/read_progress_service.dart';
 import 'package:jhentai/src/setting/scheme_setting.dart';
@@ -26,6 +28,7 @@ class PdfLibraryPage extends StatefulWidget {
 class _PdfLibraryPageState extends State<PdfLibraryPage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String? _openingPath;
+  bool _importing = false;
 
   @override
   void initState() {
@@ -59,6 +62,11 @@ class _PdfLibraryPageState extends State<PdfLibraryPage> {
         appBar: AppBar(
           title: Text('pdfLibrary'.tr),
           actions: [
+            IconButton(
+              tooltip: 'importPdf'.tr,
+              onPressed: _importing ? null : _importDocuments,
+              icon: const Icon(Icons.add),
+            ),
             IconButton(
               tooltip: 'refresh'.tr,
               onPressed: pdfService.loadingState == LoadingState.loading
@@ -186,6 +194,32 @@ class _PdfLibraryPageState extends State<PdfLibraryPage> {
         ),
       ),
     );
+  }
+
+  /// Picks PDF files and copies them into the library's own directory.
+  Future<void> _importDocuments() async {
+    setState(() => _importing = true);
+    try {
+      final FilePickerResult? picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const <String>['pdf'],
+        allowMultiple: true,
+      );
+      if (picked == null) {
+        return;
+      }
+      final int imported = await pdfService.importFiles(picked.paths.whereType<String>().toList());
+      if (imported == 0) {
+        toast('importPdfNone'.tr);
+      }
+    } catch (e, stack) {
+      log.error('Import PDF failed', e, stack);
+      toast('${'importPdfFailed'.tr}: $e', isShort: false);
+    } finally {
+      if (mounted) {
+        setState(() => _importing = false);
+      }
+    }
   }
 
   Future<void> _openDocument(PdfDocumentEntry entry) async {

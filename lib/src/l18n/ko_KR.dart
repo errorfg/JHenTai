@@ -1198,7 +1198,10 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
       'komgaSeriesProgress': '읽음 @completed · 읽는 중 @ongoing · 읽지 않음 @remaining',
       'komgaNoMatchingItems': '현재 필터와 일치하는 항목이 없습니다',
       'pdfLibrary': 'PDF 라이브러리',
-      'pdfLibraryEmpty': '추가 갤러리 검색 경로에서 PDF를 찾지 못했습니다.',
+      'pdfLibraryEmpty': '아직 PDF가 없습니다. 더하기 버튼으로 가져오거나 추가 갤러리 검색 경로에 PDF를 넣으세요.',
+      'importPdf': 'PDF 가져오기',
+      'importPdfNone': '선택한 PDF 파일이 없습니다',
+      'importPdfFailed': '가져오기 실패',
       'pdfHasNoPages': '이 PDF에는 읽을 페이지가 없습니다',
 
       /// tag dialog actions

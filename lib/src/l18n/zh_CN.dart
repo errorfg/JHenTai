@@ -1300,7 +1300,10 @@ favnote：匹配收藏备注
       'komgaSeriesProgress': '已读 @completed · 阅读中 @ongoing · 未读 @remaining',
       'komgaNoMatchingItems': '没有符合当前筛选条件的内容',
       'pdfLibrary': 'PDF 书库',
-      'pdfLibraryEmpty': '在额外画廊扫描路径中没有找到 PDF。',
+      'pdfLibraryEmpty': '还没有 PDF。点右上角的加号导入，或把 PDF 放进额外画廊扫描路径。',
+      'importPdf': '导入 PDF',
+      'importPdfNone': '没有选中 PDF 文件',
+      'importPdfFailed': '导入失败',
       'pdfHasNoPages': '这个 PDF 没有可阅读的页面',
 
       /// tag dialog actions

@@ -1246,8 +1246,10 @@ Example 2: Block comments with a score not exceeding 10————Comment Score
           '@completed lidos · @ongoing em andamento · @remaining não lidos',
       'komgaNoMatchingItems': 'Nenhum item corresponde aos filtros atuais',
       'pdfLibrary': 'Biblioteca de PDF',
-      'pdfLibraryEmpty':
-          'Nenhum PDF foi encontrado nos caminhos adicionais de galerias.',
+      'pdfLibraryEmpty': 'Ainda não há PDF. Importe com o botão de adição ou coloque arquivos PDF em um caminho extra de varredura.',
+      'importPdf': 'Importar PDF',
+      'importPdfNone': 'Nenhum arquivo PDF selecionado',
+      'importPdfFailed': 'Falha na importação',
       'pdfHasNoPages': 'Este PDF não tem páginas legíveis',
 
       /// tag dialog actions

@@ -1170,7 +1170,10 @@ favnote：配對收藏備註
       'komgaSeriesProgress': '已讀 @completed · 閱讀中 @ongoing · 未讀 @remaining',
       'komgaNoMatchingItems': '沒有符合目前篩選條件的內容',
       'pdfLibrary': 'PDF 書庫',
-      'pdfLibraryEmpty': '在額外畫廊掃描路徑中找不到 PDF。',
+      'pdfLibraryEmpty': '還沒有 PDF。點右上角的加號匯入，或把 PDF 放進額外畫廊掃描路徑。',
+      'importPdf': '匯入 PDF',
+      'importPdfNone': '沒有選取 PDF 檔案',
+      'importPdfFailed': '匯入失敗',
       'pdfHasNoPages': '這個 PDF 沒有可閱讀的頁面',
 
       /// tag dialog actions
