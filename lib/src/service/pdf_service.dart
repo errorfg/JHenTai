@@ -18,10 +18,21 @@ import 'package:path/path.dart';
 /// custom photo_view dependency, while its renderer is safe to reuse.
 import 'package:pdfx/src/renderer/interfaces/document.dart' as pdf;
 import 'package:pdfx/src/renderer/interfaces/page.dart' as pdf;
+import 'package:pdfx/src/renderer/interfaces/platform.dart' as pdf;
+import 'package:pdfx/src/renderer/io/platform_method_channel.dart' as pdf;
 
 PdfService pdfService = PdfService();
 
 class PdfService extends GetxController {
+  PdfService() {
+    // pdfx picks its Pigeon implementation on OpenHarmony (it takes every
+    // unknown system for Android); the OpenHarmony host implements the
+    // method-channel protocol instead.
+    if (Platform.operatingSystem == 'ohos') {
+      pdf.PdfxPlatform.instance = pdf.PdfxPlatformMethodChannel();
+    }
+  }
+
   static const String pageCacheDirectoryName = '.pdf_page_cache';
 
   /// Where imported PDF files are kept, beside the download directory.

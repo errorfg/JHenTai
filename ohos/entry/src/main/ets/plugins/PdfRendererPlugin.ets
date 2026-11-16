@@ -1,7 +1,7 @@
 // PDF rendering: implements the method-channel protocol of the pdfx package
-// (channel io.scer.pdf_renderer, the one pdfx uses on platforms other than
-// Android, iOS and macOS) with the system's PDF Kit. pdfx has no OpenHarmony
-// implementation.
+// (channel io.scer.pdf_renderer) with the system's PDF Kit. pdfx has no
+// OpenHarmony implementation; the app selects pdfx's method-channel
+// implementation on OpenHarmony (PdfService).
 import {
   AbilityAware,
   AbilityPluginBinding,
@@ -182,9 +182,20 @@ export default class PdfRendererPlugin implements FlutterPlugin, MethodCallHandl
     const mime = format === 0 ? 'image/jpeg' : (format === 2 ? 'image/webp' : 'image/png');
     const packer = image.createImagePacker();
     packer.packToData(pixelMap, { format: mime, quality: quality }).then((data: ArrayBuffer) => {
+      // pdfx takes OpenHarmony for Android (universal_platform's fallback),
+      // where the image comes back as a temporary file that pdfx reads and
+      // deletes; the bytes are returned as well, for the other branch.
+      const path = `${this.context?.cacheDir}/pdf_page_${Date.now()}_${this.nextId++}`;
+      const file = fs.openSync(path, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
+      try {
+        fs.writeSync(file.fd, data);
+      } finally {
+        fs.closeSync(file);
+      }
       const reply = new Map<string, Object>();
       reply.set('width', width);
       reply.set('height', height);
+      reply.set('path', path);
       reply.set('data', new Uint8Array(data));
       result.success(reply);
     }).catch((e: Error) => {
