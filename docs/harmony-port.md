@@ -46,6 +46,17 @@
 - 不改的话，网络请求模块的初始化会在这一步抛出异常，后面的 Cookie、缓存等初始化都不会执行。
 - 设置里手动填写的代理不受影响。
 
+### 2.7 读剪贴板
+
+- 应用回到前台时读剪贴板、识别画廊链接。Flutter OpenHarmony 的嵌入层读剪贴板前向用户申请 `ohos.permission.READ_PASTEBOARD`，所以 `module.json5` 要声明它。
+- 这是受限权限：签名用的描述文件必须带对应的 ACL，否则安装时报 `grant request permissions failed. PermissionName: ohos.permission.READ_PASTEBOARD`（错误码 9568289）。本机用的调试描述文件在声明权限后重新申请，得到了 `allowed-acls: [ohos.permission.READ_PASTEBOARD]`。上架分发要另行向应用市场申请，这里没有涉及。
+- 仓库所有者在真机上确认识别与跳转正常（2026-11-16）。
+
+### 2.8 Tachiyomi 扩展
+
+- 扩展宿主是 JVM 程序（`ext_host/`）。鸿蒙上的做法与 iOS 相同：在应用进程内运行 Zero 解释器版的 OpenJDK。手机上没有依据可以启动子进程；带即时编译的虚拟机需要受限权限。
+- 进行中，尚不可用。虚拟机的交叉编译在本机构建区的 `jdk-build/`。
+
 ## 3. 构建
 
 构建脚本和下面这些补丁不在仓库里：
@@ -72,6 +83,9 @@
 - 只有安卓有意义的：android_intent_plus、flutter_displaymode、flutter_windowmanager_plus。
 
 ## 5. 待办
+
+- PDF 书库页已能打开（顺带修了一个各平台共有的缺陷：`PdfService.refresh()` 覆盖了 `GetxController.refresh()`，每次 `update()` 都变成又一次扫描，界面一直转圈）。打开 PDF 文件用的 `pdfx` 没有鸿蒙实现，未验证。
+- 2026-11-16 曾见到一次界面全黑（切换来源后点底栏「设置」），未复现，原因不明。
 
 - 真机：2026-11-16 在 Mate XTs 上启动成功，主页的排行榜、热门、最新能加载出图片（手机布局）。其余功能未验证。
 - 逐个核对 `isAndroid` 的分支：返回键拦截（`will_pop_interceptor.dart`）、存储权限（`permission_util.dart`）、下载路径（`path_service.dart`）、音量键翻页、后台模糊与恢复时验证。
