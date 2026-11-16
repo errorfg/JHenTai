@@ -24,6 +24,7 @@ import 'package:jhentai/src/setting/eh2telegraph_setting.dart';
 import 'package:jhentai/src/setting/jm_account_setting.dart';
 import 'package:jhentai/src/setting/komga_setting.dart';
 import 'package:jhentai/src/setting/nhentai_api_setting.dart';
+import 'package:jhentai/src/setting/super_resolution_setting.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
 import 'dart:async';
@@ -170,6 +171,13 @@ List<RecordAdapter> defaultRecordAdapters() => [
         type: CloudConfigTypeEnum.jmAccount,
         configKey: ConfigEnum.jmAccountSetting,
         refresh: () => jmAccountSetting.refreshBean(),
+      ),
+      SingleConfigRecords(
+        kind: 'superResolutionSetting',
+        type: CloudConfigTypeEnum.superResolutionSetting,
+        configKey: ConfigEnum.superResolutionSetting,
+        refresh: () => superResolutionSetting.refreshBean(),
+        keepLocal: (value) => superResolutionSetting.withDeviceFields(value),
       ),
       EhAccountRecords(),
       TachiRepositoryRecords(),

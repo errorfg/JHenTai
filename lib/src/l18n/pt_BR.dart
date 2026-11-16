@@ -522,6 +522,7 @@ class pt_BR {
       'clearPageCache': 'Limpar cache de página',
       'clearSuccess': 'Limpado com Sucesso',
       'superResolution': 'Image Super Resolution',
+      'superResolutionSetting': 'Image super resolution',
       'stopSuperResolution': 'Stop Super Resolution',
       'deleteSuperResolvedImage': 'Delete Super Resolved Image',
       'superResolveOriginalImageHint':

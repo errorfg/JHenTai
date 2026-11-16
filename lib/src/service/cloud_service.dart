@@ -17,6 +17,7 @@ import 'package:jhentai/src/service/search_history_service.dart';
 import 'package:jhentai/src/setting/komga_setting.dart';
 import 'package:jhentai/src/setting/nhentai_api_setting.dart';
 import 'package:jhentai/src/setting/eh2telegraph_setting.dart';
+import 'package:jhentai/src/setting/super_resolution_setting.dart';
 import 'package:jhentai/src/setting/sync_setting.dart';
 import 'package:jhentai/src/utils/sync_time_util.dart';
 
@@ -56,6 +57,7 @@ class CloudConfigService
     CloudConfigTypeEnum.tachiSourceSettings: '1.0.0',
     CloudConfigTypeEnum.tachiFavorite: '1.0.0',
     CloudConfigTypeEnum.watchedProgress: '1.0.0',
+    CloudConfigTypeEnum.superResolutionSetting: '1.0.0',
   };
 
   static const int localConfigId = -1;
@@ -236,6 +238,18 @@ class CloudConfigService
         ]);
         await eh2telegraphSetting.refreshBean();
         log.info('  ✅ eh2telegraph setting imported and refreshed');
+        break;
+      case CloudConfigTypeEnum.superResolutionSetting:
+        await localConfigService.batchWrite([
+          LocalConfigCompanion(
+            configKey: Value(ConfigEnum.superResolutionSetting.key),
+            subConfigKey: const Value(LocalConfigService.defaultSubConfigKey),
+            value: Value(superResolutionSetting.withDeviceFields(config.config)),
+            utime: Value(SyncTimeUtil.format(config.ctime)),
+          ),
+        ]);
+        await superResolutionSetting.refreshBean();
+        log.info('  ✅ Super resolution setting imported and refreshed');
         break;
       case CloudConfigTypeEnum.jmAccount:
         await localConfigService.batchWrite([
@@ -470,6 +484,16 @@ class CloudConfigService
       case CloudConfigTypeEnum.eh2telegraphSetting:
         List<LocalConfig> records = await localConfigService.readWithAllSubKeys(
           configKey: ConfigEnum.eh2telegraphSetting,
+        );
+        if (records.isEmpty) {
+          return null;
+        }
+        configValue = records.first.value;
+        localConfigTime = SyncTimeUtil.tryParse(records.first.utime);
+        break;
+      case CloudConfigTypeEnum.superResolutionSetting:
+        List<LocalConfig> records = await localConfigService.readWithAllSubKeys(
+          configKey: ConfigEnum.superResolutionSetting,
         );
         if (records.isEmpty) {
           return null;

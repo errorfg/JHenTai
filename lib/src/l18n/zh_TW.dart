@@ -491,6 +491,7 @@ class zh_TW {
       'clearPageCache': '清除頁面快取',
       'clearSuccess': '清除成功',
       'superResolution': '圖片超解析度',
+      'superResolutionSetting': '圖片超解析度',
       'stopSuperResolution': '停止圖片超解析度',
       'deleteSuperResolvedImage': '刪除圖片超解析度後的圖片',
       'superResolveOriginalImageHint': '處理原圖會耗費更多的時間、空間和性能，確定繼續？',

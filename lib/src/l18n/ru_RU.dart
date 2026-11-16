@@ -519,6 +519,7 @@ class ru_RU {
       'clearPageCache': 'Очистить кэш страниц',
       'clearSuccess': 'Успешно очищено',
       'superResolution': 'Супер-разрешение изображений',
+      'superResolutionSetting': 'Супер-разрешение изображений',
       'stopSuperResolution': 'Остановить супер-разрешение',
       'deleteSuperResolvedImage': 'Удалить обработанное изображение',
       'superResolveOriginalImageHint':

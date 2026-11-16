@@ -496,6 +496,7 @@ class ko_KR {
       'clearPageCache': '페이지 캐시 삭제',
       'clearSuccess': '삭제 완료',
       'superResolution': '초고해상도 이미지 생성',
+      'superResolutionSetting': '이미지 초해상도',
       'stopSuperResolution': '초고해상도 이미지 생성 취소',
       'deleteSuperResolvedImage': '초고해상도 이미지 삭제',
       'superResolveOriginalImageHint':

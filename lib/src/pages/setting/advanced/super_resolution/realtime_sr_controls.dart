@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:jhentai/src/enum/config_type_enum.dart';
 import 'package:jhentai/src/service/sr/realtime_sr_service.dart';
 import 'package:jhentai/src/service/sr/sr_server_client.dart';
 import 'package:jhentai/src/service/sr/sr_tools.dart';
+import 'package:jhentai/src/service/sync_service.dart';
 import 'package:jhentai/src/setting/super_resolution_setting.dart';
+import 'package:jhentai/src/setting/sync_setting.dart';
 import 'package:jhentai/src/utils/toast_util.dart';
 
 /// Title of a group of settings, with what the group is for; [experimental]
@@ -141,6 +146,9 @@ Future<void> _editServerUrl() async {
     );
     if (value != null) {
       await superResolutionSetting.saveRealtimeServerUrl(value);
+      if (syncSetting.enableSync.value && syncSetting.autoSync.value) {
+        unawaited(syncService.syncAfterLocalChange(types: const [CloudConfigTypeEnum.superResolutionSetting]));
+      }
     }
   } finally {
     controller.dispose();

@@ -222,6 +222,8 @@ class SyncMerger with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
         return _mergeLatestConfig(local, remote);
       case CloudConfigTypeEnum.ehAccount:
         return _mergeLatestConfig(local, remote);
+      case CloudConfigTypeEnum.superResolutionSetting:
+        return _mergeLatestConfig(local, remote);
       case CloudConfigTypeEnum.watchedProgress:
         // Never in latest.json. Importing the remote rows keeps the newer
         // row of each.

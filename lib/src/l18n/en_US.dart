@@ -522,6 +522,7 @@ class en_US {
       'clearPageCache': 'Clear Page Cache',
       'clearSuccess': 'Clear Success',
       'superResolution': 'Image Super Resolution',
+      'superResolutionSetting': 'Image super resolution',
       'stopSuperResolution': 'Stop Super Resolution',
       'deleteSuperResolvedImage': 'Delete Super Resolved Image',
       'superResolveOriginalImageHint':

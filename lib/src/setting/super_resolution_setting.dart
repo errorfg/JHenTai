@@ -37,6 +37,24 @@ class SuperResolutionSetting with JHLifeCircleBeanWithConfigStorage implements J
   @override
   ConfigEnum get configEnum => ConfigEnum.superResolutionSetting;
 
+  /// What depends on the programs and the GPU of one computer: settings
+  /// taken from another device do not change these.
+  static const List<String> deviceFields = ['modelDirectoryPath', 'model', 'gpuId', 'realtimeBatchSize', 'realtimeOnServer'];
+
+  /// This device's setting with what [configString] of another device gives
+  /// for the rest: [deviceFields] stay, and so does a field it lacks (written
+  /// by an earlier version, or by hand).
+  String withDeviceFields(String configString) {
+    Map map = jsonDecode(configString);
+    Map own = jsonDecode(toConfigString());
+    for (MapEntry entry in map.entries) {
+      if (own.containsKey(entry.key) && !deviceFields.contains(entry.key)) {
+        own[entry.key] = entry.value;
+      }
+    }
+    return jsonEncode(own);
+  }
+
   @override
   void applyBeanConfig(String configString) {
     Map map = jsonDecode(configString);

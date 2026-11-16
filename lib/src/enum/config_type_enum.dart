@@ -19,7 +19,11 @@ enum CloudConfigTypeEnum {
 
   /// Records only (the sync server, and buckets from the version after
   /// 8.1.1 on); the layout of earlier versions never held it.
-  watchedProgress(18, 'watchedProgress');
+  watchedProgress(18, 'watchedProgress'),
+
+  /// Upscaling while reading: the service address and the model options.
+  /// What belongs to one computer (its programs and GPU) stays there.
+  superResolutionSetting(19, 'superResolutionSetting');
 
   final int code;
 
@@ -75,6 +79,8 @@ enum CloudConfigTypeEnum {
         return CloudConfigTypeEnum.tachiFavorite;
       case 18:
         return CloudConfigTypeEnum.watchedProgress;
+      case 19:
+        return CloudConfigTypeEnum.superResolutionSetting;
       default:
         throw Exception('Unknown CloudConfigTypeEnum code: $code');
     }
