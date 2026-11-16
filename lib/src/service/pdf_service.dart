@@ -31,8 +31,10 @@ class PdfService extends GetxController {
   final Set<String> _scannedDocumentPaths = {};
   LoadingState loadingState = LoadingState.idle;
 
-  @override
-  Future<void> refresh() async {
+  /// Scans the scan paths for PDF files. Not named `refresh`: that is the
+  /// method of [GetxController] that `update()` calls to notify listeners,
+  /// and overriding it turned every `update()` into another scan.
+  Future<void> scan() async {
     if (loadingState == LoadingState.loading) {
       return;
     }

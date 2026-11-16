@@ -34,7 +34,7 @@ class _PdfLibraryPageState extends State<PdfLibraryPage> {
     if (!Get.isRegistered<PdfService>()) {
       Get.put<PdfService>(pdfService, permanent: true);
     }
-    pdfService.refresh();
+    pdfService.scan();
   }
 
   @override
@@ -63,7 +63,7 @@ class _PdfLibraryPageState extends State<PdfLibraryPage> {
               tooltip: 'refresh'.tr,
               onPressed: pdfService.loadingState == LoadingState.loading
                   ? null
-                  : pdfService.refresh,
+                  : pdfService.scan,
               icon: const Icon(Icons.refresh),
             ),
           ],
@@ -84,7 +84,7 @@ class _PdfLibraryPageState extends State<PdfLibraryPage> {
     if (pdfService.loadingState == LoadingState.error) {
       return Center(
         child: FilledButton.icon(
-          onPressed: pdfService.refresh,
+          onPressed: pdfService.scan,
           icon: const Icon(Icons.refresh),
           label: Text('retry'.tr),
         ),
@@ -111,7 +111,7 @@ class _PdfLibraryPageState extends State<PdfLibraryPage> {
     }
 
     return RefreshIndicator(
-      onRefresh: pdfService.refresh,
+      onRefresh: pdfService.scan,
       child: GridView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(12),
