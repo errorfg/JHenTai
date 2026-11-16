@@ -35,6 +35,8 @@ void snack(
       showCloseIcon: onPressed == null,
       action: onPressed == null ? null : SnackBarAction(label: '->', onPressed: onPressed),
       duration: Duration(milliseconds: isShort ? 3000 : 5000),
+      // A snack bar with an action stays until dismissed by default (Flutter 3.38+).
+      persist: false,
       behavior: styleSetting.isInMobileLayout ? null : SnackBarBehavior.floating,
       width: styleSetting.isInMobileLayout ? null : max(fullScreenWidth / 2, UIConfig.snackWidth),
     ),
