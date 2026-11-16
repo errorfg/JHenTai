@@ -51,7 +51,9 @@ class _HomePageState extends State<HomePage> with LoginRequiredMixin, WindowList
   static bool _ownPageReopened = false;
 
   StreamSubscription? _intentDataStreamSubscription;
-  String? _lastDetectedText;
+  /// Static: switching back from Komga or PDF builds a new home, which must
+  /// not show again the link it has already offered.
+  static String? _lastDetectedText;
 
   late final AppLifecycleListener _listener;
 
