@@ -62,11 +62,11 @@
 - 运行时镜像（约 12.3 MB）和宿主 jar（约 9.1 MB）放在 `resources/resfile/exthost/`，系统在安装时解包到磁盘，路径取自 `context.resourceDir`。
 - 启动防护与 iOS 相同（启动前写标记文件，启动返回后删除）。另外，标记存在而上次停留在 Tachiyomi 时，应用打开后回到 E-Hentai。
 - 网络走 JDK 自带的 TLS（iOS 为了速度改用了系统的网络接口，鸿蒙没有做）。
-- 扩展用的不显示网页视图：`TachiBrowserPlugin.ets`，协议与 iOS 的 `TachiBrowser.swift` 相同（通道 `com.gallery.reader/exthost/browser`），用系统的 ArkWeb。每个视图是一个只构建、不上屏的 `Web` 组件（`BuilderNode`），创建后调用 `onActive()`。与 iOS 的差别：
+- 扩展用的不显示网页视图：`TachiBrowserPlugin.ets`，协议与 iOS 的 `TachiBrowser.swift` 相同（通道 `com.gallery.reader/exthost/browser`），用系统的 ArkWeb。每个视图是窗口里的一个 `Web` 组件，垫在应用画面下面（`TachiWebHost.ets` 提供承载节点，`pages/Index.ets` 把它放在 Flutter 视图之下），不接收触摸；做法与 iOS 把 `WKWebView` 插在窗口最底层相同。最初做成了只构建、不上屏的组件，仓库所有者指出这类页面要应付对真实浏览器的检测，必须在界面树里渲染，于是改成现在这样。被应用画面完全盖住时内核是否照常运行页面脚本，尚未在真机验证。与 iOS 的差别：
   - 页面的全部请求由引擎的 `onInterceptRequest` 上报（与安卓的 `shouldInterceptRequest` 范围相同），控制台输出由 `onConsole` 上报，所以注入的脚本只负责定义宿主的 JavaScript 接口。
   - 引擎要求导航决定当场返回，而宿主的决定要经过一次往返才到。做法是上报后先放行，宿主拒绝时停止加载。
   - 引擎的 Cookie 接口只给名字和值，交回宿主的 Cookie 都按该站点的会话 Cookie 处理（没有域、有效期、HttpOnly 等属性）。
-  - 「在网页中打开」页面（`webview_flutter` 的鸿蒙实现）与这些视图共用引擎的 Cookie。
+  - 需要用户动手的步骤（登录、点选或拖动滑块的人机验证）不在这些视图里做，而是在看得见的「在网页中打开」页面（`TachiWebViewPage`，`webview_flutter` 的鸿蒙实现）里完成；它与这些视图共用引擎的 Cookie，关闭时把站点的 Cookie 交给宿主。这个页面原先在鸿蒙上不显示入口，现已启用。
   - 2026-11-16 编译通过，尚未在真机验证。
 - 仓库所有者在真机上确认能安装插件并正常使用（2026-11-16，当时还没有网页视图）。整个包因此从 43.8 MB 增加到 75.7 MB。
 - 命令行（`hdc shell`）不能执行未签名的可执行文件（`Permission denied`，退出码 126），所以虚拟机只能在已签名的应用里验证。

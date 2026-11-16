@@ -3,10 +3,12 @@
 // ext_host/flutter/ios/Classes/TachiBrowser.swift, with the same channel
 // protocol (com.gallery.reader/exthost/browser). The host's commands arrive
 // through Dart (lib/src/network/tachi/tachi_browser.dart) as "command"; what
-// the pages do goes back as "events". The pages are Web components that are
-// built but never put on screen. They keep their cookies in the engine's
-// store, as the app's own web pages do, so a login made in the app's page
-// holds for them too.
+// the pages do goes back as "events". The pages are Web components in the
+// app's window, under its own content (TachiWebHost.ets), as the WKWebViews
+// are on iOS: they run as the visible pages of a browser do, which sites
+// that check for a real browser need. They keep their cookies in the
+// engine's store, as the app's own web pages do, so a login made in the
+// app's page holds for them too.
 import {
   AbilityAware,
   AbilityPluginBinding,
@@ -17,9 +19,9 @@ import {
   MethodChannel,
   MethodResult
 } from '@ohos/flutter_ohos';
-import { common } from '@kit.AbilityKit';
-import { BuilderNode, UIContext, window } from '@kit.ArkUI';
+import { BuilderNode, FrameNode, UIContext } from '@kit.ArkUI';
 import { webview } from '@kit.ArkWeb';
+import { tachiWebHost } from './TachiWebHost';
 
 const TAG = 'TachiBrowserPlugin';
 const CHANNEL = 'com.gallery.reader/exthost/browser';
@@ -159,8 +161,8 @@ class TachiWebParams {
 @Builder
 function buildTachiWeb(params: TachiWebParams) {
   Web({ src: 'about:blank', controller: params.controller })
-    .width(400)
-    .height(800)
+    .width('100%')
+    .height('100%')
     .javaScriptAccess(params.javaScript)
     .domStorageAccess(true)
     .javaScriptProxy({
@@ -183,6 +185,7 @@ function buildTachiWeb(params: TachiWebParams) {
 class TachiBrowserPage {
   readonly id: number;
   private plugin: TachiBrowserPlugin;
+  private host: FrameNode;
   private controller: webview.WebviewController = new webview.WebviewController();
   private node: BuilderNode<[TachiWebParams]>;
   private params: TachiWebParams;
@@ -198,13 +201,19 @@ class TachiBrowserPage {
   private programmatic = false;
   private closed = false;
 
-  constructor(id: number, plugin: TachiBrowserPlugin, uiContext: UIContext) {
+  constructor(id: number, plugin: TachiBrowserPlugin, host: FrameNode, uiContext: UIContext) {
     this.id = id;
     this.plugin = plugin;
+    this.host = host;
     this.params = new TachiWebParams(this, this.controller, new TachiBridge(this));
     this.params.scripts = [this.bootstrap()];
-    this.node = new BuilderNode<[TachiWebParams]>(uiContext, { selfIdealSize: { width: 400, height: 800 } });
+    this.node = new BuilderNode<[TachiWebParams]>(uiContext);
     this.node.build(wrapBuilder<[TachiWebParams]>(buildTachiWeb), this.params);
+    // into the window, under the app's content
+    const frame = this.node.getFrameNode();
+    if (frame != null) {
+      host.appendChild(frame);
+    }
   }
 
   /// Runs [action] once the controller is bound to its Web component.
@@ -221,7 +230,7 @@ class TachiBrowserPage {
       return;
     }
     this.attached = true;
-    // a Web component that is not on screen is otherwise left inactive
+    // covered by the app's content, the page is still to run as a shown one
     this.controller.onActive();
     const waiting = this.waiting;
     this.waiting = [];
@@ -344,6 +353,10 @@ class TachiBrowserPage {
       } catch (e) {
         // the component may already be gone
       }
+    }
+    const frame = this.node.getFrameNode();
+    if (frame != null) {
+      this.host.removeChild(frame);
     }
     this.node.dispose();
   }
@@ -551,8 +564,6 @@ class TachiBrowserPage {
 
 export default class TachiBrowserPlugin implements FlutterPlugin, MethodCallHandler, AbilityAware {
   private channel: MethodChannel | null = null;
-  private context: common.UIAbilityContext | null = null;
-  private uiContext: UIContext | null = null;
   private pages = new Map<number, TachiBrowserPage>();
   // commands are applied in order, also while the first one waits for the window
   private queue: Promise<void> = Promise.resolve();
@@ -574,12 +585,9 @@ export default class TachiBrowserPlugin implements FlutterPlugin, MethodCallHand
   }
 
   onAttachedToAbility(binding: AbilityPluginBinding): void {
-    this.context = binding.getAbility().context;
   }
 
   onDetachedFromAbility(): void {
-    this.context = null;
-    this.uiContext = null;
   }
 
   onMethodCall(call: MethodCall, result: MethodResult): void {
@@ -615,19 +623,6 @@ export default class TachiBrowserPlugin implements FlutterPlugin, MethodCallHand
     this.channel?.invokeMethod('events', events);
   }
 
-  private async uiContextOrThrow(): Promise<UIContext> {
-    if (this.uiContext != null) {
-      return this.uiContext;
-    }
-    const context = this.context;
-    if (context == null) {
-      throw new Error('no ability');
-    }
-    const last = await window.getLastWindow(context);
-    this.uiContext = last.getUIContext();
-    return this.uiContext;
-  }
-
   private async apply(command: Map<string, Object>): Promise<void> {
     const op = command.get('op') as string | undefined;
     const view = command.get('view') as number | undefined;
@@ -642,7 +637,12 @@ export default class TachiBrowserPlugin implements FlutterPlugin, MethodCallHand
     let page = this.pages.get(view);
     if (page === undefined) {
       ensureEngine();
-      page = new TachiBrowserPage(view, this, await this.uiContextOrThrow());
+      const host = await tachiWebHost.ready();
+      const uiContext = tachiWebHost.uiContext();
+      if (uiContext == null) {
+        throw new Error('the page has no UI context');
+      }
+      page = new TachiBrowserPage(view, this, host, uiContext);
       this.pages.set(view, page);
     }
     page.configure(command);
