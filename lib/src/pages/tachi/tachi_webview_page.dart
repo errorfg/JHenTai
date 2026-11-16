@@ -21,7 +21,7 @@ class TachiWebViewPage extends StatefulWidget {
   const TachiWebViewPage({super.key});
 
   /// Where webview_flutter has a web view; Windows and Linux have none.
-  static bool get supported => Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
+  static bool get supported => Platform.isAndroid || Platform.isIOS || Platform.isMacOS || Platform.operatingSystem == 'ohos';
 
   @override
   State<TachiWebViewPage> createState() => _TachiWebViewPageState();

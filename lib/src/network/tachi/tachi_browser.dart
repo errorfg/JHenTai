@@ -9,16 +9,17 @@ import 'tachi_host.dart';
 
 TachiBrowser tachiBrowser = TachiBrowser();
 
-/// Lends the extension host this platform's WKWebView (iOS and macOS) for the
-/// WebView extensions use: carries the host's commands (`/browser/poll`) to
-/// the plugin's TachiBrowser.swift and what the pages do back
+/// Lends the extension host this platform's web engine (WKWebView on iOS and
+/// macOS, ArkWeb on OpenHarmony) for the WebView extensions use: carries the
+/// host's commands (`/browser/poll`) to the plugin (TachiBrowser.swift,
+/// TachiBrowserPlugin.ets) and what the pages do back
 /// (`/browser/events`); see the host's BrowserRelay.kt. Also moves cookies
 /// between the host and the app's own web page.
 class TachiBrowser {
   static const MethodChannel _channel = MethodChannel('com.gallery.reader/exthost/browser');
 
   /// Where the plugin has a browser engine to lend.
-  static bool get supported => Platform.isIOS || Platform.isMacOS;
+  static bool get supported => Platform.isIOS || Platform.isMacOS || Platform.operatingSystem == 'ohos';
 
   bool _relaying = false;
   final List<Object?> _events = <Object?>[];
