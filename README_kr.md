@@ -1,4 +1,4 @@
-![platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Windows%20%7C%20MacOS%20%7C%20Linux-brightgreen)
+![platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20HarmonyOS%20%7C%20Windows%20%7C%20MacOS%20%7C%20Linux-brightgreen)
 ![last-commit](https://img.shields.io/github/last-commit/errorfg/JHenTai)
 [![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/total)](https://github.com/errorfg/JHenTai/releases)
 [![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/latest/total)](https://github.com/errorfg/JHenTai/releases)
@@ -9,7 +9,7 @@
 
 [English](./README.md) | [简体中文](./README_cn.md) | 한국어
 
-[JHenTai](https://github.com/jiangtian616/JHenTai)를 바탕으로 한 다중 소스 만화 뷰어로, Android, iOS, Windows, macOS, Linux를 지원합니다. E-Hentai를 중심으로 nhentai, wnacg, JM, Tachiyomi/Mihon 확장, Komga 서버와 로컬 도서를 같은 뷰어, 다운로드, 즐겨찾기, 기록, 클라우드 동기화로 읽습니다.
+[JHenTai](https://github.com/jiangtian616/JHenTai)를 바탕으로 한 다중 소스 만화 뷰어로, Android, iOS, HarmonyOS NEXT, Windows, macOS, Linux를 지원합니다. E-Hentai를 중심으로 nhentai, wnacg, JM, Tachiyomi/Mihon 확장, Komga 서버와 로컬 도서를 같은 뷰어, 다운로드, 즐겨찾기, 기록, 클라우드 동기화로 읽습니다.
 
 E-Hentai 관련 질문은 업스트림의 [Q&A](https://github.com/jiangtian616/JHenTai/wiki/Common-Questions)를 참고하세요.
 
@@ -25,7 +25,7 @@ E-Hentai 관련 질문은 업스트림의 [Q&A](https://github.com/jiangtian616/
 | nhentai | nhentai.net과 설정 가능한 미러 도메인에서 검색, 상세, 온라인 보기, 다운로드, 로컬 즐겨찾기. nhentai.net 계정 설정에서 만든 API 키로 로그인하면(공식 API v2) 더 자세한 메타데이터, 댓글, 관련 갤러리, 태그 제안, 클라우드 즐겨찾기, 태그 차단 목록, ZIP/CBZ와 토렌트 다운로드. |
 | wnacg | 검색, 둘러보기, 상세, 온라인 보기, 다운로드, 로컬 즐겨찾기. 도메인 설정과 링크 이동 지원. |
 | JM (18comic) | 홈 추천, 카테고리별 둘러보기(한국 웹툰 포함), 일·주·월·전체 랭킹, 주간 추천, 검색, 작품 번호 이동, 챕터 목록이 있는 상세, 읽기 전용 댓글과 관련 작품, 이미지 복원 온라인 보기, 뷰어에서 이전·다음 챕터, 다운로드(챕터 하나 또는 전체), 로컬 즐겨찾기, 계정 로그인, API·이미지 회선 선택. |
-| Tachiyomi / Mihon 확장 | 앱 안에서 확장을 실행: 확장 저장소를 추가해 확장을 설치(APK 파일 설치도 가능), 소스별 인기·최신 목록, 소스의 필터로 검색하거나 모든 소스에서 검색, 즐겨찾기의 새 챕터 확인, 웹 페이지 로그인, Tachiyomi/Mihon 백업(`.tachibk`) 가져오기. Android는 시스템이 확장을 직접 불러오고, iOS는 앱 안에서 Java 환경을 실행하며, 데스크톱은 런타임을 함께 제공합니다(macOS는 Apple 실리콘만, Windows·Linux에서는 아직 확장이 웹 페이지를 쓸 수 없음). |
+| Tachiyomi / Mihon 확장 | 앱 안에서 확장을 실행: 확장 저장소를 추가해 확장을 설치(APK 파일 설치도 가능), 소스별 인기·최신 목록, 소스의 필터로 검색하거나 모든 소스에서 검색, 즐겨찾기의 새 챕터 확인, 웹 페이지 로그인, Tachiyomi/Mihon 백업(`.tachibk`) 가져오기. Android는 시스템이 확장을 직접 불러오고, iOS와 HarmonyOS는 앱 안에서 Java 환경을 실행하며, 데스크톱은 런타임을 함께 제공합니다(macOS는 Apple 실리콘만, Windows·Linux에서는 아직 확장이 웹 페이지를 쓸 수 없음). |
 | Komga | 라이브러리·시리즈·책의 서버 측 페이지 나눔, 정렬, 필터, 전문 검색, 홈, 오프라인 다운로드, 읽기 진행 상황 양방향 동기화. |
 | 로컬 | 다운로드한 갤러리와 아카이브(아카이브 미리보기), 로컬 이미지 폴더, PDF 서재. |
 
@@ -72,6 +72,8 @@ Windows 설치: download Windows_xxx.zip 파일을 다운로드하고 압축 해
 사용하는데 앱 실행이 되지 않는다면 호환성 모드를 켠 상태에서 실행해 보세요. Windows Defender에 차단된 경우라면 허용으로 바꿔주세요.
 
 MacOS 설치(지원 중지): .dmg 파일을 다운로드합니다. 만약 프록시 서버를 이용한다면 네트워크 설정에서 프록시 주소를 설정해 주세요.
+
+HarmonyOS 설치: 릴리스에는 HarmonyOS 패키지가 없습니다. Flutter OpenHarmony로 직접 HAP를 빌드하고, 자신의 디버그 인증서와 프로필로 서명한 뒤 `hdc`로 설치하세요. 절차와 필요한 패치는 [docs/harmony-port.md](docs/harmony-port.md)(중국어) 3절에 있으며, 빌드 스크립트는 아직 저장소에 없습니다.
 
 Linux 설치(지원 중지): 플랫폼에 맞는 Linux-x64.deb 또는 Linux-arm64.deb 파일을 다운로드해 설치하세요. 만약 프록시 서버를 이용한다면 네트워크 설정에서 프록시 주소를 설정해 주세요.
 

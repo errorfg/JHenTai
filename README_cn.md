@@ -1,4 +1,4 @@
-![platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Windows%20%7C%20MacOS%20%7C%20Linux-brightgreen)
+![platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20HarmonyOS%20%7C%20Windows%20%7C%20MacOS%20%7C%20Linux-brightgreen)
 ![last-commit](https://img.shields.io/github/last-commit/errorfg/JHenTai)
 [![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/total)](https://github.com/errorfg/JHenTai/releases)
 [![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/latest/total)](https://github.com/errorfg/JHenTai/releases)
@@ -9,7 +9,7 @@
 
 [English](./README.md) | 简体中文 | [한국어](./README_kr.md)
 
-基于 [JHenTai](https://github.com/jiangtian616/JHenTai) 的多来源漫画阅读器，支持 Android、iOS、Windows、macOS 和 Linux。以 E-Hentai 为中心，nhentai、wnacg、JM、Tachiyomi/Mihon 扩展、Komga 服务器和本地书籍都使用同一套阅读器、下载、收藏、历史与云同步。
+基于 [JHenTai](https://github.com/jiangtian616/JHenTai) 的多来源漫画阅读器，支持 Android、iOS、鸿蒙（HarmonyOS NEXT）、Windows、macOS 和 Linux。以 E-Hentai 为中心，nhentai、wnacg、JM、Tachiyomi/Mihon 扩展、Komga 服务器和本地书籍都使用同一套阅读器、下载、收藏、历史与云同步。
 
 E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jiangtian616/JHenTai/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98)。
 
@@ -25,7 +25,7 @@ E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jian
 | nhentai | 搜索、详情、在线阅读、下载和本地收藏，支持 nhentai.net 与可配置的镜像域名。在 nhentai.net 账户设置中生成 API 密钥并登录后（官方 API v2），另有更完整的元数据、评论、相关画廊、标签建议、云端收藏、标签黑名单，以及 ZIP/CBZ 与种子下载。 |
 | wnacg | 搜索、浏览、详情、在线阅读、下载和本地收藏，可配置域名并支持链接跳转。 |
 | JM（禁漫天堂） | 首页推荐、按分类浏览（含韩漫）、日/周/月/总排行、每周必看、搜索、车号跳转、带章节列表的详情、只读评论和相关本子、在线阅读（图片自动还原）、阅读器内切换上一章与下一章、下载（单章或全部章节）、本地收藏、账号登录，可选择接口线路与图片线路。 |
-| Tachiyomi / Mihon 扩展 | 在应用内运行扩展：添加扩展仓库并安装插件（也可以从文件安装 APK），浏览各来源的热门与最新、按来源的筛选项搜索或在全部来源中搜索，检查收藏漫画的新章节，在网页中登录，导入 Tachiyomi/Mihon 备份（`.tachibk`）。Android 由系统直接加载扩展，iOS 在应用内运行 Java 环境，桌面端随应用附带运行环境（macOS 版只支持 Apple 芯片；Windows、Linux 上插件暂时不能使用网页）。 |
+| Tachiyomi / Mihon 扩展 | 在应用内运行扩展：添加扩展仓库并安装插件（也可以从文件安装 APK），浏览各来源的热门与最新、按来源的筛选项搜索或在全部来源中搜索，检查收藏漫画的新章节，在网页中登录，导入 Tachiyomi/Mihon 备份（`.tachibk`）。Android 由系统直接加载扩展，iOS 与鸿蒙在应用内运行 Java 环境，桌面端随应用附带运行环境（macOS 版只支持 Apple 芯片；Windows、Linux 上插件暂时不能使用网页）。 |
 | Komga | 书库、系列与书的服务器端分页、排序和筛选，全文搜索，首页，离线下载，以及阅读进度双向同步。 |
 | 本地 | 已下载的画廊与归档（支持归档预览）、本地图片文件夹、PDF 书库。 |
 
@@ -42,8 +42,10 @@ E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jian
 
 以下内容基于当前 `upstream/master..master` 提交历史整理：
 
-- 鸿蒙兼容 / 应用标识调整：
-  - 针对 HarmonyOS 风险弹窗场景做过包名/标识相关调整。
+- 鸿蒙：
+  - 鸿蒙（HarmonyOS NEXT）版：用 Flutter OpenHarmony 构建，宿主工程在 `ohos/`，包名 `com.gallery.reader`，显示名 Gallery Reader。各来源、阅读器、下载、云同步与其他平台共用同一份代码；Tachiyomi 扩展在应用内的 Java 环境上运行，PDF 用系统的 PDF Kit 渲染。
+  - 技术决策、各插件的状况、尚未验证和尚未处理的事项记录在 [docs/harmony-port.md](docs/harmony-port.md)。
+  - 安卓版针对 HarmonyOS 风险弹窗场景做过包名/标识相关调整。
 - 云同步增强：
   - 增加 WebDAV 配置同步。
   - 增加 S3 兼容同步（统一架构）。
@@ -59,6 +61,7 @@ E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jian
   - 配置同步原样保留无法识别的远端条目（由更新版本写入）以及本次未同步的类型；远端文件无法读取时中止同步，不再上传。
   - 同步服务（自行部署 `sync_server/` 中的 Cloudflare Worker 与 D1 数据库）：按条同步，删除也会同步到其他设备；见 [wiki](https://github.com/errorfg/JHenTai/wiki/%E5%90%8C%E6%AD%A5%E6%9C%8D%E5%8A%A1%E9%83%A8%E7%BD%B2)。
   - E-Hentai 登录纳入同步（igneous 由每台设备自行获取）；同步方式与开关由每台设备各自决定。
+  - 超分服务地址与实时超分选项纳入同步，在一台设备上填好地址，其他设备同步后即可使用；模型目录、模型、显卡、批大小以及是否使用超分服务由每台设备各自决定，不同步。
 - Tachiyomi 扩展：
   - 宿主（`ext_host/`）在应用内运行 Tachiyomi/Mihon 扩展：Android 由系统加载扩展 APK；iOS 内嵌 OpenJDK（Zero 解释器），扩展经 dex2jar 转换后运行，兼容层提供扩展用到的 Android 类，网络请求交给原生实现；桌面端随应用附带 Java 运行环境。
   - Tachiyomi 作为与 E-Hentai、nhentai、wnacg、JM 并列的站点，有来源、全部来源搜索、更新（手动刷新）与插件页；漫画与章节沿用详情页、阅读器、收藏、历史、进度与下载，与 JM 的章节相同，阅读时也可以实时超分。
@@ -149,6 +152,8 @@ MacOS安装（不维护）： 下载dmg后安装即可。
 
 - 在系统设置-安全性与隐私中信任应用
 - 如果你使用了代理服务器，在网络设置里配置代理地址。
+
+鸿蒙安装：发布页不提供鸿蒙安装包。需要在本机用 Flutter OpenHarmony 构建 HAP，用自己的调试证书与描述文件签名后经 `hdc` 安装；步骤与所需的补丁见 [docs/harmony-port.md](docs/harmony-port.md) 第 3 节，构建脚本目前不在仓库里。
 
 Linux安装（不维护）：根据你的系统选择 Linux-x64.deb 或 Linux-arm64.deb，下载后安装即可。(视需要你可能需要安装webkit2gtk-4.1)
 

@@ -1,4 +1,4 @@
-![platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Windows%20%7C%20MacOS%20%7C%20Linux-brightgreen)
+![platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20HarmonyOS%20%7C%20Windows%20%7C%20MacOS%20%7C%20Linux-brightgreen)
 ![last-commit](https://img.shields.io/github/last-commit/errorfg/JHenTai)
 [![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/total)](https://github.com/errorfg/JHenTai/releases)
 [![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/latest/total)](https://github.com/errorfg/JHenTai/releases)
@@ -9,7 +9,7 @@
 
 English | [简体中文](./README_cn.md) | [한국어](./README_kr.md)
 
-A multi-source manga reader for Android, iOS, Windows, macOS and Linux, built on [JHenTai](https://github.com/jiangtian616/JHenTai). E-Hentai stays at its center; nhentai, wnacg, JM, Tachiyomi/Mihon extensions, Komga servers and local books are read with the same reader, downloads, favorites, history and cloud sync.
+A multi-source manga reader for Android, iOS, HarmonyOS NEXT, Windows, macOS and Linux, built on [JHenTai](https://github.com/jiangtian616/JHenTai). E-Hentai stays at its center; nhentai, wnacg, JM, Tachiyomi/Mihon extensions, Komga servers and local books are read with the same reader, downloads, favorites, history and cloud sync.
 
 For E-Hentai questions, the upstream [Q&A](https://github.com/jiangtian616/JHenTai/wiki/Common-Questions) still applies.
 
@@ -25,7 +25,7 @@ Image-search bots mostly answer with nhentai pages, while I mainly use E-Hentai.
 | nhentai | Search, details, online reading, downloads and local favorites, on nhentai.net and configurable mirror domains. With an API key from the nhentai.net account settings (official API v2): richer metadata, comments, related galleries, tag suggestions, remote favorites, tag blacklist, ZIP/CBZ and torrent downloads. |
 | wnacg | Search, browsing, details, online reading, downloads and local favorites, with a configurable domain and link jumping. |
 | JM (18comic) | Home sections, category browsing (including Korean webtoons), rankings by day/week/month/all time, weekly picks, search, album-number jump, details with chapter list, read-only comments and related albums, online reading with image descrambling, previous/next chapter in the reader, downloads (single chapters or all chapters), local favorites, account login, selectable API and image lines. |
-| Tachiyomi / Mihon extensions | Extensions run inside the app: add extension repositories and install extensions (or APK files), browse each source's popular and latest lists, search a source with its filters or all sources at once, check favorites for new chapters, log in through a web page, and import a Tachiyomi/Mihon backup (`.tachibk`). Android loads extensions directly, iOS runs a Java runtime inside the app, and desktop builds bundle one (macOS: Apple silicon only; on Windows and Linux, extensions cannot use a web view yet). |
+| Tachiyomi / Mihon extensions | Extensions run inside the app: add extension repositories and install extensions (or APK files), browse each source's popular and latest lists, search a source with its filters or all sources at once, check favorites for new chapters, log in through a web page, and import a Tachiyomi/Mihon backup (`.tachibk`). Android loads extensions directly, iOS and HarmonyOS run a Java runtime inside the app, and desktop builds bundle one (macOS: Apple silicon only; on Windows and Linux, extensions cannot use a web view yet). |
 | Komga | Libraries, series and books with server-side paging, sorting and filters, full-text search, a home page, offline downloads and two-way read-progress sync. |
 | Local | Downloaded galleries and archives (with archive preview), local image folders, and a PDF library. |
 
@@ -42,8 +42,10 @@ Across sources:
 
 Compared with `upstream/master` (based on current `upstream/master..master` commit history), this fork currently contains additional work in these areas:
 
-- HarmonyOS compatibility / app identity adjustments:
-  - package/app identity related changes to reduce HarmonyOS risk-popup friction.
+- HarmonyOS:
+  - a HarmonyOS NEXT build made with Flutter OpenHarmony: the host project is in `ohos/`, the bundle name is `com.gallery.reader` and the display name is Gallery Reader. Sources, reader, downloads and cloud sync share the code of the other platforms; Tachiyomi extensions run on a Java runtime inside the app, and PDFs are rendered with the system PDF Kit.
+  - technical decisions, the state of each plugin, and what is not yet verified or handled are recorded in [docs/harmony-port.md](docs/harmony-port.md) (Chinese).
+  - on Android, package/app identity related changes to reduce HarmonyOS risk-popup friction.
 - Cloud sync enhancements:
   - WebDAV config sync.
   - S3-compatible sync provider (unified architecture).
@@ -58,6 +60,7 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - JM local favorites included in config sync.
   - config sync keeps remote entries it does not understand (written by newer versions) and the types it is not syncing, and aborts instead of uploading when the remote file cannot be read.
   - sync server provider (a Cloudflare Worker with a D1 database in `sync_server/`, deployed by yourself): item-by-item sync where deletions reach other devices too; see the [wiki](https://github.com/errorfg/JHenTai/wiki/Sync-Service).
+  - the upscaling service address and the real-time upscaling options are included in sync: enter the address on one device and the others can use it after syncing; the model directory, model, GPU, batch size and whether to use the service stay with each device and are not synced.
   - WebDAV and S3-compatible buckets sync item by item as the sync server does, deletions included, in a `records/v1/` folder: the first device of a later version takes over once what 8.1.1 and earlier synced in the bucket; those versions keep syncing among themselves in their own files, which later versions no longer read or write, so every device syncing a bucket needs the same later version.
   - galleries of the same number on two sites (E-Hentai, `nhentai`, wnacg) keep their own history, downloads, read progress and double pages; data of 8.1.1 and earlier is moved by the address it holds, and progress kept under the bare number stays a fallback for each of them.
   - E-Hentai login included in sync (each device fetches its own `igneous`); the sync provider and switches stay each device's own choice.
@@ -154,6 +157,8 @@ Install for MacOS(No maintenance): download .dmg.
 
 - Trust it in system setting.
 - If you use a proxy server, set proxy address at network setting page.
+
+Install for HarmonyOS: releases do not include a HarmonyOS package. Build the HAP on your own machine with Flutter OpenHarmony, sign it with your own debug certificate and profile, and install it with `hdc`; the steps and the patches needed are in section 3 of [docs/harmony-port.md](docs/harmony-port.md) (Chinese). The build script is not in the repository yet.
 
 Install for Linux(No maintenance): download Linux-x64.deb or Linux-arm64.deb for your platform, then install it
 (You may need to install webkit2gtk-4.1).

@@ -1,6 +1,6 @@
 # 鸿蒙移植记录
 
-这份文档记录鸿蒙版的技术决策、已知的妥协和尚未验证的事项，每完成一段工作就更新。做法沿用 PiliPlus（errorfg/PiliPlus 的 `docs/harmony-port.md`）移植时走通的路线。分支 `feature/harmony`，自 `master`（8.2.0+380）。
+这份文档记录鸿蒙版的技术决策、已知的妥协和尚未验证的事项，每完成一段工作就更新。做法沿用 PiliPlus（errorfg/PiliPlus 的 `docs/harmony-port.md`）移植时走通的路线。代码在 `master`：鸿蒙版的主体自 8.2.1+385 起包含在内，扩展的网页视图（2.8）在其后并入。
 
 ## 1. 原则
 
