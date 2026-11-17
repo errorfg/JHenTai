@@ -2,8 +2,8 @@
   "name": "JHenTai",
   "subtitle": "A cross-platform manga app made for e-hentai & exhentai by Flutter.",
   "description": "A manga app for E-Hentai, supporting Android & iOS & Windows & MacOS & Linux.\n\nStill in development stage, welcome to submit issues or feature requests.",
-  "iconURL": "https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/assets/icon/JHenTai.png",
-  "website": "https://github.com/errorfg/JHenTai",
+  "iconURL": "https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/assets/icon/JHenTai.png",
+  "website": "https://github.com/errorfg/JHenTai-Harmony",
   "tintColor": "#E6E623",
   "featuredApps": [
     "top.jtmonster.jhentai"
@@ -15,37 +15,37 @@
       "developerName": "JTMonster",
       "subtitle": "A cross-platform manga app made for e-hentai & exhentai by Flutter.",
       "localizedDescription": "A manga app for E-Hentai, supporting Android & iOS & Windows & MacOS & Linux.\n\nStill in development stage, welcome to submit issues or feature requests.",
-      "iconURL": "https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/assets/icon/JHenTai.png",
+      "iconURL": "https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/assets/icon/JHenTai.png",
       "tintColor": "#E6E623",
       "category": "entertainment",
       "screenshots": [
         {
-          "imageURL": "https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/screenshot/archive.jpg",
+          "imageURL": "https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/screenshot/archive.jpg",
           "width": 795,
           "height": 1633
         },
         {
-          "imageURL": "https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/screenshot/detail.png",
+          "imageURL": "https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/screenshot/detail.png",
           "width": 795,
           "height": 1633
         },
         {
-          "imageURL": "https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/screenshot/download.jpg",
+          "imageURL": "https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/screenshot/download.jpg",
           "width": 795,
           "height": 1633
         },
         {
-          "imageURL": "https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/screenshot/mobile_v2.jpg",
+          "imageURL": "https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/screenshot/mobile_v2.jpg",
           "width": 795,
           "height": 1633
         },
         {
-          "imageURL": "https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/screenshot/read.jpg",
+          "imageURL": "https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/screenshot/read.jpg",
           "width": 795,
           "height": 1633
         },
         {
-          "imageURL": "https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/screenshot/search.jpg",
+          "imageURL": "https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/screenshot/search.jpg",
           "width": 795,
           "height": 1633
         }
@@ -64,7 +64,7 @@
           "buildVersion": "385",
           "date": "2026-11-16T05:00:33Z",
           "localizedDescription": "- 鸿蒙：新增 HarmonyOS NEXT 版本（包名 com.gallery.reader）。浏览、阅读、下载、云同步、Komga、PDF、Tachiyomi 扩展可用；回到前台时识别剪贴板里的画廊链接（首次会请求读取剪贴板的权限）。发布页提供的是未签名的 HAP，需要自行签名后安装。已知限制：Tachiyomi 中需要加载网页的扩展不可用；下载路径和额外扫描路径暂不能改到应用目录以外；不读取系统代理，手动填写的代理不受影响\n- PDF：书库页右上角新增导入按钮，选取的 PDF 会复制到应用自己的目录，并与额外画廊扫描路径一起显示\n- PDF：修复书库页一直显示加载中、扫描反复进行的问题\n- 提示条：带操作按钮的提示条（如剪贴板中的画廊链接）恢复按时长自动消失\n- 剪贴板：从 Komga、PDF 切回站点后，已经提示过的画廊链接不再重复提示；剪贴板里是 JM 号时也弹出跳转提示\n- iPhone Duo：内屏竖握时，在页面上左右滑动切换顶部的选项卡\n- iPhone Duo：主页和信息流页面去掉底部空白，提示条不再盖住系统边条；Komga 和 Tachiyomi 漫画源页的控件移到右侧边条\n- iOS：玻璃按钮的边缘不再透过切换中的页面露出来\n- iOS：Debug 配置补上场景清单，用 Xcode 27 构建的 Debug 版在 iOS 27 上不再启动即退出\n",
-          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.2.1+385/JHenTai_8.2.1+385.ipa",
+          "downloadURL": "https://github.com/errorfg/JHenTai-Harmony/releases/download/v8.2.1+385/JHenTai_8.2.1+385.ipa",
           "size": 39347697
         },
         {
@@ -72,7 +72,7 @@
           "buildVersion": "314",
           "date": "2026-02-13T12:54:34Z",
           "localizedDescription": "- Add home sync progress indicator to dashboard sync flow\n- Enable desktop home sync from title area with progress feedback\n",
-          "downloadURL": "https://github.com/errorfg/JHenTai/releases/download/v8.0.15+314/JHenTai_8.0.15+314.ipa",
+          "downloadURL": "https://github.com/errorfg/JHenTai-Harmony/releases/download/v8.0.15+314/JHenTai_8.0.15+314.ipa",
           "size": 15915673
         }
       ]

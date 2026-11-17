@@ -10,9 +10,9 @@ Pod::Spec.new do |s|
   s.name             = 'tachi_host'
   s.version          = '1.0.0'
   s.summary          = 'Runs Tachiyomi extensions inside the app.'
-  s.homepage         = 'https://github.com/errorfg/JHenTai'
+  s.homepage         = 'https://github.com/errorfg/JHenTai-Harmony'
   s.license          = { :type => 'Apache-2.0' }
-  s.author           = { 'JHenTai' => 'https://github.com/errorfg/JHenTai' }
+  s.author           = { 'JHenTai' => 'https://github.com/errorfg/JHenTai-Harmony' }
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*.{h,m,cpp,swift}'
   s.public_header_files = 'Classes/ExtHostJVM.h'

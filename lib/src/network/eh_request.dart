@@ -80,7 +80,7 @@ class EHRequest with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
   NHentaiCdnConfig? _nhCdnConfig;
   Future<NHentaiCdnConfig>? _nhCdnConfigFuture;
   Set<int>? _nhBlacklistIds;
-  String _nhUserAgent = 'JHenTai/unknown (https://github.com/errorfg/JHenTai)';
+  String _nhUserAgent = 'JHenTai/unknown (https://github.com/errorfg/JHenTai-Harmony)';
 
   static const String _wnDefaultDomain = 'www.wn07.ru';
   static const int _wnThumbnailsPerPage = 40;
@@ -342,7 +342,7 @@ class EHRequest with JHLifeCircleBeanErrorCatch implements JHLifeCircleBean {
       final String version = packageInfo.buildNumber.isEmpty
           ? packageInfo.version
           : '${packageInfo.version}+${packageInfo.buildNumber}';
-      _nhUserAgent = 'JHenTai/$version (https://github.com/errorfg/JHenTai)';
+      _nhUserAgent = 'JHenTai/$version (https://github.com/errorfg/JHenTai-Harmony)';
     } catch (_) {
       // Keep the descriptive fallback when package metadata is unavailable.
     }
