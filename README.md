@@ -1,9 +1,9 @@
 ![platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20HarmonyOS%20%7C%20Windows%20%7C%20MacOS%20%7C%20Linux-brightgreen)
-![last-commit](https://img.shields.io/github/last-commit/errorfg/JHenTai-Harmony)
-[![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai-Harmony/total)](https://github.com/errorfg/JHenTai-Harmony/releases)
-[![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai-Harmony/latest/total)](https://github.com/errorfg/JHenTai-Harmony/releases)
-![star](https://img.shields.io/github/stars/errorfg/JHenTai-Harmony)
-[![issue](https://img.shields.io/badge/chat-issue-brightgreen)](https://github.com/errorfg/JHenTai-Harmony/issues/new)
+![last-commit](https://img.shields.io/github/last-commit/errorfg/JHenTai)
+[![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/total)](https://github.com/errorfg/JHenTai/releases)
+[![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/latest/total)](https://github.com/errorfg/JHenTai/releases)
+![star](https://img.shields.io/github/stars/errorfg/JHenTai)
+[![issue](https://img.shields.io/badge/chat-issue-brightgreen)](https://github.com/errorfg/JHenTai/issues/new)
 
 # JHenTai
 
@@ -59,7 +59,7 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - `nhentai` API key included in config sync, with automatic migration from the legacy EH setting payload.
   - JM local favorites included in config sync.
   - config sync keeps remote entries it does not understand (written by newer versions) and the types it is not syncing, and aborts instead of uploading when the remote file cannot be read.
-  - sync server provider (a Cloudflare Worker with a D1 database in `sync_server/`, deployed by yourself): item-by-item sync where deletions reach other devices too; see the [wiki](https://github.com/errorfg/JHenTai-Harmony/wiki/Sync-Service).
+  - sync server provider (a Cloudflare Worker with a D1 database in `sync_server/`, deployed by yourself): item-by-item sync where deletions reach other devices too; see the [wiki](https://github.com/errorfg/JHenTai/wiki/Sync-Service).
   - the upscaling service address and the real-time upscaling options are included in sync: enter the address on one device and the others can use it after syncing; the model directory, model, GPU, batch size and whether to use the service stay with each device and are not synced.
   - WebDAV and S3-compatible buckets sync item by item as the sync server does, deletions included, in a `records/v1/` folder: the first device of a later version takes over once what 8.1.1 and earlier synced in the bucket; those versions keep syncing among themselves in their own files, which later versions no longer read or write, so every device syncing a bucket needs the same later version.
   - galleries of the same number on two sites (E-Hentai, `nhentai`, wnacg) keep their own history, downloads, read progress and double pages; data of 8.1.1 and earlier is moved by the address it holds, and progress kept under the bare number stays a fallback for each of them.
@@ -85,12 +85,12 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
   - pulling down the JM or Tachiyomi favorites checks them for new chapters: favorites whose newest chapter is not opened yet (never read ones too) come first, those read up to it show faded. JM is checked through its newest list (about two pages a day since the last check) and asks for the details of the updated favorites only; the first check, or one after a month, asks for every favorite; Tachiyomi asks each manga for its chapters.
   - single login page with a site picker (E-Hentai, `nhentai`, JM); the account page shows and logs out each site separately, and the `nhentai` API key is entered there and verified before it is saved.
   - wnacg URL link jumping with automatic domain rewriting.
-  - "Send to Telegraph bot" button on the details pages of every site (E-Hentai/ExHentai, `nhentai`, wnacg, JM), posting the gallery to a self-hosted eh2telegraph service that offers the HTTP interface described in the [wiki](https://github.com/errorfg/JHenTai-Harmony/wiki/Send-to-Telegraph); its address and token are included in config sync.
+  - "Send to Telegraph bot" button on the details pages of every site (E-Hentai/ExHentai, `nhentai`, wnacg, JM), posting the gallery to a self-hosted eh2telegraph service that offers the HTTP interface described in the [wiki](https://github.com/errorfg/JHenTai/wiki/Send-to-Telegraph); its address and token are included in config sync.
 - Watched list:
   - galleries scrolled past count as read and show faded next time; a progress page shows what was read on a timeline, with where you left off and bookmarks; an "In Watched" button on details pages opens the watched list at that gallery.
   - what was read, the bookmarks and where you left off are included in sync (sync server, or a bucket in the `records/v1/` layout), shortly after the list stops scrolling and when the progress page is opened.
 - Reading:
-  - upscale pages while reading (experimental): with the upscaler programs on a desktop, or through an upscaling service (`sr_server/`) on another computer with a GPU, which phones and tablets can use too; see the [wiki](https://github.com/errorfg/JHenTai-Harmony/wiki/Real-time-Upscaling).
+  - upscale pages while reading (experimental): with the upscaler programs on a desktop, or through an upscaling service (`sr_server/`) on another computer with a GPU, which phones and tablets can use too; see the [wiki](https://github.com/errorfg/JHenTai/wiki/Real-time-Upscaling).
   - split wide pages: an image wider than tall is cut in two, shown as two pages in single-page mode or one above the other in top-to-bottom mode.
   - in the scrolling layouts, JM and Tachiyomi chapters and Komga books continue in one list: the next one follows the last page, and scrolling back past the first page puts the previous one before it, keeping the page in view where it is.
   - brightness lock in the reader's top bar on phones and tablets; the auto page turn is switched on and off in the reader's settings there.
@@ -120,22 +120,22 @@ Compared with `upstream/master` (based on current `upstream/master..master` comm
 
 ## Download & Install
 
-[<img src="https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/master/badges/download_from_github.png" 
+[<img src="https://raw.githubusercontent.com/errorfg/JHenTai/master/badges/download_from_github.png" 
       alt="Download from GitHub" 
-      height="60">](https://github.com/errorfg/JHenTai-Harmony/releases)
-[<img src="https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/master/badges/get_it_on_obtainium.png" 
+      height="60">](https://github.com/errorfg/JHenTai/releases)
+[<img src="https://raw.githubusercontent.com/errorfg/JHenTai/master/badges/get_it_on_obtainium.png" 
       alt="Get it on Obtainium" 
-      height="60">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.gallery.reader%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Ferrorfg%2FJHenTai-Harmony%22%2C%22author%22%3A%22jiangtian616%22%2C%22name%22%3A%22JHenTai%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22filterReleaseNotesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22verifyLatestTag%5C%22%3Afalse%2C%5C%22sortMethodChoice%5C%22%3A%5C%22date%5C%22%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22v(.*)%5C%22%2C%5C%22matchGroupToUse%5C%22%3A%5C%22%241%5C%22%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Afalse%2C%5C%22useVersionCodeAsOSVersion%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22invertAPKFilter%5C%22%3Afalse%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%2C%5C%22appName%5C%22%3A%5C%22JHenTai%5C%22%2C%5C%22appAuthor%5C%22%3A%5C%22JTMonster%5C%22%2C%5C%22shizukuPretendToBeGooglePlay%5C%22%3Afalse%2C%5C%22allowInsecure%5C%22%3Afalse%2C%5C%22exemptFromBackgroundUpdates%5C%22%3Afalse%2C%5C%22skipUpdateNotifications%5C%22%3Afalse%2C%5C%22about%5C%22%3A%5C%22https%3A%2F%2Fgithub.com%2Ferrorfg%2FJHenTai-Harmony%2Fblob%2Fmaster%2FREADME.md%5C%22%2C%5C%22refreshBeforeDownload%5C%22%3Afalse%7D%22%2C%22overrideSource%22%3Anull%7D)
+      height="60">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.gallery.reader%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Ferrorfg%2FJHenTai%22%2C%22author%22%3A%22jiangtian616%22%2C%22name%22%3A%22JHenTai%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22filterReleaseNotesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22verifyLatestTag%5C%22%3Afalse%2C%5C%22sortMethodChoice%5C%22%3A%5C%22date%5C%22%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22v(.*)%5C%22%2C%5C%22matchGroupToUse%5C%22%3A%5C%22%241%5C%22%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Afalse%2C%5C%22useVersionCodeAsOSVersion%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22invertAPKFilter%5C%22%3Afalse%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%2C%5C%22appName%5C%22%3A%5C%22JHenTai%5C%22%2C%5C%22appAuthor%5C%22%3A%5C%22JTMonster%5C%22%2C%5C%22shizukuPretendToBeGooglePlay%5C%22%3Afalse%2C%5C%22allowInsecure%5C%22%3Afalse%2C%5C%22exemptFromBackgroundUpdates%5C%22%3Afalse%2C%5C%22skipUpdateNotifications%5C%22%3Afalse%2C%5C%22about%5C%22%3A%5C%22https%3A%2F%2Fgithub.com%2Ferrorfg%2FJHenTai%2Fblob%2Fmaster%2FREADME.md%5C%22%2C%5C%22refreshBeforeDownload%5C%22%3Afalse%7D%22%2C%22overrideSource%22%3Anull%7D)
 
-[<img src="https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/master/badges/add_to_altstore.png" 
+[<img src="https://raw.githubusercontent.com/errorfg/JHenTai/master/badges/add_to_altstore.png" 
       alt="Add to AltStore" 
-      height="60">](https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/altsource/AltSource.json)
-[<img src="https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/master/badges/add_to_sidestore.png" 
+      height="60">](https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/altsource/AltSource.json)
+[<img src="https://raw.githubusercontent.com/errorfg/JHenTai/master/badges/add_to_sidestore.png" 
       alt="Add to SideStore" 
-      height="60">](https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/altsource/AltSource.json)
-[<img src="https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/master/badges/add_to_feather.png" 
+      height="60">](https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/altsource/AltSource.json)
+[<img src="https://raw.githubusercontent.com/errorfg/JHenTai/master/badges/add_to_feather.png" 
       alt="Add to Feather" 
-      height="60">](https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/altsource/AltSource.json)
+      height="60">](https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/altsource/AltSource.json)
 
 Install for Android: download .apk according to your device architecture and install.
 
@@ -145,7 +145,7 @@ Install for Android: download .apk according to your device architecture and ins
 
 Install for iOS: download .ipa, then use [AltStore](https://altstore.io) or SideLoadly to sign.
 
-- You can get easier installation and updates by adding [AltStore Repo](https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/altsource/AltSource.json)
+- You can get easier installation and updates by adding [AltStore Repo](https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/altsource/AltSource.json)
 
 Install for Windows: download Windows_xxx.zip, then unpack it.
 
@@ -190,7 +190,7 @@ Update for Linux(No maintenance): Delete old and download the latest product.
 
 Please submit a PR if you want to help with translation.
 
-[steps](https://github.com/errorfg/JHenTai-Harmony#Translation)
+[steps](https://github.com/errorfg/JHenTai#Translation)
 
 ## Screenshots
 

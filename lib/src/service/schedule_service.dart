@@ -68,7 +68,7 @@ class ScheduleService with JHLifeCircleBeanErrorCatch implements JHLifeCircleBea
       return;
     }
 
-    String url = 'https://api.github.com/repos/errorfg/JHenTai-Harmony/releases';
+    String url = 'https://api.github.com/repos/errorfg/JHenTai/releases';
     String latestVersion;
 
     try {

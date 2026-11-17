@@ -1,9 +1,9 @@
 ![platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20HarmonyOS%20%7C%20Windows%20%7C%20MacOS%20%7C%20Linux-brightgreen)
-![last-commit](https://img.shields.io/github/last-commit/errorfg/JHenTai-Harmony)
-[![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai-Harmony/total)](https://github.com/errorfg/JHenTai-Harmony/releases)
-[![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai-Harmony/latest/total)](https://github.com/errorfg/JHenTai-Harmony/releases)
-![star](https://img.shields.io/github/stars/errorfg/JHenTai-Harmony)
-[![issue](https://img.shields.io/badge/chat-issue-brightgreen)](https://github.com/errorfg/JHenTai-Harmony/issues/new)
+![last-commit](https://img.shields.io/github/last-commit/errorfg/JHenTai)
+[![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/total)](https://github.com/errorfg/JHenTai/releases)
+[![downloads](https://img.shields.io/github/downloads/errorfg/JHenTai/latest/total)](https://github.com/errorfg/JHenTai/releases)
+![star](https://img.shields.io/github/stars/errorfg/JHenTai)
+[![issue](https://img.shields.io/badge/chat-issue-brightgreen)](https://github.com/errorfg/JHenTai/issues/new)
 
 # JHenTai
 
@@ -59,7 +59,7 @@ E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jian
   - `nhentai` API 密钥纳入配置同步，并自动迁移旧版保存在 EH 设置中的密钥。
   - JM 本地收藏纳入配置同步。
   - 配置同步原样保留无法识别的远端条目（由更新版本写入）以及本次未同步的类型；远端文件无法读取时中止同步，不再上传。
-  - 同步服务（自行部署 `sync_server/` 中的 Cloudflare Worker 与 D1 数据库）：按条同步，删除也会同步到其他设备；见 [wiki](https://github.com/errorfg/JHenTai-Harmony/wiki/%E5%90%8C%E6%AD%A5%E6%9C%8D%E5%8A%A1%E9%83%A8%E7%BD%B2)。
+  - 同步服务（自行部署 `sync_server/` 中的 Cloudflare Worker 与 D1 数据库）：按条同步，删除也会同步到其他设备；见 [wiki](https://github.com/errorfg/JHenTai/wiki/%E5%90%8C%E6%AD%A5%E6%9C%8D%E5%8A%A1%E9%83%A8%E7%BD%B2)。
   - E-Hentai 登录纳入同步（igneous 由每台设备自行获取）；同步方式与开关由每台设备各自决定。
   - 超分服务地址与实时超分选项纳入同步，在一台设备上填好地址，其他设备同步后即可使用；模型目录、模型、显卡、批大小以及是否使用超分服务由每台设备各自决定，不同步。
 - Tachiyomi 扩展：
@@ -82,11 +82,11 @@ E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jian
   - EH / NH / WN / JM 收藏同时支持混合插入与分菜单切换显示。
   - 统一的登录页可选择站点（E-Hentai、`nhentai`、JM）；账号设置页分别显示并登出各站点，`nhentai` API 密钥在登录页填写，验证成功后才保存。
   - 支持 wnacg 链接跳转，自动域名重写。
-  - 各站点（E-Hentai / ExHentai、`nhentai`、wnacg、JM）详情页的「发送到 Telegraph 机器人」按钮，把画廊提交给自行部署的 eh2telegraph 服务，服务需提供 [wiki](https://github.com/errorfg/JHenTai-Harmony/wiki/%E5%8F%91%E9%80%81%E5%88%B0Telegraph) 中说明的 HTTP 接口；服务地址与令牌纳入配置同步。
+  - 各站点（E-Hentai / ExHentai、`nhentai`、wnacg、JM）详情页的「发送到 Telegraph 机器人」按钮，把画廊提交给自行部署的 eh2telegraph 服务，服务需提供 [wiki](https://github.com/errorfg/JHenTai/wiki/%E5%8F%91%E9%80%81%E5%88%B0Telegraph) 中说明的 HTTP 接口；服务地址与令牌纳入配置同步。
 - 关注页：
   - 翻过的画廊记为已读并在下次淡化显示；进度页面以时间轴显示读过的部分、上次停留的位置与书签；详情页的「关注位置」按钮从这本画廊开始打开关注页。
 - 阅读：
-  - 阅读时实时超分（实验性）：桌面端使用本机的超分程序，也可以通过另一台有显卡的电脑上的超分服务（`sr_server/`），手机和平板同样可用；见 [wiki](https://github.com/errorfg/JHenTai-Harmony/wiki/%E5%AE%9E%E6%97%B6%E8%B6%85%E5%88%86)。
+  - 阅读时实时超分（实验性）：桌面端使用本机的超分程序，也可以通过另一台有显卡的电脑上的超分服务（`sr_server/`），手机和平板同样可用；见 [wiki](https://github.com/errorfg/JHenTai/wiki/%E5%AE%9E%E6%97%B6%E8%B6%85%E5%88%86)。
   - 切分双页：宽大于高的图片从中间切开，单页模式下分成两页，从上至下模式下两半上下排列。
   - 手机和平板上，阅读器顶栏可以锁定亮度；自动翻页在阅读设置中开启和停止。
   - E-Hentai 画廊的新版本沿用它所替换的旧版本的阅读进度。
@@ -114,23 +114,23 @@ E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jian
 
 ## 下载&安装
 
-[<img src="https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/master/badges/download_from_github.png" 
+[<img src="https://raw.githubusercontent.com/errorfg/JHenTai/master/badges/download_from_github.png" 
       alt="Download from GitHub" 
-      height="60">](https://github.com/errorfg/JHenTai-Harmony/releases)
-[<img src="https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/master/badges/get_it_on_obtainium.png" 
+      height="60">](https://github.com/errorfg/JHenTai/releases)
+[<img src="https://raw.githubusercontent.com/errorfg/JHenTai/master/badges/get_it_on_obtainium.png" 
       alt="Get it on Obtainium" 
-      height="60">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.gallery.reader%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Ferrorfg%2FJHenTai-Harmony%22%2C%22author%22%3A%22jiangtian616%22%2C%22name%22%3A%22JHenTai%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22filterReleaseNotesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22verifyLatestTag%5C%22%3Afalse%2C%5C%22sortMethodChoice%5C%22%3A%5C%22date%5C%22%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22v(.*)%5C%22%2C%5C%22matchGroupToUse%5C%22%3A%5C%22%241%5C%22%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Afalse%2C%5C%22useVersionCodeAsOSVersion%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22invertAPKFilter%5C%22%3Afalse%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%2C%5C%22appName%5C%22%3A%5C%22JHenTai%5C%22%2C%5C%22appAuthor%5C%22%3A%5C%22JTMonster%5C%22%2C%5C%22shizukuPretendToBeGooglePlay%5C%22%3Afalse%2C%5C%22allowInsecure%5C%22%3Afalse%2C%5C%22exemptFromBackgroundUpdates%5C%22%3Afalse%2C%5C%22skipUpdateNotifications%5C%22%3Afalse%2C%5C%22about%5C%22%3A%5C%22https%3A%2F%2Fgithub.com%2Ferrorfg%2FJHenTai-Harmony%2Fblob%2Fmaster%2FREADME.md%5C%22%2C%5C%22refreshBeforeDownload%5C%22%3Afalse%7D%22%2C%22overrideSource%22%3Anull%7D)
+      height="60">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22com.gallery.reader%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Ferrorfg%2FJHenTai%22%2C%22author%22%3A%22jiangtian616%22%2C%22name%22%3A%22JHenTai%22%2C%22preferredApkIndex%22%3A0%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22fallbackToOlderReleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22filterReleaseNotesByRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22verifyLatestTag%5C%22%3Afalse%2C%5C%22sortMethodChoice%5C%22%3A%5C%22date%5C%22%2C%5C%22useLatestAssetDateAsReleaseDate%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%2C%5C%22trackOnly%5C%22%3Afalse%2C%5C%22versionExtractionRegEx%5C%22%3A%5C%22v(.*)%5C%22%2C%5C%22matchGroupToUse%5C%22%3A%5C%22%241%5C%22%2C%5C%22versionDetection%5C%22%3Atrue%2C%5C%22releaseDateAsVersion%5C%22%3Afalse%2C%5C%22useVersionCodeAsOSVersion%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5C%22%2C%5C%22invertAPKFilter%5C%22%3Afalse%2C%5C%22autoApkFilterByArch%5C%22%3Atrue%2C%5C%22appName%5C%22%3A%5C%22JHenTai%5C%22%2C%5C%22appAuthor%5C%22%3A%5C%22JTMonster%5C%22%2C%5C%22shizukuPretendToBeGooglePlay%5C%22%3Afalse%2C%5C%22allowInsecure%5C%22%3Afalse%2C%5C%22exemptFromBackgroundUpdates%5C%22%3Afalse%2C%5C%22skipUpdateNotifications%5C%22%3Afalse%2C%5C%22about%5C%22%3A%5C%22https%3A%2F%2Fgithub.com%2Ferrorfg%2FJHenTai%2Fblob%2Fmaster%2FREADME.md%5C%22%2C%5C%22refreshBeforeDownload%5C%22%3Afalse%7D%22%2C%22overrideSource%22%3Anull%7D)
 
 
-[<img src="https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/master/badges/add_to_altstore.png" 
+[<img src="https://raw.githubusercontent.com/errorfg/JHenTai/master/badges/add_to_altstore.png" 
       alt="Add to AltStore" 
-      height="60">](https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/altsource/AltSource.json)
-[<img src="https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/master/badges/add_to_sidestore.png" 
+      height="60">](https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/altsource/AltSource.json)
+[<img src="https://raw.githubusercontent.com/errorfg/JHenTai/master/badges/add_to_sidestore.png" 
       alt="Add to SideStore" 
-      height="60">](https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/altsource/AltSource.json)
-[<img src="https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/master/badges/add_to_feather.png" 
+      height="60">](https://intradeus.github.io/http-protocol-redirector?r=sidestore://source?url=https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/altsource/AltSource.json)
+[<img src="https://raw.githubusercontent.com/errorfg/JHenTai/master/badges/add_to_feather.png" 
       alt="Add to Feather" 
-      height="60">](https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/altsource/AltSource.json)
+      height="60">](https://intradeus.github.io/http-protocol-redirector?r=feather://source/https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/altsource/AltSource.json)
 
 安卓安装:  下载对应自己设置架构的apk文件，直接安装即可。
 
@@ -140,7 +140,7 @@ E-Hentai 相关问题仍可参考上游的[常见问题](https://github.com/jian
 
 iOS安装:  下载ipa文件后，使用[AltStore](https://altstore.io)、SideLoadly、爱思助手等任一工具进行自签名。
 
-- 你可以通过[ AltStore 订阅](https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/errorfg/JHenTai-Harmony/refs/heads/master/altsource/AltSource.json)来获得更便捷的安装与更新体验
+- 你可以通过[ AltStore 订阅](https://intradeus.github.io/http-protocol-redirector?r=altstore://source?url=https://raw.githubusercontent.com/errorfg/JHenTai/refs/heads/master/altsource/AltSource.json)来获得更便捷的安装与更新体验
 
 Windows安装： 下载Windows_xxx.zip后解压即可。
 
